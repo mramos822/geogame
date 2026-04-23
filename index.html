@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GeoChallenge</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div id="splash-screen">
+    <h1>GeoChallenge</h1>
+    <p>Encontrá la ciudad en el mapa antes de que se acabe el tiempo.<br>Cuanto más cerca clickeés, más puntos ganás.</p>
+    <button id="btn-start">Jugar</button>
+  </div>
+
+  <div id="gameover-screen">
+    <h2>¡Tiempo!</h2>
+    <div id="final-score-label">Puntaje final</div>
+    <div id="final-score-value">0</div>
+    <button id="btn-restart">Jugar de nuevo</button>
+  </div>
+
+  <div id="game-wrapper">
+
+    <canvas id="game-canvas"></canvas>
+
+    <div id="city-tag">
+      <img src="images/tag3.png" alt="">
+      <span id="city-tag-text">Ciudad</span>
+    </div>
+
+    <div id="countdown-widget">
+      <img src="images/countdown.png" alt="">
+      <div id="timer-number">60</div>
+      <div id="progress-dots">
+        <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        <div class="dot"></div>
+      </div>
+    </div>
+
+    <div id="result-label"></div>
+    <div id="coord-tooltip"></div>
+
+  </div>
+
+  <div id="speed-bonus-text">¡Bonus velocidad!</div>
+
+  <div id="score-display">
+    <img src="images/points.png" alt="">
+    <div id="score-value">0</div>
+  </div>
+
+  <script src="js/cities.js"></script>
+  <script src="js/game.js"></script>
+  
+</body>
+</html>
