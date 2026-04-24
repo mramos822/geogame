@@ -57,6 +57,11 @@ const speedBonusText = document.getElementById('speed-bonus-text');
 const coordTooltip   = document.getElementById('coord-tooltip');
 const resultLabel    = document.getElementById('result-label');
 const finalScoreEl   = document.getElementById('final-score-value');
+const highscoreEl        = document.getElementById('highscore-value');
+const splashHighscoreEl  = document.getElementById('splash-highscore-value');
+const newHighscoreBanner = document.getElementById('new-highscore-banner');
+const newHighscoreScore  = document.getElementById('new-highscore-score');
+const profileCurrentEl   = null; // removed
 const btnStart       = document.getElementById('btn-start');
 const btnRestart     = document.getElementById('btn-restart');
 const progressContainer = document.getElementById('progress-dots');
@@ -64,16 +69,200 @@ const progressContainer = document.getElementById('progress-dots');
 canvas.width  = DISPLAY_W;
 canvas.height = DISPLAY_H;
 
+const badgeOverlay    = document.createElement('canvas');
+badgeOverlay.width    = DISPLAY_W;
+badgeOverlay.height   = DISPLAY_H;
+badgeOverlay.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;z-index:25;';
+const badgeOverlayCtx = badgeOverlay.getContext('2d');
+gameWrapper.appendChild(badgeOverlay);
+
 // ── ASSETS ───────────────────────────────────────────────────────────────────
 const imgMap  = new Image(); imgMap.src  = 'images/mapimage.png';
 const imgPin1 = new Image(); imgPin1.src = 'images/pin1.png';
 const imgPin2 = new Image(); imgPin2.src = 'images/pin2.png';
-const imgStar = new Image(); imgStar.src = 'images/stareffect.png';
+const imgStar  = new Image(); imgStar.src  = 'images/stareffect.png';
+const imgCheck       = new Image(); imgCheck.src       = 'images/check.png';
+const imgBadgeGold   = new Image(); imgBadgeGold.src   = 'images/badges/goldbadge.png';
+const imgBadgeGreen  = new Image(); imgBadgeGreen.src  = 'images/badges/greenbadge.png';
+const imgBadgeRed    = new Image(); imgBadgeRed.src    = 'images/badges/redbadge.png';
+const imgBadgeBlue   = new Image(); imgBadgeBlue.src   = 'images/badges/bluebadge.png';
+const imgBadgeGarnet = new Image(); imgBadgeGarnet.src = 'images/badges/garnetbadge.png';
+const imgBadgeYellow = new Image(); imgBadgeYellow.src = 'images/badges/yellowbadge.png';
+const imgBadgeSilver = new Image(); imgBadgeSilver.src = 'images/badges/silverbadge.png';
 
 // ── STATE ────────────────────────────────────────────────────────────────────
 let state          = null;
 let animFrameId    = null;
 let timerIntervalId = null;
+let speedBonusHideId = null;
+
+let highscore = parseInt(localStorage.getItem('geochallenge_highscore') || '0', 10);
+highscoreEl.textContent = highscore.toLocaleString();
+
+function updateSplashHighscore() {
+  if (splashHighscoreEl) {
+    splashHighscoreEl.textContent = highscore > 0 ? highscore.toLocaleString() : '—';
+  }
+}
+updateSplashHighscore();
+
+// ── LEADERBOARD ──────────────────────────────────────────────────────────────────────────────
+const LB_COLORS = ['#e74c3c','#e67e22','#f1c40f','#2ecc71','#1abc9c',
+                    '#3498db','#9b59b6','#e91e63','#00bcd4','#8bc34a'];
+const mockPlayers = Array.from({ length: 10 }, (_, i) => ({
+  id: `mock${i}`,
+  score: Math.floor(Math.random() * 9500) + 400,
+  color: LB_COLORS[i],
+  initial: 'ABCDEFGHIJ'[i],
+}));
+
+// Perfil del highscore propio (entrada 11)
+const highscorePlayer = { id: 'best', score: highscore, color: '#6a0dad', initial: '★' };
+
+// Ventana visible y fila de anclaje del player
+const LB_WINDOW  = 5;
+const LB_PIN_ROW = 2;
+const LB_GAP     = 4; // px
+let lbElements   = {};
+
+const EMOTE_SRCS = [
+  'images/emotes/Gemini_Generated_Image_9dly9v9dly9v9dly (2).png',
+  'images/emotes/Gemini_Generated_Image_9uavb19uavb19uav.png',
+  'images/emotes/Gemini_Generated_Image_b2kisyb2kisyb2ki.png',
+  'images/emotes/Gemini_Generated_Image_o8jl8no8jl8no8jl.png',
+  'images/emotes/Gemini_Generated_Image_omvaevomvaevomva.png',
+  'images/emotes/Gemini_Generated_Image_wuzcs6wuzcs6wuzc.png',
+];
+
+// Lanza un globo de emote sobre el elemento del leaderboard indicado.
+// El globo es hijo del entry para seguir su movimiento automaticamente.
+function spawnEmoteBubble(entryEl) {
+  const bubble = document.createElement('div');
+  bubble.className = 'emote-bubble';
+
+  const img = document.createElement('img');
+  img.src = EMOTE_SRCS[Math.floor(Math.random() * EMOTE_SRCS.length)];
+  img.className = 'emote-img';
+  bubble.appendChild(img);
+
+  entryEl.appendChild(bubble);
+  bubble.addEventListener('animationend', () => bubble.remove());
+}
+
+let lastPlayerRank = -1;
+
+// Alto de una fila = ancho del panel * 1.5 (aspect-ratio 4/6) + gap
+function getLbRowHeight() {
+  const panel = document.getElementById('right-panel');
+  if (!panel) return 84;
+  return Math.round(panel.getBoundingClientRect().width * 1.5) + LB_GAP;
+}
+
+function initLeaderboard() {
+  const lb = document.getElementById('leaderboard');
+  lb.innerHTML = '';
+  lbElements = {};
+
+  mockPlayers.forEach(p => {
+    const el = document.createElement('div');
+    el.className = 'lb-entry';
+    el.id = `lb-${p.id}`;
+    el.innerHTML = `<div class="lb-avatar" style="background:${p.color}">${p.initial}</div>`
+                 + `<span class="lb-score">${p.score.toLocaleString()}</span>`;
+    el.style.transition = 'none';
+    el.style.top = '-9999px';
+    lbElements[el.id] = el;
+    lb.appendChild(el);
+  });
+
+  // Entrada del highscore propio
+  const bestEl = document.createElement('div');
+  bestEl.className = 'lb-entry lb-best';
+  bestEl.id = 'lb-best';
+  bestEl.innerHTML = `<div class="lb-avatar lb-avatar-best">★</div>`
+                   + `<span class="lb-score" id="lb-best-score">${highscorePlayer.score > 0 ? highscorePlayer.score.toLocaleString() : '—'}</span>`;
+  bestEl.style.transition = 'none';
+  bestEl.style.top = '-9999px';
+  lbElements['lb-best'] = bestEl;
+  lb.appendChild(bestEl);
+
+  const playerEl = document.createElement('div');
+  playerEl.className = 'lb-entry lb-player';
+  playerEl.id = 'lb-player';
+  playerEl.innerHTML = `<div class="lb-avatar"><img class="lb-avatar-img" src="images/ppdefault.png"></div>`
+                     + `<span class="lb-score" id="lb-player-score">0</span>`;
+  playerEl.style.transition = 'none';
+  playerEl.style.top = '-9999px';
+  lbElements['lb-player'] = playerEl;
+  lb.appendChild(playerEl);
+
+  // Primer frame: posicionar sin animar; segundo frame: habilitar transicion
+  requestAnimationFrame(() => {
+    positionLeaderboard(0, false);
+    requestAnimationFrame(() => {
+      Object.values(lbElements).forEach(el => {
+        el.style.transition = 'top 0.7s cubic-bezier(0.22,1,0.36,1)';
+      });
+    });
+  });
+}
+
+// Posiciona todas las entradas segun el score. animate=false omite la transicion.
+function positionLeaderboard(playerScore, animate) {
+  const lb   = document.getElementById('leaderboard');
+  const rowH = getLbRowHeight();
+
+  lb.style.height = (LB_WINDOW * rowH - LB_GAP) + 'px';
+
+  const all = [...mockPlayers, { id: 'best', score: highscorePlayer.score }, { id: 'player', score: playerScore }];
+  all.sort((a, b) => b.score - a.score);
+
+  const playerRank = all.findIndex(p => p.id === 'player');
+
+  // Detectar a todos los que el player acaba de superar y lanzar un globo a cada uno
+  if (animate && lastPlayerRank !== -1 && playerRank < lastPlayerRank) {
+    let bubbleIndex = 0;
+    for (let r = lastPlayerRank; r >= playerRank + 1; r--) {
+      const overtaken = all[r];
+      if (overtaken && overtaken.id !== 'player') {
+        const overtakenEl = lbElements[`lb-${overtaken.id}`];
+        if (overtakenEl) {
+          setTimeout(() => spawnEmoteBubble(overtakenEl), 200 + bubbleIndex * 100);
+          bubbleIndex++;
+        }
+      }
+    }
+  }
+  lastPlayerRank = playerRank;
+
+  // El player se ancla en LB_PIN_ROW; cerca del final la ventana se corre
+  // para que el player suba fisicamente las primeras posiciones ganadas.
+  let windowStart = Math.max(0, playerRank - LB_PIN_ROW);
+  let windowEnd   = Math.min(all.length, windowStart + LB_WINDOW);
+  windowStart     = Math.max(0, windowEnd - LB_WINDOW);
+
+  if (!animate) {
+    Object.values(lbElements).forEach(el => { el.style.transition = 'none'; });
+  }
+
+  // Cada entrada se posiciona en su fila de la cadena completa.
+  // Las que quedan fuera de la ventana quedan ocultas por overflow:hidden.
+  all.forEach((p, rank) => {
+    lbElements[`lb-${p.id}`].style.top = ((rank - windowStart) * rowH) + 'px';
+  });
+
+  const scoreEl = lbElements['lb-player'].querySelector('.lb-score');
+  if (scoreEl) scoreEl.textContent = playerScore.toLocaleString();
+}
+
+let lastLbScore = -1;
+function sortLeaderboard(playerScore) {
+  if (playerScore === lastLbScore) return;
+  lastLbScore = playerScore;
+  positionLeaderboard(playerScore, true);
+}
+
+initLeaderboard();
 
 function resetState() {
   state = {
@@ -91,6 +280,7 @@ function resetState() {
     pin2Anim: null,
     starParticles: [],
     sunburst: null,
+    badgeAnim: null,
     lastTimestamp: null,
     streak: 0,
   };
@@ -157,6 +347,15 @@ function slideTagIn(cityName) {
   }
 
   cityTagText.textContent = cityName;
+  // Reduce el font-size progresivamente si el nombre es largo, mínimo 14px
+  const baseSize = 26;
+  const maxWidth = 230; // px disponibles en el tag
+  cityTagText.style.fontSize = baseSize + 'px';
+  let fs = baseSize;
+  while (fs > 14 && cityTagText.scrollWidth > maxWidth) {
+    fs--;
+    cityTagText.style.fontSize = fs + 'px';
+  }
   cityTagEl.style.visibility = 'hidden';
   cityTagEl.style.transition = 'none';
   cityTagEl.style.top  = '-130px';
@@ -177,12 +376,11 @@ function updateDotsUI() {
 }
 
 function advanceDot() {
-  if (progressContainer.classList.contains('train-animation')) return;
-
+  // Si la animación ya está corriendo, acumula el dot pero no re-dispara la animación
   state.dots++;
   updateDotsUI();
-  
-  if (state.dots >= DOTS_NEEDED) {
+
+  if (state.dots >= DOTS_NEEDED && !progressContainer.classList.contains('train-animation')) {
     progressContainer.classList.add('train-animation');
     
     // Bonus de tiempo
@@ -199,7 +397,8 @@ function advanceDot() {
 
       // 3. Esperamos a que el fade out (0.5s) termine para resetear el estado
       setTimeout(() => {
-        state.dots = 0;
+        // Conserva los dots acumulados DURANTE la animación (los que superan DOTS_NEEDED)
+        state.dots = Math.max(0, state.dots - DOTS_NEEDED);
         // Quitamos ambas clases y reseteamos la UI
         progressContainer.classList.remove('train-animation', 'dots-fade-out');
         updateDotsUI();
@@ -294,16 +493,20 @@ canvas.addEventListener('click', (e) => {
   }
   const streakMult = 1 + Math.floor(state.streak / 4) * 0.3;
 
+  const badgeColor  = getBadgeImg(state.streak);
+  const inRowBonus  = getInRowBonus(state.streak);
+
   const { base, bonusAmt } = computeScore(grade, shownAt);
   const streakBonus = Math.round((base + bonusAmt) * (streakMult - 1));
-  const totalGained = base + bonusAmt + streakBonus;
+  const totalGained = base + bonusAmt + streakBonus + inRowBonus;
   state.score += totalGained;
   if (totalGained > 0) showScorePopup(totalGained);
   if (bonusAmt > 0) {
+    clearTimeout(speedBonusHideId);
     speedBonusText.classList.remove('visible');
     void speedBonusText.offsetWidth;
     speedBonusText.classList.add('visible');
-    setTimeout(() => speedBonusText.classList.remove('visible'), 1600);
+    speedBonusHideId = setTimeout(() => speedBonusText.classList.remove('visible'), 1600);
   }
 
   state.placedDots.push({
@@ -324,6 +527,7 @@ canvas.addEventListener('click', (e) => {
                     wobbleTime: 0,
                     sunburstSpawned: false
                   };
+  const capturedPin1 = state.pin1Anim;
 
   setTimeout(() => {
     state.pin2Anim = { x: correct.x, y: correct.y,
@@ -336,6 +540,7 @@ canvas.addEventListener('click', (e) => {
                         spawnStars(correct.x, correct.y);
                         setTimeout(() => {
                           showResultLabel(correct.x, correct.y, grade, base, bonusAmt);
+                          if (badgeColor) state.badgeAnim = { t: 0, img: badgeColor, streak: state.streak, inRowBonus };
                         }, 200);
                         setTimeout(() => {
                           state.phase = 'waiting';
@@ -343,11 +548,47 @@ canvas.addEventListener('click', (e) => {
                         }, 500);
                       }
                     };
-  }, 300);     
+    const capturedPin2 = state.pin2Anim;
+    setTimeout(() => { if (state.pin2Anim === capturedPin2) capturedPin2.fading = true; }, 1000);
+  }, 300);
 
-  setTimeout(() => { if (state.pin1Anim) state.pin1Anim.fading = true; }, 1000);
-  setTimeout(() => { if (state.pin2Anim) state.pin2Anim.fading = true; }, 1300);
+  setTimeout(() => { if (state.pin1Anim === capturedPin1) capturedPin1.fading = true; }, 1000);
 });
+
+// ── BADGE ─────────────────────────────────────────────────────────────────────
+function getInRowBonus(streak) {
+  const milestones = [3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+  const idx = milestones.indexOf(streak);
+  if (idx !== -1) return (idx + 1) * 100;
+  if (streak >= 60 && streak % 5 === 0) return (12 + (streak - 55) / 5) * 100;
+  return 0;
+}
+
+function getBadgeStrokeColor(streak) {
+  if (streak === 5)  return '#3d5806';
+  if (streak === 10) return '#5c0000';
+  if (streak === 20) return '#104696';
+  if (streak === 30) return '#6b0015';
+  if (streak === 40) return '#ac7600';
+  if (streak === 50) return '#383838';
+  return '#623103'; // gold: 3, 15, 25, 35, 45, 55, 60, 65, 70...
+}
+
+function getBadgeImg(streak) {
+  if (streak === 3)  return imgBadgeGold;
+  if (streak === 5)  return imgBadgeGreen;
+  if (streak === 10) return imgBadgeRed;
+  if (streak === 15) return imgBadgeGold;
+  if (streak === 20) return imgBadgeBlue;
+  if (streak === 25) return imgBadgeGold;
+  if (streak === 30) return imgBadgeGarnet;
+  if (streak === 35) return imgBadgeGold;
+  if (streak === 40) return imgBadgeYellow;
+  if (streak === 45) return imgBadgeGold;
+  if (streak === 50) return imgBadgeSilver;
+  if (streak >= 55 && streak % 5 === 0) return imgBadgeGold;
+  return null;
+}
 
 // ── RENDER ───────────────────────────────────────────────────────────────────
 function render(timestamp) {
@@ -363,6 +604,7 @@ function render(timestamp) {
     const diff = state.score - state.displayedScore;
     state.displayedScore = Math.min(state.score, state.displayedScore + Math.max(1, Math.round(diff * 8 * dt)));
     scoreValueEl.textContent = state.displayedScore.toLocaleString();
+    sortLeaderboard(state.score);
   }
 
   for (const dot of state.placedDots) {
@@ -378,12 +620,24 @@ function render(timestamp) {
     if (age < 4) {
       dot.labelOpacity = age < 3 ? 1 : Math.max(0, 1 - (age - 3));
       ctx.globalAlpha = dot.labelOpacity;
-      ctx.font = 'bold 11px Georgia';
+
+      const maxFontSize = 11;
+      const minFontSize = 7;
+      let fontSize = maxFontSize;
+      ctx.font = `bold ${fontSize}px Georgia`;
+      while (fontSize > minFontSize && ctx.measureText(dot.name).width > 90) {
+        fontSize--;
+        ctx.font = `bold ${fontSize}px Georgia`;
+      }
+
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
       ctx.strokeStyle = 'rgba(0,0,0,0.75)';
       ctx.lineWidth = 3;
-      ctx.strokeText(dot.name, dot.x + 7, dot.y - 7);
+      ctx.strokeText(dot.name, dot.x, dot.y + 8);
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(dot.name, dot.x + 7, dot.y - 7);
+      ctx.fillText(dot.name, dot.x, dot.y + 8);
+
       ctx.globalAlpha = 1;
     }
   }
@@ -583,6 +837,84 @@ if (state.pin2Anim) {
     ctx.globalAlpha = 1;
   }
 
+  badgeOverlayCtx.clearRect(0, 0, DISPLAY_W, DISPLAY_H);
+  if (state.badgeAnim) {
+    const ba = state.badgeAnim;
+    ba.t += dt;
+    const IN_END = 0.2, HOLD_END = 0.50, SHRINK_DUR = 0.22, TOTAL = HOLD_END + SHRINK_DUR;
+    if (ba.t >= TOTAL) {
+      state.badgeAnim = null;
+    } else {
+      let alpha, scale;
+      if (ba.t < IN_END) {
+        const p = ba.t / IN_END;
+        alpha = p;
+        scale = 0.25 + p * 0.75;
+      } else if (ba.t < HOLD_END) {
+        alpha = 1; scale = 1;
+      } else {
+        const p = (ba.t - HOLD_END) / SHRINK_DUR;
+        alpha = 1; scale = 1 - p;
+      }
+
+      const W = 405, H = 333;
+      const CW = 477, CH = 405; // tamaño del check
+
+      badgeOverlayCtx.save();
+      badgeOverlayCtx.globalAlpha = alpha;
+      badgeOverlayCtx.translate(DISPLAY_W / 2, DISPLAY_H / 2);
+      badgeOverlayCtx.scale(scale, scale);
+      badgeOverlayCtx.drawImage(imgCheck, -CW / 2, -CH / 2, CW, CH);
+      badgeOverlayCtx.restore();
+
+      // bonus number — zoom in / hold / zoom out independiente
+      const BZ_IN = 0.18, BZ_HOLD = 0.42, BZ_OUT = 0.62;
+      let bonusScale;
+      if      (ba.t < BZ_IN)   bonusScale = ba.t / BZ_IN;
+      else if (ba.t < BZ_HOLD) bonusScale = 1;
+      else if (ba.t < BZ_OUT)  bonusScale = 1 - (ba.t - BZ_HOLD) / (BZ_OUT - BZ_HOLD);
+      else                     bonusScale = 0;
+
+      if (bonusScale > 0) {
+        const bonusLabel = `+${ba.inRowBonus}`;
+        const bonusCX = DISPLAY_W / 2;
+        const bonusCY = DISPLAY_H / 2 + CH / 2 + 20;
+        badgeOverlayCtx.save();
+        badgeOverlayCtx.globalAlpha = alpha;
+        badgeOverlayCtx.translate(bonusCX, bonusCY);
+        badgeOverlayCtx.scale(bonusScale, bonusScale);
+        badgeOverlayCtx.font = 'bold 52px "Arial Black", Impact, sans-serif';
+        badgeOverlayCtx.textAlign = 'center';
+        badgeOverlayCtx.textBaseline = 'middle';
+        const shadowOffsets = [[-7,-7],[-7,0],[-7,7],[0,-7],[0,7],[7,-7],[7,0],[7,7]];
+        badgeOverlayCtx.fillStyle = '#183897';
+        for (const [ox, oy] of shadowOffsets) badgeOverlayCtx.fillText(bonusLabel, ox, oy);
+        badgeOverlayCtx.strokeStyle = '#ffaa00';
+        badgeOverlayCtx.lineWidth = 7;
+        badgeOverlayCtx.strokeText(bonusLabel, 0, 0);
+        badgeOverlayCtx.fillStyle = '#ffffff';
+        badgeOverlayCtx.fillText(bonusLabel, 0, 0);
+        badgeOverlayCtx.restore();
+      }
+
+      badgeOverlayCtx.save();
+      badgeOverlayCtx.globalAlpha = alpha;
+      badgeOverlayCtx.translate(DISPLAY_W / 2 + 30, DISPLAY_H / 2 - 30);
+      badgeOverlayCtx.scale(scale, scale);
+      badgeOverlayCtx.drawImage(ba.img, -W / 2, -H / 2, W, H);
+      badgeOverlayCtx.font = 'bold 67px Fredoka, sans-serif';
+      badgeOverlayCtx.textAlign = 'center';
+      badgeOverlayCtx.textBaseline = 'middle';
+      badgeOverlayCtx.scale(1, 1.2);
+      badgeOverlayCtx.strokeStyle = getBadgeStrokeColor(ba.streak);
+      badgeOverlayCtx.lineWidth = 11;
+      badgeOverlayCtx.strokeText(`${ba.streak} IN A ROW`, 0, 0);
+      badgeOverlayCtx.fillStyle = '#ffffff';
+      badgeOverlayCtx.fillText(`${ba.streak} IN A ROW`, 0, 0);
+      badgeOverlayCtx.restore();
+    }
+  }
+
   animFrameId = requestAnimationFrame(render);
 }
 
@@ -591,6 +923,7 @@ function startTimer() {
   timerNumberEl.textContent = state.timeLeft;
   timerNumberEl.style.color = '';
   countdownImg.src = 'images/countdown.png';
+  countdownImg.style.animationPlayState = 'running';
 
   timerIntervalId = setInterval(() => {
     state.timeLeft--;
@@ -618,6 +951,22 @@ function endGame() {
     gameWrapper.style.display = 'none';
     document.getElementById('score-display').style.display = 'none';
     finalScoreEl.textContent = state.score.toLocaleString();
+    const isNewHighscore = state.score > highscore;
+    if (isNewHighscore) {
+      highscore = state.score;
+      localStorage.setItem('geochallenge_highscore', highscore);
+      highscoreEl.textContent = highscore.toLocaleString();
+      // Actualizar perfil del highscore en el leaderboard
+      highscorePlayer.score = highscore;
+      const bestScoreEl = document.getElementById('lb-best-score');
+      if (bestScoreEl) bestScoreEl.textContent = highscore.toLocaleString();
+      updateSplashHighscore();
+    }
+    // Mostrar u ocultar banner de nuevo récord
+    newHighscoreBanner.style.display = isNewHighscore ? 'flex' : 'none';
+    if (isNewHighscore) {
+      newHighscoreScore.textContent = highscore.toLocaleString();
+    }
     gameoverScreen.style.display = 'flex';
   }, 600);
 }
@@ -664,6 +1013,40 @@ function showScorePopup(amount) {
 window.addEventListener('resize', redimensionarJuego);
 
 
+// ── PREGAME COUNTDOWN ─────────────────────────────────────────────────────────
+const pregameCountdownEl    = document.getElementById('pregame-countdown');
+const pregameCountdownImg   = document.getElementById('pregame-countdown-img');
+const PREGAME_STEPS = [
+  { src: 'images/countdown/3.png', hold: 900,  size: 420 },
+  { src: 'images/countdown/2.png', hold: 900,  size: 420 },
+  { src: 'images/countdown/1.png', hold: 900,  size: 420 },
+  { src: 'images/countdown/go.png', hold: 1000, size: 490 },
+];
+
+function runPregameCountdown(onDone) {
+  pregameCountdownEl.style.display = 'flex';
+  let step = 0;
+
+  function showStep() {
+    if (step >= PREGAME_STEPS.length) {
+      pregameCountdownEl.style.display = 'none';
+      onDone();
+      return;
+    }
+    const { src, hold, size } = PREGAME_STEPS[step++];
+    pregameCountdownImg.style.animation = 'none';
+    pregameCountdownImg.style.width  = size + 'px';
+    pregameCountdownImg.style.height = size + 'px';
+    pregameCountdownImg.src = src;
+    // Forzar reflow para reiniciar la animación CSS en cada paso
+    void pregameCountdownImg.offsetWidth;
+    pregameCountdownImg.style.animation = '';
+    setTimeout(showStep, hold);
+  }
+
+  showStep();
+}
+
 // ── START ─────────────────────────────────────────────────────────────────────
 function startGame() {
   clearInterval(timerIntervalId);
@@ -671,15 +1054,18 @@ function startGame() {
 
   splashScreen.style.display    = 'none';
   gameoverScreen.style.display  = 'none';
+  newHighscoreBanner.style.display = 'none';
   gameWrapper.style.display     = 'block';
   document.getElementById('score-display').style.display = 'block';
 
-  // Al mostrar el juego, ajustamos la escala inmediatamente
   redimensionarJuego();
 
   resetState();
   updateDotsUI();
   scoreValueEl.textContent     = '0';
+  lastLbScore = -1;
+  lastPlayerRank = -1;
+  sortLeaderboard(0);
   resultLabel.className        = '';
   speedBonusText.classList.remove('visible');
   cityTagEl.style.transition   = 'none';
@@ -688,8 +1074,15 @@ function startGame() {
   gameWrapper.querySelectorAll('.city-tag-ghost').forEach(g => g.remove());
 
   animFrameId = requestAnimationFrame(render);
-  startTimer();
-  setTimeout(nextCity, 300);
+
+  // Pausar el pulso del timer hasta que arranque el juego real
+  countdownImg.style.animationPlayState = 'paused';
+
+  // Cuenta regresiva antes de arrancar el timer y la primera ciudad
+  runPregameCountdown(() => {
+    startTimer();
+    setTimeout(nextCity, 100);
+  });
 }
 
 btnStart.addEventListener('click', startGame);

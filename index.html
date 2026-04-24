@@ -10,7 +10,11 @@
 
   <div id="splash-screen">
     <h1>GeoChallenge</h1>
-    <p>Encontrá la ciudad en el mapa antes de que se acabe el tiempo.<br>Cuanto más cerca clickeés, más puntos ganás.</p>
+    <p>Encuentra la ciudad en el mapa antes de que se acabe el tiempo.<br>Cuanto más cerca clickeés, más puntos ganas.</p>
+    <div id="splash-highscore-wrap">
+      <span id="splash-highscore-label">Mejor puntaje</span>
+      <span id="splash-highscore-value">—</span>
+    </div>
     <button id="btn-start">Jugar</button>
   </div>
 
@@ -18,6 +22,10 @@
     <h2>¡Tiempo!</h2>
     <div id="final-score-label">Puntaje final</div>
     <div id="final-score-value">0</div>
+    <div id="new-highscore-banner" style="display:none">
+      <span id="new-highscore-text">¡Nuevo récord!</span>
+      <span id="new-highscore-score"></span>
+    </div>
     <button id="btn-restart">Jugar de nuevo</button>
   </div>
 
@@ -51,6 +59,15 @@
   <div id="score-display">
     <img src="images/points.png" alt="">
     <div id="score-value">0</div>
+  </div>
+
+  <div id="right-panel">
+    <div id="leaderboard"></div>
+    <div id="highscore-value" style="display:none">0</div>
+  </div>
+
+  <div id="pregame-countdown" style="display:none">
+    <img id="pregame-countdown-img" src="" alt="">
   </div>
 
   <script src="js/cities.js"></script>
