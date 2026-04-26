@@ -40,22 +40,6 @@ body::after {
   border-left: 2px solid rgba(255, 255, 255, 0.5);
 }
 
-/* ── CONTADOR INFERIOR (EJ: "0") ────────────────────── */
-#bottom-counter {
-  position: absolute;
-  bottom: 0px;
-  left: 15%; /* Debe coincidir con el width de body::before */
-  background: #808080;
-  color: white;
-  padding: 10px 40px;
-  font-size: 24px;
-  font-weight: bold;
-  border-top-right-radius: 4px;
-  box-shadow: 2px -2px 5px rgba(0,0,0,0.3);
-  z-index: 50; /* Sobre el mapa, debajo de las barras laterales */
-  text-align: center;
-  min-width: 120px;
-}
 
 /* ── SPLASH ─────────────────────────────────────────── */
 #splash-screen {
@@ -108,6 +92,44 @@ body::after {
   55%  { opacity: 1; transform: scale(1.1) rotate(2deg); }
   75%  { transform: scale(0.96) rotate(-1deg); }
   100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+
+/* ── TIME UP OVERLAY ────────────────────────────────── */
+#timeup-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 600;
+  pointer-events: none;
+}
+
+#timeup-overlay img {
+  max-width: 35vw;
+  max-height: 25vh;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 32px rgba(0,0,0,0.7));
+}
+
+#timeup-overlay.timeup-in img {
+  animation: timeup-enter 0.4s cubic-bezier(0.22,1,0.36,1) forwards;
+}
+
+#timeup-overlay.timeup-out img {
+  animation: timeup-exit 0.35s ease-in forwards;
+}
+
+@keyframes timeup-enter {
+  0%   { opacity: 0; transform: scale(0.3) rotate(-6deg); }
+  60%  { opacity: 1; transform: scale(1.08) rotate(2deg); }
+  80%  { transform: scale(0.97) rotate(-1deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+
+@keyframes timeup-exit {
+  0%   { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.4); }
 }
 
 /* ── GAME OVER ──────────────────────────────────────── */
@@ -294,7 +316,6 @@ body::after {
   z-index: 10;
 }
 
-/* Definimos la animación de latido para el contorno de la imagen */
 /* Definimos la animación de latido para el contorno de la imagen */
 @keyframes pulse-img-shadow {
   0% {
@@ -585,41 +606,6 @@ body::after {
   color: #f0e060;
 }
 
-/* ── PROFILE CARD ───────────────────────────────────── */
-#profile-card {
-  width: 100%;
-  aspect-ratio: 4 / 6;
-  background: #1a4080;
-  border-radius: 10px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px;
-  box-shadow: 0 4px 14px rgba(0,0,0,0.4);
-}
-
-#profile-pic-wrapper {
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-#profile-pic {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-#profile-current-value {
-  font-family: 'Arial Black', Impact, sans-serif;
-  font-size: 10px;
-  font-weight: 900;
-  color: #f0e060;
-  white-space: nowrap;
-}
 
 #highscore-value {
   font-family: 'Arial Black', Impact, sans-serif;

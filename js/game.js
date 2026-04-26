@@ -1,3 +1,25 @@
+// ── SFX ───────────────────────────────────────────────────────────────────────
+const sfxPin       = new Audio('sfx/pin.mp3');
+const sfxCountdown = new Audio('sfx/cuentaregresiva.mp3');
+const sfxError     = new Audio('sfx/error.mp3');
+const sfxAcertar   = new Audio('sfx/acertar.mp3');
+const sfxVeryNice  = new Audio('sfx/verynice.mp3');
+const sfxTag       = new Audio('sfx/tag.mp3');
+const sfxBonus     = new Audio('sfx/bonus.mp3');
+const sfxTickdown  = new Audio('sfx/countdown.mp3');
+const sfxTimesUp   = new Audio('sfx/timesup.mp3');
+const sfxCheck     = new Audio('sfx/check.mp3');
+const sfxPostgame  = new Audio('sfx/postgameloop.mp3');
+sfxPostgame.loop   = true;
+
+function playMusic(track) {
+  [sfxPostgame].forEach(t => { if (t !== track) { t.pause(); t.currentTime = 0; } });
+  if (!track) return;
+  track.currentTime = 0;
+  const p = track.play();
+  if (p) p.catch(() => {});
+}
+
 // ── CONFIG ──────────────────────────────────────────────────────────────────
 const GAME_DURATION   = 60;
 const BONUS_TIME      = 5;
@@ -45,6 +67,7 @@ const PIN2_TIP = { x: 0.80, y: 0.88 }; // green — needle exits lower-right
 const splashScreen   = document.getElementById('splash-screen');
 const gameoverScreen = document.getElementById('gameover-screen');
 const gameWrapper    = document.getElementById('game-wrapper');
+const timeupOverlay  = document.getElementById('timeup-overlay');
 const canvas         = document.getElementById('game-canvas');
 const ctx            = canvas.getContext('2d');
 const cityTagEl      = document.getElementById('city-tag');
@@ -54,17 +77,17 @@ const countdownImg   = document.querySelector('#countdown-widget img');
 const progressDots   = document.querySelectorAll('.dot');
 const scoreValueEl   = document.getElementById('score-value');
 const speedBonusText = document.getElementById('speed-bonus-text');
-const coordTooltip   = document.getElementById('coord-tooltip');
 const resultLabel    = document.getElementById('result-label');
 const finalScoreEl   = document.getElementById('final-score-value');
 const highscoreEl        = document.getElementById('highscore-value');
 const splashHighscoreEl  = document.getElementById('splash-highscore-value');
 const newHighscoreBanner = document.getElementById('new-highscore-banner');
 const newHighscoreScore  = document.getElementById('new-highscore-score');
-const profileCurrentEl   = null; // removed
-const btnStart       = document.getElementById('btn-start');
-const btnRestart     = document.getElementById('btn-restart');
+const btnStart          = document.getElementById('btn-start');
+const btnRestart        = document.getElementById('btn-restart');
 const progressContainer = document.getElementById('progress-dots');
+const scoreDisplayEl    = document.getElementById('score-display');
+const lbBestScoreEl     = document.getElementById('lb-best-score');
 
 canvas.width  = DISPLAY_W;
 canvas.height = DISPLAY_H;
@@ -105,6 +128,13 @@ function updateSplashHighscore() {
   }
 }
 updateSplashHighscore();
+
+// El autoplay requiere interacción previa — arrancamos pregame en el primer toque
+function startPregameMusic() {
+  playMusic(sfxPostgame);
+  splashScreen.removeEventListener('click', startPregameMusic);
+}
+splashScreen.addEventListener('click', startPregameMusic);
 
 // ── LEADERBOARD ──────────────────────────────────────────────────────────────────────────────
 const LB_COLORS = ['#e74c3c','#e67e22','#f1c40f','#2ecc71','#1abc9c',
@@ -293,12 +323,6 @@ function latLonToCanvas(lat, lon) {
   return { x, y };
 }
 
-function canvasToLatLon(x, y) {
-  const lon = MAP_LON_LEFT + (x / DISPLAY_W) * (MAP_LON_RIGHT - MAP_LON_LEFT);
-  const m   = MERC_TOP - (y / DISPLAY_H) * (MERC_TOP - MERC_BOT);
-  const lat = (Math.atan(Math.exp(m)) - Math.PI / 4) * 360 / Math.PI;
-  return { lat, lon };
-}
 
 function dist(ax, ay, bx, by) {
   return Math.sqrt((ax - bx) ** 2 + (ay - by) ** 2);
@@ -360,6 +384,7 @@ function slideTagIn(cityName) {
   cityTagEl.style.transition = 'none';
   cityTagEl.style.top  = '-130px';
   cityTagEl.style.left = '-420px';
+  setTimeout(() => { sfxTag.currentTime = 0; sfxTag.play(); }, 200);
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       cityTagEl.style.visibility = 'visible';
@@ -428,6 +453,10 @@ function computeScore(grade, cityShownAt) {
 
 // ── RESULT LABEL ─────────────────────────────────────────────────────────────
 function showResultLabel(cx, cy, grade, base, bonusAmt) {
+  if (grade === 'wayoff')        { sfxError.currentTime    = 0; sfxError.play(); }
+  else if (grade === 'perfect')  { sfxVeryNice.currentTime = 0; sfxVeryNice.play(); }
+  else                           { sfxAcertar.currentTime  = 0; sfxAcertar.play(); }
+
   resultLabel.textContent = LABEL_MAP[grade];
   resultLabel.className = grade;
 
@@ -472,6 +501,8 @@ function nextCity() {
 canvas.addEventListener('click', (e) => {
   if (!state || state.phase !== 'waiting') return;
   state.phase = 'animating';
+  sfxPin.currentTime = 0;
+  sfxPin.play();
 
   const rect    = canvas.getBoundingClientRect();
   
@@ -540,8 +571,11 @@ canvas.addEventListener('click', (e) => {
                         spawnStars(correct.x, correct.y);
                         setTimeout(() => {
                           showResultLabel(correct.x, correct.y, grade, base, bonusAmt);
-                          if (badgeColor) state.badgeAnim = { t: 0, img: badgeColor, streak: state.streak, inRowBonus };
-                        }, 200);
+                          if (badgeColor) {
+                            state.badgeAnim = { t: 0, img: badgeColor, streak: state.streak, inRowBonus };
+                            setTimeout(() => { sfxBonus.currentTime = 0; sfxBonus.play(); }, 800);
+                          }
+                        }, 300);
                         setTimeout(() => {
                           state.phase = 'waiting';
                           nextCity();
@@ -556,36 +590,26 @@ canvas.addEventListener('click', (e) => {
 });
 
 // ── BADGE ─────────────────────────────────────────────────────────────────────
+const MILESTONE_BONUSES = { 3:100, 5:200, 10:300, 15:400, 20:500, 25:600, 30:700, 35:800, 40:900, 45:1000, 50:1100, 55:1200 };
 function getInRowBonus(streak) {
-  const milestones = [3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
-  const idx = milestones.indexOf(streak);
-  if (idx !== -1) return (idx + 1) * 100;
+  if (MILESTONE_BONUSES[streak]) return MILESTONE_BONUSES[streak];
   if (streak >= 60 && streak % 5 === 0) return (12 + (streak - 55) / 5) * 100;
   return 0;
 }
 
+const BADGE_STROKE = { 5:'#3d5806', 10:'#5c0000', 20:'#104696', 30:'#6b0015', 40:'#ac7600', 50:'#383838' };
 function getBadgeStrokeColor(streak) {
-  if (streak === 5)  return '#3d5806';
-  if (streak === 10) return '#5c0000';
-  if (streak === 20) return '#104696';
-  if (streak === 30) return '#6b0015';
-  if (streak === 40) return '#ac7600';
-  if (streak === 50) return '#383838';
-  return '#623103'; // gold: 3, 15, 25, 35, 45, 55, 60, 65, 70...
+  return BADGE_STROKE[streak] ?? '#623103';
 }
 
+let BADGE_IMG = null;
 function getBadgeImg(streak) {
-  if (streak === 3)  return imgBadgeGold;
-  if (streak === 5)  return imgBadgeGreen;
-  if (streak === 10) return imgBadgeRed;
-  if (streak === 15) return imgBadgeGold;
-  if (streak === 20) return imgBadgeBlue;
-  if (streak === 25) return imgBadgeGold;
-  if (streak === 30) return imgBadgeGarnet;
-  if (streak === 35) return imgBadgeGold;
-  if (streak === 40) return imgBadgeYellow;
-  if (streak === 45) return imgBadgeGold;
-  if (streak === 50) return imgBadgeSilver;
+  if (!BADGE_IMG) {
+    BADGE_IMG = { 3:imgBadgeGold, 5:imgBadgeGreen, 10:imgBadgeRed, 15:imgBadgeGold,
+      20:imgBadgeBlue, 25:imgBadgeGold, 30:imgBadgeGarnet, 35:imgBadgeGold,
+      40:imgBadgeYellow, 45:imgBadgeGold, 50:imgBadgeSilver };
+  }
+  if (BADGE_IMG[streak]) return BADGE_IMG[streak];
   if (streak >= 55 && streak % 5 === 0) return imgBadgeGold;
   return null;
 }
@@ -683,79 +707,67 @@ if (state.sunburst) {
   }
 }
 
-// ── DIBUJO PIN 1 ────────────────────────
-if (state.pin1Anim) {
-  const p = state.pin1Anim;
-  if (p.fading) {
-    p.opacity = Math.max(0, p.opacity - dt / 0.1);
-    if (p.opacity <= 0) { state.pin1Anim = null; }
-  } else {
-    p.progress = Math.min(1, p.progress + dt / 0.1);
-    if (p.progress >= 1 && !p.sunburstSpawned) {
-      p.sunburstSpawned = true;
-      state.sunburst = { x: p.x, y: p.y, t: 0 };
-    }
-  }
+// ── DIBUJO PINS ──────────────────────────
+  function drawPin(pinState, img, tip, xDir) {
+    const p = pinState;
+    const d    = 220 * (1 - p.progress);
+    const sc   = 10 - 9 * p.progress;
+    const curW = PIN_W * sc;
+    const curH = PIN_H * sc;
+    const tipX = p.x + xDir * d;
+    const tipY = p.y - d;
 
-  if (state.pin1Anim) {
-    const dist   = 220 * (1 - p.progress);
-    const scale  = 10 - 9 * p.progress;
-    const curW   = PIN_W * scale;
-    const curH   = PIN_H * scale;
-    const tipX   = p.x + dist;
-    const tipY   = p.y - dist;
-
-    // ── LÓGICA DE ROTACIÓN (WOBBLE) ──
     let angle = 0;
-    if (p.progress >= 1) { // El movimiento de caída ha terminado
+    if (p.progress >= 1) {
       p.wobbleTime += dt;
-      const duration = 0.08; // 0.08 segundos de animación
+      const duration = 0.08;
       if (p.wobbleTime < duration) {
         const half = duration / 2;
-        const maxRad = (3 * Math.PI) / 180; // Convertimos 3° a radianes
-
-        // Efecto elástico: va de 0 a 3° y vuelve a 0
-        if (p.wobbleTime < half) {
-          angle = (p.wobbleTime / half) * maxRad;
-        } else {
-          angle = maxRad - ((p.wobbleTime - half) / half) * maxRad;
-        }
+        const maxRad = (3 * Math.PI) / 180;
+        angle = p.wobbleTime < half
+          ? (p.wobbleTime / half) * maxRad
+          : maxRad - ((p.wobbleTime - half) / half) * maxRad;
       }
     }
 
     const hf = 1 - p.progress;
     const shadowAlpha = Math.max(0, (p.progress - 0.1) / 0.9) * 0.30 * p.opacity;
-    
-    // Sombra (mantenemos tu lógica de transformación)
     if (shadowAlpha > 0) {
       ctx.save();
       ctx.globalAlpha = shadowAlpha;
       ctx.filter = 'brightness(0) blur(1.5px)';
       ctx.translate(tipX, tipY);
-
       ctx.rotate(angle);
-
       ctx.transform(1, 0, -hf * 1.2, 0.08, 0, 0);
-      ctx.drawImage(imgPin1, -curW * PIN1_TIP.x, -curH * PIN1_TIP.y, curW, curH);
+      ctx.drawImage(img, -curW * tip.x, -curH * tip.y, curW, curH);
       ctx.restore();
     }
 
-    // Pin con rotación en la punta
     ctx.save();
     ctx.globalAlpha = p.opacity;
-    
-    // 1. Trasladamos el contexto a la punta (punto de impacto)
     ctx.translate(tipX, tipY);
-    // 2. Rotamos el contexto los grados calculados
     ctx.rotate(angle);
-    // 3. Dibujamos desplazando la imagen según su punto de anclaje (TIP)
-    ctx.drawImage(imgPin1, -curW * PIN1_TIP.x, -curH * PIN1_TIP.y, curW, curH);
-    
+    ctx.drawImage(img, -curW * tip.x, -curH * tip.y, curW, curH);
     ctx.restore();
     ctx.globalAlpha = 1;
   }
-}
-if (state.pin2Anim) {
+
+  if (state.pin1Anim) {
+    const p = state.pin1Anim;
+    if (p.fading) {
+      p.opacity = Math.max(0, p.opacity - dt / 0.1);
+      if (p.opacity <= 0) { state.pin1Anim = null; }
+    } else {
+      p.progress = Math.min(1, p.progress + dt / 0.1);
+      if (p.progress >= 1 && !p.sunburstSpawned) {
+        p.sunburstSpawned = true;
+        state.sunburst = { x: p.x, y: p.y, t: 0 };
+      }
+    }
+    if (state.pin1Anim) drawPin(state.pin1Anim, imgPin1, PIN1_TIP, 1);
+  }
+
+  if (state.pin2Anim) {
     const p = state.pin2Anim;
     if (p.fading) {
       p.opacity = Math.max(0, p.opacity - dt / 0.1);
@@ -767,61 +779,7 @@ if (state.pin2Anim) {
         p.onLanded();
       }
     }
-
-    if (state.pin2Anim) {
-      const dist   = 220 * (1 - p.progress);
-      const scale  = 10 - 9 * p.progress;
-      const curW   = PIN_W * scale;
-      const curH   = PIN_H * scale;
-      const tipX   = p.x - dist;
-      const tipY   = p.y - dist;
-
-      // ── LÓGICA DE ROTACIÓN (WOBBLE) ──
-      let angle = 0;
-      if (p.progress >= 1) { // Solo cuando termina de caer
-        p.wobbleTime += dt;
-        const duration = 0.08; // Duración total deseada
-        if (p.wobbleTime < duration) {
-          const half = duration / 2;
-          const maxRad = (3 * Math.PI) / 180; // 3 grados a radianes
-
-          // Triangulamos la rotación: sube a 3° y baja a 0°
-          if (p.wobbleTime < half) {
-            angle = (p.wobbleTime / half) * maxRad;
-          } else {
-            angle = maxRad - ((p.wobbleTime - half) / half) * maxRad;
-          }
-        }
-      }
-
-      const hf = 1 - p.progress;
-      const shadowAlpha = Math.max(0, (p.progress - 0.1) / 0.9) * 0.30 * p.opacity;
-      
-      // Sombra (se queda igual)
-      if (shadowAlpha > 0) {
-        ctx.save();
-        ctx.globalAlpha = shadowAlpha;
-        ctx.filter = 'brightness(0) blur(1.5px)';
-        ctx.translate(tipX, tipY);
-        ctx.transform(1, 0, -hf * 1.2, 0.08, 0, 0);
-        ctx.drawImage(imgPin2, -curW * PIN2_TIP.x, -curH * PIN2_TIP.y, curW, curH);
-        ctx.restore();
-      }
-      
-      // Pin con efecto de rotación
-      ctx.save();
-      ctx.globalAlpha = p.opacity;
-      
-      // 1. Trasladamos a la punta del pin
-      ctx.translate(tipX, tipY);
-      // 2. Aplicamos la rotación
-      ctx.rotate(angle);
-      // 3. Dibujamos el pin centrado en su punta (usando los offsets negativos de PIN2_TIP)
-      ctx.drawImage(imgPin2, -curW * PIN2_TIP.x, -curH * PIN2_TIP.y, curW, curH);
-      
-      ctx.restore();
-      ctx.globalAlpha = 1;
-    }
+    if (state.pin2Anim) drawPin(state.pin2Anim, imgPin2, PIN2_TIP, -1);
   }
 
   for (let i = state.starParticles.length - 1; i >= 0; i--) {
@@ -841,7 +799,7 @@ if (state.pin2Anim) {
   if (state.badgeAnim) {
     const ba = state.badgeAnim;
     ba.t += dt;
-    const IN_END = 0.2, HOLD_END = 0.50, SHRINK_DUR = 0.22, TOTAL = HOLD_END + SHRINK_DUR;
+    const IN_END = 0.2, HOLD_END = 0.60, SHRINK_DUR = 0.22, TOTAL = HOLD_END + SHRINK_DUR;
     if (ba.t >= TOTAL) {
       state.badgeAnim = null;
     } else {
@@ -868,7 +826,7 @@ if (state.pin2Anim) {
       badgeOverlayCtx.restore();
 
       // bonus number — zoom in / hold / zoom out independiente
-      const BZ_IN = 0.18, BZ_HOLD = 0.42, BZ_OUT = 0.62;
+      const BZ_IN = 0.18, BZ_HOLD = 0.42, BZ_OUT = 0.72;
       let bonusScale;
       if      (ba.t < BZ_IN)   bonusScale = ba.t / BZ_IN;
       else if (ba.t < BZ_HOLD) bonusScale = 1;
@@ -932,6 +890,7 @@ function startTimer() {
     if (state.timeLeft <= 10) {
       timerNumberEl.style.color = '#ffffff';
       countdownImg.src = 'images/countdownred.png';
+      if (state.timeLeft > 0) { sfxTickdown.currentTime = 0; sfxTickdown.play(); }
     } else {
       timerNumberEl.style.color = '';
       countdownImg.src = 'images/countdown.png';
@@ -944,37 +903,54 @@ function startTimer() {
 function endGame() {
   clearInterval(timerIntervalId);
   state.phase = 'idle';
+  canvas.style.pointerEvents = 'none';
+  countdownImg.style.animationPlayState = 'paused';
 
+  // Mostrar overlay timeup.png
+  sfxTimesUp.currentTime = 0; sfxTimesUp.play();
+  timeupOverlay.style.display = 'flex';
+  timeupOverlay.classList.remove('timeup-out');
+  timeupOverlay.classList.add('timeup-in');
+
+  // Después de 1.2s de hold, animación de salida
   setTimeout(() => {
-    cancelAnimationFrame(animFrameId);
-    animFrameId = null;
-    gameWrapper.style.display = 'none';
-    document.getElementById('score-display').style.display = 'none';
-    finalScoreEl.textContent = state.score.toLocaleString();
-    const isNewHighscore = state.score > highscore;
-    if (isNewHighscore) {
-      highscore = state.score;
-      localStorage.setItem('geochallenge_highscore', highscore);
-      highscoreEl.textContent = highscore.toLocaleString();
-      // Actualizar perfil del highscore en el leaderboard
-      highscorePlayer.score = highscore;
-      const bestScoreEl = document.getElementById('lb-best-score');
-      if (bestScoreEl) bestScoreEl.textContent = highscore.toLocaleString();
-      updateSplashHighscore();
-    }
-    // Mostrar u ocultar banner de nuevo récord
-    newHighscoreBanner.style.display = isNewHighscore ? 'flex' : 'none';
-    if (isNewHighscore) {
-      newHighscoreScore.textContent = highscore.toLocaleString();
-    }
-    gameoverScreen.style.display = 'flex';
-  }, 600);
+    timeupOverlay.classList.remove('timeup-in');
+    timeupOverlay.classList.add('timeup-out');
+
+    // Al segundo (350ms animación salida + ~650ms margen) ir al gameover
+    setTimeout(() => {
+      timeupOverlay.style.display = 'none';
+      timeupOverlay.classList.remove('timeup-out');
+
+      cancelAnimationFrame(animFrameId);
+      animFrameId = null;
+      gameWrapper.style.display = 'none';
+      scoreDisplayEl.style.display = 'none';
+      finalScoreEl.textContent = state.score.toLocaleString();
+      const isNewHighscore = state.score > highscore;
+      if (isNewHighscore) {
+        highscore = state.score;
+        localStorage.setItem('geochallenge_highscore', highscore);
+        highscoreEl.textContent = highscore.toLocaleString();
+        // Actualizar perfil del highscore en el leaderboard
+        highscorePlayer.score = highscore;
+        if (lbBestScoreEl) lbBestScoreEl.textContent = highscore.toLocaleString();
+        updateSplashHighscore();
+      }
+      // Mostrar u ocultar banner de nuevo récord
+      newHighscoreBanner.style.display = isNewHighscore ? 'flex' : 'none';
+      if (isNewHighscore) {
+        newHighscoreScore.textContent = highscore.toLocaleString();
+      }
+      gameoverScreen.style.display = 'flex';
+      playMusic(sfxPostgame);
+    }, 1000);
+  }, 400 + 1200); // 400ms entrada + 1200ms hold
 }
 
 // ── ESCALADO RESPONSIVE ───────────────────────────────────────────────────────
 function redimensionarJuego() {
-  const wrapper = document.getElementById('game-wrapper');
-  if (!wrapper || wrapper.style.display === 'none') return;
+  if (!gameWrapper || gameWrapper.style.display === 'none') return;
 
   const anchoVentana = window.innerWidth;
   const altoVentana = window.innerHeight;
@@ -998,8 +974,8 @@ function redimensionarJuego() {
 
   escalaFinal = escalaFinal * 0.92;
 
-  wrapper.style.transform = `scale(${escalaFinal})`;
-  wrapper.style.transformOrigin = 'center center';
+  gameWrapper.style.transform = `scale(${escalaFinal})`;
+  gameWrapper.style.transformOrigin = 'center center';
 }
 
 function showScorePopup(amount) {
@@ -1017,14 +993,16 @@ window.addEventListener('resize', redimensionarJuego);
 const pregameCountdownEl    = document.getElementById('pregame-countdown');
 const pregameCountdownImg   = document.getElementById('pregame-countdown-img');
 const PREGAME_STEPS = [
-  { src: 'images/countdown/3.png', hold: 900,  size: 420 },
-  { src: 'images/countdown/2.png', hold: 900,  size: 420 },
-  { src: 'images/countdown/1.png', hold: 900,  size: 420 },
-  { src: 'images/countdown/go.png', hold: 1000, size: 490 },
+  { src: 'images/countdown/3.png', hold: 750,  size: 420 },
+  { src: 'images/countdown/2.png', hold: 750,  size: 420 },
+  { src: 'images/countdown/1.png', hold: 750,  size: 420 },
+  { src: 'images/countdown/go.png', hold: 750, size: 490 },
 ];
 
 function runPregameCountdown(onDone) {
   pregameCountdownEl.style.display = 'flex';
+  sfxCountdown.currentTime = 0;
+  sfxCountdown.play();
   let step = 0;
 
   function showStep() {
@@ -1049,14 +1027,17 @@ function runPregameCountdown(onDone) {
 
 // ── START ─────────────────────────────────────────────────────────────────────
 function startGame() {
+  splashScreen.removeEventListener('click', startPregameMusic);
   clearInterval(timerIntervalId);
   if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
+  canvas.style.pointerEvents = '';
 
+  playMusic(null);
   splashScreen.style.display    = 'none';
   gameoverScreen.style.display  = 'none';
   newHighscoreBanner.style.display = 'none';
   gameWrapper.style.display     = 'block';
-  document.getElementById('score-display').style.display = 'block';
+  scoreDisplayEl.style.display = 'block';
 
   redimensionarJuego();
 
@@ -1073,6 +1054,14 @@ function startGame() {
   cityTagEl.style.top          = '-130px';
   gameWrapper.querySelectorAll('.city-tag-ghost').forEach(g => g.remove());
 
+  // Resetear timer visualmente antes del pregame countdown
+  timerNumberEl.textContent = GAME_DURATION;
+  timerNumberEl.style.color = '';
+  countdownImg.src = 'images/countdown.png';
+
+  // Ocultar el city tag sin transición
+  cityTagEl.style.visibility = 'hidden';
+
   animFrameId = requestAnimationFrame(render);
 
   // Pausar el pulso del timer hasta que arranque el juego real
@@ -1085,8 +1074,8 @@ function startGame() {
   });
 }
 
-btnStart.addEventListener('click', startGame);
-btnRestart.addEventListener('click', startGame);
+btnStart.addEventListener('click', () => { sfxCheck.currentTime = 0; sfxCheck.play(); startGame(); });
+btnRestart.addEventListener('click', () => { sfxCheck.currentTime = 0; sfxCheck.play(); startGame(); });
 
 /* ── COORD TOOLTIP ─────────────────────────────────────────────────────────────
 canvas.addEventListener('mousemove', (e) => {
