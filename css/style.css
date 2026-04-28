@@ -41,17 +41,225 @@ body::after {
 }
 
 
+/* ── FONDO COMPARTIDO (splash + gameover) ───────────── */
+.game-bg-screen {
+  background: none;
+  overflow: hidden;
+}
+
+
+.game-bg-table {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%) scale(0.35);
+  transform-origin: top center;
+  pointer-events: none;
+  z-index: 15;
+}
+
+.game-bg-sky {
+  position: absolute;
+  bottom: 30%;
+  left: 50%;
+  transform: translateX(-50%) scaleY(0.37);
+  transform-origin: bottom center;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.game-bg-cloud {
+  position: absolute;
+  pointer-events: none;
+  z-index: -1;
+  will-change: transform;
+}
+
+.game-bg-cloud1 {
+  top: 2%;
+  right: -26%;
+  width: 762px;
+  animation: cloud1-move 10s linear infinite;
+}
+
+@keyframes cloud1-move {
+  from { right: -26%; }
+  to   { right: 120%; }
+}
+
+.game-bg-cloud2 {
+  top: 35%;
+  right: 5%;
+  width: 408px;
+  animation: cloud2-move 12s linear 3s infinite;
+}
+
+@keyframes cloud2-move {
+  from { right: 5%; }
+  to   { right: 120%; }
+}
+
+.game-bg-people {
+  position: absolute;
+  bottom: 3%;
+  left: 14%;
+  pointer-events: none;
+  z-index: 8;
+  transform: scaleX(1.1);
+  transform-origin: left bottom;
+}
+
+.game-bg-men,
+.game-bg-men1,
+.game-bg-men2 {
+  position: absolute;
+  bottom: 2%;
+  left: 18%;
+  width: 50%;
+  transform: scale(0.28);
+  transform-origin: left bottom;
+  pointer-events: none;
+}
+
+.game-bg-men2 { z-index: 9; }
+.game-bg-men1 { z-index: 10; animation: men1-blink 3s steps(1, end) infinite; }
+
+.game-bg-women1 {
+  position: absolute;
+  bottom: 2%;
+  left: 40%;
+  width: 50%;
+  transform: scale(0.16);
+  transform-origin: left bottom;
+  pointer-events: none;
+  z-index: 9;
+}
+
+.game-bg-girl,
+.game-bg-girl1,
+.game-bg-girl2 {
+  position: absolute;
+  bottom: 2%;
+  left: 31.5%;
+  width: 50%;
+  transform: scale(0.17);
+  transform-origin: left bottom;
+  pointer-events: none;
+}
+
+.game-bg-girl2 { z-index: 9; }
+.game-bg-girl1 { z-index: 10; animation: girl1-blink 2.5s steps(1, end) 0.8s infinite; }
+
+@keyframes girl1-blink {
+  0%  { opacity: 1 }
+  40% { opacity: 0 }
+  44% { opacity: 1 }
+  100%{ opacity: 1 }
+}
+
+@keyframes men1-blink {
+  0%     { opacity: 1 }
+  60%    { opacity: 0 }
+  63.33% { opacity: 1 }
+  100%   { opacity: 1 }
+}
+
+.game-bg-city {
+  position: absolute;
+  bottom: 0%;
+  right: 14%;
+  width: 72%;
+  object-fit: contain;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.game-bg-plane {
+  position: absolute;
+  top: 55%;
+  left: 0;
+  transform: translate(calc(-40vw - 50%), -50%) scale(0.38);
+  transform-origin: center center;
+  pointer-events: none;
+  z-index: 0;
+  will-change: transform;
+}
+
+/* z-index: plane1 adelante, plane6 atrás */
+.game-bg-plane1 { z-index: 6; animation: plane-fly-in 2.7s ease-out forwards, plane1-blink 2.5s steps(1, end) forwards, plane-peel 0s 2.7s forwards; }
+.game-bg-plane2 { z-index: 5; opacity: 0; animation: plane-fly-in 2.7s ease-out forwards, plane2-blink 2.5s steps(1, end) forwards, plane-peel 0s 2.8s forwards; }
+.game-bg-plane3 { z-index: 4; animation: plane-fly-in 2.7s ease-out forwards, plane-peel 0s 2.9s forwards; }
+.game-bg-plane4 { z-index: 3; animation: plane-fly-in 2.7s ease-out forwards, plane-peel 0s 3.0s forwards; }
+.game-bg-plane5 { z-index: 2; animation: plane-fly-in 2.7s ease-out forwards, plane-peel 0s 3.1s forwards; }
+.game-bg-plane6 { z-index: 1; animation: plane-fly-in 2.7s ease-out forwards; }
+
+@keyframes plane-fly-in { from { transform: translate(calc(-40vw - 50%), -50%) scale(0.38); } to { transform: translate(calc(30vw - 50%), -50%) scale(0.38); } }
+@keyframes plane-peel   { to { opacity: 0; } }
+@keyframes plane-peel   { to   { opacity: 0; } }
+
+@keyframes plane1-blink {
+  0%   { opacity: 1 }  4%   { opacity: 0 }  8%   { opacity: 1 }
+  12%  { opacity: 0 }  16%  { opacity: 1 }  20%  { opacity: 0 }
+  24%  { opacity: 1 }  28%  { opacity: 0 }  32%  { opacity: 1 }
+  36%  { opacity: 0 }  40%  { opacity: 1 }  46%  { opacity: 0 }
+  52%  { opacity: 1 }  58%  { opacity: 0 }  64%  { opacity: 1 }
+  70%  { opacity: 0 }  78%  { opacity: 1 }  88%  { opacity: 0 }
+  100% { opacity: 1 }
+}
+
+@keyframes plane2-blink {
+  0%   { opacity: 0 }  4%   { opacity: 1 }  8%   { opacity: 0 }
+  12%  { opacity: 1 }  16%  { opacity: 0 }  20%  { opacity: 1 }
+  24%  { opacity: 0 }  28%  { opacity: 1 }  32%  { opacity: 0 }
+  36%  { opacity: 1 }  40%  { opacity: 0 }  46%  { opacity: 1 }
+  52%  { opacity: 0 }  58%  { opacity: 1 }  64%  { opacity: 0 }
+  70%  { opacity: 1 }  78%  { opacity: 0 }  88%  { opacity: 1 }
+  100% { opacity: 0 }
+}
+
+.game-bg-stairs {
+  position: absolute;
+  bottom: 0;
+  right: 22.1%;
+  width: 14%;
+  transform: scaleX(1.4);
+  transform-origin: right bottom;
+  pointer-events: none;
+  z-index: 7;
+  animation: stairs-wipe 0.6s ease-out 2.8s forwards;
+  clip-path: inset(100% 0 0 0);
+}
+
+@keyframes stairs-wipe {
+  from { clip-path: inset(100% 0 0 0); }
+  to   { clip-path: inset(0% 0 0 0); }
+}
+
+.game-bg-screen > *:not(.game-bg-city):not(.game-bg-plane):not(.game-bg-plane1):not(.game-bg-plane2):not(.game-bg-plane3):not(.game-bg-plane4):not(.game-bg-plane5):not(.game-bg-plane6):not(.game-bg-stairs):not(.game-bg-cloud):not(.game-bg-cloud1):not(.game-bg-cloud2):not(.game-bg-people):not(.game-bg-men):not(.game-bg-men1):not(.game-bg-men2):not(.game-bg-girl):not(.game-bg-girl1):not(.game-bg-girl2):not(.game-bg-women):not(.game-bg-women1):not(.game-bg-sky):not(.game-bg-table) {
+  position: relative;
+  z-index: 20;
+}
+
 /* ── SPLASH ─────────────────────────────────────────── */
 #splash-screen {
   position: fixed;
   inset: 0;
-  background: radial-gradient(ellipse at center, #4a2c0a 0%, #1a0d00 100%);
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
   z-index: 100;
   gap: 28px;
+  padding-top: 4%;
+}
+
+#splash-city {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 50%;
+  object-fit: contain;
+  pointer-events: none;
 }
 
 #splash-screen h1 {
@@ -68,6 +276,17 @@ body::after {
   text-align: center;
   max-width: 460px;
   line-height: 1.7;
+}
+
+#splash-highscore-wrap {
+  position: absolute;
+  left: 40%;
+  top: 34%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
 }
 
 /* ── PREGAME COUNTDOWN ──────────────────────────────── */
@@ -136,7 +355,6 @@ body::after {
 #gameover-screen {
   position: fixed;
   inset: 0;
-  background: radial-gradient(ellipse at center, #4a2c0a 0%, #1a0d00 100%);
   flex-direction: column;
   justify-content: center;
   align-items: center;
@@ -183,7 +401,7 @@ body::after {
   font-size: 40px;
   font-weight: bold;
   color: #f0c040;
-  text-shadow: 0 0 16px #c8860a;
+  text-shadow: none;
   font-family: 'Arial Black', Impact, sans-serif;
 }
 
@@ -219,6 +437,14 @@ body::after {
 }
 
 /* ── SHARED BUTTON ──────────────────────────────────── */
+#btn-start {
+  position: absolute;
+  left: 50%;
+  top: 33%;
+  transform: translateY(-50%);
+  margin-top: 0;
+}
+
 #btn-start, #btn-restart {
   margin-top: 8px;
   padding: 15px 52px;
@@ -235,12 +461,21 @@ body::after {
   transition: transform 0.1s, box-shadow 0.1s;
 }
 
-#btn-start:hover, #btn-restart:hover {
+#btn-start:hover {
+  transform: translateY(calc(-50% - 2px));
+  box-shadow: 0 6px 24px rgba(0,0,0,0.6);
+}
+
+#btn-restart:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 24px rgba(0,0,0,0.6);
 }
 
-#btn-start:active, #btn-restart:active {
+#btn-start:active {
+  transform: translateY(-50%);
+}
+
+#btn-restart:active {
   transform: translateY(0);
 }
 
