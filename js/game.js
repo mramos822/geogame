@@ -129,6 +129,131 @@ function updateSplashHighscore() {
 }
 updateSplashHighscore();
 
+// ── GRADE COUNTS ─────────────────────────────────────────────────────────────
+let gradeCounts = { perfect: 0, good: 0, fair: 0 };
+let wrongCount = 0;
+
+function updateWrongCountUI() {
+  ['splash-wrong-total', 'gameover-wrong-total'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = wrongCount;
+  });
+}
+
+function saveGradeCount(grade) {
+  if (grade === 'perfect' || grade === 'good' || grade === 'fair') {
+    gradeCounts[grade]++;
+    updateGradeCountsUI();
+  } else if (grade === 'wayoff') {
+    wrongCount++;
+    updateWrongCountUI();
+  }
+}
+
+function updateGradeCountsUI() {
+  const total = gradeCounts.perfect + gradeCounts.good + gradeCounts.fair;
+  ['splash-count-total', 'gameover-count-total'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = total;
+  });
+}
+updateGradeCountsUI();
+updateWrongCountUI();
+
+function buildChecksRow() {
+  const row = document.getElementById('gameover-checks-row');
+  if (!row) return;
+  row.innerHTML = '';
+  const total = gradeCounts.perfect + gradeCounts.good + gradeCounts.fair;
+  const IMG_W = 58;
+  const BASE_GAP = 3;
+  const MAX_W = 12 * IMG_W + 11 * BASE_GAP; // 729px
+  const gap = total > 1 ? (total > 12 ? (MAX_W - total * IMG_W) / (total - 1) : BASE_GAP) : 0;
+  if (total === 0) {
+    const none = document.createElement('span');
+    none.textContent = 'None';
+    none.style.cssText = 'color:#ffffff;-webkit-text-stroke:7px #132886;paint-order:stroke fill;font-family:VAGRoundBold,"Arial Black",Impact,sans-serif;font-size:41px;font-weight:bold;position:relative;left:20px;';
+    row.appendChild(none);
+    return;
+  }
+
+  row.style.gap = '0px';
+  for (let i = 0; i < total; i++) {
+    const img = document.createElement('img');
+    img.src = 'images/check3.png';
+    img.alt = '';
+    img.style.animationDelay = `${i * 0.1}s`;
+    img.style.zIndex = 16 + i;
+    if (i < total - 1) img.style.marginRight = `${gap}px`;
+    row.appendChild(img);
+  }
+
+  // Ocultar contador y check3 estático hasta 0.2s después del último check
+  const check3Static   = gameoverScreen.querySelector('.game-bg-check3');
+  const gradeCountEl   = gameoverScreen.querySelector('.grade-count-total');
+  if (check3Static)  check3Static.style.opacity  = '0';
+  if (gradeCountEl)  gradeCountEl.style.opacity   = '0';
+
+  const revealDelay = (total > 0 ? (total - 1) * 0.1 + 0.2 : 0) + 0.2;
+  setTimeout(() => {
+    if (check3Static)  check3Static.style.opacity  = '1';
+    if (gradeCountEl)  gradeCountEl.style.opacity   = '1';
+  }, revealDelay * 1000);
+}
+
+function buildWrongsRow(startOffset = 0) {
+  const row = document.getElementById('gameover-wrongs-row');
+  if (!row) return;
+  row.innerHTML = '';
+  const total = wrongCount;
+  const IMG_W = 58;
+  const BASE_GAP = 3;
+  const MAX_W = 12 * IMG_W + 11 * BASE_GAP;
+  const gap = total > 1 ? (total > 12 ? (MAX_W - total * IMG_W) / (total - 1) : BASE_GAP) : 0;
+
+  if (total === 0) {
+    const none = document.createElement('span');
+    none.textContent = 'None';
+    none.style.cssText = 'color:#ffffff;-webkit-text-stroke:7px #132886;paint-order:stroke fill;font-family:VAGRoundBold,"Arial Black",Impact,sans-serif;font-size:41px;font-weight:bold;position:relative;left:20px;opacity:0;';
+    row.appendChild(none);
+    const w3s = gameoverScreen.querySelector('.game-bg-wrong3');
+    const wce = gameoverScreen.querySelector('.wrong-count-total');
+    if (w3s) w3s.style.opacity = '0';
+    if (wce) wce.style.opacity = '0';
+    setTimeout(() => {
+      none.style.opacity = '1';
+      if (w3s) w3s.style.opacity = '1';
+      if (wce) wce.style.opacity = '1';
+    }, startOffset * 1000);
+    return;
+  }
+
+  row.style.gap = '0px';
+  for (let i = 0; i < total; i++) {
+    const img = document.createElement('img');
+    img.src = 'images/wrong3.png';
+    img.alt = '';
+    img.style.animationDelay = `${startOffset + i * 0.1}s`;
+    img.style.zIndex = 16 + i;
+    if (i < total - 1) img.style.marginRight = `${gap}px`;
+    row.appendChild(img);
+  }
+
+  const wrong3Static   = gameoverScreen.querySelector('.game-bg-wrong3');
+  const wrongCountEl   = gameoverScreen.querySelector('.wrong-count-total');
+  const wrongTotalEl   = document.getElementById('gameover-wrong-total');
+  if (wrongTotalEl) wrongTotalEl.textContent = total;
+  const splashWrongEl = document.getElementById('splash-wrong-total');
+  if (splashWrongEl) splashWrongEl.textContent = total;
+  if (wrong3Static)  wrong3Static.style.opacity  = '0';
+  if (wrongCountEl)  wrongCountEl.style.opacity   = '0';
+  const revealDelay = startOffset + (total > 0 ? (total - 1) * 0.1 + 0.2 : 0) + 0.2;
+  setTimeout(() => {
+    if (wrong3Static)  wrong3Static.style.opacity  = '1';
+    if (wrongCountEl)  wrongCountEl.style.opacity   = '1';
+  }, revealDelay * 1000);
+}
+
 // El autoplay requiere interacción previa — arrancamos pregame en el primer toque
 function startPregameMusic() {
   playMusic(sfxPostgame);
@@ -516,6 +641,8 @@ canvas.addEventListener('click', (e) => {
   const d       = dist(clickX, clickY, correct.x, correct.y);
   const grade   = classify(d);
   const shownAt = state.cityShownAt;
+
+  saveGradeCount(grade);
 
   if (grade === 'wayoff') {
     state.streak = 0;
@@ -943,6 +1070,11 @@ function endGame() {
         newHighscoreScore.textContent = highscore.toLocaleString();
       }
       gameoverScreen.style.display = 'flex';
+      updateGradeCountsUI();
+      buildChecksRow();
+      const checksTotal = gradeCounts.perfect + gradeCounts.good + gradeCounts.fair;
+      const checksEndTime = (checksTotal > 0 ? (checksTotal - 1) * 0.1 + 0.2 : 0) + 0.4;
+      buildWrongsRow(checksEndTime);
       playMusic(sfxPostgame);
     }, 1000);
   }, 400 + 1200); // 400ms entrada + 1200ms hold
@@ -1042,6 +1174,9 @@ function startGame() {
   redimensionarJuego();
 
   resetState();
+  // Cambiar puntaje para testeo
+  gradeCounts = { perfect: 0, good: 0, fair: 0 };
+  wrongCount = 0;
   updateDotsUI();
   scoreValueEl.textContent     = '0';
   lastLbScore = -1;

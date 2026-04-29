@@ -1,3 +1,10 @@
+@font-face {
+  font-family: 'VAGRoundBold';
+  src: url('../fonts/OPTIVagRound-Bold.otf') format('opentype');
+  font-weight: bold;
+  font-style: normal;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -41,10 +48,19 @@ body::after {
 }
 
 
+/* ── OCULTAR STATS EN SPLASH ────────────────────────── */
+#splash-screen .game-bg-check3,
+#splash-screen .game-bg-wrong3,
+#splash-screen .grade-count-total,
+#splash-screen .wrong-count-total {
+  display: none;
+}
+
 /* ── FONDO COMPARTIDO (splash + gameover) ───────────── */
 .game-bg-screen {
   background: none;
   overflow: hidden;
+  position: relative;
 }
 
 
@@ -56,6 +72,127 @@ body::after {
   transform-origin: top center;
   pointer-events: none;
   z-index: 15;
+}
+
+.game-bg-check3 {
+  position: absolute;
+  top: 13%;
+  left: 70%;
+  transform: translateX(-50%) scale(0.98);
+  transform-origin: top center;
+  pointer-events: none;
+  z-index: 16;
+}
+
+.game-bg-wrong3 {
+  position: absolute;
+  top: 26%;
+  left: 70%;
+  transform: translateX(-50%) scale(0.98);
+  transform-origin: top center;
+  pointer-events: none;
+  z-index: 16;
+}
+
+.grade-count-total {
+  position: absolute;
+  top: 13%;
+  left: 72%;
+  color: #A4D300;
+  font-family: 'VAGRoundBold', 'Arial Black', Impact, sans-serif;
+  font-size: 41px;
+  font-weight: bold;
+  text-shadow: none;
+  z-index: 17;
+  pointer-events: none;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.grade-count-x {
+  font-size: 34px;
+}
+
+.wrong-count-total {
+  position: absolute !important;
+  top: 26%;
+  left: 72%;
+  transform: none;
+  color: #ff4444;
+  font-family: 'VAGRoundBold', 'Arial Black', Impact, sans-serif;
+  font-size: 41px;
+  font-weight: bold;
+  text-shadow: none;
+  z-index: 17;
+  pointer-events: none;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.wrong-count-x {
+  font-size: 34px;
+}
+
+.wrong-count-total span:last-child {
+  position: relative;
+  top: 4px;
+}
+
+.game-bg-check3-mid {
+  left: 31%;
+  transform: translateX(-50%) scale(0.98);
+}
+
+.checks-row {
+  position: absolute !important;
+  top: 16.5%;
+  left: 28%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  z-index: 16;
+  pointer-events: none;
+}
+
+.checks-row img {
+  width: 58px;
+  height: auto;
+  opacity: 0;
+  animation: check-pop-in 0.2s ease-out forwards;
+}
+
+@keyframes check-pop-in {
+  from { opacity: 1; transform: scale(0.5); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.wrongs-row {
+  position: absolute !important;
+  top: 29.4%;
+  left: 28%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  z-index: 16;
+  pointer-events: none;
+}
+
+.wrongs-row img {
+  width: 58px;
+  height: auto;
+  opacity: 0;
+  animation: check-pop-in 0.2s ease-out forwards;
+}
+
+.grade-count-total span:last-child {
+  position: relative;
+  top: 4px;
 }
 
 .game-bg-sky {
@@ -235,7 +372,7 @@ body::after {
   to   { clip-path: inset(0% 0 0 0); }
 }
 
-.game-bg-screen > *:not(.game-bg-city):not(.game-bg-plane):not(.game-bg-plane1):not(.game-bg-plane2):not(.game-bg-plane3):not(.game-bg-plane4):not(.game-bg-plane5):not(.game-bg-plane6):not(.game-bg-stairs):not(.game-bg-cloud):not(.game-bg-cloud1):not(.game-bg-cloud2):not(.game-bg-people):not(.game-bg-men):not(.game-bg-men1):not(.game-bg-men2):not(.game-bg-girl):not(.game-bg-girl1):not(.game-bg-girl2):not(.game-bg-women):not(.game-bg-women1):not(.game-bg-sky):not(.game-bg-table) {
+.game-bg-screen > *:not(.game-bg-city):not(.game-bg-plane):not(.game-bg-plane1):not(.game-bg-plane2):not(.game-bg-plane3):not(.game-bg-plane4):not(.game-bg-plane5):not(.game-bg-plane6):not(.game-bg-stairs):not(.game-bg-cloud):not(.game-bg-cloud1):not(.game-bg-cloud2):not(.game-bg-people):not(.game-bg-men):not(.game-bg-men1):not(.game-bg-men2):not(.game-bg-girl):not(.game-bg-girl1):not(.game-bg-girl2):not(.game-bg-women):not(.game-bg-women1):not(.game-bg-sky):not(.game-bg-table):not(.game-bg-check3):not(.game-bg-wrong3):not(.grade-count-total) {
   position: relative;
   z-index: 20;
 }
