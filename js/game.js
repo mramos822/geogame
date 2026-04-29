@@ -658,7 +658,7 @@ canvas.addEventListener('click', (e) => {
   const streakBonus = Math.round((base + bonusAmt) * (streakMult - 1));
   const totalGained = base + bonusAmt + streakBonus + inRowBonus;
   state.score += totalGained;
-  if (totalGained > 0) showScorePopup(totalGained);
+  if (base + bonusAmt + streakBonus > 0) showScorePopup(base + bonusAmt + streakBonus);
   if (bonusAmt > 0) {
     clearTimeout(speedBonusHideId);
     speedBonusText.classList.remove('visible');
@@ -717,10 +717,10 @@ canvas.addEventListener('click', (e) => {
 });
 
 // ── BADGE ─────────────────────────────────────────────────────────────────────
-const MILESTONE_BONUSES = { 3:100, 5:200, 10:300, 15:400, 20:500, 25:600, 30:700, 35:800, 40:900, 45:1000, 50:1100, 55:1200 };
+const MILESTONE_BONUSES = { 3:100, 5:200, 10:400, 15:500, 20:600, 25:800, 30:1200, 35:1500, 40:1800, 45:2000, 50:2500, 55:3000 };
 function getInRowBonus(streak) {
   if (MILESTONE_BONUSES[streak]) return MILESTONE_BONUSES[streak];
-  if (streak >= 60 && streak % 5 === 0) return (12 + (streak - 55) / 5) * 100;
+  if (streak >= 60 && streak % 5 === 0) return 3500 + ((streak - 60) / 5) * 500;
   return 0;
 }
 
@@ -1070,6 +1070,7 @@ function endGame() {
         newHighscoreScore.textContent = highscore.toLocaleString();
       }
       gameoverScreen.style.display = 'flex';
+      restartFlightAtt();
       updateGradeCountsUI();
       buildChecksRow();
       const checksTotal = gradeCounts.perfect + gradeCounts.good + gradeCounts.fair;
@@ -1231,3 +1232,56 @@ canvas.addEventListener('mouseleave', () => {
   coordTooltip.style.display = 'none';
 });
 */
+
+// ── FLIGHT ATTENDANT ANIMATION ───────────────────────────────────────────────
+let restartFlightAtt;
+(function () {
+  // [frameIndex (1-based), duration in ms until next frame]
+  const TIMELINE = [
+    [1,  150], [2,  100], [3,  150], [4,  100], [5,  100],
+    [6,  100], [7,  150], [8,   50], [9,   50], [10,  50],
+    [11, 100], [12, 100], [11, 100], [12, 100], [11, 100],
+    [12, 100], [13, 100], [14, 100], [15, 100], [6,  100],
+    [5,  100], [4,  100], [3,  100], [2,  100],
+  ];
+
+  const frames = document.querySelectorAll('.flightatt');
+
+  // Hide all except frame 1 on init
+  frames.forEach(img => {
+    const num = parseInt(img.src.match(/(\d+)\.png$/)[1]);
+    img.style.visibility = num === 1 ? 'visible' : 'hidden';
+  });
+
+  let step = 0;
+  let pendingTimeout = null;
+
+  restartFlightAtt = function () {
+    if (pendingTimeout) clearTimeout(pendingTimeout);
+    step = 0;
+    showFrame(1);
+    pendingTimeout = setTimeout(tick, TIMELINE[0][1]);
+  };
+
+  function showFrame(n) {
+    frames.forEach(img => {
+      const num = parseInt(img.src.match(/(\d+)\.png$/)[1]);
+      img.style.visibility = num === n ? 'visible' : 'hidden';
+    });
+  }
+
+  function tick() {
+    const [frameNum, duration] = TIMELINE[step];
+    showFrame(frameNum);
+    step++;
+    if (step >= TIMELINE.length) {
+      step = 0;
+      showFrame(1);
+      pendingTimeout = setTimeout(tick, 2000);
+    } else {
+      pendingTimeout = setTimeout(tick, duration);
+    }
+  }
+
+  pendingTimeout = setTimeout(tick, TIMELINE[0][1]);
+})();

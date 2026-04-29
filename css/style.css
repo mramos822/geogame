@@ -48,6 +48,16 @@ body::after {
 }
 
 
+/* ── FLIGHT ATTENDANT ───────────────────────────────── */
+.flightatt {
+  position: absolute !important;
+  top: 76%;
+  left: 75%;
+  transform: translate(-50%, -50%) scale(2.5);
+  pointer-events: none;
+  z-index: 18;
+}
+
 /* ── OCULTAR STATS EN SPLASH ────────────────────────── */
 #splash-screen .game-bg-check3,
 #splash-screen .game-bg-wrong3,
