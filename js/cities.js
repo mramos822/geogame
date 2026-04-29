@@ -6,6 +6,7 @@ const CITIES = [
   { name: "Salvador",            lat: -12.97, lon:  -38.50 },
   { name: "Curitiba",            lat: -25.43, lon:  -49.27 },
   { name: "Porto Alegre",        lat: -30.03, lon:  -51.23 },
+  { name: "Porto Velho",         lat:  -8.76, lon:  -63.90 },
   { name: "Río de Janeiro",      lat: -22.91, lon:  -43.17 },
   { name: "Brasilia",            lat: -15.78, lon:  -47.93 },
   { name: "Belo Horizonte",      lat: -19.92, lon:  -43.94 },
@@ -30,12 +31,24 @@ const CITIES = [
   { name: "Santa Cruz",          lat: -17.79, lon:  -63.18 },
   { name: "Georgetown",          lat:   6.80, lon:  -58.16 },
   { name: "Paramaribo",          lat:   5.87, lon:  -55.17 },
+  { name: "Santarém",           lat:  -2.44, lon:  -54.71 },
+  { name: "Iquitos",            lat:  -3.74, lon:  -73.25 },
+  { name: "Piura",              lat:  -5.19, lon:  -80.63 },
+  { name: "Antofagasta",        lat: -23.65, lon:  -70.40 },
+  { name: "Rancagua",           lat: -34.17, lon:  -70.74 },
+  { name: "Valparaíso",         lat: -33.05, lon:  -71.62 },
+  { name: "Ushuaia",            lat: -54.80, lon:  -68.30 },
+  { name: "Corrientes",         lat: -27.47, lon:  -58.83 },
+  { name: "Belém",              lat:  -1.46, lon:  -48.50 },
 
   // América Central y Caribe
   { name: "Ciudad de México",    lat:  19.43, lon:  -99.13 },
   { name: "Guadalajara",         lat:  20.67, lon: -103.35 },
   { name: "Monterrey",           lat:  25.67, lon: -100.31 },
   { name: "Cancún",              lat:  21.16, lon:  -86.85 },
+  { name: "Mérida",             lat:  20.97, lon:  -89.62 },
+  { name: "Tijuana",            lat:  32.53, lon: -117.04 },
+  { name: "Nassau",             lat:  25.05, lon:  -77.34 },
   { name: "Ciudad de Guatemala", lat:  14.64, lon:  -90.51 },
   { name: "San Salvador",        lat:  13.69, lon:  -89.19 },
   { name: "Tegucigalpa",         lat:  14.10, lon:  -87.20 },
@@ -47,6 +60,8 @@ const CITIES = [
   { name: "Santo Domingo",       lat:  18.48, lon:  -69.90 },
   { name: "Kingston",            lat:  17.99, lon:  -76.79 },
   { name: "Bridgetown",          lat:  13.10, lon:  -59.62 },
+  { name: "The Valley",         lat:  18.22, lon:  -63.05 },
+  { name: "Oranjestad",         lat:  12.52, lon:  -70.03 },
 
   // América del Norte
   { name: "Washington D.C.",     lat:  38.91, lon:  -77.04 },
@@ -73,6 +88,17 @@ const CITIES = [
   { name: "Vancouver",           lat:  49.25, lon: -123.12 },
   { name: "Calgary",             lat:  51.04, lon: -114.07 },
   { name: "Nuuk",                lat:  64.18, lon:  -51.74 },
+  { name: "Detroit",            lat:  42.33, lon:  -83.05 },
+  { name: "Baltimore",          lat:  39.29, lon:  -76.61 },
+  { name: "Nashville",          lat:  36.17, lon:  -86.78 },
+  { name: "Bridgeport",         lat:  41.18, lon:  -73.19 },
+  { name: "Wichita",            lat:  37.69, lon:  -97.34 },
+  { name: "Des Moines",         lat:  41.60, lon:  -93.61 },
+  { name: "Quebec",             lat:  46.81, lon:  -71.21 },
+  { name: "Winnipeg",           lat:  49.90, lon:  -97.14 },
+  { name: "Oklahoma City",      lat:  35.47, lon:  -97.52 },
+  { name: "Jacksonville",       lat:  30.33, lon:  -81.66 },
+  { name: "Orlando",            lat:  28.54, lon:  -81.38 },
 
   // Europa
   { name: "Londres",             lat:  51.51, lon:   -0.13 },
@@ -115,6 +141,20 @@ const CITIES = [
   { name: "Glasgow",             lat:  55.86, lon:   -4.25 },
   { name: "Dublín",              lat:  53.33, lon:   -6.25 },
   { name: "Reikiavik",           lat:  64.13, lon:  -21.94 },
+  { name: "Tallinn",            lat:  59.44, lon:   24.75 },
+  { name: "Nicosia",            lat:  35.17, lon:   33.36 },
+  { name: "Greenwich",          lat:  51.48, lon:    0.00 },
+  { name: "Birmingham",         lat:  52.48, lon:   -1.90 },
+  { name: "Tórshavn",           lat:  62.01, lon:   -6.77 },
+  { name: "Sarajevo",           lat:  43.85, lon:   18.36 },
+  { name: "Ljubljana",          lat:  46.05, lon:   14.51 },
+  { name: "Vaduz",              lat:  47.14, lon:    9.52 },
+  { name: "Niza",               lat:  43.70, lon:    7.26 },
+  { name: "Minsk",              lat:  53.90, lon:   27.57 },
+  { name: "Brno",               lat:  49.20, lon:   16.61 },
+  { name: "Andorra la Vella",   lat:  42.51, lon:    1.52 },
+  { name: "San Marino",         lat:  43.94, lon:   12.45 },
+  { name: "Cork",               lat:  51.90, lon:   -8.47 },
 
   // África
   { name: "El Cairo",            lat:  30.06, lon:   31.25 },
@@ -139,6 +179,11 @@ const CITIES = [
   { name: "Maputo",              lat: -25.97, lon:   32.59 },
   { name: "Harare",              lat: -17.83, lon:   31.05 },
   { name: "Antananarivo",        lat: -18.91, lon:   47.54 },
+  { name: "Lomé",               lat:   6.13, lon:    1.22 },
+  { name: "Mogadiscio",         lat:   2.05, lon:   45.34 },
+  { name: "Monrovia",           lat:   6.30, lon:  -10.80 },
+  { name: "Windhoek",           lat: -22.56, lon:   17.08 },
+  { name: "Mamoudzou",          lat: -12.78, lon:   45.23 },
 
   // Medio Oriente
   { name: "Riad",                lat:  24.69, lon:   46.72 },
@@ -149,6 +194,8 @@ const CITIES = [
   { name: "Amán",                lat:  31.96, lon:   35.95 },
   { name: "Beirut",              lat:  33.89, lon:   35.50 },
   { name: "Kuwait",              lat:  29.37, lon:   47.98 },
+  { name: "Muscat",             lat:  23.61, lon:   58.59 },
+  { name: "Al-Manama",         lat:  26.22, lon:   50.59 },
   { name: "Doha",                lat:  25.29, lon:   51.53 },
   { name: "Tel Aviv",            lat:  32.08, lon:   34.78 },
 
@@ -164,6 +211,8 @@ const CITIES = [
   { name: "Islamabad",           lat:  33.72, lon:   73.04 },
   { name: "Tashkent",            lat:  41.30, lon:   69.27 },
   { name: "Almaty",              lat:  43.26, lon:   76.95 },
+  { name: "Herat",               lat:  34.34, lon:   62.20 },
+  { name: "Petropavl",           lat:  54.87, lon:   69.16 },
 
   // Asia Oriental y Suroriental
   { name: "Beijing",             lat:  39.91, lon:  116.39 },
@@ -183,6 +232,11 @@ const CITIES = [
   { name: "Rangún",              lat:  16.80, lon:   96.16 },
   { name: "Nom Pen",             lat:  11.57, lon:  104.92 },
   { name: "Ulán Bator",          lat:  47.91, lon:  106.90 },
+  { name: "Vientiane",          lat:  17.97, lon:  102.60 },
+  { name: "Kota Kinabalu",      lat:   5.98, lon:  116.07 },
+  { name: "Hiroshima",          lat:  34.39, lon:  132.45 },
+  { name: "Nagasaki",           lat:  32.74, lon:  129.87 },
+  { name: "Ürümqi",             lat:  43.82, lon:   87.60 },
 
   // Oceanía
   { name: "Sídney",              lat: -33.87, lon:  151.21 },
