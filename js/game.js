@@ -1,8 +1,110 @@
+// ── LOADING SCREEN ───────────────────────────────────────────────────────────
+(function () {
+  const IMAGES = [
+    'images/checkerrortable.png','images/check3.png','images/wrong3.png',
+    'images/bg/sky.png','images/bg/cloud1.png','images/bg/cloud2.png',
+    'images/bg/level3complete.png','images/bg/stairs.png',
+    'images/bg/plane.png','images/bg/plane2.png','images/bg/plane3.png',
+    'images/bg/plane4.png','images/bg/plane5.png','images/bg/plane6.png',
+    'images/characters/people.png','images/characters/men1.png','images/characters/men2.png',
+    'images/characters/women1.png','images/characters/girl1.png','images/characters/girl2.png',
+    'images/characters/flightattpost2/1.png','images/characters/flightattpost2/2.png',
+    'images/characters/flightattpost2/3.png','images/characters/flightattpost2/4.png',
+    'images/characters/flightattpost2/5.png','images/characters/flightattpost2/6.png',
+    'images/characters/flightattpost2/7.png','images/characters/flightattpost2/8.png',
+    'images/characters/flightattpost2/9.png','images/characters/flightattpost2/10.png',
+    'images/characters/flightattpost2/11.png',
+    'images/characters/flightattpost/1.png','images/characters/flightattpost/2.png',
+    'images/characters/flightattpost/3.png','images/characters/flightattpost/4.png',
+    'images/characters/flightattpost/5.png','images/characters/flightattpost/6.png',
+    'images/characters/flightattpost/7.png','images/characters/flightattpost/8.png',
+    'images/characters/flightattpost/9.png','images/characters/flightattpost/10.png',
+    'images/characters/flightattpost/11.png','images/characters/flightattpost/12.png',
+    'images/characters/flightattpost/13.png','images/characters/flightattpost/14.png',
+    'images/characters/flightattpost/15.png',
+    'images/howtoplaytable.png','images/confirm1.png','images/confirm2.png',
+    'images/text1.png','images/text2.png',
+    'images/tag3.png','images/countdown.png','images/points.png',
+    'images/countdown/1.png','images/countdown/2.png','images/countdown/3.png',
+    'images/countdown/go.png','images/countdown/timeup.png',
+    'images/badges/bluebadge.png','images/badges/garnetbadge.png',
+    'images/badges/goldbadge.png','images/badges/greenbadge.png',
+    'images/badges/redbadge.png','images/badges/silverbadge.png',
+    'images/badges/yellowbadge.png',
+    'images/mapimage.png','images/countdownred.png',
+    'images/pin1.png','images/pin2.png',
+    'images/vol1.png','images/vol2.png','images/logo.png',
+  ];
+
+  const AUDIO = [
+    'sfx/check.mp3','sfx/postgameloop.mp3','sfx/pin.mp3',
+    'sfx/countdown.mp3','sfx/cuentaregresiva.mp3','sfx/error.mp3',
+    'sfx/acertar.mp3','sfx/verynice.mp3','sfx/tag.mp3',
+    'sfx/bonus.mp3','sfx/timesup.mp3','sfx/gamemusic.mp3','sfx/select.mp3',
+  ];
+
+  const barFill = document.getElementById('loading-bar-fill');
+  const pctEl   = document.getElementById('loading-pct');
+  const playBtn = document.getElementById('loading-play-btn');
+
+  // Cada promesa representa un asset completamente cargado
+  const promises = [];
+
+  IMAGES.forEach(src => {
+    promises.push(new Promise(resolve => {
+      const img = new Image();
+      img.onload = img.onerror = resolve;
+      img.src = src;
+    }));
+  });
+
+  // fetch garantiza descarga completa del archivo de audio
+  AUDIO.forEach(src => {
+    promises.push(
+      fetch(src).then(r => r.arrayBuffer()).catch(() => {})
+    );
+  });
+
+  // Fuentes completamente renderizadas
+  promises.push(document.fonts.ready);
+
+  // Página y todos sus sub-recursos listos
+  promises.push(new Promise(resolve => {
+    if (document.readyState === 'complete') resolve();
+    else window.addEventListener('load', resolve, { once: true });
+  }));
+
+  const total = promises.length;
+  let done = 0;
+
+  function tick() {
+    done++;
+    const pct = Math.min(100, Math.round(done / total * 100));
+    barFill.style.width = pct + '%';
+    pctEl.textContent   = pct + '%';
+    if (done >= total) playBtn.style.display = 'block';
+  }
+
+  promises.forEach(p => Promise.resolve(p).then(tick, tick));
+
+})();
+
 // ── SFX ───────────────────────────────────────────────────────────────────────
 // Solo check y postgame se necesitan en el splash — el resto se difiere al primer juego
-const sfxCheck    = new Audio('sfx/check.mp3');
-const sfxPostgame = new Audio('sfx/postgameloop.mp3');
-sfxPostgame.loop  = true;
+const sfxCheck     = new Audio('sfx/check.mp3');
+const sfxPostgame  = new Audio('sfx/postgameloop.mp3');
+sfxPostgame.loop   = true;
+const sfxGameMusic = new Audio('sfx/gamemusic.mp3');
+sfxGameMusic.loop  = true;
+const sfxSelect    = new Audio('sfx/select.mp3');
+if (localStorage.getItem('muted') === 'true') { sfxCheck.volume = 0; sfxPostgame.volume = 0; sfxGameMusic.volume = 0; sfxSelect.volume = 0; }
+
+document.getElementById('loading-play-btn').addEventListener('click', () => {
+  sfxCheck.currentTime = 0; sfxCheck.play();
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('splash-screen').style.display  = 'flex';
+  playMusic(sfxPostgame);
+});
 
 let sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus, sfxTickdown, sfxTimesUp;
 
@@ -21,7 +123,7 @@ function loadGameSFX() {
 }
 
 function playMusic(track) {
-  [sfxPostgame].forEach(t => { if (t !== track) { t.pause(); t.currentTime = 0; } });
+  [sfxPostgame, sfxGameMusic].forEach(t => { if (t !== track) { t.pause(); t.currentTime = 0; } });
   if (!track) return;
   track.currentTime = 0;
   const p = track.play();
@@ -273,12 +375,6 @@ function buildWrongsRow(startOffset = 0) {
   }, revealDelay * 1000);
 }
 
-// El autoplay requiere interacción previa — arrancamos pregame en el primer toque
-function startPregameMusic() {
-  playMusic(sfxPostgame);
-  splashScreen.removeEventListener('click', startPregameMusic);
-}
-splashScreen.addEventListener('click', startPregameMusic);
 
 // ── LEADERBOARD ──────────────────────────────────────────────────────────────────────────────
 const LB_COLORS = ['#e74c3c','#e67e22','#f1c40f','#2ecc71','#1abc9c',
@@ -496,7 +592,7 @@ function easeOutBounce(t) {
 }
 
 // ── TAG ANIMATION ────────────────────────────────────────────────────────────
-function slideTagIn(cityName) {
+function slideTagIn(cityName, countryCode) {
   const wasVisible = cityTagEl.style.left !== '' && cityTagEl.style.left !== '-420px';
   if (wasVisible) {
     const ghost = cityTagEl.cloneNode(true);
@@ -514,16 +610,29 @@ function slideTagIn(cityName) {
     }, 450);
   }
 
-  cityTagText.textContent = cityName;
-  // Reduce el font-size progresivamente si el nombre es largo, mínimo 14px
-  const baseSize = 26;
-  const maxWidth = 230; // px disponibles en el tag
-  cityTagText.style.fontSize = baseSize + 'px';
-  let fs = baseSize;
-  while (fs > 14 && cityTagText.scrollWidth > maxWidth) {
-    fs--;
-    cityTagText.style.fontSize = fs + 'px';
+  if (slideTagIn._countryTimer) clearTimeout(slideTagIn._countryTimer);
+  slideTagIn._hintShown = false;
+
+  function setTagText(text) {
+    cityTagText.textContent = text;
+    const baseSize = 26;
+    const maxWidth = 230;
+    cityTagText.style.fontSize = baseSize + 'px';
+    let fs = baseSize;
+    while (fs > 14 && cityTagText.scrollWidth > maxWidth) {
+      fs--;
+      cityTagText.style.fontSize = fs + 'px';
+    }
   }
+
+  setTagText(cityName);
+  if (countryCode) {
+    slideTagIn._countryTimer = setTimeout(() => {
+      slideTagIn._hintShown = true;
+      setTagText(`${cityName}, ${countryCode}`);
+    }, 5000);
+  }
+
   cityTagEl.style.visibility = 'hidden';
   cityTagEl.style.transition = 'none';
   cityTagEl.style.top  = '-130px';
@@ -638,13 +747,14 @@ function nextCity() {
   state.currentCity = state.cityPool[state.poolIndex++];
   state.cityShownAt = Date.now();
   state.phase = 'waiting';
-  slideTagIn(state.currentCity.name);
+  slideTagIn(state.currentCity.name, state.currentCity.country);
 }
 
 // ── CLICK ─────────────────────────────────────────────────────────────────────
 canvas.addEventListener('click', (e) => {
   if (!state || state.phase !== 'waiting') return;
   state.phase = 'animating';
+  if (slideTagIn._countryTimer) { clearTimeout(slideTagIn._countryTimer); slideTagIn._countryTimer = null; }
   sfxPin.currentTime = 0;
   sfxPin.play();
 
@@ -675,9 +785,10 @@ canvas.addEventListener('click', (e) => {
 
   const { base, bonusAmt } = computeScore(grade, shownAt);
   const streakBonus = Math.round((base + bonusAmt) * (streakMult - 1));
-  const totalGained = base + bonusAmt + streakBonus + inRowBonus;
+  const hintMult = slideTagIn._hintShown ? 0.5 : 1;
+  const totalGained = Math.round((base + bonusAmt + streakBonus) * hintMult) + inRowBonus;
   state.score += totalGained;
-  if (base + bonusAmt + streakBonus > 0) showScorePopup(base + bonusAmt + streakBonus);
+  if (base + bonusAmt + streakBonus > 0) showScorePopup(Math.round((base + bonusAmt + streakBonus) * hintMult));
   if (bonusAmt > 0) {
     clearTimeout(speedBonusHideId);
     speedBonusText.classList.remove('visible');
@@ -1053,6 +1164,7 @@ function endGame() {
   countdownImg.style.animationPlayState = 'paused';
 
   // Mostrar overlay timeup.png
+  playMusic(null);
   sfxTimesUp.currentTime = 0; sfxTimesUp.play();
   timeupOverlay.style.display = 'flex';
   timeupOverlay.classList.remove('timeup-out');
@@ -1148,7 +1260,7 @@ const PREGAME_STEPS = [
   { src: 'images/countdown/3.png', hold: 750,  size: 420 },
   { src: 'images/countdown/2.png', hold: 750,  size: 420 },
   { src: 'images/countdown/1.png', hold: 750,  size: 420 },
-  { src: 'images/countdown/go.png', hold: 750, size: 490 },
+  { src: 'images/countdown/go.png', hold: 950, size: 490 },
 ];
 
 function runPregameCountdown(onDone) {
@@ -1181,7 +1293,6 @@ function runPregameCountdown(onDone) {
 function startGame() {
   loadBadges();
   loadGameSFX();
-  splashScreen.removeEventListener('click', startPregameMusic);
   clearInterval(timerIntervalId);
   if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
   canvas.style.pointerEvents = '';
@@ -1226,6 +1337,7 @@ function startGame() {
 
   // Cuenta regresiva antes de arrancar el timer y la primera ciudad
   runPregameCountdown(() => {
+    playMusic(sfxGameMusic);
     startTimer();
     setTimeout(nextCity, 100);
   });
@@ -1234,14 +1346,22 @@ function startGame() {
 btnStart.addEventListener('click', () => { sfxCheck.currentTime = 0; sfxCheck.play(); startGame(); });
 
 let confirmStep = 0;
+let confirmCooldown = false;
+function confirmCooldownLock() {
+  confirmCooldown = true;
+  setTimeout(() => { confirmCooldown = false; }, 100);
+}
+
 document.querySelector('.splash-confirm-wrap')?.addEventListener('click', () => {
+  if (confirmCooldown) return;
+  confirmCooldownLock();
   const a = new Audio('sfx/check.mp3'); a.volume = isMuted ? 0 : 1; a.play();
   const wrap = document.querySelector('.splash-confirm-wrap');
   wrap.classList.add('confirm-pressed');
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
   if (confirmStep === 0) {
     const label = document.querySelector('.splash-text2-label');
-    if (label) label.textContent = 'Coloca un pin en el mapa donde creas que cada ciudad se ubica. ¡Haz click en el botón VERDE cuando estes listo!';
+    if (label) { label.textContent = 'Coloca un pin en el mapa donde creas que cada ciudad se ubica. ¡Haz click en el botón VERDE cuando estes listo!'; label.classList.add('step2'); }
     const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
     if (howtoWrap) howtoWrap.classList.add('slide-down');
     const howtoVideo = document.querySelector('.splash-howtoplay-video');
@@ -1252,6 +1372,8 @@ document.querySelector('.splash-confirm-wrap')?.addEventListener('click', () => 
   }
 });
 document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () => {
+  if (confirmCooldown) return;
+  confirmCooldownLock();
   const a = new Audio('sfx/check.mp3'); a.volume = isMuted ? 0 : 1; a.play();
   const wrap = document.querySelector('.gameover-confirm-wrap');
   wrap.classList.add('confirm-pressed');
@@ -1394,14 +1516,38 @@ let restartFlightAtt;
 })();
 
 // ── VOLUME TOGGLE ─────────────────────────────────────────────────────────────
-let isMuted = false;
+let isMuted = localStorage.getItem('muted') === 'true';
 
 function getAllSfx() {
-  return [sfxCheck, sfxPostgame, sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus, sfxTickdown, sfxTimesUp].filter(Boolean);
+  return [sfxCheck, sfxPostgame, sfxGameMusic, sfxSelect, sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus, sfxTickdown, sfxTimesUp].filter(Boolean);
 }
+
+// Apply saved mute state to the icon on page load
+document.addEventListener('DOMContentLoaded', () => {
+  if (isMuted) {
+    const img = document.getElementById('vol-img');
+    if (img) img.src = 'images/vol2.png';
+  }
+});
+
+// ── HOVER SOUNDS ──────────────────────────────────────────────────────────────
+function playSelect() { sfxSelect.currentTime = 0; sfxSelect.play(); }
+
+[
+  document.getElementById('loading-play-btn'),
+  document.querySelector('.splash-confirm-wrap'),
+  document.querySelector('.gameover-confirm-wrap'),
+  document.getElementById('vol-btn'),
+].forEach(el => el?.addEventListener('mouseenter', playSelect));
+
+[
+  document.querySelector('.splash-confirm-wrap'),
+  document.querySelector('.gameover-confirm-wrap'),
+].forEach(el => el?.addEventListener('mouseleave', playSelect));
 
 document.getElementById('vol-btn')?.addEventListener('click', () => {
   isMuted = !isMuted;
+  localStorage.setItem('muted', isMuted);
   const vol = isMuted ? 0 : 1;
   getAllSfx().forEach(sfx => { sfx.volume = vol; });
   document.getElementById('vol-img').src = isMuted ? 'images/vol2.png' : 'images/vol1.png';

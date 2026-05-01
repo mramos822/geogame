@@ -119,9 +119,13 @@ body::after {
   font-size: 8px;
   line-height: 1.5;
   padding: 8%;
-  padding-top: 15%;
+  padding-top: 20%;
   padding-left: 14%;
   z-index: 21;
+}
+
+.splash-text2-label.step2 {
+  padding-top: 15%;
 }
 
 .gameover-text1-wrap {
@@ -624,6 +628,75 @@ body::after {
 .game-bg-screen > *:not(.game-bg-city):not(.game-bg-plane):not(.game-bg-plane1):not(.game-bg-plane2):not(.game-bg-plane3):not(.game-bg-plane4):not(.game-bg-plane5):not(.game-bg-plane6):not(.game-bg-stairs):not(.game-bg-cloud):not(.game-bg-cloud1):not(.game-bg-cloud2):not(.game-bg-people):not(.game-bg-men):not(.game-bg-men1):not(.game-bg-men2):not(.game-bg-girl):not(.game-bg-girl1):not(.game-bg-girl2):not(.game-bg-women):not(.game-bg-women1):not(.game-bg-sky):not(.game-bg-table):not(.game-bg-check3):not(.game-bg-wrong3):not(.grade-count-total):not(.splash-confirm1):not(.splash-confirm2):not(.splash-confirm-wrap):not(.splash-howtoplaytable):not(.splash-howtoplay-wrap):not(.splash-howtoplay-video):not(.splash-text2-wrap):not(.gameover-confirm-wrap):not(.gameover-confirm1):not(.gameover-confirm2):not(.gameover-text1-wrap):not(.gameover-text1):not(.gameover-text1-label) {
   position: relative;
   z-index: 20;
+}
+
+/* ── LOADING SCREEN ─────────────────────────────────── */
+#loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: #5b9fd4;
+}
+
+.loading-logo {
+  width: clamp(200px, 36%, 420px);
+  height: auto;
+  margin-bottom: 8px;
+}
+
+.loading-bar-track {
+  width: clamp(200px, 40%, 400px);
+  height: 20px;
+  background: rgba(0,0,0,0.2);
+  border-radius: 999px;
+  overflow: hidden;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.loading-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #f9e04b, #f4a800);
+  border-radius: 999px;
+  transition: width 0.2s ease;
+  box-shadow: 0 0 8px rgba(244,168,0,0.6);
+}
+
+.loading-pct {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 15px;
+  color: rgba(255,255,255,0.85);
+  letter-spacing: 1px;
+}
+
+#loading-play-btn {
+  margin-top: 16px;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: clamp(16px, 2.5vw, 22px);
+  color: #fff;
+  background: #2ecc71;
+  border: none;
+  border-radius: 999px;
+  padding: 14px 48px;
+  cursor: pointer;
+  box-shadow: 0 5px 0 #1a8a4a, 0 8px 16px rgba(0,0,0,0.25);
+  transition: transform 0.08s, box-shadow 0.08s;
+  animation: pop-in 0.35s cubic-bezier(0.34,1.56,0.64,1) forwards;
+}
+
+#loading-play-btn:active {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 #1a8a4a, 0 2px 6px rgba(0,0,0,0.2);
+}
+
+@keyframes pop-in {
+  from { transform: scale(0.5); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
 }
 
 /* ── SPLASH ─────────────────────────────────────────── */

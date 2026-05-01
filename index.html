@@ -8,7 +8,16 @@
 </head>
 <body>
 
-  <div id="splash-screen" class="game-bg-screen">
+  <div id="loading-screen">
+    <img class="loading-logo" src="images/logo.png" alt="City Blitz">
+    <div class="loading-bar-track">
+      <div class="loading-bar-fill" id="loading-bar-fill"></div>
+    </div>
+    <div class="loading-pct" id="loading-pct">0%</div>
+    <button id="loading-play-btn" style="display:none">¡Jugar!</button>
+  </div>
+
+  <div id="splash-screen" class="game-bg-screen" style="display:none">
     <img class="game-bg-table" src="images/checkerrortable.png" alt="" loading="lazy">
     <img class="game-bg-check3" src="images/check3.png" alt="" loading="lazy">
     <span class="grade-count-total"><span class="grade-count-x">x</span><span id="splash-count-total">0</span></span>
@@ -57,7 +66,7 @@
     </div><button id="btn-start" style="display:none">Jugar</button>
 <div class="splash-text2-wrap">
       <img class="splash-text2" src="images/text2.png" alt="">
-      <p class="splash-text2-label">Ahora vamos a ver a qué ciudad está yendo cada viajero. Aquí es donde tú entras.</p>
+      <p class="splash-text2-label">¡Veamos a qué ciudad va cada uno! Aquí es donde tú entras a formar parte.</p>
     </div>
   </div>
 
@@ -110,7 +119,7 @@
     </div>
     <div class="gameover-text1-wrap">
       <img class="gameover-text1" src="images/text1.png" alt="">
-      <p class="gameover-text1-label">¡Buen trabajo! ¡Todos llegaron a sus ciudades de destino!</p>
+      <p class="gameover-text1-label">¡Buen intento! ¡Todos llegaron a sus ciudades de destino!</p>
     </div>
     <div class="gameover-confirm-wrap">
       <img class="gameover-confirm1" src="images/confirm1.png" alt="">
