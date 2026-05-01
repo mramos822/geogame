@@ -28,7 +28,7 @@ const CITIES = [
   { name: "Montevideo",          lat: -34.90, lon:  -56.19 },
   { name: "La Paz",              lat: -16.50, lon:  -68.15 },
   { name: "Cochabamba",          lat: -17.39, lon:  -66.16 },
-  { name: "Santa Cruz",          lat: -17.79, lon:  -63.18 },
+  { name: "Santa Cruz de la Sierra", lat: -17.79, lon:  -63.18 },
   { name: "Georgetown",          lat:   6.80, lon:  -58.16 },
   { name: "Paramaribo",          lat:   5.87, lon:  -55.17 },
   { name: "Santarém",           lat:  -2.44, lon:  -54.71 },

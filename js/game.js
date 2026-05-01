@@ -104,14 +104,26 @@ const imgMap  = new Image(); imgMap.src  = 'images/mapimage.png';
 const imgPin1 = new Image(); imgPin1.src = 'images/pin1.png';
 const imgPin2 = new Image(); imgPin2.src = 'images/pin2.png';
 const imgStar  = new Image(); imgStar.src  = 'images/stareffect.png';
-const imgCheck       = new Image(); imgCheck.src       = 'images/check.png';
-const imgBadgeGold   = new Image(); imgBadgeGold.src   = 'images/badges/goldbadge.png';
-const imgBadgeGreen  = new Image(); imgBadgeGreen.src  = 'images/badges/greenbadge.png';
-const imgBadgeRed    = new Image(); imgBadgeRed.src    = 'images/badges/redbadge.png';
-const imgBadgeBlue   = new Image(); imgBadgeBlue.src   = 'images/badges/bluebadge.png';
-const imgBadgeGarnet = new Image(); imgBadgeGarnet.src = 'images/badges/garnetbadge.png';
-const imgBadgeYellow = new Image(); imgBadgeYellow.src = 'images/badges/yellowbadge.png';
-const imgBadgeSilver = new Image(); imgBadgeSilver.src = 'images/badges/silverbadge.png';
+const imgCheck       = new Image(); imgCheck.src = 'images/check.png';
+
+// Badges cargados diferido — no se necesitan hasta el gameover
+const imgBadgeGold   = new Image();
+const imgBadgeGreen  = new Image();
+const imgBadgeRed    = new Image();
+const imgBadgeBlue   = new Image();
+const imgBadgeGarnet = new Image();
+const imgBadgeYellow = new Image();
+const imgBadgeSilver = new Image();
+
+function loadBadges() {
+  imgBadgeGold.src   = 'images/badges/goldbadge.png';
+  imgBadgeGreen.src  = 'images/badges/greenbadge.png';
+  imgBadgeRed.src    = 'images/badges/redbadge.png';
+  imgBadgeBlue.src   = 'images/badges/bluebadge.png';
+  imgBadgeGarnet.src = 'images/badges/garnetbadge.png';
+  imgBadgeYellow.src = 'images/badges/yellowbadge.png';
+  imgBadgeSilver.src = 'images/badges/silverbadge.png';
+}
 
 // ── STATE ────────────────────────────────────────────────────────────────────
 let state          = null;
@@ -1160,6 +1172,7 @@ function runPregameCountdown(onDone) {
 
 // ── START ─────────────────────────────────────────────────────────────────────
 function startGame() {
+  loadBadges();
   splashScreen.removeEventListener('click', startPregameMusic);
   clearInterval(timerIntervalId);
   if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
@@ -1211,6 +1224,25 @@ function startGame() {
 }
 
 btnStart.addEventListener('click', () => { sfxCheck.currentTime = 0; sfxCheck.play(); startGame(); });
+
+let confirmStep = 0;
+document.querySelector('.splash-confirm-wrap')?.addEventListener('click', () => {
+  new Audio('sfx/check.mp3').play();
+  const wrap = document.querySelector('.splash-confirm-wrap');
+  wrap.classList.add('confirm-pressed');
+  setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
+  if (confirmStep === 0) {
+    const label = document.querySelector('.splash-text2-label');
+    if (label) label.textContent = 'Coloca un pin en el mapa donde creas que cada ciudad se ubica. ¡Haz click en el botón VERDE cuando estes listo!';
+    const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
+    if (howtoWrap) howtoWrap.classList.add('slide-down');
+    const howtoVideo = document.querySelector('.splash-howtoplay-video');
+    if (howtoVideo) howtoVideo.play();
+    confirmStep = 1;
+  } else {
+    startGame();
+  }
+});
 btnRestart.addEventListener('click', () => { sfxCheck.currentTime = 0; sfxCheck.play(); startGame(); });
 
 /* ── COORD TOOLTIP ─────────────────────────────────────────────────────────────
@@ -1285,3 +1317,22 @@ let restartFlightAtt;
 
   pendingTimeout = setTimeout(tick, TIMELINE[0][1]);
 })();
+
+// ── SPLASH ANIMATE-IN (una sola vez al cargar) ───────────────────────────────
+(function () {
+  document.querySelectorAll('#splash-screen .flightatt, .splash-text2-wrap').forEach(el => {
+    el.classList.add('animate-in');
+  });
+})();
+
+// ── SPLASH TEXT2 RESPONSIVE ──────────────────────────────────────────────────
+(function () {
+  const wrap  = document.querySelector('.splash-text2-wrap');
+  const label = document.querySelector('.splash-text2-label');
+  if (!wrap || !label) return;
+  const ro = new ResizeObserver(() => {
+    label.style.fontSize = (wrap.offsetWidth * 0.055) + 'px';
+  });
+  ro.observe(wrap);
+})();
+
