@@ -1,16 +1,24 @@
 // ── SFX ───────────────────────────────────────────────────────────────────────
-const sfxPin       = new Audio('sfx/pin.mp3');
-const sfxCountdown = new Audio('sfx/cuentaregresiva.mp3');
-const sfxError     = new Audio('sfx/error.mp3');
-const sfxAcertar   = new Audio('sfx/acertar.mp3');
-const sfxVeryNice  = new Audio('sfx/verynice.mp3');
-const sfxTag       = new Audio('sfx/tag.mp3');
-const sfxBonus     = new Audio('sfx/bonus.mp3');
-const sfxTickdown  = new Audio('sfx/countdown.mp3');
-const sfxTimesUp   = new Audio('sfx/timesup.mp3');
-const sfxCheck     = new Audio('sfx/check.mp3');
-const sfxPostgame  = new Audio('sfx/postgameloop.mp3');
-sfxPostgame.loop   = true;
+// Solo check y postgame se necesitan en el splash — el resto se difiere al primer juego
+const sfxCheck    = new Audio('sfx/check.mp3');
+const sfxPostgame = new Audio('sfx/postgameloop.mp3');
+sfxPostgame.loop  = true;
+
+let sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus, sfxTickdown, sfxTimesUp;
+
+function loadGameSFX() {
+  if (sfxPin) return;
+  sfxPin       = new Audio('sfx/pin.mp3');
+  sfxCountdown = new Audio('sfx/cuentaregresiva.mp3');
+  sfxError     = new Audio('sfx/error.mp3');
+  sfxAcertar   = new Audio('sfx/acertar.mp3');
+  sfxVeryNice  = new Audio('sfx/verynice.mp3');
+  sfxTag       = new Audio('sfx/tag.mp3');
+  sfxBonus     = new Audio('sfx/bonus.mp3');
+  sfxTickdown  = new Audio('sfx/countdown.mp3');
+  sfxTimesUp   = new Audio('sfx/timesup.mp3');
+  if (isMuted) getAllSfx().forEach(sfx => { sfx.volume = 0; });
+}
 
 function playMusic(track) {
   [sfxPostgame].forEach(t => { if (t !== track) { t.pause(); t.currentTime = 0; } });
@@ -84,7 +92,6 @@ const splashHighscoreEl  = document.getElementById('splash-highscore-value');
 const newHighscoreBanner = document.getElementById('new-highscore-banner');
 const newHighscoreScore  = document.getElementById('new-highscore-score');
 const btnStart          = document.getElementById('btn-start');
-const btnRestart        = document.getElementById('btn-restart');
 const progressContainer = document.getElementById('progress-dots');
 const scoreDisplayEl    = document.getElementById('score-display');
 const lbBestScoreEl     = document.getElementById('lb-best-score');
@@ -1173,6 +1180,7 @@ function runPregameCountdown(onDone) {
 // ── START ─────────────────────────────────────────────────────────────────────
 function startGame() {
   loadBadges();
+  loadGameSFX();
   splashScreen.removeEventListener('click', startPregameMusic);
   clearInterval(timerIntervalId);
   if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
@@ -1227,7 +1235,7 @@ btnStart.addEventListener('click', () => { sfxCheck.currentTime = 0; sfxCheck.pl
 
 let confirmStep = 0;
 document.querySelector('.splash-confirm-wrap')?.addEventListener('click', () => {
-  new Audio('sfx/check.mp3').play();
+  const a = new Audio('sfx/check.mp3'); a.volume = isMuted ? 0 : 1; a.play();
   const wrap = document.querySelector('.splash-confirm-wrap');
   wrap.classList.add('confirm-pressed');
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
@@ -1243,7 +1251,13 @@ document.querySelector('.splash-confirm-wrap')?.addEventListener('click', () => 
     startGame();
   }
 });
-btnRestart.addEventListener('click', () => { sfxCheck.currentTime = 0; sfxCheck.play(); startGame(); });
+document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () => {
+  const a = new Audio('sfx/check.mp3'); a.volume = isMuted ? 0 : 1; a.play();
+  const wrap = document.querySelector('.gameover-confirm-wrap');
+  wrap.classList.add('confirm-pressed');
+  setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
+  startGame();
+});
 
 /* ── COORD TOOLTIP ─────────────────────────────────────────────────────────────
 canvas.addEventListener('mousemove', (e) => {
@@ -1264,6 +1278,38 @@ canvas.addEventListener('mouseleave', () => {
   coordTooltip.style.display = 'none';
 });
 */
+
+// ── SPLASH FLIGHT ATTENDANT (flightattpost2) ─────────────────────────────────
+(function () {
+  // [frameNum, ms until next frame]
+  const TIMELINE2 = [
+    [1, 150], [2, 100], [3, 150], [4, 150], [5, 150],
+    [6,  50], [7, 150], [8, 200], [7, 200], [8, 200],
+    [11,200], [5, 200], [6, 200], [9,  50], [8, 200],
+    [11,150], [10,100], [7, 150], [8, 150], [3, 150],
+    [2, 150], [1, 1000],
+  ];
+
+  const frames = document.querySelectorAll('#splash-screen .flightatt-splash');
+  frames.forEach(img => {
+    img.style.visibility = img.dataset.frame === '1' ? 'visible' : 'hidden';
+  });
+
+  function showFrame(n) {
+    frames.forEach(img => {
+      img.style.visibility = img.dataset.frame === String(n) ? 'visible' : 'hidden';
+    });
+  }
+
+  let step = 0;
+  function tick() {
+    const [frameNum, duration] = TIMELINE2[step];
+    showFrame(frameNum);
+    step = (step + 1) % TIMELINE2.length;
+    setTimeout(tick, duration);
+  }
+  setTimeout(tick, TIMELINE2[0][1]);
+})();
 
 // ── FLIGHT ATTENDANT ANIMATION ───────────────────────────────────────────────
 let restartFlightAtt;
@@ -1320,7 +1366,7 @@ let restartFlightAtt;
 
 // ── SPLASH ANIMATE-IN (una sola vez al cargar) ───────────────────────────────
 (function () {
-  document.querySelectorAll('#splash-screen .flightatt, .splash-text2-wrap').forEach(el => {
+  document.querySelectorAll('#splash-screen .flightatt-splash, .splash-text2-wrap').forEach(el => {
     el.classList.add('animate-in');
   });
 })();
@@ -1335,4 +1381,30 @@ let restartFlightAtt;
   });
   ro.observe(wrap);
 })();
+
+// ── GAMEOVER TEXT1 RESPONSIVE ─────────────────────────────────────────────────
+(function () {
+  const wrap  = document.querySelector('.gameover-text1-wrap');
+  const label = document.querySelector('.gameover-text1-label');
+  if (!wrap || !label) return;
+  const ro = new ResizeObserver(() => {
+    label.style.fontSize = (wrap.offsetWidth * 0.055) + 'px';
+  });
+  ro.observe(wrap);
+})();
+
+// ── VOLUME TOGGLE ─────────────────────────────────────────────────────────────
+let isMuted = false;
+
+function getAllSfx() {
+  return [sfxCheck, sfxPostgame, sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus, sfxTickdown, sfxTimesUp].filter(Boolean);
+}
+
+document.getElementById('vol-btn')?.addEventListener('click', () => {
+  isMuted = !isMuted;
+  const vol = isMuted ? 0 : 1;
+  getAllSfx().forEach(sfx => { sfx.volume = vol; });
+  document.getElementById('vol-img').src = isMuted ? 'images/vol2.png' : 'images/vol1.png';
+  const a = new Audio('sfx/check.mp3'); a.volume = 1; a.play();
+});
 
