@@ -47,6 +47,14 @@
   const pctEl   = document.getElementById('loading-pct');
   const playBtn = document.getElementById('loading-play-btn');
 
+  const planet = document.querySelector('.loading-planet');
+  if (planet) {
+    const randomDeg = Math.floor(Math.random() * 360);
+    planet.style.animation = 'none';
+    planet.getBoundingClientRect();
+    planet.style.animation = `planet-spin 25s linear -${(randomDeg / 360) * 25}s infinite`;
+  }
+
   // Cada promesa representa un asset completamente cargado
   const promises = [];
 
@@ -82,7 +90,13 @@
     const pct = Math.min(100, Math.round(done / total * 100));
     barFill.style.width = pct + '%';
     pctEl.textContent   = pct + '%';
-    if (done >= total) playBtn.style.display = 'block';
+    if (done >= total) {
+      playBtn.style.display = 'block';
+      playBtn.addEventListener('animationend', () => playBtn.classList.add('loaded'), { once: true });
+      const flagsBtn = document.getElementById('loading-flags-btn');
+      flagsBtn.style.display = 'block';
+      flagsBtn.addEventListener('animationend', () => flagsBtn.classList.add('loaded'), { once: true });
+    }
   }
 
   promises.forEach(p => Promise.resolve(p).then(tick, tick));
@@ -98,6 +112,10 @@ const sfxGameMusic = new Audio('sfx/gamemusic.mp3');
 sfxGameMusic.loop  = true;
 const sfxSelect    = new Audio('sfx/select.mp3');
 if (localStorage.getItem('muted') === 'true') { sfxCheck.volume = 0; sfxPostgame.volume = 0; sfxGameMusic.volume = 0; sfxSelect.volume = 0; }
+
+document.getElementById('loading-play-btn').addEventListener('mouseenter', () => {
+  sfxSelect.currentTime = 0; sfxSelect.play();
+});
 
 document.getElementById('loading-play-btn').addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxCheck.play();
@@ -1400,6 +1418,37 @@ canvas.addEventListener('mouseleave', () => {
   coordTooltip.style.display = 'none';
 });
 */
+
+// ── LOADING FLIGHT ATTENDANT (flightattpost2) ────────────────────────────────
+(function () {
+  const TIMELINE_LOADING = [
+    [1, 150], [2, 100], [3, 150], [4, 150], [5, 150],
+    [6,  50], [7, 150], [8, 200], [7, 200], [8, 200],
+    [11,200], [5, 200], [6, 200], [9,  50], [8, 200],
+    [11,150], [10,100], [7, 150], [8, 150], [3, 150],
+    [2, 150], [1, 1000],
+  ];
+
+  const frames = document.querySelectorAll('#loading-screen .flightatt-loading');
+  frames.forEach(img => {
+    img.style.visibility = img.dataset.frame === '1' ? 'visible' : 'hidden';
+  });
+
+  function showFrame(n) {
+    frames.forEach(img => {
+      img.style.visibility = img.dataset.frame === String(n) ? 'visible' : 'hidden';
+    });
+  }
+
+  let step = 0;
+  function tick() {
+    const [frameNum, duration] = TIMELINE_LOADING[step];
+    showFrame(frameNum);
+    step = (step + 1) % TIMELINE_LOADING.length;
+    setTimeout(tick, duration);
+  }
+  setTimeout(tick, TIMELINE_LOADING[0][1]);
+})();
 
 // ── SPLASH FLIGHT ATTENDANT (flightattpost2) ─────────────────────────────────
 (function () {

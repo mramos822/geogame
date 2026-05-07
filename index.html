@@ -9,12 +9,39 @@
 <body>
 
   <div id="loading-screen">
-    <img class="loading-logo" src="images/logo.png" alt="City Blitz">
+    <img class="loading-planet" src="images/planet.png" alt="">
+    <img class="loading-clouds" src="images/clouds.png" alt="">
+    <img class="loading-clouds loading-clouds2" src="images/clouds.png" alt="">
+    <img class="loading-clouds loading-clouds3" src="images/clouds.png" alt="">
+    <img class="loading-clouds-b" src="images/clouds.png" alt="">
+    <img class="loading-clouds-b loading-clouds-b2" src="images/clouds.png" alt="">
+    <img class="loading-clouds-b loading-clouds-b3" src="images/clouds.png" alt="">
+    <img class="loading-clouds-c" src="images/clouds.png" alt="">
+    <img class="loading-clouds-c loading-clouds-c2" src="images/clouds.png" alt="">
+    <img class="loading-clouds-c loading-clouds-c3" src="images/clouds.png" alt="">
+    <div class="loading-clouds-fade"></div>
+    <div class="loading-clouds-fade loading-clouds-fade2"></div>
+    <div class="loading-clouds-fade loading-clouds-fade3"></div>
+    <img class="flightatt-loading" data-frame="1" src="images/characters/flightattpost2/1.png" alt="">
+    <img class="flightatt-loading" data-frame="2" src="images/characters/flightattpost2/2.png" alt="" loading="lazy">
+    <img class="flightatt-loading" data-frame="3" src="images/characters/flightattpost2/3.png" alt="" loading="lazy">
+    <img class="flightatt-loading" data-frame="4" src="images/characters/flightattpost2/4.png" alt="" loading="lazy">
+    <img class="flightatt-loading" data-frame="5" src="images/characters/flightattpost2/5.png" alt="" loading="lazy">
+    <img class="flightatt-loading" data-frame="6" src="images/characters/flightattpost2/6.png" alt="" loading="lazy">
+    <img class="flightatt-loading" data-frame="7" src="images/characters/flightattpost2/7.png" alt="" loading="lazy">
+    <img class="flightatt-loading" data-frame="8" src="images/characters/flightattpost2/8.png" alt="" loading="lazy">
+    <img class="flightatt-loading" data-frame="9" src="images/characters/flightattpost2/9.png" alt="" loading="lazy">
+    <img class="flightatt-loading" data-frame="10" src="images/characters/flightattpost2/10.png" alt="" loading="lazy">
+    <img class="flightatt-loading" data-frame="11" src="images/characters/flightattpost2/11.png" alt="" loading="lazy">
+    <div class="flightatt-loading-shadow"></div>
+    <img id="loading-flags-btn" src="images/buttons/es-play.png" alt="Modo Banderas" style="display:none" draggable="false" oncontextmenu="return false">
+    <img class="loading-logo" src="images/logo.png" alt="City Blitz" draggable="false" oncontextmenu="return false">
+    <img class="loading-plane" src="images/plane.png" alt="" draggable="false" oncontextmenu="return false">
     <div class="loading-bar-track">
       <div class="loading-bar-fill" id="loading-bar-fill"></div>
     </div>
     <div class="loading-pct" id="loading-pct">0%</div>
-    <button id="loading-play-btn" style="display:none">¡Jugar!</button>
+    <img id="loading-play-btn" src="images/buttons/es-play.png" alt="Jugar" style="display:none" draggable="false" oncontextmenu="return false">
   </div>
 
   <div id="splash-screen" class="game-bg-screen" style="display:none">
@@ -129,7 +156,7 @@
 
   <div id="game-wrapper">
 
-    <canvas id="game-canvas"></canvas>
+    <canvas id="game-canvas" oncontextmenu="return false"></canvas>
 
     <div id="city-tag">
       <img src="images/tag3.png" alt="">
@@ -176,8 +203,99 @@
     <img id="vol-img" src="images/vol1.png" alt="">
   </div>
 
+  <!-- ── MODO BANDERAS ──────────────────────────────────── -->
+  <div id="flags-wrapper" style="display:none">
+
+    <div id="flags-countdown-widget">
+      <img src="images/countdown2.png" alt="">
+      <div id="flags-timer-number">60</div>
+      <div id="flags-progress-dots">
+        <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        <div class="dot"></div>
+      </div>
+    </div>
+
+    <div id="flags-result-label"></div>
+
+  </div>
+
+  <div id="flags-speed-bonus-text">¡Bonus velocidad!</div>
+
+  <div id="flags-score-display" style="display:none">
+    <img src="images/points.png" alt="">
+    <div id="flags-score-value">0</div>
+  </div>
+
+  <div id="flags-right-panel" style="display:none">
+    <div id="flags-leaderboard"></div>
+    <div id="flags-highscore-value" style="display:none">0</div>
+  </div>
+
+  <div id="flags-pregame-countdown" style="display:none">
+    <img id="flags-pregame-countdown-img" src="" alt="">
+  </div>
+
+  <div id="flags-timeup-overlay" style="display:none">
+    <img src="images/countdown/timeup.png" alt="Time Up" loading="lazy">
+  </div>
+
+  <img id="flags-machine" src="images/machine1.png" alt="" style="display:none">
+  <img id="flags-machine2" src="images/machine2.png" alt="" style="display:none">
+  <img id="flags-machine3" src="images/machine3.png" alt="" style="display:none">
+  <img id="flags-machine3b" src="images/machine3.png" alt="" style="display:none">
+  <img id="flags-check-overlay" src="images/check.png" alt="">
+  <img id="flags-wrong-overlay" src="images/wrong.png" alt="">
+  <canvas id="flags-badge-canvas"></canvas>
+  <div id="flags-luggage-wrap" style="display:none">
+    <div id="flags-luggage-left-group">
+      <div id="flags-flag-container-left">
+        <img id="flags-flag-img-left" src="" alt="">
+      </div>
+      <img class="flags-luggage-side" src="images/luggage.png" alt="">
+    </div>
+    <div id="flags-luggage-group">
+      <div id="flags-flag-container">
+        <img id="flags-flag-img" src="" alt="">
+      </div>
+      <img id="flags-luggage" src="images/luggage.png" alt="">
+    </div>
+    <div id="flags-luggage-right-group">
+      <div id="flags-flag-container-right">
+        <img id="flags-flag-img-right" src="" alt="">
+      </div>
+      <img class="flags-luggage-side" src="images/luggage.png" alt="">
+    </div>
+    <div id="flags-luggage-bl-group" style="display:none">
+      <div id="flags-flag-container-bl">
+        <img id="flags-flag-img-bl" src="" alt="">
+      </div>
+      <img class="flags-luggage-side" src="images/luggage.png" alt="">
+    </div>
+    <div id="flags-luggage-bc-group" style="display:none">
+      <div id="flags-flag-container-bc">
+        <img id="flags-flag-img-bc" src="" alt="">
+      </div>
+      <img class="flags-luggage-side" src="images/luggage.png" alt="">
+    </div>
+    <div id="flags-luggage-br-group" style="display:none">
+      <div id="flags-flag-container-br">
+        <img id="flags-flag-img-br" src="" alt="">
+      </div>
+      <img class="flags-luggage-side" src="images/luggage.png" alt="">
+    </div>
+  </div>
+  <div id="flags-flagid-wrap" style="display:none">
+    <img id="flags-flagid" src="images/flagid.png" alt="">
+    <div id="flags-flagid-label"></div>
+  </div>
+  <!-- ── FIN MODO BANDERAS ───────────────────────────────── -->
+
   <script src="js/cities.js"></script>
+  <script src="js/countries.js"></script>
   <script src="js/game.js"></script>
+  <script src="js/flags.js"></script>
 
 </body>
 </html>
