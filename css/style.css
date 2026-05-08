@@ -12,7 +12,7 @@
 }
 
 body {
-  background: #5b9fd4;
+  background: #5b9fd4 url('../images/background.png') center center / 95% no-repeat;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1724,11 +1724,12 @@ body::after {
 /* ── MODO BANDERAS ───────────────────────────────────── */
 #flags-wrapper {
   position: relative;
-  z-index: 1;
+  z-index: 15;
   display: none;
   overflow: visible;
   margin-right: auto;
   margin-left: 18%;
+  pointer-events: none;
 }
 
 
@@ -1739,7 +1740,7 @@ body::after {
   width: 240px;
   height: 132px;
   pointer-events: none;
-  z-index: 10;
+  z-index: 20;
 }
 
 #flags-countdown-widget > img {
@@ -2240,7 +2241,13 @@ body::after {
 }
 
 #flags-machine  { left: 50%; transform: translateX(-50%); z-index: 3; }
-#flags-machine2 { left: 50%; transform: translateX(-50%); z-index: 5; }
+#flags-findluggage { position: absolute; left: calc(50% + 370px); bottom: 75px; transform: translateX(-50%) scaleX(0.95); width: 220px; z-index: 5; }
+#flags-findluggage.scrolling { animation: findluggage-scroll 8.15s linear forwards; }
+@keyframes findluggage-scroll {
+  from { transform: translateX(-50%); }
+  to   { transform: translateX(calc(-50% - 1100px)); }
+}
+#flags-machine2 { left: 50%; transform: translateX(-50%); z-index: 12; }
 #flags-machine3 { left: 50%; transform: translateX(-50%); z-index: 4; }
 #flags-machine3b { left: calc(50% + 1350px); transform: translateX(-50%); z-index: 4; }
 

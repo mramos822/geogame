@@ -20,6 +20,7 @@ const flagsMachine       = document.getElementById('flags-machine');
 const flagsMachine2      = document.getElementById('flags-machine2');
 const flagsMachine3      = document.getElementById('flags-machine3');
 const flagsMachine3b     = document.getElementById('flags-machine3b');
+const flagsFindLuggage   = document.getElementById('flags-findluggage');
 const flagsLuggageWrap   = document.getElementById('flags-luggage-wrap');
 const flagsFlagImg       = document.getElementById('flags-flag-img');
 const flagsFlagidWrap    = document.getElementById('flags-flagid-wrap');
@@ -77,17 +78,26 @@ function showFlagsMode() {
   flagsMachine2.style.display     = 'block';
   flagsMachine3.style.display     = 'block';
   flagsMachine3b.style.display    = 'block';
-  flagsLuggageWrap.style.display  = 'block';
-  flagsFlagidWrap.style.display   = 'block';
-  flagsFlagidLabel.textContent = '';
+  flagsFindLuggage.style.display  = 'none';
+  flagsLuggageWrap.style.display  = 'none';
+  flagsFlagidWrap.style.display   = 'none';
 
   flagsTimerEl.textContent = FLAGS_GAME_DURATION;
   flagsTimerEl.style.color = '';
   flagsTimerImg.src = 'images/countdown2.png';
   flagsTimerImg.style.animationPlayState = 'paused';
 
-  // runFlagsPregame(() => {
-  (() => { // TEMP: sin pregame
+  if (typeof loadBadges !== 'undefined') loadBadges();
+  initFlagsLeaderboard();
+
+  runFlagsPregame(() => {
+    flagsFindLuggage.style.display  = 'block';
+    flagsFindLuggage.classList.remove('scrolling');
+    void flagsFindLuggage.offsetWidth;
+    flagsFindLuggage.classList.add('scrolling');
+    flagsLuggageWrap.style.display  = 'block';
+    flagsFlagidWrap.style.display   = 'block';
+    flagsFlagidLabel.textContent = '';
     flagsTimerImg.style.animationPlayState = 'running';
     if (typeof playMusic !== 'undefined') playMusic(sfxGameMusic);
     flagsMachine3.classList.add('scrolling');
@@ -97,8 +107,10 @@ function showFlagsMode() {
     flagsUpdateDotsUI();
     flagsProgressContainer.classList.remove('train-animation', 'dots-fade-out');
     flagsEasyUnlocked = false;
+    flagsSixUnlocked = false;
     flagsMediumUnlocked = false;
-    flagsHardUnlocked = false;
+    flagsHardUnlocked   = false;
+    flagsInsaneUnlocked = false;
     flagsCorrectCount = 0;
     flagsIsFirstRound = true;
     flagsAnswered = new Set();
@@ -109,14 +121,12 @@ function showFlagsMode() {
       const g = document.getElementById(id);
       if (g) g.style.display = 'none';
     });
-    if (typeof loadBadges !== 'undefined') loadBadges();
-    initFlagsLeaderboard();
     startFlagsRound();
     startFlagsTimer();
-  })();
+  });
 }
 
-const FLAGS_SPEED_WIN  = 1.5;   // segundos para conseguir bonus velocidad
+const FLAGS_SPEED_WIN  = 2.0;   // segundos para conseguir bonus velocidad
 const FLAGS_SPEED_MULT = 1.5;   // multiplicador
 
 const flagsSpeedBonusText = document.getElementById('flags-speed-bonus-text');
@@ -178,8 +188,10 @@ const flagsBottomGroupIds = ['flags-luggage-bl-group', 'flags-luggage-bc-group',
 let flagsGroupIds = flagsTopGroupIds.slice();
 let flagsStreak = 0;
 let flagsEasyUnlocked = false;
-let flagsMediumUnlocked = false;
-let flagsHardUnlocked = false;
+let flagsSixUnlocked = false;   // 6 maletas desde correcta 3
+let flagsMediumUnlocked = false; // pool medium desde correcta 5
+let flagsHardUnlocked   = false;
+let flagsInsaneUnlocked = false;
 let flagsCorrectCount = 0;
 let flagsIsFirstRound = true;
 let flagsAnswered = new Set();
@@ -448,21 +460,79 @@ function showFlagsBadge(badgeImg, bonus, streak) {
 }
 
 function startFlagsRound() {
+  // Reset findluggage to initial position and restart scroll animation
+  flagsFindLuggage.style.transition = '';
+  flagsFindLuggage.style.animation  = 'none';
+  flagsFindLuggage.style.transform  = '';
+  flagsFindLuggage.classList.remove('scrolling');
+  void flagsFindLuggage.offsetWidth;
+  flagsFindLuggage.style.animation  = '';
+  flagsFindLuggage.classList.add('scrolling');
+
+  // Si la animación termina sin que se haya seleccionado nada → wrong
+  const onFindLuggageEnd = () => {
+    flagsFindLuggage.removeEventListener('animationend', onFindLuggageEnd);
+    if (!flagsRunning) return;
+    // Simular wrong: misma lógica que click incorrecto
+    flagsGroupIds.forEach(gid => {
+      const g = document.getElementById(gid);
+      if (g) { g.style.pointerEvents = 'none'; g.style.cursor = 'default'; }
+    });
+    flagsStreak = 0;
+    flagsIsFirstRound = false;
+    if (typeof sfxError !== 'undefined') { sfxError.currentTime = 0; sfxError.play(); }
+    const overlay = document.getElementById('flags-wrong-overlay');
+    if (overlay) {
+      overlay.style.display = '';
+      overlay.classList.remove('animate');
+      void overlay.offsetWidth;
+      overlay.classList.add('animate');
+      setTimeout(() => {
+        overlay.classList.remove('animate');
+        overlay.style.display = 'none';
+        if (!flagsRunning) return;
+        const allGroupIds = [...flagsTopGroupIds, ...flagsBottomGroupIds];
+        allGroupIds.forEach(gid => {
+          const g = document.getElementById(gid);
+          if (g) { g.classList.remove('luggage-enter-active'); g.style.animation = ''; g.style.transition = ''; g.style.transform = ''; g.style.opacity = '0'; }
+        });
+        setTimeout(() => {
+          if (!flagsRunning) return;
+          allGroupIds.forEach(gid => {
+            const g = document.getElementById(gid);
+            if (g) g.style.opacity = '';
+          });
+          if (!flagsSixUnlocked) {
+            flagsBottomGroupIds.forEach(id => {
+              const g = document.getElementById(id);
+              if (g) g.style.display = 'none';
+            });
+          }
+          startFlagsRound();
+        }, 50);
+      }, 750);
+    }
+  };
+  flagsFindLuggage.addEventListener('animationend', onFindLuggageEnd);
+
   const inicioCountries  = (COUNTRIES.inicio  || []).filter(c => COUNTRY_FLAGS[c]);
   const easyCountries    = (COUNTRIES.easy    || []).filter(c => COUNTRY_FLAGS[c]);
   const mediumCountries  = (COUNTRIES.medium  || []).filter(c => COUNTRY_FLAGS[c]);
   const hardCountries    = (COUNTRIES.hard    || []).filter(c => COUNTRY_FLAGS[c]);
+  const insaneCountries  = (COUNTRIES.insane  || []).filter(c => COUNTRY_FLAGS[c]);
 
   const easyInitPool = [...inicioCountries, ...easyCountries];
   const fullPool = flagsIsFirstRound
     ? inicioCountries
-    : flagsHardUnlocked
-      ? [...easyInitPool, ...mediumCountries, ...hardCountries]
-      : flagsMediumUnlocked
-        ? [...easyInitPool, ...mediumCountries]
-        : flagsEasyUnlocked
-          ? easyInitPool
-          : inicioCountries;
+    : flagsInsaneUnlocked
+      ? [...easyInitPool, ...mediumCountries, ...hardCountries, ...insaneCountries]
+      : flagsHardUnlocked
+        ? [...easyInitPool, ...mediumCountries, ...hardCountries]
+        : flagsMediumUnlocked
+          ? [...easyInitPool, ...mediumCountries]
+          : flagsEasyUnlocked
+            ? easyInitPool
+            : inicioCountries;
 
   const excluded = c => flagsAnswered.has(c) || c === flagsLastChosen;
 
@@ -481,17 +551,22 @@ function startFlagsRound() {
   }
 
   let chosen;
-  if (flagsHardUnlocked) {
-    // hard vs medium+easy+inicio
-    // 1:5 at 12 correct → 5:1 at 32 correct
-    const hardParts       = Math.min(Math.floor((flagsCorrectCount - 17) / 5) + 1, 5);
-    const lowerParts      = Math.max(6 - hardParts, 1);
-    const lowerPool       = [...easyInitPool, ...mediumCountries];
+  if (flagsInsaneUnlocked) {
+    // insane vs hard+lower — 1:5 at 30 → 5:1 at 50
+    const insaneParts = Math.min(Math.floor((flagsCorrectCount - 30) / 5) + 1, 5);
+    const lowerParts  = Math.max(6 - insaneParts, 1);
+    const lowerPool   = [...easyInitPool, ...mediumCountries, ...hardCountries];
+    chosen = weightedPick(insaneParts, insaneCountries, lowerParts, lowerPool);
+  } else if (flagsHardUnlocked) {
+    // hard vs medium+easy+inicio — 1:5 at 17 → 5:1 at 37
+    const hardParts  = Math.min(Math.floor((flagsCorrectCount - 17) / 5) + 1, 5);
+    const lowerParts = Math.max(6 - hardParts, 1);
+    const lowerPool  = [...easyInitPool, ...mediumCountries];
     chosen = weightedPick(hardParts, hardCountries, lowerParts, lowerPool);
   } else if (flagsMediumUnlocked) {
     // medium vs easy+inicio
     // 1:5 at 3 correct → 5:1 at 15 correct
-    const mediumParts = Math.min(Math.floor((flagsCorrectCount - 3) / 3) + 1, 5);
+    const mediumParts = Math.min(Math.floor((flagsCorrectCount - 8) / 3) + 1, 5);
     const easyParts   = Math.max(6 - mediumParts, 1);
     chosen = weightedPick(mediumParts, mediumCountries, easyParts, easyInitPool);
   } else {
@@ -515,7 +590,7 @@ function startFlagsRound() {
   }
 
   // Distractors: prefer visually similar flags from correcta 23 onward
-  const useSimilar = flagsCorrectCount >= 23 && FLAG_SIMILAR[chosen];
+  const useSimilar = flagsCorrectCount >= 35 && FLAG_SIMILAR[chosen];
   const similarAvailable = useSimilar
     ? [...(FLAG_SIMILAR[chosen] || [])].filter(c => COUNTRY_FLAGS[c] && c !== chosen)
     : [];
@@ -528,7 +603,7 @@ function startFlagsRound() {
   const correctSlot = Math.floor(Math.random() * slotCount);
 
   // Apply six-mode layout before animations so positions are correct when luggages drop
-  if (flagsMediumUnlocked) flagsLuggageWrap.classList.add('flags-six-mode');
+  if (flagsSixUnlocked) flagsLuggageWrap.classList.add('flags-six-mode');
 
   // Show/animate top groups; show bottom groups if medium unlocked
   flagsTopGroupIds.forEach(id => {
@@ -542,7 +617,7 @@ function startFlagsRound() {
     group.classList.add('luggage-enter-active');
   });
 
-  if (flagsMediumUnlocked) {
+  if (flagsSixUnlocked) {
     flagsBottomGroupIds.forEach(id => {
       const group = document.getElementById(id);
       if (!group) return;
@@ -580,6 +655,36 @@ function startFlagsRound() {
     group.onclick = () => {
       if (!flagsRunning || flagsPicked) return;
       flagsPicked = true;
+      flagsFindLuggage.removeEventListener('animationend', onFindLuggageEnd);
+      // Animate selected luggage toward findluggage position
+      group.classList.remove('luggage-enter-active');
+      group.style.animation  = 'none';
+      void group.offsetWidth; // reflow — group is now at natural CSS position
+      const groupRect = group.getBoundingClientRect();
+      const findRect  = flagsFindLuggage.getBoundingClientRect();
+      const dx = findRect.left - groupRect.left;
+      const dy = findRect.top  - groupRect.top;
+      group.style.transition = 'transform 0.1s linear';
+      group.style.transform  = `translate(${dx}px, ${dy}px)`;
+      flagsMachine2.style.animationPlayState = 'paused';
+      flagsMachine3.style.animationPlayState = 'paused';
+      flagsMachine3b.style.animationPlayState = 'paused';
+      flagsFindLuggage.style.animationPlayState = 'paused';
+      setTimeout(() => {
+        flagsMachine2.style.animationPlayState = 'running';
+        flagsMachine3.style.animationPlayState = 'running';
+        flagsMachine3b.style.animationPlayState = 'running';
+        // Freeze findluggage at its current paused position then whoosh -900px
+        const mat = new DOMMatrix(window.getComputedStyle(flagsFindLuggage).transform);
+        flagsFindLuggage.classList.remove('scrolling');
+        flagsFindLuggage.style.transform = `matrix(${mat.a},${mat.b},${mat.c},${mat.d},${mat.e},${mat.f})`;
+        void flagsFindLuggage.offsetWidth;
+        flagsFindLuggage.style.transition = 'transform 0.15s linear';
+        flagsFindLuggage.style.transform  = `matrix(${mat.a},${mat.b},${mat.c},${mat.d},${mat.e - 1000},${mat.f})`;
+        // Whoosh selected group -1000px from findluggage position
+        group.style.transition = 'transform 0.15s linear';
+        group.style.transform  = `translate(${dx - 1000}px, ${dy}px)`;
+      }, 600);
       flagsGroupIds.forEach(gid => {
         const g = document.getElementById(gid);
         if (g) { g.style.pointerEvents = 'none'; g.style.cursor = 'default'; }
@@ -591,22 +696,26 @@ function startFlagsRound() {
         flagsAnswered.add(chosen);
         flagsEasyUnlocked = true;
         flagsIsFirstRound = false;
-        if (flagsCorrectCount >= 3 && !flagsMediumUnlocked) {
-          flagsMediumUnlocked = true;
+        if (flagsCorrectCount >= 3 && !flagsSixUnlocked) {
+          flagsSixUnlocked = true;
           flagsGroupIds = [...flagsTopGroupIds, ...flagsBottomGroupIds];
         }
+        if (flagsCorrectCount >= 8 && !flagsMediumUnlocked) {
+          flagsMediumUnlocked = true;
+        }
         if (flagsCorrectCount >= 17) flagsHardUnlocked = true;
+        if (flagsCorrectCount >= 30) flagsInsaneUnlocked = true;
         flagsAdvanceDot();
         if (typeof sfxCheck   !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.play(); }
         if (typeof sfxAcertar !== 'undefined') { sfxAcertar.currentTime = 0; sfxAcertar.play(); }
         const badgeImg   = typeof getBadgeImg    !== 'undefined' ? getBadgeImg(flagsStreak)   : null;
         const inRowBonus = typeof getInRowBonus  !== 'undefined' ? getInRowBonus(flagsStreak) : 0;
-        const pts = getFlagsRoundPoints(flagsStreak);
+        const pts = getFlagsRoundPoints(flagsCorrectCount);
         const elapsed = Math.max(0, (performance.now() - flagsRoundStartTime) / 1000);
         const GRACE = 0.8;
         const ratio = elapsed <= GRACE ? 1 : Math.max(0, 1 - (elapsed - GRACE) / (FLAGS_SPEED_WIN - GRACE));
         const speedBonus = ratio > 0 ? Math.round(pts * (FLAGS_SPEED_MULT - 1) * ratio) : 0;
-        flagsScore += pts + speedBonus;
+        flagsScore += pts + speedBonus + inRowBonus;
         flagsAnimateScore();
         sortFlagsLeaderboard(flagsScore);
         if (typeof showScorePopup !== 'undefined') showScorePopup(pts + speedBonus);
@@ -632,19 +741,21 @@ function startFlagsRound() {
         setTimeout(() => {
           overlay.classList.remove('animate');
           overlay.style.display = 'none';
+          if (!flagsRunning) return;
           // Hide all current groups
           const allGroupIds = [...flagsTopGroupIds, ...flagsBottomGroupIds];
           allGroupIds.forEach(gid => {
             const g = document.getElementById(gid);
-            if (g) { g.classList.remove('luggage-enter-active'); g.style.opacity = '0'; }
+            if (g) { g.classList.remove('luggage-enter-active'); g.style.animation = ''; g.style.transition = ''; g.style.transform = ''; g.style.opacity = '0'; }
           });
           setTimeout(() => {
+            if (!flagsRunning) return;
             allGroupIds.forEach(gid => {
               const g = document.getElementById(gid);
               if (g) g.style.opacity = '';
             });
             // Hide bottom row if not yet unlocked
-            if (!flagsMediumUnlocked) {
+            if (!flagsSixUnlocked) {
               flagsBottomGroupIds.forEach(id => {
                 const g = document.getElementById(id);
                 if (g) g.style.display = 'none';
@@ -668,6 +779,8 @@ function hideFlagsMode() {
   flagsMachine2.style.display     = 'none';
   flagsMachine3.style.display     = 'none';
   flagsMachine3b.style.display    = 'none';
+  flagsFindLuggage.style.display  = 'none';
+  flagsFindLuggage.classList.remove('scrolling');
   flagsLuggageWrap.style.display  = 'none';
   flagsFlagImg.style.display      = 'none';
   flagsFlagImg.src                = '';
