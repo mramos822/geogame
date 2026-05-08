@@ -1,4 +1,4 @@
-# City Blitz 🌍
+  # GeoChallenge 🌍
 
 A fast-paced geography trivia game where you race against the clock to identify countries, flags, and capitals from around the world.
 
