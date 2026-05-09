@@ -2241,7 +2241,7 @@ body::after {
 }
 
 #flags-machine  { left: 50%; transform: translateX(-50%); z-index: 3; }
-#flags-findluggage { position: absolute; left: calc(50% + 370px); bottom: 75px; transform: translateX(-50%) scaleX(0.95); width: 220px; z-index: 5; }
+#flags-findluggage { position: absolute; left: calc(50% + 370px); bottom: 75px; transform: translateX(-50%) scaleX(0.95); width: 220px; z-index: 5; user-select: none; -webkit-user-select: none; -webkit-user-drag: none; }
 #flags-findluggage.scrolling { animation: findluggage-scroll 8.15s linear forwards; }
 @keyframes findluggage-scroll {
   from { transform: translateX(-50%); }
