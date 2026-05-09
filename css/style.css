@@ -1975,11 +1975,14 @@ body::after {
   cursor: pointer;
 }
 
+#flags-luggage-wrap img,
 #flags-luggage,
 .flags-luggage-side {
   transition: filter 0.15s ease;
   -webkit-user-drag: none;
   user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none;
 }
 
 #flags-luggage-group:hover #flags-luggage,
