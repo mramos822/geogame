@@ -90,6 +90,7 @@ body::after {
   pointer-events: none;
   z-index: 20;
   width: 25%;
+  will-change: transform;
 }
 
 .splash-text2-wrap.animate-in {
@@ -174,6 +175,7 @@ body::after {
   background: none;
   overflow: hidden;
   position: relative;
+
 }
 
 
@@ -315,7 +317,7 @@ body::after {
   transform: translateX(-50%) scaleY(0.37);
   transform-origin: bottom center;
   pointer-events: none;
-  z-index: -1;
+  z-index: -2;
 }
 
 .game-bg-cloud {
@@ -331,6 +333,7 @@ body::after {
   right: -26%;
   width: 762px;
   animation: cloud1-move 10s linear infinite;
+  z-index: -1;
 }
 
 @keyframes cloud1-move {
@@ -387,7 +390,9 @@ body::after {
 #splash-screen .game-bg-men2 { animation: char-enter 0.3s ease forwards; }
 #splash-screen .game-bg-men1 { animation: char-enter 0.3s ease forwards, men1-blink 3s steps(1, end) 0.3s infinite; }
 
-.game-bg-women1 {
+.game-bg-women,
+.game-bg-women1,
+.game-bg-women2 {
   position: absolute;
   bottom: 2%;
   left: 40%;
@@ -395,12 +400,19 @@ body::after {
   transform: scale(0.16);
   transform-origin: left bottom;
   pointer-events: none;
-  z-index: 9;
 }
 
-#splash-screen .game-bg-women1 {
-  animation: char-enter 0.3s ease forwards;
-}
+.game-bg-women2 { z-index: 9; display: none; }
+.game-bg-women1 { z-index: 10; }
+
+#splash-screen .game-bg-women1 { animation: char-enter 0.3s ease forwards; }
+
+.mode-flags .game-bg-women2 { display: block; }
+.mode-flags .game-bg-women1,
+.mode-flags .game-bg-women2 { transform: scale(0.199); bottom: 1%; }
+.mode-flags .game-bg-women1 { animation: women1-blink 3.5s steps(1, end) 0.7s infinite; }
+#splash-screen.mode-flags .game-bg-women2 { animation: char-enter 0.3s ease forwards; }
+#splash-screen.mode-flags .game-bg-women1 { animation: char-enter 0.3s ease forwards, women1-blink 3.5s steps(1, end) 0.7s infinite; }
 
 .game-bg-girl,
 .game-bg-girl1,
@@ -434,6 +446,20 @@ body::after {
   100%   { opacity: 1 }
 }
 
+@keyframes women1-blink {
+  0%     { opacity: 1 }
+  55%    { opacity: 0 }
+  58.5%  { opacity: 1 }
+  100%   { opacity: 1 }
+}
+
+@keyframes women2-blink-show {
+  0%    { opacity: 0 }
+  55%   { opacity: 1 }
+  58.5% { opacity: 0 }
+  100%  { opacity: 0 }
+}
+
 .game-bg-city {
   position: absolute;
   bottom: 0%;
@@ -443,6 +469,29 @@ body::after {
   pointer-events: none;
   z-index: 0;
 }
+
+.game-bg-plane7 {
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+  display: none;
+  right: 1%;
+  top: 38%;
+  transform: scale(0.333);
+  transform-origin: top right;
+  animation: plane7-fly 3.5s 0.7s linear forwards;
+}
+
+@keyframes plane7-fly {
+  from { transform: scale(0.333) translate(0, 0); }
+  to   { transform: scale(0.6) translate(-210vw, -150vh); }
+}
+
+.game-bg-city-flags {
+  display: none;
+  z-index: 1;
+}
+
 
 .game-bg-plane {
   position: absolute;
@@ -625,7 +674,7 @@ body::after {
   to   { clip-path: inset(0% 0 0 0); }
 }
 
-.game-bg-screen > *:not(.game-bg-city):not(.game-bg-plane):not(.game-bg-plane1):not(.game-bg-plane2):not(.game-bg-plane3):not(.game-bg-plane4):not(.game-bg-plane5):not(.game-bg-plane6):not(.game-bg-stairs):not(.game-bg-cloud):not(.game-bg-cloud1):not(.game-bg-cloud2):not(.game-bg-people):not(.game-bg-men):not(.game-bg-men1):not(.game-bg-men2):not(.game-bg-girl):not(.game-bg-girl1):not(.game-bg-girl2):not(.game-bg-women):not(.game-bg-women1):not(.game-bg-sky):not(.game-bg-table):not(.game-bg-check3):not(.game-bg-wrong3):not(.grade-count-total):not(.splash-confirm1):not(.splash-confirm2):not(.splash-confirm-wrap):not(.splash-howtoplaytable):not(.splash-howtoplay-wrap):not(.splash-howtoplay-video):not(.splash-text2-wrap):not(.gameover-confirm-wrap):not(.gameover-confirm1):not(.gameover-confirm2):not(.gameover-text1-wrap):not(.gameover-text1):not(.gameover-text1-label) {
+.game-bg-screen > *:not(.game-bg-city):not(.game-bg-plane):not(.game-bg-plane1):not(.game-bg-plane2):not(.game-bg-plane3):not(.game-bg-plane4):not(.game-bg-plane5):not(.game-bg-plane6):not(.game-bg-stairs):not(.game-bg-cloud):not(.game-bg-cloud1):not(.game-bg-cloud2):not(.game-bg-people):not(.game-bg-men):not(.game-bg-men1):not(.game-bg-men2):not(.game-bg-girl):not(.game-bg-girl1):not(.game-bg-girl2):not(.game-bg-women):not(.game-bg-women1):not(.game-bg-sky):not(.game-bg-plane7):not(.game-bg-table):not(.game-bg-check3):not(.game-bg-wrong3):not(.grade-count-total):not(.splash-confirm1):not(.splash-confirm2):not(.splash-confirm-wrap):not(.splash-howtoplaytable):not(.splash-howtoplay-wrap):not(.splash-howtoplay-video):not(.splash-text2-wrap):not(.gameover-confirm-wrap):not(.gameover-confirm1):not(.gameover-confirm2):not(.gameover-text1-wrap):not(.gameover-text1):not(.gameover-text1-label) {
   position: relative;
   z-index: 20;
 }
@@ -1985,6 +2034,11 @@ body::after {
   pointer-events: none;
 }
 
+#flags-luggage-wrap #flags-luggage,
+#flags-luggage-wrap .flags-luggage-side {
+  pointer-events: auto;
+}
+
 #flags-luggage-group:hover #flags-luggage,
 #flags-luggage-left-group:hover .flags-luggage-side,
 #flags-luggage-right-group:hover .flags-luggage-side,
@@ -2283,4 +2337,69 @@ body::after {
   -webkit-user-drag: none;
   height: auto;
 }
+
+/* ── FLAGS MODE OVERRIDES ─────────────────────────────── */
+#splash-screen.mode-flags .splash-text2-label        { padding-top: 15%; }
+#splash-screen.mode-flags .splash-text2-label.step2  { padding-top: 6%; }
+#gameover-screen.mode-flags .gameover-text1-label    { padding-top: 18%; }
+
+.mode-flags .game-bg-men,
+.mode-flags .game-bg-men1,
+.mode-flags .game-bg-men2  { left: 26.5%; }
+
+.mode-flags .game-bg-girl,
+.mode-flags .game-bg-girl1,
+.mode-flags .game-bg-girl2 { left: 18%; bottom: 0.8%; transform: scale(0.21); }
+
+.mode-flags .game-bg-plane,
+.mode-flags .game-bg-plane1,
+.mode-flags .game-bg-plane2,
+.mode-flags .game-bg-plane3,
+.mode-flags .game-bg-plane4,
+.mode-flags .game-bg-plane5,
+.mode-flags .game-bg-plane6 { display: none; animation: none; }
+
+.mode-flags .game-bg-stairs { display: none; }
+
+
+.mode-flags .game-bg-plane7 { display: block; }
+.mode-flags .game-bg-city-flags { display: block; }
+.mode-flags .game-bg-city:not(.game-bg-city-flags) { display: none; }
+
+/* ── RECORDING TOGGLE BUTTON ─────────────────────────── */
+#recording-toggle {
+  position: fixed;
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 9999;
+  background: rgba(0,0,0,0.45);
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 13px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 28px;
+  text-align: center;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+#recording-toggle:hover  { opacity: 1; }
+#recording-toggle.active { background: rgba(200,0,0,0.7); opacity: 1; }
+
+/* ── RECORDING MODE ───────────────────────────────────── */
+.recording-mode,
+.recording-mode * { cursor: url('../images/cursor.png'), auto !important; }
+
+.recording-mode #flags-countdown-widget,
+.recording-mode #flags-score-display,
+.recording-mode #flags-speed-bonus-text,
+.recording-mode #flags-result-label,
+.recording-mode #flags-right-panel,
+.recording-mode #flags-check-overlay,
+.recording-mode #flags-wrong-overlay,
+.recording-mode .score-popup { display: none !important; }
 

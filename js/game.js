@@ -119,6 +119,13 @@ document.getElementById('loading-play-btn').addEventListener('mouseenter', () =>
 
 document.getElementById('loading-play-btn').addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxCheck.play();
+  window.pendingGameMode = 'game';
+  document.getElementById('splash-screen').classList.remove('mode-flags');
+  document.getElementById('gameover-screen').classList.remove('mode-flags');
+  document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men1.png');
+  document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men2.png');
+  document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl1.png');
+  document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl2.png');
   document.getElementById('loading-screen').style.display = 'none';
   document.getElementById('splash-screen').style.display  = 'flex';
   playMusic(sfxPostgame);
@@ -271,6 +278,13 @@ updateSplashHighscore();
 // ── GRADE COUNTS ─────────────────────────────────────────────────────────────
 let gradeCounts = { perfect: 0, good: 0, fair: 0 };
 let wrongCount = 0;
+
+function setModeCounts(correct, wrong) {
+  gradeCounts = { perfect: correct, good: 0, fair: 0 };
+  wrongCount = wrong;
+  updateGradeCountsUI();
+  updateWrongCountUI();
+}
 
 function updateWrongCountUI() {
   ['splash-wrong-total', 'gameover-wrong-total'].forEach(id => {
@@ -1379,14 +1393,23 @@ document.querySelector('.splash-confirm-wrap')?.addEventListener('click', () => 
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
   if (confirmStep === 0) {
     const label = document.querySelector('.splash-text2-label');
-    if (label) { label.textContent = 'Coloca un pin en el mapa donde creas que cada ciudad se ubica. ¡Haz click en el botón VERDE cuando estes listo!'; label.classList.add('step2'); }
+    if (window.pendingGameMode === 'flags') {
+      if (label) { label.textContent = 'Haz clic sobre la bandera del país, estado o unión que corresponda al nombre que aparece arriba. ¿Todo listo? ¡Entonces haz clic sobre el icono VERDE para empezar!'; label.classList.add('step2'); }
+    } else {
+      if (label) { label.textContent = 'Coloca un pin en el mapa donde creas que cada ciudad se ubica. ¡Haz click en el botón VERDE cuando estes listo!'; label.classList.add('step2'); }
+    }
     const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
     if (howtoWrap) howtoWrap.classList.add('slide-down');
     const howtoVideo = document.querySelector('.splash-howtoplay-video');
     if (howtoVideo) howtoVideo.play();
     confirmStep = 1;
   } else {
-    startGame();
+    if (window.pendingGameMode === 'flags') {
+      splashScreen.style.display = 'none';
+      if (typeof showFlagsMode !== 'undefined') showFlagsMode();
+    } else {
+      startGame();
+    }
   }
 });
 document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () => {
@@ -1396,7 +1419,12 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
   const wrap = document.querySelector('.gameover-confirm-wrap');
   wrap.classList.add('confirm-pressed');
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
-  startGame();
+  if (window.pendingGameMode === 'flags') {
+    gameoverScreen.style.display = 'none';
+    if (typeof showFlagsMode !== 'undefined') showFlagsMode();
+  } else {
+    startGame();
+  }
 });
 
 /* ── COORD TOOLTIP ─────────────────────────────────────────────────────────────

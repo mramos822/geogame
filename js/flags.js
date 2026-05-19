@@ -41,6 +41,7 @@ let flagsScore           = 0;
 let flagsDisplayedScore  = 0;
 let flagsScoreRafId      = null;
 let flagsRunning         = false;
+let flagsWrongCount      = 0;
 
 const FLAGS_PREGAME_STEPS = [
   { src: 'images/countdown/3.png',  hold: 800,  size: 420 },
@@ -52,6 +53,7 @@ const FLAGS_PREGAME_STEPS = [
 // ── SHOW / HIDE ───────────────────────────────────────────────────────────────
 function showFlagsMode() {
   if (typeof loadGameSFX !== 'undefined') loadGameSFX();
+  if (typeof playMusic !== 'undefined') playMusic(null);
   const gameCanvas = document.getElementById('game-canvas');
 
   flagsWrapper.style.position  = '';
@@ -119,6 +121,16 @@ function showFlagsMode() {
     flagsLastChosen = null;
     flagsGroupIds = flagsTopGroupIds.slice();
     flagsLuggageWrap.classList.remove('flags-six-mode');
+    // Reset all group inline styles that may be stuck from a previous game's
+    // mid-round cleanup being skipped by the !flagsRunning guard.
+    ;[...flagsTopGroupIds, ...flagsBottomGroupIds].forEach(id => {
+      const g = document.getElementById(id);
+      if (!g) return;
+      g.style.animation  = '';
+      g.style.transition = '';
+      g.style.transform  = '';
+      g.style.opacity    = '';
+    });
     flagsBottomGroupIds.forEach(id => {
       const g = document.getElementById(id);
       if (g) g.style.display = 'none';
@@ -461,7 +473,71 @@ function showFlagsBadge(badgeImg, bonus, streak) {
   rafId = requestAnimationFrame(frame);
 }
 
+function startFlagsRoundRecording() {
+  const REC_SLOTS = ['Reino Unido', 'Brasil', 'Italia'];
+
+  flagsFindLuggage.style.transition = '';
+  flagsFindLuggage.style.animation  = 'none';
+  flagsFindLuggage.style.transform  = '';
+  flagsFindLuggage.classList.remove('scrolling');
+  void flagsFindLuggage.offsetWidth;
+  flagsFindLuggage.style.animation  = '';
+  flagsFindLuggage.classList.add('scrolling');
+
+  flagsFlagidLabel.textContent         = 'Italy';
+  flagsFlagidLabel.style.fontSize      = '38px';
+  flagsFlagidLabel.style.letterSpacing = '';
+
+  flagsTopGroupIds.forEach((id, i) => {
+    const group = document.getElementById(id);
+    if (!group) return;
+    group.style.display       = '';
+    group.style.opacity       = '';
+    group.style.pointerEvents = 'auto';
+    group.style.cursor        = 'pointer';
+    group.classList.remove('luggage-enter-active');
+    void group.offsetWidth;
+    group.classList.add('luggage-enter-active');
+
+    const imgId = flagsSlotImgIds[id];
+    const img   = document.getElementById(imgId);
+    if (img) { img.src = COUNTRY_FLAGS[REC_SLOTS[i]] || ''; img.style.display = 'block'; }
+  });
+
+  let picked = false;
+  flagsTopGroupIds.forEach(id => {
+    const group = document.getElementById(id);
+    if (!group) return;
+    group.onclick = () => {
+      if (!flagsRunning || picked) return;
+      picked = true;
+      // Disable further clicks
+      flagsTopGroupIds.forEach(gid => {
+        const g = document.getElementById(gid);
+        if (g) { g.style.pointerEvents = 'none'; g.style.cursor = 'default'; }
+      });
+      // Igual que el juego real: freeze inmediato + translate hacia findluggage
+      group.classList.remove('luggage-enter-active');
+      group.style.animation = 'none';
+      void group.offsetWidth;
+      const groupRect = group.getBoundingClientRect();
+      const findRect  = flagsFindLuggage.getBoundingClientRect();
+      const dx = findRect.left - groupRect.left;
+      const dy = findRect.top  - groupRect.top;
+      group.style.transition = 'transform 0.1s linear';
+      group.style.transform  = `translate(${dx}px, ${dy}px)`;
+      flagsMachine2.style.animationPlayState     = 'paused';
+      flagsMachine3.style.animationPlayState     = 'paused';
+      flagsMachine3b.style.animationPlayState    = 'paused';
+      flagsFindLuggage.style.animationPlayState  = 'paused';
+    };
+  });
+}
+
 function startFlagsRound() {
+  if (document.body.classList.contains('recording-mode')) {
+    return startFlagsRoundRecording();
+  }
   // Reset findluggage to initial position and restart scroll animation
   flagsFindLuggage.style.transition = '';
   flagsFindLuggage.style.animation  = 'none';
@@ -482,6 +558,7 @@ function startFlagsRound() {
     });
     flagsStreak = 0;
     flagsIsFirstRound = false;
+    flagsWrongCount++;
     if (typeof sfxError !== 'undefined') { sfxError.currentTime = 0; sfxError.play(); }
     const overlay = document.getElementById('flags-wrong-overlay');
     if (overlay) {
@@ -500,6 +577,7 @@ function startFlagsRound() {
         });
         setTimeout(() => {
           if (!flagsRunning) return;
+          if (document.body.classList.contains('recording-mode')) return;
           allGroupIds.forEach(gid => {
             const g = document.getElementById(gid);
             if (g) g.style.opacity = '';
@@ -673,6 +751,7 @@ function startFlagsRound() {
       flagsMachine3b.style.animationPlayState = 'paused';
       flagsFindLuggage.style.animationPlayState = 'paused';
       setTimeout(() => {
+        if (document.body.classList.contains('recording-mode')) return;
         flagsMachine2.style.animationPlayState = 'running';
         flagsMachine3.style.animationPlayState = 'running';
         flagsMachine3b.style.animationPlayState = 'running';
@@ -684,8 +763,10 @@ function startFlagsRound() {
         flagsFindLuggage.style.transition = 'transform 0.15s linear';
         flagsFindLuggage.style.transform  = `matrix(${mat.a},${mat.b},${mat.c},${mat.d},${mat.e - 1000},${mat.f})`;
         // Whoosh selected group -1000px from findluggage position
-        group.style.transition = 'transform 0.15s linear';
-        group.style.transform  = `translate(${dx - 1000}px, ${dy}px)`;
+        if (!document.body.classList.contains('recording-mode')) {
+          group.style.transition = 'transform 0.15s linear';
+          group.style.transform  = `translate(${dx - 1000}px, ${dy}px)`;
+        }
       }, 600);
       flagsGroupIds.forEach(gid => {
         const g = document.getElementById(gid);
@@ -732,6 +813,7 @@ function startFlagsRound() {
       } else {
         flagsStreak = 0;
         flagsIsFirstRound = false;
+        flagsWrongCount++;
         if (typeof sfxError !== 'undefined') { sfxError.currentTime = 0; sfxError.play(); }
       }
       const overlay = document.getElementById(correct ? 'flags-check-overlay' : 'flags-wrong-overlay');
@@ -746,12 +828,15 @@ function startFlagsRound() {
           if (!flagsRunning) return;
           // Hide all current groups
           const allGroupIds = [...flagsTopGroupIds, ...flagsBottomGroupIds];
-          allGroupIds.forEach(gid => {
-            const g = document.getElementById(gid);
-            if (g) { g.classList.remove('luggage-enter-active'); g.style.animation = ''; g.style.transition = ''; g.style.transform = ''; g.style.opacity = '0'; }
-          });
+          if (!document.body.classList.contains('recording-mode')) {
+            allGroupIds.forEach(gid => {
+              const g = document.getElementById(gid);
+              if (g) { g.classList.remove('luggage-enter-active'); g.style.animation = ''; g.style.transition = ''; g.style.transform = ''; g.style.opacity = '0'; }
+            });
+          }
           setTimeout(() => {
             if (!flagsRunning) return;
+            if (document.body.classList.contains('recording-mode')) return;
             allGroupIds.forEach(gid => {
               const g = document.getElementById(gid);
               if (g) g.style.opacity = '';
@@ -799,6 +884,35 @@ function hideFlagsMode() {
   flagsSpeedBonusText.classList.remove('visible');
   clearInterval(flagsTimerIntervalId);
   flagsRunning = false;
+
+  const finalScore = Math.round(flagsScore);
+  const finalScoreEl = document.getElementById('final-score-value');
+  if (finalScoreEl) finalScoreEl.textContent = finalScore.toLocaleString();
+
+  const LS_HIGHSCORE = 'flagsHighscore';
+  const prevHighscore = parseInt(localStorage.getItem(LS_HIGHSCORE) || '0', 10);
+  const newHSBanner = document.getElementById('new-highscore-banner');
+  const newHSScore  = document.getElementById('new-highscore-score');
+  if (finalScore > prevHighscore) {
+    localStorage.setItem(LS_HIGHSCORE, String(finalScore));
+    if (newHSBanner) newHSBanner.style.display = 'flex';
+    if (newHSScore)  newHSScore.textContent = finalScore.toLocaleString();
+  } else {
+    if (newHSBanner) newHSBanner.style.display = 'none';
+  }
+
+  if (typeof setModeCounts !== 'undefined') setModeCounts(flagsCorrectCount, flagsWrongCount);
+  const gameoverScreen = document.getElementById('gameover-screen');
+  if (gameoverScreen) {
+    gameoverScreen.style.display = 'flex';
+    const label = gameoverScreen.querySelector('.gameover-text1-label');
+    if (label) label.textContent = '¡Buen trabajo! ¡Llevemos a los turistas a la puerta de embarque!';
+  }
+  if (typeof restartFlightAtt !== 'undefined') restartFlightAtt();
+  if (typeof buildChecksRow !== 'undefined') buildChecksRow();
+  const checksEndTime = (flagsCorrectCount > 0 ? (flagsCorrectCount - 1) * 0.1 + 0.2 : 0) + 0.4;
+  if (typeof buildWrongsRow !== 'undefined') buildWrongsRow(checksEndTime);
+  if (typeof playMusic !== 'undefined') playMusic(sfxPostgame);
 }
 
 // ── PREGAME COUNTDOWN ─────────────────────────────────────────────────────────
@@ -831,6 +945,7 @@ function startFlagsTimer() {
   flagsTimeLeft = FLAGS_GAME_DURATION;
   flagsScore          = 0;
   flagsDisplayedScore = 0;
+  flagsWrongCount     = 0;
   flagsScoreEl.textContent = '0';
   flagsRunning  = true;
 
@@ -869,10 +984,36 @@ function endFlagsGame() {
 
 // ── BOTÓN DE INICIO ───────────────────────────────────────────────────────────
 document.getElementById('loading-flags-btn').addEventListener('click', () => {
+  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.play(); }
+  window.pendingGameMode = 'flags';
+  document.getElementById('splash-screen').classList.add('mode-flags');
+  document.getElementById('gameover-screen').classList.add('mode-flags');
+  const howtoplayVideo = document.querySelector('.splash-howtoplay-video');
+  if (howtoplayVideo) { howtoplayVideo.src = 'images/howtoplay/howtoplay1.mp4'; howtoplayVideo.load(); }
+  document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men3.png');
+  document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men4.png');
+  document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl3.png');
+  document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl4.png');
+  document.querySelectorAll('.game-bg-women1').forEach(el => el.src = 'images/characters/women2.png');
+  document.querySelectorAll('.game-bg-women2').forEach(el => el.src = 'images/characters/women3.png');
+  document.querySelectorAll('.game-bg-city').forEach(el => el.src = 'images/bg/level1complete.png');
+  const label = document.querySelector('.splash-text2-label');
+  if (label) { label.textContent = '¡Eh, Tú! ¿Crees que podrías echarme una mano ordenando el equipaje de los turistas?'; label.classList.remove('step2'); }
+  const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
+  if (howtoWrap) howtoWrap.classList.remove('slide-down');
+  const howtoTitle = document.querySelector('.splash-howtoplay-title');
+  if (howtoTitle) howtoTitle.textContent = 'Suitcase Shuffle';
   document.getElementById('loading-screen').style.display = 'none';
-  showFlagsMode();
+  const splashEl = document.getElementById('splash-screen');
+  splashEl.style.display = 'flex';
+  const animEls = splashEl.querySelectorAll('.flightatt-splash, .splash-text2-wrap');
+  animEls.forEach(el => el.classList.remove('animate-in'));
+  void splashEl.offsetWidth;
+  animEls.forEach(el => el.classList.add('animate-in'));
+  if (typeof playMusic !== 'undefined') playMusic(sfxPostgame);
 });
 
 document.getElementById('loading-flags-btn').addEventListener('mouseenter', () => {
   if (typeof sfxSelect !== 'undefined') { sfxSelect.currentTime = 0; sfxSelect.play(); }
 });
+
