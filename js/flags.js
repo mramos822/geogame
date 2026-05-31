@@ -391,14 +391,14 @@ function getFlagsRoundPoints(streak) {
   return 10;
 }
 
-function showFlagsBadge(badgeImg, bonus, streak) {
+function showFlagsBadge(badgeImg, bonus, streak, cxOverride, scaleOverride) {
   const canvas = document.getElementById('flags-badge-canvas');
   if (!canvas) return;
   canvas.width  = window.innerWidth;
   canvas.height = window.innerHeight;
   canvas.style.display = 'block';
   const ctx2 = canvas.getContext('2d');
-  const CX = canvas.width / 2, CY = canvas.height / 2;
+  const CX = cxOverride !== undefined ? cxOverride : canvas.width / 2, CY = (scaleOverride !== undefined ? canvas.height * 0.44 : canvas.height / 2);
   const W = 405, H = 333, CW = 477, CH = 405;
   const IN_END = 0.2, HOLD_END = 0.60, SHRINK_DUR = 0.22, TOTAL = HOLD_END + SHRINK_DUR;
   const BZ_IN = 0.18, BZ_HOLD = 0.42, BZ_OUT = 0.72;
@@ -415,10 +415,11 @@ function showFlagsBadge(badgeImg, bonus, streak) {
     ctx2.clearRect(0, 0, canvas.width, canvas.height);
     if (t >= TOTAL) { canvas.style.display = 'none'; return; }
 
+    const sxMult = scaleOverride !== undefined ? scaleOverride : 1;
     let alpha, scale;
-    if      (t < IN_END)   { scale = 0.25 + (t / IN_END) * 0.75; alpha = 1; }
-    else if (t < HOLD_END) { scale = 1; alpha = 1; }
-    else                   { const p = (t - HOLD_END) / SHRINK_DUR; scale = 1 - p; alpha = 1; }
+    if      (t < IN_END)   { scale = (0.25 + (t / IN_END) * 0.75) * sxMult; alpha = 1; }
+    else if (t < HOLD_END) { scale = 1 * sxMult; alpha = 1; }
+    else                   { const p = (t - HOLD_END) / SHRINK_DUR; scale = (1 - p) * sxMult; alpha = 1; }
 
     // check.png
     ctx2.save();

@@ -91,11 +91,14 @@
     barFill.style.width = pct + '%';
     pctEl.textContent   = pct + '%';
     if (done >= total) {
-      playBtn.style.display = 'block';
+      document.getElementById('loading-play-wrap').style.display = 'flex';
       playBtn.addEventListener('animationend', () => playBtn.classList.add('loaded'), { once: true });
       const flagsBtn = document.getElementById('loading-flags-btn');
-      flagsBtn.style.display = 'block';
+      document.getElementById('loading-flags-wrap').style.display = 'flex';
       flagsBtn.addEventListener('animationend', () => flagsBtn.classList.add('loaded'), { once: true });
+      const shapesBtn = document.getElementById('loading-shapes-btn');
+      document.getElementById('loading-shapes-wrap').style.display = 'flex';
+      shapesBtn.addEventListener('animationend', () => shapesBtn.classList.add('loaded'), { once: true });
     }
   }
 
@@ -1596,7 +1599,8 @@ let restartFlightAtt;
 let isMuted = localStorage.getItem('muted') === 'true';
 
 function getAllSfx() {
-  return [sfxCheck, sfxPostgame, sfxGameMusic, sfxSelect, sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus, sfxTickdown, sfxTimesUp].filter(Boolean);
+  return [sfxCheck, sfxPostgame, sfxGameMusic, sfxSelect, sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus, sfxTickdown, sfxTimesUp,
+    typeof sfxLevel2 !== 'undefined' ? sfxLevel2 : null].filter(Boolean);
 }
 
 // Apply saved mute state to the icon on page load
@@ -1630,4 +1634,55 @@ document.getElementById('vol-btn')?.addEventListener('click', () => {
   document.getElementById('vol-img').src = isMuted ? 'images/vol2.png' : 'images/vol1.png';
   const a = new Audio('sfx/check.mp3'); a.volume = 1; a.play();
 });
+
+// ── LOCK LOADING SCREEN ZOOM & POSITION ───────────────────────────────────────
+(function () {
+  const el = document.getElementById('loading-screen');
+  if (!el || !window.visualViewport) return;
+  const vp = window.visualViewport;
+  function fix() {
+    const s = 1 / vp.scale;
+    el.style.left   = vp.offsetLeft + 'px';
+    el.style.top    = vp.offsetTop  + 'px';
+    el.style.width  = (vp.width  * vp.scale) + 'px';
+    el.style.height = (vp.height * vp.scale) + 'px';
+    el.style.transform = `scale(${s})`;
+  }
+  vp.addEventListener('resize', fix);
+  vp.addEventListener('scroll', fix);
+})();
+
+// ── SCREEN SIZE WARNING ───────────────────────────────────────────────────────
+(function () {
+  const warning = document.getElementById('screen-warning');
+  const msg     = document.getElementById('screen-warning-msg');
+  const MIN_W   = 480;
+  const MIN_H   = 320;
+  const MAX_RATIO = 2.8;
+
+  function check() {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const ratio = w / h;
+    let text = '';
+
+    if (w < MIN_W || h < MIN_H) {
+      text = 'La pantalla es demasiado pequeña para mostrar el juego.';
+    } else if (ratio > MAX_RATIO) {
+      text = 'La pantalla es demasiado ancha. Redimensiona la ventana verticalmente.';
+    } else if (ratio < 1 / MAX_RATIO) {
+      text = 'La pantalla es demasiado alta. Redimensiona la ventana horizontalmente.';
+    }
+
+    if (text) {
+      msg.textContent = text;
+      warning.classList.add('visible');
+    } else {
+      warning.classList.remove('visible');
+    }
+  }
+
+  window.addEventListener('resize', check);
+  check();
+})();
 

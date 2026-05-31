@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
   <title>GeoChallenge</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="preload" href="images/characters/men3.png" as="image">
@@ -38,14 +38,28 @@
     <img class="flightatt-loading" data-frame="10" src="images/characters/flightattpost2/10.png" alt="" loading="lazy">
     <img class="flightatt-loading" data-frame="11" src="images/characters/flightattpost2/11.png" alt="" loading="lazy">
     <div class="flightatt-loading-shadow"></div>
-    <img id="loading-flags-btn" src="images/buttons/es-play.png" alt="Modo Banderas" style="display:none" draggable="false" oncontextmenu="return false">
-    <img class="loading-logo" src="images/logo.png" alt="City Blitz" draggable="false" oncontextmenu="return false">
-    <img class="loading-plane" src="images/plane.png" alt="" draggable="false" oncontextmenu="return false">
-    <div class="loading-bar-track">
-      <div class="loading-bar-fill" id="loading-bar-fill"></div>
+    <div class="loading-btn-row">
+      <div class="loading-btn-wrap" style="display:none" id="loading-shapes-wrap">
+        <span class="loading-btn-label">Países</span>
+        <img id="loading-shapes-btn" src="images/buttons/es-play.png" alt="Modo Siluetas" draggable="false" oncontextmenu="return false">
+      </div>
+      <div class="loading-btn-wrap" style="display:none" id="loading-flags-wrap">
+        <span class="loading-btn-label">Banderas</span>
+        <img id="loading-flags-btn" src="images/buttons/es-play.png" alt="Modo Banderas" draggable="false" oncontextmenu="return false">
+      </div>
     </div>
-    <div class="loading-pct" id="loading-pct">0%</div>
-    <img id="loading-play-btn" src="images/buttons/es-play.png" alt="Jugar" style="display:none" draggable="false" oncontextmenu="return false">
+    <img class="loading-logo" src="images/logo.png" alt="City Blitz" draggable="false" oncontextmenu="return false">
+    <div class="loading-center-group">
+      <img class="loading-plane" src="images/plane.png" alt="" draggable="false" oncontextmenu="return false">
+      <div class="loading-bar-track">
+        <div class="loading-bar-fill" id="loading-bar-fill"></div>
+      </div>
+      <div class="loading-pct" id="loading-pct">0%</div>
+    </div>
+    <div class="loading-btn-wrap loading-play-wrap" style="display:none" id="loading-play-wrap">
+      <span class="loading-btn-label">Ciudades</span>
+      <img id="loading-play-btn" src="images/buttons/es-play.png" alt="Jugar" draggable="false" oncontextmenu="return false">
+    </div>
   </div>
 
   <div id="splash-screen" class="game-bg-screen" style="display:none">
@@ -303,12 +317,21 @@
   </div>
   <!-- ── FIN MODO BANDERAS ───────────────────────────────── -->
 
+  <div id="screen-warning">
+    <div id="screen-warning-box">
+      <div id="screen-warning-icon">⚠️</div>
+      <p id="screen-warning-msg">La pantalla no es suficiente para mostrar el juego.</p>
+      <p id="screen-warning-sub">Redimensiona la ventana para una experiencia óptima.</p>
+    </div>
+  </div>
+
   <script src="js/cities.js"></script>
   <script src="js/countries.js"></script>
   <script src="js/game.js"></script>
   <script src="js/flags.js"></script>
+  <script src="js/shapes.js"></script>
 
-  <button id="recording-toggle" onclick="document.body.classList.toggle('recording-mode');this.classList.toggle('active')">⏺</button>
+  <button id="recording-toggle" onclick="document.body.classList.toggle('recording-mode');this.classList.toggle('active')" style="display:none">⏺</button>
 
 </body>
 </html>
