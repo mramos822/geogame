@@ -474,6 +474,28 @@ const SHAPE_COUNTRIES = [
   { name: 'Guatemala',      label: 'Guatemala',        ext1: 'png', ext2: 'jpg' },
   { name: 'Uruguay',        label: 'Uruguay',          ext1: 'png', ext2: 'jpg' },
   { name: 'Paraguay',       label: 'Paraguay',         ext1: 'png', ext2: 'jpg' },
+  { name: 'Mauritania',     label: 'Mauritania',       ext1: 'png', ext2: 'jpg' },
+  { name: 'Marruecos',      label: 'Marruecos',        ext1: 'png', ext2: 'jpg' },
+  { name: 'Nigeria',        label: 'Nigeria',          ext1: 'png', ext2: 'jpg' },
+  { name: 'Niger',          label: 'Niger',            ext1: 'png', ext2: 'jpg' },
+  { name: 'Mali',           label: 'Mali',             ext1: 'png', ext2: 'jpg' },
+  { name: 'Libia',          label: 'Libia',            ext1: 'png', ext2: 'jpg' },
+  { name: 'Argelia',        label: 'Argelia',          ext1: 'png', ext2: 'jpg' },
+  { name: 'Etiopia',        label: 'Etiopia',          ext1: 'png', ext2: 'jpg' },
+  { name: 'Sudan',          label: 'Sudán',            ext1: 'png', ext2: 'jpg' },
+  { name: 'Angola',         label: 'Angola',           ext1: 'png', ext2: 'jpg' },
+  { name: 'Tanzania',       label: 'Tanzania',         ext1: 'png', ext2: 'jpg' },
+  { name: 'Mozambique',     label: 'Mozambique',       ext1: 'png', ext2: 'jpg' },
+  { name: 'Kenia',          label: 'Kenia',            ext1: 'png', ext2: 'jpg' },
+  { name: 'RepDemCongo',    label: 'República Democrática del Congo',         ext1: 'png', ext2: 'jpg' },
+  { name: 'Zimbabue',       label: 'Zimbabue',         ext1: 'png', ext2: 'jpg' },
+  { name: 'Namibia',        label: 'Namibia',          ext1: 'png', ext2: 'jpg' },
+  { name: 'Botsuana',       label: 'Botsuana',         ext1: 'png', ext2: 'jpg' },
+  { name: 'Camerun',        label: 'Camerún',          ext1: 'png', ext2: 'jpg' },
+  { name: 'Chad',           label: 'Chad',             ext1: 'png', ext2: 'jpg' },
+  { name: 'PapGuinea',      label: 'Papúa Nueva Guinea',         ext1: 'png', ext2: 'jpg' },
+  { name: 'Groenlandia',    label: 'Groenlandia',      ext1: 'png', ext2: 'jpg' },
+
 ];
 
 const SHAPES_PREGAME_STEPS = [
