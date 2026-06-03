@@ -864,7 +864,7 @@ function hideFlagsMode() {
   flagsWrapper.style.display      = 'none';
   flagsScoreDisplay.style.display = 'none';
   flagsRightPanel.style.display   = 'none';
-  mainRightPanel.style.display    = '';
+  mainRightPanel.style.display    = 'none';
   flagsTimeupEl.style.display     = 'none';
   flagsMachine.style.display      = 'none';
   flagsMachine2.style.display     = 'none';

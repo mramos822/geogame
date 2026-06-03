@@ -142,8 +142,15 @@ document.getElementById('loading-play-btn').addEventListener('click', () => {
   document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl2.png');
   document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check3.png');
   document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong3.png');
+  const label = document.querySelector('.splash-text2-label');
+  if (label) { label.textContent = '¡Veamos a qué ciudad va cada uno! Aquí es donde tú entras a formar parte.'; label.classList.remove('step2'); }
   document.getElementById('loading-screen').style.display = 'none';
-  document.getElementById('splash-screen').style.display  = 'flex';
+  const splashElCity = document.getElementById('splash-screen');
+  splashElCity.style.display = 'flex';
+  const animElsCity = splashElCity.querySelectorAll('.flightatt-splash, .splash-text2-wrap');
+  animElsCity.forEach(el => el.classList.remove('animate-in'));
+  void splashElCity.offsetWidth;
+  animElsCity.forEach(el => el.classList.add('animate-in'));
   playMusic(sfxPostgame);
 });
 
@@ -1260,6 +1267,8 @@ function endGame() {
         newHighscoreScore.textContent = highscore.toLocaleString();
       }
       gameoverScreen.style.display = 'flex';
+      const rpGO = document.getElementById('right-panel');
+      if (rpGO) rpGO.style.display = 'none';
       restartFlightAtt();
       updateGradeCountsUI();
       buildChecksRow();
@@ -1361,7 +1370,9 @@ function startGame() {
   gameoverScreen.style.display  = 'none';
   newHighscoreBanner.style.display = 'none';
   gameWrapper.style.display     = 'block';
-  scoreDisplayEl.style.display = 'block';
+  scoreDisplayEl.style.display  = 'block';
+  const rpEl = document.getElementById('right-panel');
+  if (rpEl) rpEl.style.display = 'flex';
 
   redimensionarJuego();
 
@@ -1462,6 +1473,17 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
   if (elPlay)   elPlay.textContent   = fmt(parseInt(localStorage.getItem('geochallenge_highscore') || '0', 10));
   if (elFlags)  elFlags.textContent  = fmt(parseInt(localStorage.getItem('flagsHighscore')         || '0', 10));
   if (elShapes) elShapes.textContent = fmt(parseInt(localStorage.getItem('shapesHighscore')        || '0', 10));
+
+  // reset splash state so next mode entry starts from step 0
+  confirmStep = 0;
+  const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
+  if (howtoWrap) howtoWrap.classList.remove('slide-down');
+  const label = document.querySelector('.splash-text2-label');
+  if (label) { label.classList.remove('step2'); label.textContent = ''; }
+  const howtoVideo = document.querySelector('.splash-howtoplay-video');
+  if (howtoVideo) { howtoVideo.pause(); howtoVideo.currentTime = 0; }
+  const animEls = document.querySelectorAll('#splash-screen .flightatt-splash, .splash-text2-wrap');
+  animEls.forEach(el => el.classList.remove('animate-in'));
 });
 
 /* ── COORD TOOLTIP ─────────────────────────────────────────────────────────────

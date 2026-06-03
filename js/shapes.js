@@ -735,9 +735,21 @@ function showShapesMode() {
 
   const scoreEl = document.getElementById('score-value');
   if (scoreEl) scoreEl.textContent = '0';
-  if (typeof positionLeaderboard !== 'undefined') positionLeaderboard(0, false);
-  if (typeof lastLbScore        !== 'undefined') lastLbScore = -1;
-  if (typeof lastPlayerRank     !== 'undefined') lastPlayerRank = -1;
+  if (typeof lastLbScore    !== 'undefined') lastLbScore    = -1;
+  if (typeof lastPlayerRank !== 'undefined') lastPlayerRank = -1;
+  if (typeof lbElements !== 'undefined') {
+    Object.values(lbElements).forEach(el => { el.style.transition = 'none'; });
+  }
+  requestAnimationFrame(() => {
+    if (typeof positionLeaderboard !== 'undefined') positionLeaderboard(0, false);
+    requestAnimationFrame(() => {
+      if (typeof lbElements !== 'undefined') {
+        Object.values(lbElements).forEach(el => {
+          el.style.transition = 'top 0.7s cubic-bezier(0.22,1,0.36,1)';
+        });
+      }
+    });
+  });
 
   const PREGAME_DURATION = SHAPES_PREGAME_STEPS.reduce((s, x) => s + x.hold, 0);
   let c;
