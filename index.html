@@ -51,10 +51,20 @@
         <img id="loading-shapes-btn" src="images/buttons/es-play.png" alt="Modo Siluetas" draggable="false" oncontextmenu="return false">
         <span class="loading-btn-hs" id="loading-shapes-hs"></span>
       </div>
+      <div class="loading-btn-wrap loading-play-wrap" style="display:none" id="loading-play-wrap">
+        <span class="loading-btn-label">Ciudades</span>
+        <img id="loading-play-btn" src="images/buttons/es-play.png" alt="Jugar" draggable="false" oncontextmenu="return false">
+        <span class="loading-btn-hs" id="loading-play-hs"></span>
+      </div>
       <div class="loading-btn-wrap" style="display:none" id="loading-flags-wrap">
         <span class="loading-btn-label">Banderas</span>
         <img id="loading-flags-btn" src="images/buttons/es-play.png" alt="Modo Banderas" draggable="false" oncontextmenu="return false">
         <span class="loading-btn-hs" id="loading-flags-hs"></span>
+      </div>
+      <div class="loading-btn-wrap" style="display:none" id="loading-mode4-wrap">
+        <span class="loading-btn-label">Monumentos</span>
+        <img id="loading-mode4-btn" src="images/buttons/es-play.png" alt="Modo Monumentos" draggable="false" oncontextmenu="return false">
+        <span class="loading-btn-hs" id="loading-mode4-hs"></span>
       </div>
     </div>
     <img class="loading-logo" src="images/logo.png" alt="City Blitz" draggable="false" oncontextmenu="return false">
@@ -64,11 +74,6 @@
         <div class="loading-bar-fill" id="loading-bar-fill"></div>
       </div>
       <div class="loading-pct" id="loading-pct">0%</div>
-    </div>
-    <div class="loading-btn-wrap loading-play-wrap" style="display:none" id="loading-play-wrap">
-      <span class="loading-btn-label">Ciudades</span>
-      <img id="loading-play-btn" src="images/buttons/es-play.png" alt="Jugar" draggable="false" oncontextmenu="return false">
-      <span class="loading-btn-hs" id="loading-play-hs"></span>
     </div>
   </div>
 
@@ -195,6 +200,8 @@
     <div id="city-tag">
       <img src="images/tag3.png" alt="">
       <span id="city-tag-text">Ciudad</span>
+      <img id="monument-img" src="" alt="" style="display:none; width:282px; height:180px; object-fit:cover; position:absolute; top:51px; left:87px; pointer-events:none;">
+      <div id="monument-name"></div>
     </div>
 
     <div id="countdown-widget">
@@ -337,7 +344,8 @@
 
   <script src="js/cities.js"></script>
   <script src="js/countries.js"></script>
-  <script src="js/game.js"></script>
+  <script src="js/places.js"></script>
+  <script src="js/monuments.js"></script>
   <script src="js/flags.js"></script>
   <script src="js/shapes.js"></script>
 

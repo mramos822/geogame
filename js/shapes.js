@@ -908,3 +908,37 @@ document.getElementById('loading-shapes-btn').addEventListener('click', () => {
 document.getElementById('loading-shapes-btn').addEventListener('mouseenter', () => {
   if (typeof sfxSelect !== 'undefined') { sfxSelect.currentTime = 0; sfxSelect.play(); }
 });
+
+// ── MODO MONUMENTOS (placeholder) ────────────────────────────────────────────
+document.getElementById('loading-mode4-btn').addEventListener('mouseenter', () => {
+  if (typeof sfxSelect !== 'undefined') { sfxSelect.currentTime = 0; sfxSelect.play(); }
+});
+
+document.getElementById('loading-mode4-btn').addEventListener('click', () => {
+  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.play(); }
+  if (typeof loadGameSFX !== 'undefined') loadGameSFX();
+  window.pendingGameMode = 'monuments';
+  document.getElementById('splash-screen').classList.remove('mode-flags', 'mode-shapes');
+  document.getElementById('splash-screen').classList.add('mode-monuments');
+  document.getElementById('gameover-screen').classList.remove('mode-flags', 'mode-shapes');
+  document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men1.png');
+  document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men2.png');
+  document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl1.png');
+  document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl2.png');
+  document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check4.png');
+  document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong4.png');
+  const label = document.querySelector('.splash-text2-label');
+  if (label) { label.textContent = '¡Vale, es hora de hacer un poco de turismo! ¿Qué tal es tu conocimiento de monumentos famosos?'; label.classList.remove('step2'); }
+  const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
+  if (howtoWrap) howtoWrap.classList.remove('slide-down');
+  const howtoTitle = document.querySelector('.splash-howtoplay-title');
+  if (howtoTitle) howtoTitle.textContent = 'Landmark Loco';
+  document.getElementById('loading-screen').style.display = 'none';
+  const splashEl = document.getElementById('splash-screen');
+  splashEl.style.display = 'flex';
+  const animEls = splashEl.querySelectorAll('.flightatt-splash, .splash-text2-wrap');
+  animEls.forEach(el => el.classList.remove('animate-in'));
+  void splashEl.offsetWidth;
+  animEls.forEach(el => el.classList.add('animate-in'));
+  if (typeof playMusic !== 'undefined') playMusic(sfxPostgame);
+});

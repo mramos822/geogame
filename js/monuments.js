@@ -24,14 +24,14 @@
     'images/characters/flightattpost/15.png',
     'images/howtoplaytable.png','images/confirm1.png','images/confirm2.png',
     'images/text1.png','images/text2.png',
-    'images/tag3.png','images/countdown.png','images/points.png',
+    'images/tag3.png','images/countdown4.png','images/points.png',
     'images/countdown/1.png','images/countdown/2.png','images/countdown/3.png',
     'images/countdown/go.png','images/countdown/timeup.png',
     'images/badges/bluebadge.png','images/badges/garnetbadge.png',
     'images/badges/goldbadge.png','images/badges/greenbadge.png',
     'images/badges/redbadge.png','images/badges/silverbadge.png',
     'images/badges/yellowbadge.png',
-    'images/mapimage.png','images/countdownred.png',
+    'images/mapimage.png','images/countdownred4.png',
     'images/pin1.png','images/pin2.png',
     'images/vol1.png','images/vol2.png','images/logo.png',
   ];
@@ -104,15 +104,18 @@
       mode4Btn.addEventListener('animationend', () => mode4Btn.classList.add('loaded'), { once: true });
 
       const fmt = v => v > 0 ? '🏆 ' + v.toLocaleString() : '';
-      const playHs   = parseInt(localStorage.getItem('geochallenge_highscore') || '0', 10);
-      const flagsHs  = parseInt(localStorage.getItem('flagsHighscore')         || '0', 10);
-      const shapesHs = parseInt(localStorage.getItem('shapesHighscore')        || '0', 10);
-      const elPlay   = document.getElementById('loading-play-hs');
-      const elFlags  = document.getElementById('loading-flags-hs');
-      const elShapes = document.getElementById('loading-shapes-hs');
+      const playHs      = parseInt(localStorage.getItem('geochallenge_highscore') || '0', 10);
+      const flagsHs     = parseInt(localStorage.getItem('flagsHighscore')         || '0', 10);
+      const shapesHs    = parseInt(localStorage.getItem('shapesHighscore')        || '0', 10);
+      const monumentsHs = parseInt(localStorage.getItem('monumentsHighscore')     || '0', 10);
+      const elPlay      = document.getElementById('loading-play-hs');
+      const elFlags     = document.getElementById('loading-flags-hs');
+      const elShapes    = document.getElementById('loading-shapes-hs');
+      const elMode4     = document.getElementById('loading-mode4-hs');
       if (elPlay)   elPlay.textContent   = fmt(playHs);
       if (elFlags)  elFlags.textContent  = fmt(flagsHs);
       if (elShapes) elShapes.textContent = fmt(shapesHs);
+      if (elMode4)  elMode4.textContent  = fmt(monumentsHs);
     }
   }
 
@@ -137,8 +140,8 @@ document.getElementById('loading-play-btn').addEventListener('mouseenter', () =>
 document.getElementById('loading-play-btn').addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxCheck.play();
   window.pendingGameMode = 'game';
-  document.getElementById('splash-screen').classList.remove('mode-flags', 'mode-shapes');
-  document.getElementById('gameover-screen').classList.remove('mode-flags', 'mode-shapes');
+  document.getElementById('splash-screen').classList.remove('mode-flags', 'mode-shapes', 'mode-monuments');
+  document.getElementById('gameover-screen').classList.remove('mode-flags', 'mode-shapes', 'mode-monuments');
   document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men1.png');
   document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men2.png');
   document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl1.png');
@@ -210,7 +213,7 @@ const MERC_TOP = mercatorY(MAP_LAT_TOP);
 const MERC_BOT = mercatorY(MAP_LAT_BOT);
 
 const MAP_ASPECT = 2380 / 1759;
-const _pad = 24; 
+const _pad = 24;
 const _scale = 0.88;
 const DISPLAY_W = Math.min(
   Math.floor((window.innerWidth  - _pad * 2) * _scale),
@@ -233,6 +236,8 @@ const canvas         = document.getElementById('game-canvas');
 const ctx            = canvas.getContext('2d');
 const cityTagEl      = document.getElementById('city-tag');
 const cityTagText    = document.getElementById('city-tag-text');
+const monumentImgEl  = document.getElementById('monument-img');
+const monumentNameEl = document.getElementById('monument-name');
 const timerNumberEl  = document.getElementById('timer-number');
 const countdownImg   = document.querySelector('#countdown-widget img');
 const progressDots   = document.querySelectorAll('.dot');
@@ -260,7 +265,16 @@ const badgeOverlayCtx = badgeOverlay.getContext('2d');
 gameWrapper.appendChild(badgeOverlay);
 
 // ── ASSETS ───────────────────────────────────────────────────────────────────
-const imgMap  = new Image(); imgMap.src  = 'images/mapimage.png';
+const MONUMENTS_EASY_NAMES = [
+  "Torre Eiffel", "Estatua de la Libertad", "Taj Mahal", "Pirámides de Giza",
+  "Coliseo Romano", "Gran Muralla China", "Machu Picchu", "Cristo Redentor",
+  "Sagrada Família", "Stonehenge", "Big Ben", "Chichén Itzá",
+];
+const MONUMENTS_EASY = MONUMENTS.filter(m => MONUMENTS_EASY_NAMES.includes(m.name));
+
+const imgMap   = new Image(); imgMap.src   = 'images/mapimage.png';
+const imgMap2  = new Image(); imgMap2.src  = 'images/mapimage2.png';
+const imgFlag  = new Image(); imgFlag.src  = 'images/flag.png';
 const imgPin1 = new Image(); imgPin1.src = 'images/pin1.png';
 const imgPin2 = new Image(); imgPin2.src = 'images/pin2.png';
 const imgStar  = new Image(); imgStar.src  = 'images/stareffect.png';
@@ -292,6 +306,7 @@ let timerIntervalId = null;
 let speedBonusHideId = null;
 
 let highscore = parseInt(localStorage.getItem('geochallenge_highscore') || '0', 10);
+let monumentsHighscore = parseInt(localStorage.getItem('monumentsHighscore') || '0', 10);
 highscoreEl.textContent = highscore.toLocaleString();
 
 function updateSplashHighscore() {
@@ -340,13 +355,15 @@ updateGradeCountsUI();
 updateWrongCountUI();
 
 function getModeCheckImg() {
-  if (window.pendingGameMode === 'flags')  return 'images/check1.png';
-  if (window.pendingGameMode === 'shapes') return 'images/check2.png';
+  if (window.pendingGameMode === 'flags')     return 'images/check1.png';
+  if (window.pendingGameMode === 'shapes')    return 'images/check2.png';
+  if (window.pendingGameMode === 'monuments') return 'images/check4.png';
   return 'images/check3.png';
 }
 function getModeWrongImg() {
-  if (window.pendingGameMode === 'flags')  return 'images/wrong1.png';
-  if (window.pendingGameMode === 'shapes') return 'images/wrong2.png';
+  if (window.pendingGameMode === 'flags')     return 'images/wrong1.png';
+  if (window.pendingGameMode === 'shapes')    return 'images/wrong2.png';
+  if (window.pendingGameMode === 'monuments') return 'images/wrong4.png';
   return 'images/wrong3.png';
 }
 
@@ -357,7 +374,7 @@ function buildChecksRow() {
   const total = gradeCounts.perfect + gradeCounts.good + gradeCounts.fair;
   const IMG_W = 58;
   const BASE_GAP = 3;
-  const MAX_W = 12 * IMG_W + 11 * BASE_GAP; // 729px
+  const MAX_W = 12 * IMG_W + 11 * BASE_GAP;
   const gap = total > 1 ? (total > 12 ? (MAX_W - total * IMG_W) / (total - 1) : BASE_GAP) : 0;
   if (total === 0) {
     const none = document.createElement('span');
@@ -378,7 +395,6 @@ function buildChecksRow() {
     row.appendChild(img);
   }
 
-  // Ocultar contador y check3 estático hasta 0.2s después del último check
   const check3Static   = gameoverScreen.querySelector('.game-bg-check3');
   const gradeCountEl   = gameoverScreen.querySelector('.grade-count-total');
   if (check3Static)  check3Static.style.opacity  = '0';
@@ -455,13 +471,11 @@ const mockPlayers = Array.from({ length: 10 }, (_, i) => ({
   initial: 'ABCDEFGHIJ'[i],
 }));
 
-// Perfil del highscore propio (entrada 11)
 const highscorePlayer = { id: 'best', score: highscore, color: '#6a0dad', initial: '★' };
 
-// Ventana visible y fila de anclaje del player
 const LB_WINDOW  = 5;
 const LB_PIN_ROW = 2;
-const LB_GAP     = 4; // px
+const LB_GAP     = 4;
 let lbElements   = {};
 
 const EMOTE_SRCS = [
@@ -473,8 +487,6 @@ const EMOTE_SRCS = [
   'images/emotes/Gemini_Generated_Image_wuzcs6wuzcs6wuzc.png',
 ];
 
-// Lanza un globo de emote sobre el elemento del leaderboard indicado.
-// El globo es hijo del entry para seguir su movimiento automaticamente.
 function spawnEmoteBubble(entryEl) {
   const bubble = document.createElement('div');
   bubble.className = 'emote-bubble';
@@ -490,7 +502,6 @@ function spawnEmoteBubble(entryEl) {
 
 let lastPlayerRank = -1;
 
-// Alto de una fila = ancho del panel * 1.5 (aspect-ratio 4/6) + gap
 function getLbRowHeight() {
   const panel = document.getElementById('right-panel');
   if (!panel) return 84;
@@ -514,7 +525,6 @@ function initLeaderboard() {
     lb.appendChild(el);
   });
 
-  // Entrada del highscore propio
   const bestEl = document.createElement('div');
   bestEl.className = 'lb-entry lb-best';
   bestEl.id = 'lb-best';
@@ -535,7 +545,6 @@ function initLeaderboard() {
   lbElements['lb-player'] = playerEl;
   lb.appendChild(playerEl);
 
-  // Primer frame: posicionar sin animar; segundo frame: habilitar transicion
   requestAnimationFrame(() => {
     positionLeaderboard(0, false);
     requestAnimationFrame(() => {
@@ -546,7 +555,6 @@ function initLeaderboard() {
   });
 }
 
-// Posiciona todas las entradas segun el score. animate=false omite la transicion.
 function positionLeaderboard(playerScore, animate) {
   const lb   = document.getElementById('leaderboard');
   const rowH = getLbRowHeight();
@@ -558,7 +566,6 @@ function positionLeaderboard(playerScore, animate) {
 
   const playerRank = all.findIndex(p => p.id === 'player');
 
-  // Detectar a todos los que el player acaba de superar y lanzar un globo a cada uno
   if (animate && lastPlayerRank !== -1 && playerRank < lastPlayerRank) {
     let bubbleIndex = 0;
     for (let r = lastPlayerRank; r >= playerRank + 1; r--) {
@@ -574,8 +581,6 @@ function positionLeaderboard(playerScore, animate) {
   }
   lastPlayerRank = playerRank;
 
-  // El player se ancla en LB_PIN_ROW; cerca del final la ventana se corre
-  // para que el player suba fisicamente las primeras posiciones ganadas.
   let windowStart = Math.max(0, playerRank - LB_PIN_ROW);
   let windowEnd   = Math.min(all.length, windowStart + LB_WINDOW);
   windowStart     = Math.max(0, windowEnd - LB_WINDOW);
@@ -584,8 +589,6 @@ function positionLeaderboard(playerScore, animate) {
     Object.values(lbElements).forEach(el => { el.style.transition = 'none'; });
   }
 
-  // Cada entrada se posiciona en su fila de la cadena completa.
-  // Las que quedan fuera de la ventana quedan ocultas por overflow:hidden.
   all.forEach((p, rank) => {
     lbElements[`lb-${p.id}`].style.top = ((rank - windowStart) * rowH) + 'px';
   });
@@ -611,6 +614,10 @@ function resetState() {
     displayedScore: 0,
     dots: 0,
     cityPool: shuffle([...CITIES]),
+    monumentPool: shuffle([...MONUMENTS_EASY]),
+    monumentsCorrectCount: 0,
+    monumentsUnlocked: false,
+    monumentsSeen: new Set(),
     poolIndex: 0,
     currentCity: null,
     cityShownAt: 0,
@@ -723,44 +730,36 @@ function updateDotsUI() {
 }
 
 function advanceDot() {
-  // Si la animación ya está corriendo, acumula el dot pero no re-dispara la animación
   state.dots++;
   updateDotsUI();
 
   if (state.dots >= DOTS_NEEDED && !progressContainer.classList.contains('train-animation')) {
     progressContainer.classList.add('train-animation');
-    
-    // Bonus de tiempo
+
     state.timeLeft = Math.min(state.timeLeft + BONUS_TIME, 99);
     timerNumberEl.textContent = state.timeLeft;
-    
-    const originalColor = timerNumberEl.style.color;
-    timerNumberEl.style.color = '#00ff88'; 
 
-    // 1. Esperamos los 2 segundos de la animación del "trencito"
+    const originalColor = timerNumberEl.style.color;
+    timerNumberEl.style.color = '#00ff88';
+
     setTimeout(() => {
-      // 2. Iniciamos el fade out añadiendo la clase de CSS
       progressContainer.classList.add('dots-fade-out');
 
-      // 3. Esperamos a que el fade out (0.5s) termine para resetear el estado
       setTimeout(() => {
-        // Conserva los dots acumulados DURANTE la animación (los que superan DOTS_NEEDED)
         state.dots = Math.max(0, state.dots - DOTS_NEEDED);
-        // Quitamos ambas clases y reseteamos la UI
         progressContainer.classList.remove('train-animation', 'dots-fade-out');
         updateDotsUI();
-        
-        // Restaurar color del timer
+
         if (state.timeLeft <= 10) {
           timerNumberEl.style.color = '#ffffff';
-          countdownImg.src = 'images/countdownred.png';
+          countdownImg.src = window.pendingGameMode === 'monuments' ? 'images/countdownred4.png' : 'images/countdownred.png';
         } else {
           timerNumberEl.style.color = originalColor;
-          countdownImg.src = 'images/countdown.png';
+          countdownImg.src = window.pendingGameMode === 'monuments' ? 'images/countdown4.png' : 'images/countdown.png';
         }
-      }, 500); // Este tiempo debe coincidir con el 'transition: opacity' de CSS
+      }, 500);
 
-    }, 2000); // Duración de la animación de colores
+    }, 2000);
   }
 }
 
@@ -809,14 +808,77 @@ function spawnStars(cx, cy) {
 
 // ── NEXT CITY ─────────────────────────────────────────────────────────────────
 function nextCity() {
-  if (state.poolIndex >= state.cityPool.length) {
-    state.cityPool = shuffle([...CITIES]);
-    state.poolIndex = 0;
+  if (window.pendingGameMode === 'monuments') {
+    if (state.poolIndex >= state.monumentPool.length) {
+      const base = state.monumentsUnlocked ? MONUMENTS : MONUMENTS_EASY;
+      const unseen = base.filter(m => !state.monumentsSeen.has(m.name));
+      state.monumentPool = shuffle(unseen.length ? unseen : [...base]);
+      state.poolIndex = 0;
+    }
+    state.currentCity = state.monumentPool[state.poolIndex++];
+    state.cityShownAt = Date.now();
+    state.phase = 'waiting';
+    slideMonumentIn(state.currentCity);
+  } else {
+    if (state.poolIndex >= state.cityPool.length) {
+      state.cityPool = shuffle([...CITIES]);
+      state.poolIndex = 0;
+    }
+    state.currentCity = state.cityPool[state.poolIndex++];
+    state.cityShownAt = Date.now();
+    state.phase = 'waiting';
+    slideTagIn(state.currentCity.name, state.currentCity.country);
   }
-  state.currentCity = state.cityPool[state.poolIndex++];
-  state.cityShownAt = Date.now();
-  state.phase = 'waiting';
-  slideTagIn(state.currentCity.name, state.currentCity.country);
+}
+
+function slideMonumentIn(monument) {
+  const wasVisible = cityTagEl.style.visibility === 'visible';
+  if (wasVisible) {
+    const ghost = cityTagEl.cloneNode(true);
+    ghost.className = 'city-tag-ghost';
+    ghost.style.left       = cityTagEl.style.left;
+    ghost.style.top        = cityTagEl.style.top;
+    ghost.style.visibility = 'visible';
+    ghost.style.zIndex     = '9';
+    ghost.style.transition = 'none';
+    ghost.style.opacity    = '1';
+    gameWrapper.appendChild(ghost);
+    const ghostImg = ghost.querySelector('img');
+    if (ghostImg) ghostImg.classList.add('monument-exit');
+    const ghostMonumentImg = ghost.querySelector('#monument-img');
+    if (ghostMonumentImg) ghostMonumentImg.classList.add('monument-exit');
+    const ghostMonumentName = ghost.querySelector('#monument-name');
+    if (ghostMonumentName && ghostMonumentName.textContent) ghostMonumentName.classList.add('monument-exit');
+    setTimeout(() => ghost.remove(), 300);
+  }
+
+  const tagImg = cityTagEl.querySelector('img');
+  tagImg.src = 'images/photo.png';
+  tagImg.style.width  = '431px';
+  tagImg.style.height = 'auto';
+  cityTagText.style.display = 'none';
+  monumentImgEl.src = `images/places/${monument.img}`;
+  monumentImgEl.style.display = 'block';
+
+  cityTagEl.style.transition  = 'none';
+  cityTagEl.style.left        = '-50px';
+  cityTagEl.style.top         = '-55px';
+  cityTagEl.style.visibility  = 'visible';
+  setTimeout(() => { sfxTag.currentTime = 0; sfxTag.play(); }, 200);
+
+  monumentNameEl.textContent = '';
+  monumentNameEl.style.opacity = '0';
+  if (slideMonumentIn._nameTimer) clearTimeout(slideMonumentIn._nameTimer);
+  slideMonumentIn._nameTimer = setTimeout(() => {
+    monumentNameEl.textContent = monument.name;
+    monumentNameEl.style.opacity = '1';
+  }, 3500);
+
+  tagImg.classList.remove('monument-appear');
+  monumentImgEl.classList.remove('monument-appear');
+  void tagImg.offsetWidth;
+  tagImg.classList.add('monument-appear');
+  monumentImgEl.classList.add('monument-appear');
 }
 
 // ── CLICK ─────────────────────────────────────────────────────────────────────
@@ -824,17 +886,17 @@ canvas.addEventListener('click', (e) => {
   if (!state || state.phase !== 'waiting') return;
   state.phase = 'animating';
   if (slideTagIn._countryTimer) { clearTimeout(slideTagIn._countryTimer); slideTagIn._countryTimer = null; }
+  if (slideMonumentIn._nameTimer) { clearTimeout(slideMonumentIn._nameTimer); slideMonumentIn._nameTimer = null; }
   sfxPin.currentTime = 0;
   sfxPin.play();
 
   const rect    = canvas.getBoundingClientRect();
-  
-  // ¡CORRECCIÓN CRÍTICA! Ajustamos las coordenadas por si el canvas se escaló por CSS
+
   const scaleX  = canvas.width / rect.width;
   const scaleY  = canvas.height / rect.height;
   const clickX  = (e.clientX - rect.left) * scaleX;
   const clickY  = (e.clientY - rect.top) * scaleY;
-  
+
   const correct = latLonToCanvas(state.currentCity.lat, state.currentCity.lon);
   const d       = dist(clickX, clickY, correct.x, correct.y);
   const grade   = classify(d);
@@ -871,10 +933,23 @@ canvas.addEventListener('click', (e) => {
     name: state.currentCity.name,
     labelOpacity: 1,
     labelBorn: Date.now(),
+    permanent: grade === 'perfect',
   });
 
   if (grade !== 'wayoff') {
     advanceDot();
+    if (window.pendingGameMode === 'monuments') {
+      state.monumentsSeen.add(state.currentCity.name);
+      if (!state.monumentsUnlocked) {
+        state.monumentsCorrectCount++;
+        if (state.monumentsCorrectCount >= 5) {
+          state.monumentsUnlocked = true;
+          const remaining = MONUMENTS.filter(m => !state.monumentsSeen.has(m.name));
+          state.monumentPool = shuffle(remaining.length ? remaining : [...MONUMENTS]);
+          state.poolIndex = 0;
+        }
+      }
+    }
   }
 
   state.pin1Anim = { x: clickX, y: clickY,
@@ -948,7 +1023,8 @@ function render(timestamp) {
   state.lastTimestamp = timestamp;
 
   ctx.clearRect(0, 0, DISPLAY_W, DISPLAY_H);
-  ctx.drawImage(imgMap, 0, 0, DISPLAY_W, DISPLAY_H);
+  const activeMap = window.pendingGameMode === 'monuments' ? imgMap2 : imgMap;
+  ctx.drawImage(activeMap, 0, 0, DISPLAY_W, DISPLAY_H);
 
   if (state.displayedScore < state.score) {
     const diff = state.score - state.displayedScore;
@@ -958,17 +1034,36 @@ function render(timestamp) {
   }
 
   for (const dot of state.placedDots) {
+    const age = (Date.now() - dot.labelBorn) / 1000;
+    dot.labelOpacity = age < 3 ? 1 : Math.max(0, 1 - (age - 3));
+
+    const dotAlpha = dot.permanent ? 1 : dot.labelOpacity;
+    ctx.globalAlpha = dotAlpha;
     ctx.beginPath();
-    ctx.arc(dot.x, dot.y, 5, 0, Math.PI * 2);
-    ctx.fillStyle = '#ff2222';
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 1.5;
+    ctx.arc(dot.x, dot.y, 3, 0, Math.PI * 2);
+    const perfectColor = window.pendingGameMode === 'monuments' ? '#000000' : '#ff2222';
+    ctx.fillStyle = dot.permanent ? perfectColor : '#666666';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2.5;
     ctx.fill();
     ctx.stroke();
+    ctx.globalAlpha = 1;
 
-    const age = (Date.now() - dot.labelBorn) / 1000;
+    if (dot.permanent && age >= 2 && window.pendingGameMode === 'monuments') {
+      const flagAlpha = Math.min(1, (age - 2) / 0.1);
+      const fw = (imgFlag.naturalWidth  || 24) * 0.8;
+      const fh = (imgFlag.naturalHeight || 24) * 0.8;
+      const angle = (60 * (1 - flagAlpha)) * Math.PI / 180;
+      ctx.globalAlpha = flagAlpha;
+      ctx.save();
+      ctx.translate(dot.x + 6, dot.y + 4);
+      ctx.rotate(angle);
+      ctx.drawImage(imgFlag, -fw / 2, -fh, fw, fh);
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    }
+
     if (age < 4) {
-      dot.labelOpacity = age < 3 ? 1 : Math.max(0, 1 - (age - 3));
       ctx.globalAlpha = dot.labelOpacity;
 
       const maxFontSize = 11;
@@ -991,6 +1086,10 @@ function render(timestamp) {
       ctx.globalAlpha = 1;
     }
   }
+
+  state.placedDots = state.placedDots.filter(dot =>
+    dot.permanent || dot.labelOpacity > 0
+  );
 
 // ── SUNBURST ────────────────────────────
 if (state.sunburst) {
@@ -1026,9 +1125,7 @@ if (state.sunburst) {
       ctx.globalAlpha = 1;
     };
 
-    // Layer 1: 12 rays, fast rotation
     drawLayer(12, 4 + prog * 6,  12 + prog * 68, 0.28 / 12,  -4.4);
-    // Layer 2: 8 rays, slow rotation (opposite direction)
     drawLayer( 8, 5 + prog * 8,   8 + prog * 50, 0.30 /  8, -2.2);
   }
 }
@@ -1142,7 +1239,7 @@ if (state.sunburst) {
       }
 
       const W = 405, H = 333;
-      const CW = 477, CH = 405; // tamaño del check
+      const CW = 477, CH = 405;
 
       badgeOverlayCtx.save();
       badgeOverlayCtx.globalAlpha = alpha;
@@ -1151,7 +1248,6 @@ if (state.sunburst) {
       badgeOverlayCtx.drawImage(imgCheck, -CW / 2, -CH / 2, CW, CH);
       badgeOverlayCtx.restore();
 
-      // bonus number — zoom in / hold / zoom out independiente
       const BZ_IN = 0.18, BZ_HOLD = 0.42, BZ_OUT = 0.72;
       let bonusScale;
       if      (ba.t < BZ_IN)   bonusScale = ba.t / BZ_IN;
@@ -1206,7 +1302,7 @@ if (state.sunburst) {
 function startTimer() {
   timerNumberEl.textContent = state.timeLeft;
   timerNumberEl.style.color = '';
-  countdownImg.src = 'images/countdown.png';
+  countdownImg.src = window.pendingGameMode === 'monuments' ? 'images/countdown4.png' : 'images/countdown.png';
   countdownImg.style.animationPlayState = 'running';
 
   timerIntervalId = setInterval(() => {
@@ -1215,11 +1311,11 @@ function startTimer() {
 
     if (state.timeLeft <= 10) {
       timerNumberEl.style.color = '#ffffff';
-      countdownImg.src = 'images/countdownred.png';
+      countdownImg.src = window.pendingGameMode === 'monuments' ? 'images/countdownred4.png' : 'images/countdownred.png';
       if (state.timeLeft > 0) { sfxTickdown.currentTime = 0; sfxTickdown.play(); }
     } else {
       timerNumberEl.style.color = '';
-      countdownImg.src = 'images/countdown.png';
+      countdownImg.src = window.pendingGameMode === 'monuments' ? 'images/countdown4.png' : 'images/countdown.png';
     }
 
     if (state.timeLeft <= 0)  endGame();
@@ -1228,23 +1324,22 @@ function startTimer() {
 
 function endGame() {
   clearInterval(timerIntervalId);
+  if (slideMonumentIn._nameTimer) { clearTimeout(slideMonumentIn._nameTimer); slideMonumentIn._nameTimer = null; }
+  monumentNameEl.style.opacity = '0';
   state.phase = 'idle';
   canvas.style.pointerEvents = 'none';
   countdownImg.style.animationPlayState = 'paused';
 
-  // Mostrar overlay timeup.png
   playMusic(null);
   sfxTimesUp.currentTime = 0; sfxTimesUp.play();
   timeupOverlay.style.display = 'flex';
   timeupOverlay.classList.remove('timeup-out');
   timeupOverlay.classList.add('timeup-in');
 
-  // Después de 1.2s de hold, animación de salida
   setTimeout(() => {
     timeupOverlay.classList.remove('timeup-in');
     timeupOverlay.classList.add('timeup-out');
 
-    // Al segundo (350ms animación salida + ~650ms margen) ir al gameover
     setTimeout(() => {
       timeupOverlay.style.display = 'none';
       timeupOverlay.classList.remove('timeup-out');
@@ -1254,20 +1349,36 @@ function endGame() {
       gameWrapper.style.display = 'none';
       scoreDisplayEl.style.display = 'none';
       finalScoreEl.textContent = state.score.toLocaleString();
-      const isNewHighscore = state.score > highscore;
-      if (isNewHighscore) {
-        highscore = state.score;
-        localStorage.setItem('geochallenge_highscore', highscore);
-        highscoreEl.textContent = highscore.toLocaleString();
-        // Actualizar perfil del highscore en el leaderboard
-        highscorePlayer.score = highscore;
-        if (lbBestScoreEl) lbBestScoreEl.textContent = highscore.toLocaleString();
-        updateSplashHighscore();
+      let isNewHighscore = false;
+      if (window.pendingGameMode === 'monuments') {
+        isNewHighscore = state.score > monumentsHighscore;
+        if (isNewHighscore) {
+          monumentsHighscore = state.score;
+          localStorage.setItem('monumentsHighscore', monumentsHighscore);
+        }
+      } else {
+        isNewHighscore = state.score > highscore;
+        if (isNewHighscore) {
+          highscore = state.score;
+          localStorage.setItem('geochallenge_highscore', highscore);
+          highscoreEl.textContent = highscore.toLocaleString();
+          highscorePlayer.score = highscore;
+          if (lbBestScoreEl) lbBestScoreEl.textContent = highscore.toLocaleString();
+          updateSplashHighscore();
+        }
       }
-      // Mostrar u ocultar banner de nuevo récord
       newHighscoreBanner.style.display = isNewHighscore ? 'flex' : 'none';
       if (isNewHighscore) {
-        newHighscoreScore.textContent = highscore.toLocaleString();
+        newHighscoreScore.textContent = (window.pendingGameMode === 'monuments' ? monumentsHighscore : highscore).toLocaleString();
+      }
+      const gameoverTextLabel = document.querySelector('.gameover-text1-label');
+      if (gameoverTextLabel) {
+        gameoverTextLabel.textContent = window.pendingGameMode === 'monuments'
+          ? '¡Buen trabajo! ¡Lo conseguimos!'
+          : '¡Buen intento! ¡Todos llegaron a sus ciudades de destino!';
+      }
+      if (window.pendingGameMode === 'monuments') {
+        gameoverScreen.classList.add('mode-monuments');
       }
       gameoverScreen.style.display = 'flex';
       const rpGO = document.getElementById('right-panel');
@@ -1280,7 +1391,7 @@ function endGame() {
       buildWrongsRow(checksEndTime);
       playMusic(sfxPostgame);
     }, 1000);
-  }, 400 + 1200); // 400ms entrada + 1200ms hold
+  }, 400 + 1200);
 }
 
 // ── ESCALADO RESPONSIVE ───────────────────────────────────────────────────────
@@ -1290,23 +1401,19 @@ function redimensionarJuego() {
   const anchoVentana = window.innerWidth;
   const altoVentana = window.innerHeight;
 
-  // Calculamos el margen según la pantalla para respetar las barras blancas
-  let margenHorizontal = 40; 
+  let margenHorizontal = 40;
   if (anchoVentana > 1024) {
-    margenHorizontal = anchoVentana * 0.35; // 30% en barras + un margen extra
+    margenHorizontal = anchoVentana * 0.35;
   } else if (anchoVentana > 768) {
-    margenHorizontal = anchoVentana * 0.20; // Barras más chicas
+    margenHorizontal = anchoVentana * 0.20;
   }
 
   const margenVertical = 80;
 
-  // Escala necesaria para encajar en el alto y en el ancho disponible
   const escalaW = (anchoVentana - margenHorizontal) / DISPLAY_W;
   const escalaH = (altoVentana - margenVertical) / DISPLAY_H;
-  
-  // Math.min garantiza que el juego nunca se recorte
-  let escalaFinal = Math.min(escalaW, escalaH);
 
+  let escalaFinal = Math.min(escalaW, escalaH);
   escalaFinal = escalaFinal * 0.92;
 
   gameWrapper.style.transform = `scale(${escalaFinal})`;
@@ -1351,7 +1458,6 @@ function runPregameCountdown(onDone) {
     pregameCountdownImg.style.width  = size + 'px';
     pregameCountdownImg.style.height = size + 'px';
     pregameCountdownImg.src = src;
-    // Forzar reflow para reiniciar la animación CSS en cada paso
     void pregameCountdownImg.offsetWidth;
     pregameCountdownImg.style.animation = '';
     setTimeout(showStep, hold);
@@ -1380,7 +1486,6 @@ function startGame() {
   redimensionarJuego();
 
   resetState();
-  // Cambiar puntaje para testeo
   gradeCounts = { perfect: 0, good: 0, fair: 0 };
   wrongCount = 0;
   updateDotsUI();
@@ -1393,22 +1498,29 @@ function startGame() {
   cityTagEl.style.transition   = 'none';
   cityTagEl.style.left         = '-420px';
   cityTagEl.style.top          = '-130px';
+  const tagImg = cityTagEl.querySelector('img');
+  tagImg.src = 'images/tag3.png';
+  tagImg.style.width  = '';
+  tagImg.style.height = '';
+  cityTagText.style.display = '';
+  cityTagEl.querySelector('img').classList.remove('monument-appear');
+  monumentImgEl.style.display = 'none';
+  monumentImgEl.src = '';
+  monumentNameEl.textContent = '';
+  monumentNameEl.style.opacity = '0';
+  if (slideMonumentIn._nameTimer) { clearTimeout(slideMonumentIn._nameTimer); slideMonumentIn._nameTimer = null; }
   gameWrapper.querySelectorAll('.city-tag-ghost').forEach(g => g.remove());
 
-  // Resetear timer visualmente antes del pregame countdown
   timerNumberEl.textContent = GAME_DURATION;
   timerNumberEl.style.color = '';
-  countdownImg.src = 'images/countdown.png';
+  countdownImg.src = window.pendingGameMode === 'monuments' ? 'images/countdown4.png' : 'images/countdown.png';
 
-  // Ocultar el city tag sin transición
   cityTagEl.style.visibility = 'hidden';
 
   animFrameId = requestAnimationFrame(render);
 
-  // Pausar el pulso del timer hasta que arranque el juego real
   countdownImg.style.animationPlayState = 'paused';
 
-  // Cuenta regresiva antes de arrancar el timer y la primera ciudad
   runPregameCountdown(() => {
     playMusic(sfxGameMusic);
     startTimer();
@@ -1438,6 +1550,8 @@ document.querySelector('.splash-confirm-wrap')?.addEventListener('click', () => 
       if (label) { label.textContent = 'Haz clic sobre la bandera del país, estado o unión que corresponda al nombre que aparece arriba. ¿Todo listo? ¡Entonces haz clic sobre el icono VERDE para empezar!'; label.classList.add('step2'); }
     } else if (window.pendingGameMode === 'shapes') {
       if (label) { label.textContent = 'Observa la forma del país y haz click en el nombre correcto, ¡pero no te olvides de que cada segundo cuenta! ¡Haz click en el icono VERDE y comenzamos!'; label.classList.add('step2'); }
+    } else if (window.pendingGameMode === 'monuments') {
+      if (label) { label.textContent = 'Pon un pin en el mapa allí donde crees que están. ¡Haz click en el icono VERDE cuando creas que estes listo!'; label.classList.add('step2'); }
     } else {
       if (label) { label.textContent = 'Coloca un pin en el mapa donde creas que cada ciudad se ubica. ¡Haz click en el botón VERDE cuando estes listo!'; label.classList.add('step2'); }
     }
@@ -1453,6 +1567,9 @@ document.querySelector('.splash-confirm-wrap')?.addEventListener('click', () => 
     } else if (window.pendingGameMode === 'shapes') {
       splashScreen.style.display = 'none';
       if (typeof showShapesMode !== 'undefined') showShapesMode();
+    } else if (window.pendingGameMode === 'monuments') {
+      splashScreen.style.display = 'none';
+      startGame();
     } else {
       startGame();
     }
@@ -1468,16 +1585,16 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
   gameoverScreen.style.display = 'none';
   document.getElementById('loading-screen').style.display = '';
 
-  // refresh highscore displays
   const fmt = v => v > 0 ? '🏆 ' + v.toLocaleString() : '';
   const elPlay   = document.getElementById('loading-play-hs');
   const elFlags  = document.getElementById('loading-flags-hs');
   const elShapes = document.getElementById('loading-shapes-hs');
+  const elMode4  = document.getElementById('loading-mode4-hs');
   if (elPlay)   elPlay.textContent   = fmt(parseInt(localStorage.getItem('geochallenge_highscore') || '0', 10));
   if (elFlags)  elFlags.textContent  = fmt(parseInt(localStorage.getItem('flagsHighscore')         || '0', 10));
   if (elShapes) elShapes.textContent = fmt(parseInt(localStorage.getItem('shapesHighscore')        || '0', 10));
+  if (elMode4)  elMode4.textContent  = fmt(parseInt(localStorage.getItem('monumentsHighscore')     || '0', 10));
 
-  // reset splash state so next mode entry starts from step 0
   confirmStep = 0;
   const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
   if (howtoWrap) howtoWrap.classList.remove('slide-down');
@@ -1488,26 +1605,6 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
   const animEls = document.querySelectorAll('#splash-screen .flightatt-splash, .splash-text2-wrap');
   animEls.forEach(el => el.classList.remove('animate-in'));
 });
-
-/* ── COORD TOOLTIP ─────────────────────────────────────────────────────────────
-canvas.addEventListener('mousemove', (e) => {
-  const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
-  const x = (e.clientX - rect.left) * scaleX;
-  const y = (e.clientY - rect.top) * scaleY;
-  
-  const { lat, lon } = canvasToLatLon(x, y);
-  coordTooltip.textContent = `${lat.toFixed(2)}°  ${lon.toFixed(2)}°`;
-  coordTooltip.style.left = `${x}px`;
-  coordTooltip.style.top  = `${y}px`;
-  coordTooltip.style.display = 'block';
-});
-
-canvas.addEventListener('mouseleave', () => {
-  coordTooltip.style.display = 'none';
-});
-*/
 
 // ── LOADING FLIGHT ATTENDANT (flightattpost2) ────────────────────────────────
 (function () {
@@ -1542,7 +1639,6 @@ canvas.addEventListener('mouseleave', () => {
 
 // ── SPLASH FLIGHT ATTENDANT (flightattpost2) ─────────────────────────────────
 (function () {
-  // [frameNum, ms until next frame]
   const TIMELINE2 = [
     [1, 150], [2, 100], [3, 150], [4, 150], [5, 150],
     [6,  50], [7, 150], [8, 200], [7, 200], [8, 200],
@@ -1575,7 +1671,6 @@ canvas.addEventListener('mouseleave', () => {
 // ── FLIGHT ATTENDANT ANIMATION ───────────────────────────────────────────────
 let restartFlightAtt;
 (function () {
-  // [frameIndex (1-based), duration in ms until next frame]
   const TIMELINE = [
     [1,  150], [2,  100], [3,  150], [4,  100], [5,  100],
     [6,  100], [7,  150], [8,   50], [9,   50], [10,  50],
@@ -1586,7 +1681,6 @@ let restartFlightAtt;
 
   const frames = document.querySelectorAll('.flightatt');
 
-  // Hide all except frame 1 on init
   frames.forEach(img => {
     const num = parseInt(img.src.match(/(\d+)\.png$/)[1]);
     img.style.visibility = num === 1 ? 'visible' : 'hidden';
@@ -1662,7 +1756,6 @@ function getAllSfx() {
     typeof sfxLevel2 !== 'undefined' ? sfxLevel2 : null].filter(Boolean);
 }
 
-// Apply saved mute state to the icon on page load
 document.addEventListener('DOMContentLoaded', () => {
   if (isMuted) {
     const img = document.getElementById('vol-img');
@@ -1744,4 +1837,3 @@ document.getElementById('vol-btn')?.addEventListener('click', () => {
   window.addEventListener('resize', check);
   check();
 })();
-
