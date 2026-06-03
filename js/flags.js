@@ -6,6 +6,7 @@ document.addEventListener('contextmenu', e => {
 ['flags-luggage-group', 'flags-luggage-left-group', 'flags-luggage-right-group',
  'flags-luggage-bl-group', 'flags-luggage-bc-group', 'flags-luggage-br-group'].forEach(id => {
   document.getElementById(id)?.addEventListener('mouseenter', () => {
+    if (!flagsRunning) return;
     if (typeof sfxSelect !== 'undefined') { sfxSelect.currentTime = 0; sfxSelect.play(); }
   });
 });
@@ -100,6 +101,8 @@ function showFlagsMode() {
     void flagsFindLuggage.offsetWidth;
     flagsFindLuggage.classList.add('scrolling');
     flagsLuggageWrap.style.display  = 'block';
+    flagsLuggageWrap.style.pointerEvents = '';
+    flagsLuggageWrap.classList.remove('flags-game-ended');
     flagsFlagidWrap.style.display   = 'block';
     flagsFlagidLabel.textContent = '';
     flagsTimerImg.style.animationPlayState = 'running';
@@ -962,6 +965,8 @@ function startFlagsTimer() {
     if (flagsTimeLeft <= 0) {
       clearInterval(flagsTimerIntervalId);
       flagsRunning = false;
+      flagsLuggageWrap.style.pointerEvents = 'none';
+      flagsLuggageWrap.classList.add('flags-game-ended');
       if (typeof sfxTimesUp !== 'undefined') { sfxTimesUp.currentTime = 0; sfxTimesUp.play(); }
       endFlagsGame();
     }
@@ -988,7 +993,9 @@ document.getElementById('loading-flags-btn').addEventListener('click', () => {
   if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.play(); }
   window.pendingGameMode = 'flags';
   document.getElementById('splash-screen').classList.add('mode-flags');
+  document.getElementById('splash-screen').classList.remove('mode-shapes');
   document.getElementById('gameover-screen').classList.add('mode-flags');
+  document.getElementById('gameover-screen').classList.remove('mode-shapes');
   const howtoplayVideo = document.querySelector('.splash-howtoplay-video');
   if (howtoplayVideo) { howtoplayVideo.src = 'images/howtoplay/howtoplay1.mp4'; howtoplayVideo.load(); }
   document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men3.png');
@@ -998,6 +1005,8 @@ document.getElementById('loading-flags-btn').addEventListener('click', () => {
   document.querySelectorAll('.game-bg-women1').forEach(el => el.src = 'images/characters/women2.png');
   document.querySelectorAll('.game-bg-women2').forEach(el => el.src = 'images/characters/women3.png');
   document.querySelectorAll('.game-bg-city').forEach(el => el.src = 'images/bg/level1complete.png');
+  document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check1.png');
+  document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong1.png');
   const label = document.querySelector('.splash-text2-label');
   if (label) { label.textContent = '¡Eh, Tú! ¿Crees que podrías echarme una mano ordenando el equipaje de los turistas?'; label.classList.remove('step2'); }
   const howtoWrap = document.querySelector('.splash-howtoplay-wrap');

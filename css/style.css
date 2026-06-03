@@ -949,6 +949,16 @@ body::after {
   user-select: none;
 }
 
+.loading-btn-hs {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 1.5vmin;
+  color: rgba(0,0,0,0.7);
+  letter-spacing: 0.05vmin;
+  pointer-events: none;
+  user-select: none;
+  min-height: 1.8vmin;
+}
+
 .loading-play-wrap {
   position: absolute;
   bottom: 12vmin;
@@ -1223,6 +1233,11 @@ body::after {
   text-shadow: 0 0 30px #c8860a, 2px 2px 0 #7a4400;
   letter-spacing: 3px;
 }
+
+#gameover-screen h2,
+#final-score-label,
+#final-score-value,
+#new-highscore-banner { display: none !important; }
 
 #final-score-label {
   color: #c8a060;
@@ -2174,6 +2189,16 @@ body::after {
   filter: brightness(0.7);
 }
 
+#flags-luggage-wrap.flags-game-ended #flags-luggage-group:hover #flags-luggage,
+#flags-luggage-wrap.flags-game-ended #flags-luggage-left-group:hover .flags-luggage-side,
+#flags-luggage-wrap.flags-game-ended #flags-luggage-right-group:hover .flags-luggage-side,
+#flags-luggage-wrap.flags-game-ended #flags-luggage-bl-group:hover .flags-luggage-side,
+#flags-luggage-wrap.flags-game-ended #flags-luggage-bc-group:hover .flags-luggage-side,
+#flags-luggage-wrap.flags-game-ended #flags-luggage-br-group:hover .flags-luggage-side {
+  filter: none !important;
+  cursor: default !important;
+}
+
 #flags-luggage-group {
   position: absolute;
   top: -80px;
@@ -2469,9 +2494,35 @@ body::after {
 #splash-screen.mode-flags .splash-text2-label.step2  { padding-top: 6%; }
 #gameover-screen.mode-flags .gameover-text1-label    { padding-top: 18%; }
 
+/* ── SHAPES MODE OVERRIDES ────────────────────────────── */
+#splash-screen.mode-shapes .splash-text2-label       { padding-top: 20%; }
+#splash-screen.mode-shapes .splash-text2-label.step2 { padding-top: 10%; }
+
 .mode-flags .game-bg-men,
 .mode-flags .game-bg-men1,
 .mode-flags .game-bg-men2  { left: 26.5%; }
+
+.mode-flags.mode-shapes .game-bg-men,
+.mode-flags.mode-shapes .game-bg-men1,
+.mode-flags.mode-shapes .game-bg-men2  { left: 35%; }
+
+.mode-flags.mode-shapes .game-bg-women,
+.mode-flags.mode-shapes .game-bg-women1,
+.mode-flags.mode-shapes .game-bg-women2 { left: 20%; }
+
+.mode-flags.mode-shapes .game-bg-sky { transform: translateX(-50%) scaleY(0.533); bottom: 22%; }
+
+.mode-flags.mode-shapes .game-bg-cloud2 { right: -5%; animation: cloud2-move-shapes 12s linear 3s infinite; }
+.mode-flags.mode-shapes .game-bg-plane7 { right: -5%; top: 46%; }
+
+@keyframes cloud2-move-shapes {
+  from { right: -5%; }
+  to   { right: 120%; }
+}
+
+.mode-flags.mode-shapes .game-bg-girl,
+.mode-flags.mode-shapes .game-bg-girl1,
+.mode-flags.mode-shapes .game-bg-girl2 { transform: scale(0.17); bottom: 2%; left: 29.3%; z-index: 12; }
 
 .mode-flags .game-bg-girl,
 .mode-flags .game-bg-girl1,
@@ -2528,4 +2579,12 @@ body::after {
 .recording-mode #flags-check-overlay,
 .recording-mode #flags-wrong-overlay,
 .recording-mode .score-popup { display: none !important; }
+
+.recording-mode #shapes-countdown-widget,
+.recording-mode #score-display,
+.recording-mode #speed-bonus-text,
+.recording-mode #right-panel,
+.recording-mode #flags-check-overlay,
+.recording-mode #flags-wrong-overlay,
+.recording-mode #vol-btn { display: none !important; }
 

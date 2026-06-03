@@ -9,7 +9,9 @@ let shapesRunning = false;
 let shapesDots = 0;
 let shapesTrainTimeouts = [];
 let shapesCurrentImg = null, shapesCurrentImg2 = null, shapesCurrentClip = null;
+let shapesCurrentBoard = null, shapesCurrentSvg = null;
 let shapesCurrentAnimTimeout = null, shapesCurrentClipFadeTimeout = null;
+let shapesWrongAnswerCount = 0;
 let shapesSpeedBonusHideId = null;
 const SHAPES_SPEED_WIN  = 2.0;
 const SHAPES_SPEED_MULT = 1.5;
@@ -17,6 +19,9 @@ const SHAPES_GRACE      = 0.8;
 let shapesScore = 0;
 let shapesDisplayedScore = 0;
 let shapesScoreRafId = null;
+let shapesAnsweredSet = new Set();
+let shapesWrongCooldown = new Map(); // country name → remaining questions before re-entry
+let shapesCorrectCount = 0;
 
 function positionShapesCountdown() {
   const cwEl = document.getElementById('shapes-countdown-widget');
@@ -114,12 +119,14 @@ function showCountryShape(country, ext1, ext2, startDelay) {
   defs.appendChild(clipPathEl);
   svgEl.appendChild(defs);
   document.body.appendChild(svgEl);
+  shapesCurrentSvg = svgEl;
 
   const board = document.createElement('img');
   board.src = 'images/countryboard.png';
   board.style.cssText = 'position:fixed;top:50%;left:36%;transform:translate(-50%,-50%) scaleX(0.96);width:85.15vmin;height:auto;z-index:99;';
   board.draggable = false;
   document.body.appendChild(board);
+  shapesCurrentBoard = board;
 
 
   const img = document.createElement('img');
@@ -195,15 +202,21 @@ function showCountryShape(country, ext1, ext2, startDelay) {
     document.head.appendChild(st);
   }
 
-  const correctLabel = SHAPE_COUNTRIES.find(c => c.name === country).label;
-  const distractors = SHAPE_COUNTRIES
-    .filter(c => c.name !== country)
-    .sort(() => Math.random() - 0.5)
-    .slice(0, 3)
-    .map(c => c.label);
-  const correctIdx = Math.floor(Math.random() * 4);
-  const options = [...distractors];
-  options.splice(correctIdx, 0, correctLabel);
+  let options, correctIdx;
+  if (document.body.classList.contains('recording-mode')) {
+    options    = ['China', 'Germany', 'Spain', 'Egypt'];
+    correctIdx = 0;
+  } else {
+    const correctLabel = SHAPE_COUNTRIES.find(c => c.name === country).label;
+    const distractors  = getActiveShapesPool()
+      .filter(c => c.name !== country)
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 3)
+      .map(c => c.label);
+    correctIdx = Math.floor(Math.random() * 4);
+    options    = [...distractors];
+    options.splice(correctIdx, 0, correctLabel);
+  }
 
   const animTimeout = country !== 'Rusia' ? setTimeout(() => {
     img.style.transform  = 'translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01) scale(0.52)';
@@ -272,6 +285,7 @@ function showCountryShape(country, ext1, ext2, startDelay) {
       if (anyClicked || !shapesRunning) return;
       tagImg.src = 'images/tag2yellow.png';
       tag.style.transform = base + ' scale(1.1)';
+      if (typeof sfxSelect !== 'undefined') { sfxSelect.currentTime = 0; sfxSelect.play(); }
     });
     tag.addEventListener('mouseleave', () => {
       if (anyClicked || !shapesRunning) return;
@@ -293,6 +307,11 @@ function showCountryShape(country, ext1, ext2, startDelay) {
         }
       }
 
+      if (document.body.classList.contains('recording-mode')) {
+        tagEls.forEach(t => { t.style.pointerEvents = 'none'; t.style.cursor = 'default'; });
+        return;
+      }
+
       const overlayId = isCorrect ? 'flags-check-overlay' : 'flags-wrong-overlay';
       const overlay = document.getElementById(overlayId);
       if (overlay) {
@@ -310,6 +329,8 @@ function showCountryShape(country, ext1, ext2, startDelay) {
       if (typeof loadGameSFX  !== 'undefined') loadGameSFX();
       if (typeof loadBadges   !== 'undefined') loadBadges();
       if (isCorrect) {
+        shapesAnsweredSet.add(country);
+        shapesCorrectCount++;
         shapesStreak++;
         if (sfxAcertar) { sfxAcertar.currentTime = 0; sfxAcertar.play(); }
         const pts        = typeof getFlagsRoundPoints !== 'undefined' ? getFlagsRoundPoints(shapesStreak) : 10;
@@ -365,6 +386,8 @@ function showCountryShape(country, ext1, ext2, startDelay) {
           showFlagsBadge(badgeImg, inRowBonus, shapesStreak, window.innerWidth * 0.39, 0.85);
         }
       } else {
+        shapesWrongCooldown.set(country, 5);
+        shapesWrongAnswerCount++;
         shapesStreak = 0;
         if (sfxError) { sfxError.currentTime = 0; sfxError.play(); }
       }
@@ -378,7 +401,14 @@ function showCountryShape(country, ext1, ext2, startDelay) {
           board.remove();
           img.remove();
           clip.remove();
-          const next = SHAPE_COUNTRIES[Math.floor(Math.random() * SHAPE_COUNTRIES.length)];
+          for (const [name, remaining] of shapesWrongCooldown) {
+            if (remaining <= 1) shapesWrongCooldown.delete(name);
+            else shapesWrongCooldown.set(name, remaining - 1);
+          }
+          const activePool = getActiveShapesPool();
+          const pool = activePool.filter(c => !shapesAnsweredSet.has(c.name) && !shapesWrongCooldown.has(c.name));
+          const src  = pool.length > 0 ? pool : activePool.filter(c => !shapesAnsweredSet.has(c.name));
+          const next = (src.length > 0 ? src : activePool)[Math.floor(Math.random() * (src.length > 0 ? src : activePool).length)];
           showCountryShape(next.name, next.ext1, next.ext2);
         }, 200);
       }, 500);
@@ -413,12 +443,14 @@ function showCountryShape(country, ext1, ext2, startDelay) {
 }
 
 const SHAPE_COUNTRIES = [
+  { name: 'China',          label: 'China',            ext1: 'png', ext2: 'jpg' },
   { name: 'Italia',         label: 'Italia',           ext1: 'png', ext2: 'jpg' },
   { name: 'Chile',          label: 'Chile',            ext1: 'png', ext2: 'jpg' },
   { name: 'Japon',          label: 'Japón',            ext1: 'png', ext2: 'jpg' },
   { name: 'Australia',      label: 'Australia',        ext1: 'png', ext2: 'jpg' },
   { name: 'EstadosUnidos',  label: 'Estados Unidos',   ext1: 'png', ext2: 'jpg' },
   { name: 'Brasil',         label: 'Brasil',           ext1: 'png', ext2: 'jpg' },
+  { name: 'China',          label: 'China',            ext1: 'png', ext2: 'jpg' },
   { name: 'India',          label: 'India',            ext1: 'png', ext2: 'jpg' },
   { name: 'Noruega',        label: 'Noruega',          ext1: 'png', ext2: 'jpg' },
   { name: 'NuevaZelanda',   label: 'Nueva Zelanda',    ext1: 'png', ext2: 'jpg' },
@@ -487,16 +519,173 @@ const SHAPE_COUNTRIES = [
   { name: 'Tanzania',       label: 'Tanzania',         ext1: 'png', ext2: 'jpg' },
   { name: 'Mozambique',     label: 'Mozambique',       ext1: 'png', ext2: 'jpg' },
   { name: 'Kenia',          label: 'Kenia',            ext1: 'png', ext2: 'jpg' },
-  { name: 'RepDemCongo',    label: 'República Democrática del Congo',         ext1: 'png', ext2: 'jpg' },
+  { name: 'RepDemCongo',    label: 'República Democrática del Congo', ext1: 'png', ext2: 'jpg' },
   { name: 'Zimbabue',       label: 'Zimbabue',         ext1: 'png', ext2: 'jpg' },
   { name: 'Namibia',        label: 'Namibia',          ext1: 'png', ext2: 'jpg' },
   { name: 'Botsuana',       label: 'Botsuana',         ext1: 'png', ext2: 'jpg' },
   { name: 'Camerun',        label: 'Camerún',          ext1: 'png', ext2: 'jpg' },
   { name: 'Chad',           label: 'Chad',             ext1: 'png', ext2: 'jpg' },
-  { name: 'PapGuinea',      label: 'Papúa Nueva Guinea',         ext1: 'png', ext2: 'jpg' },
+  { name: 'PapGuinea',      label: 'Papúa Nueva Guinea', ext1: 'png', ext2: 'jpg' },
   { name: 'Groenlandia',    label: 'Groenlandia',      ext1: 'png', ext2: 'jpg' },
-
+  { name: 'Luxemburgo',     label: 'Luxemburgo',       ext1: 'png', ext2: 'jpg' },
+  { name: 'PaisesBajos',    label: 'Países Bajos',     ext1: 'png', ext2: 'jpg' },
+  { name: 'Belgica',        label: 'Bélgica',          ext1: 'png', ext2: 'jpg' },
+  { name: 'Hungria',        label: 'Hungría',          ext1: 'png', ext2: 'jpg' },
+  { name: 'Eslovaquia',     label: 'Eslovaquia',       ext1: 'png', ext2: 'jpg' },
+  { name: 'RepCheca',       label: 'Chequia',          ext1: 'png', ext2: 'jpg' },
+  { name: 'Austria',        label: 'Austria',          ext1: 'png', ext2: 'jpg' },
+  { name: 'Suiza',          label: 'Suiza',            ext1: 'png', ext2: 'jpg' },
+  { name: 'Kosovo',         label: 'Kosovo',           ext1: 'png', ext2: 'jpg' },
+  { name: 'Albania',        label: 'Albania',          ext1: 'png', ext2: 'jpg' },
+  { name: 'Bosnia',         label: 'Bosnia y Herzegovina', ext1: 'png', ext2: 'jpg' },
+  { name: 'Serbia',         label: 'Serbia',           ext1: 'png', ext2: 'jpg' },
+  { name: 'Moldavia',       label: 'Moldavia',         ext1: 'png', ext2: 'jpg' },
+  { name: 'Macedonia',      label: 'Macedonia del Norte', ext1: 'png', ext2: 'jpg' },
+  { name: 'Eslovenia',      label: 'Eslovenia',        ext1: 'png', ext2: 'jpg' },
+  { name: 'Letonia',        label: 'Letonia',          ext1: 'png', ext2: 'jpg' },
+  { name: 'Bulgaria',       label: 'Bulgaria',         ext1: 'png', ext2: 'jpg' },
+  { name: 'Estonia',        label: 'Estonia',          ext1: 'png', ext2: 'jpg' },
+  { name: 'Bielorrusia',    label: 'Bielorrusia',      ext1: 'png', ext2: 'jpg' },
+  { name: 'Lituania',       label: 'Lituania',         ext1: 'png', ext2: 'jpg' },
+  { name: 'Chipre',         label: 'Chipre',           ext1: 'png', ext2: 'jpg' },
+  { name: 'Malta',          label: 'Malta',            ext1: 'png', ext2: 'jpg' },
+  { name: 'Andorra',        label: 'Andorra',          ext1: 'png', ext2: 'jpg' },
+  { name: 'Liechtenstein',  label: 'Liechtenstein',    ext1: 'png', ext2: 'jpg' },
+  { name: 'Jordania',       label: 'Jordania',         ext1: 'png', ext2: 'jpg' },
+  { name: 'Libano',         label: 'Líbano',           ext1: 'png', ext2: 'jpg' },
+  { name: 'Siria',          label: 'Siria',            ext1: 'png', ext2: 'jpg' },
+  { name: 'Israel',         label: 'Israel',           ext1: 'png', ext2: 'jpg' },
+  { name: 'Tayikistan',     label: 'Tayikistán',       ext1: 'png', ext2: 'jpg' },
+  { name: 'Emiratos',       label: 'Emiratos Árabes Unidos', ext1: 'png', ext2: 'jpg' },
+  { name: 'Catar',          label: 'Catar',            ext1: 'png', ext2: 'jpg' },
+  { name: 'Turkmenistan',   label: 'Turkmenistán',     ext1: 'png', ext2: 'jpg' },
+  { name: 'Kuwait',         label: 'Kuwait',           ext1: 'png', ext2: 'jpg' },
+  { name: 'Azerbaijan',     label: 'Azerbaiján',       ext1: 'png', ext2: 'jpg' },
+  { name: 'Armenia',        label: 'Armenia',          ext1: 'png', ext2: 'jpg' },
+  { name: 'Palestina',      label: 'Palestina',        ext1: 'png', ext2: 'jpg' },
+  { name: 'Kirguistan',     label: 'Kirguistán',       ext1: 'png', ext2: 'jpg' },
+  { name: 'Uzbekistan',     label: 'Uzbekistán',       ext1: 'png', ext2: 'jpg' },
+  { name: 'Georgia',        label: 'Georgia',          ext1: 'png', ext2: 'jpg' },
+  { name: 'Nepal',          label: 'Nepal',            ext1: 'png', ext2: 'jpg' },
+  { name: 'Butan',          label: 'Bután',            ext1: 'png', ext2: 'jpg' },
+  { name: 'Bangladesh',     label: 'Bangladesh',       ext1: 'png', ext2: 'jpg' },
+  { name: 'SriLanka',       label: 'Sri Lanka',        ext1: 'png', ext2: 'jpg' },
+  { name: 'Malasia',        label: 'Malasia',          ext1: 'png', ext2: 'jpg' },
+  { name: 'Laos',           label: 'Laos',             ext1: 'png', ext2: 'jpg' },
+  { name: 'Cambodia',       label: 'Cambodia',         ext1: 'png', ext2: 'jpg' },
+  { name: 'Brunei',         label: 'Brunei',           ext1: 'png', ext2: 'jpg' },
+  { name: 'Timor',          label: 'Timor Oriental',   ext1: 'png', ext2: 'jpg' },
+  { name: 'Taiwan',         label: 'Taiwan',           ext1: 'png', ext2: 'jpg' },
+  { name: 'Panama',         label: 'Panamá',           ext1: 'png', ext2: 'jpg' },
+  { name: 'CostaRica',      label: 'Costa Rica',       ext1: 'png', ext2: 'jpg' },
+  { name: 'Belice',         label: 'Belice',           ext1: 'png', ext2: 'jpg' },
+  { name: 'ElSalvador',     label: 'El Salvador',      ext1: 'png', ext2: 'jpg' },
+  { name: 'Trinidad',       label: 'Trinidad y Tobago', ext1: 'png', ext2: 'jpg' },
+  { name: 'Surinam',        label: 'Surinam',          ext1: 'png', ext2: 'jpg' },
+  { name: 'Guyana',         label: 'Guyana',           ext1: 'png', ext2: 'jpg' },
+  { name: 'Jamaica',        label: 'Jamaica',          ext1: 'png', ext2: 'jpg' },
+  { name: 'Guayana',        label: 'Guayana Francesa', ext1: 'png', ext2: 'jpg' },
+  { name: 'Bahamas',        label: 'Bahamas',          ext1: 'png', ext2: 'jpg' },
+  { name: 'Dominicana',     label: 'República Dominicana', ext1: 'png', ext2: 'jpg' },
+  { name: 'Haiti',          label: 'Haití',            ext1: 'png', ext2: 'jpg' },
+  { name: 'PuertoRico',     label: 'Puerto Rico',      ext1: 'png', ext2: 'jpg' },
+  { name: 'Hawaii',         label: 'Hawaii',           ext1: 'png', ext2: 'jpg' },
+  { name: 'Tunez',          label: 'Túnez',            ext1: 'png', ext2: 'jpg' },
+  { name: 'Guinea',         label: 'Guinea',           ext1: 'png', ext2: 'jpg' },
+  { name: 'CostaDeMarfil',  label: 'Costa de Marfil',  ext1: 'png', ext2: 'jpg' },
+  { name: 'Ghana',          label: 'Ghana',            ext1: 'png', ext2: 'jpg' },
+  { name: 'Liberia',        label: 'Liberia',          ext1: 'png', ext2: 'jpg' },
+  { name: 'SierraLeona',    label: 'Sierra Leona',     ext1: 'png', ext2: 'jpg' },
+  { name: 'GuineaBisau',    label: 'Guinea-Bisáu',     ext1: 'png', ext2: 'jpg' },
+  { name: 'Gambia',         label: 'Gambia',           ext1: 'png', ext2: 'jpg' },
+  { name: 'BurkinaFaso',    label: 'Burkina Faso',     ext1: 'png', ext2: 'jpg' },
+  { name: 'Senegal',        label: 'Senegal',          ext1: 'png', ext2: 'jpg' },
+  { name: 'Benin',          label: 'Benín',            ext1: 'png', ext2: 'jpg' },
+  { name: 'Togo',           label: 'Togo',             ext1: 'png', ext2: 'jpg' },
+  { name: 'Uganda',         label: 'Uganda',           ext1: 'png', ext2: 'jpg' },
+  { name: 'SudanDelSur',    label: 'Sudán del Sur',    ext1: 'png', ext2: 'jpg' },
+  { name: 'Congo',          label: 'República del Congo', ext1: 'png', ext2: 'jpg' },
+  { name: 'Gabon',          label: 'Gabón',            ext1: 'png', ext2: 'jpg' },
+  { name: 'GuineaEcuator',  label: 'Guinea Ecuatorial', ext1: 'png', ext2: 'jpg' },
+  { name: 'Burundi',        label: 'Burundi',          ext1: 'png', ext2: 'jpg' },
+  { name: 'Ruanda',         label: 'Ruanda',           ext1: 'png', ext2: 'jpg' },
+  { name: 'Sahara',         label: 'Sahara Occidental', ext1: 'png', ext2: 'jpg' },
+  { name: 'CaboVerde',      label: 'Cabo Verde',       ext1: 'png', ext2: 'jpg' },
+  { name: 'IslasCanarias',  label: 'Islas Canarias',   ext1: 'png', ext2: 'jpg' },
+  { name: 'Yibuti',         label: 'Yibuti',           ext1: 'png', ext2: 'jpg' },
+  { name: 'Eritrea',        label: 'Eritrea',          ext1: 'png', ext2: 'jpg' },
+  { name: 'Esuatini',       label: 'Esuatini',         ext1: 'png', ext2: 'jpg' },
+  { name: 'Malaui',         label: 'Malaui',           ext1: 'png', ext2: 'jpg' },
+  { name: 'Lesoto',         label: 'Lesoto',           ext1: 'png', ext2: 'jpg' },
+  { name: 'Seychelles',     label: 'Seychelles',       ext1: 'png', ext2: 'jpg' },
+  { name: 'IslasSalomon',   label: 'Islas Salomón',    ext1: 'png', ext2: 'jpg' },
+  { name: 'Vanuatu',        label: 'Vanuatu',          ext1: 'png', ext2: 'jpg' },
+  { name: 'NuevaCaledonia', label: 'Nueva Caledonia',  ext1: 'png', ext2: 'jpg' },
+  { name: 'Fiji',           label: 'Fiji',             ext1: 'png', ext2: 'jpg' },
+  { name: 'Samoa',          label: 'Samoa',            ext1: 'png', ext2: 'jpg' },
 ];
+
+// ── Pool system ──────────────────────────────────────────────────────────────
+// Unlock thresholds: 1 correct → fácil | 10 → medio (3 batches) | 30 → difícil
+
+const SHAPES_POOL_INICIO = new Set([
+  'Italia','Japon','EstadosUnidos','ReinoUnido','Mexico','Canada','China',
+]);
+
+const SHAPES_POOL_FACIL = [
+  'India','Noruega','Australia','Francia','NuevaZelanda','Tailandia',
+  'Rusia','Brasil','Argentina','Cuba','Irlanda','Chile','Turquia',
+  'Vietnam','Polonia','Espana','Iran','Madagascar','Alemania','Suecia',
+  'Finlandia','Mongolia','Sudafrica','Egipto',
+];
+
+// Ordered from most to least recognizable so the 3-batch unlock makes sense
+const SHAPES_POOL_MEDIO = [
+  // batch 1 (unlocks at 10 correct)
+  'Groenlandia','Indonesia','Kazajistan','ArabiaSaudita','Ucrania','Pakistan',
+  'Afganistan','CoreaDelSur','CoreaDelNorte','Myanmar','Filipinas','PapGuinea',
+  'Peru','Colombia','Venezuela','Bolivia','Ecuador',
+  'PaisesBajos','Austria','Hungria','Suiza','Grecia','Portugal','Rumania','Bulgaria',
+  // batch 2 (unlocks at 17 correct)
+  'Dinamarca','Islandia','Croacia','Somalia','Irak','Yemen','Oman',
+  'Israel','Siria','Nepal','Bangladesh','SriLanka','Malasia','Laos','Cambodia','Taiwan',
+  'Alaska','Marruecos','Nigeria','Argelia','Sudan','Etiopia','Angola','Tanzania','Kenia',
+  // batch 3 (unlocks at 24 correct)
+  'RepDemCongo','Niger','Mali','Libia','Mauritania','Mozambique','Namibia',
+  'Zimbabue','Botsuana','Camerun','Chad',
+  'Nicaragua','Honduras','Guatemala','Uruguay','Paraguay','Panama','CostaRica',
+  'Haiti','Dominicana','Ghana','Senegal','CostaDeMarfil','Uganda','Tunez','SudanDelSur',
+];
+
+const SHAPES_POOL_DIFICIL = [
+  'Luxemburgo','Belgica','Eslovaquia','RepCheca','Kosovo','Albania','Bosnia','Serbia',
+  'Moldavia','Macedonia','Eslovenia','Letonia','Estonia','Bielorrusia','Lituania',
+  'Chipre','Malta','Andorra','Liechtenstein',
+  'Jordania','Libano','Tayikistan','Emiratos','Catar','Turkmenistan','Kuwait',
+  'Azerbaijan','Armenia','Palestina','Kirguistan','Uzbekistan','Georgia',
+  'Butan','Brunei','Timor',
+  'Belice','ElSalvador','Trinidad','Surinam','Guyana','Guayana','Bahamas','PuertoRico','Hawaii','Jamaica',
+  'Guinea','Liberia','SierraLeona','GuineaBisau','Gambia','BurkinaFaso','Benin','Togo',
+  'Congo','Gabon','GuineaEcuator','Burundi','Ruanda',
+  'Sahara','CaboVerde','IslasCanarias','Yibuti','Eritrea','Esuatini','Malaui','Lesoto','Seychelles',
+  'IslasSalomon','Vanuatu','NuevaCaledonia','Fiji','Samoa',
+];
+
+function getActiveShapesPool() {
+  const names = new Set(SHAPES_POOL_INICIO);
+  if (shapesCorrectCount >= 1) SHAPES_POOL_FACIL.forEach(n => names.add(n));
+  if (shapesCorrectCount >= 10) {
+    const batch1End = 25;
+    const batch2End = 50;
+    const limit = shapesCorrectCount >= 24 ? SHAPES_POOL_MEDIO.length
+                : shapesCorrectCount >= 17 ? batch2End
+                : batch1End;
+    SHAPES_POOL_MEDIO.slice(0, limit).forEach(n => names.add(n));
+  }
+  if (shapesCorrectCount >= 30) SHAPES_POOL_DIFICIL.forEach(n => names.add(n));
+  return SHAPE_COUNTRIES.filter(c => names.has(c.name));
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 const SHAPES_PREGAME_STEPS = [
   { src: 'images/countdown/3.png',  hold: 800,  size: 420 },
@@ -526,9 +715,10 @@ function runShapesPregame(onDone) {
   showStep();
 }
 
-document.getElementById('loading-shapes-btn').addEventListener('click', () => {
-  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.play(); }
+// ── SHOW / HIDE SHAPES MODE ───────────────────────────────────────────────────
+function showShapesMode() {
   if (typeof loadGameSFX !== 'undefined') loadGameSFX();
+  if (typeof playMusic   !== 'undefined') playMusic(null);
 
   document.getElementById('loading-screen').style.display = 'none';
   const scoreDisplay = document.getElementById('score-display');
@@ -538,60 +728,169 @@ document.getElementById('loading-shapes-btn').addEventListener('click', () => {
 
   shapesScore = 0; shapesDisplayedScore = 0; shapesStreak = 0; shapesDots = 0;
   shapesTrainTimeouts.forEach(clearTimeout); shapesTrainTimeouts = [];
+  shapesAnsweredSet    = new Set();
+  shapesWrongCooldown  = new Map();
+  shapesCorrectCount   = 0;
+  shapesWrongAnswerCount = 0;
+
+  const scoreEl = document.getElementById('score-value');
+  if (scoreEl) scoreEl.textContent = '0';
+  if (typeof positionLeaderboard !== 'undefined') positionLeaderboard(0, false);
+  if (typeof lastLbScore        !== 'undefined') lastLbScore = -1;
+  if (typeof lastPlayerRank     !== 'undefined') lastPlayerRank = -1;
 
   const PREGAME_DURATION = SHAPES_PREGAME_STEPS.reduce((s, x) => s + x.hold, 0);
-  const c = SHAPE_COUNTRIES[Math.floor(Math.random() * SHAPE_COUNTRIES.length)];
+  let c;
+  if (document.body.classList.contains('recording-mode')) {
+    c = SHAPE_COUNTRIES.find(co => co.name === 'China');
+  } else {
+    const initActive = getActiveShapesPool();
+    const initPool   = initActive.filter(co => !shapesAnsweredSet.has(co.name));
+    const initSrc    = initPool.length > 0 ? initPool : initActive;
+    c = initSrc[Math.floor(Math.random() * initSrc.length)];
+  }
   showCountryShape(c.name, c.ext1, c.ext2, PREGAME_DURATION);
 
   runShapesPregame(() => {
-  if (typeof playMusic !== 'undefined') playMusic(sfxGameMusic);
-  shapesTimeLeft = 60;
-  shapesRunning  = true;
+    if (typeof playMusic !== 'undefined') playMusic(sfxGameMusic);
+    shapesTimeLeft = 60;
+    shapesRunning  = true;
 
-  clearInterval(shapesTimerIntervalId);
-  shapesTimerIntervalId = setInterval(() => {
-    const tEl  = document.getElementById('shapes-timer-number');
-    const tImg = document.getElementById('shapes-timer-img');
-    shapesTimeLeft--;
-    if (tEl) tEl.textContent = shapesTimeLeft;
-    if (shapesTimeLeft <= 10) {
-      if (tEl)  tEl.style.color = '#ffffff';
-      if (tImg) tImg.src = 'images/countdownred3.png';
-      if (shapesTimeLeft > 0 && typeof sfxTickdown !== 'undefined') { sfxTickdown.currentTime = 0; sfxTickdown.play(); }
-    } else {
-      if (tEl) tEl.style.color = '';
-    }
-    if (shapesTimeLeft <= 0) {
-      clearInterval(shapesTimerIntervalId);
-      shapesRunning = false;
-      document.querySelectorAll('.shapes-tag').forEach(el => { el.style.cursor = 'default'; el.style.pointerEvents = 'none'; });
-      clearTimeout(shapesCurrentAnimTimeout);
-      clearTimeout(shapesCurrentClipFadeTimeout);
-      if (shapesCurrentImg)  { const f = getComputedStyle(shapesCurrentImg).transform;  shapesCurrentImg.style.transition  = 'none'; shapesCurrentImg.style.transform  = f; }
-      if (shapesCurrentImg2) { const f = getComputedStyle(shapesCurrentImg2).transform; shapesCurrentImg2.style.transition = 'none'; shapesCurrentImg2.style.transform = f; }
-      if (shapesCurrentClip) { const f = getComputedStyle(shapesCurrentClip).opacity;   shapesCurrentClip.style.transition = 'none'; shapesCurrentClip.style.opacity   = f; }
-      if (tImg) tImg.style.animationPlayState = 'paused';
-      if (typeof sfxTimesUp !== 'undefined') { sfxTimesUp.currentTime = 0; sfxTimesUp.play(); }
-      if (typeof playMusic !== 'undefined') playMusic(null);
-      const timeupEl = document.getElementById('timeup-overlay');
-      if (timeupEl) {
-        timeupEl.style.zIndex = '300';
-        timeupEl.style.display = 'flex';
-        timeupEl.classList.remove('timeup-out');
-        timeupEl.classList.add('timeup-in');
-        setTimeout(() => {
-          timeupEl.classList.remove('timeup-in');
-          timeupEl.classList.add('timeup-out');
-          setTimeout(() => {
-            timeupEl.style.display = 'none';
-            timeupEl.classList.remove('timeup-out');
-          }, 400);
-        }, 1800);
+    clearInterval(shapesTimerIntervalId);
+    shapesTimerIntervalId = setInterval(() => {
+      const tEl  = document.getElementById('shapes-timer-number');
+      const tImg = document.getElementById('shapes-timer-img');
+      shapesTimeLeft--;
+      if (tEl) tEl.textContent = shapesTimeLeft;
+      if (shapesTimeLeft <= 10) {
+        if (tEl)  tEl.style.color = '#ffffff';
+        if (tImg) tImg.src = 'images/countdownred3.png';
+        if (shapesTimeLeft > 0 && typeof sfxTickdown !== 'undefined') { sfxTickdown.currentTime = 0; sfxTickdown.play(); }
+      } else {
+        if (tEl) tEl.style.color = '';
       }
-    }
-  }, 1000);
-
+      if (shapesTimeLeft <= 0) {
+        clearInterval(shapesTimerIntervalId);
+        shapesRunning = false;
+        document.querySelectorAll('.shapes-tag').forEach(el => { el.style.cursor = 'default'; el.style.pointerEvents = 'none'; });
+        clearTimeout(shapesCurrentAnimTimeout);
+        clearTimeout(shapesCurrentClipFadeTimeout);
+        if (shapesCurrentImg)  { const f = getComputedStyle(shapesCurrentImg).transform;  shapesCurrentImg.style.transition  = 'none'; shapesCurrentImg.style.transform  = f; }
+        if (shapesCurrentImg2) { const f = getComputedStyle(shapesCurrentImg2).transform; shapesCurrentImg2.style.transition = 'none'; shapesCurrentImg2.style.transform = f; }
+        if (shapesCurrentClip) { const f = getComputedStyle(shapesCurrentClip).opacity;   shapesCurrentClip.style.transition = 'none'; shapesCurrentClip.style.opacity   = f; }
+        if (tImg) tImg.style.animationPlayState = 'paused';
+        if (typeof sfxTimesUp !== 'undefined') { sfxTimesUp.currentTime = 0; sfxTimesUp.play(); }
+        if (typeof playMusic  !== 'undefined') playMusic(null);
+        const timeupEl = document.getElementById('timeup-overlay');
+        if (timeupEl) {
+          timeupEl.style.zIndex = '300';
+          timeupEl.style.display = 'flex';
+          timeupEl.classList.remove('timeup-out');
+          timeupEl.classList.add('timeup-in');
+          setTimeout(() => {
+            timeupEl.classList.remove('timeup-in');
+            timeupEl.classList.add('timeup-out');
+            setTimeout(() => {
+              timeupEl.style.display = 'none';
+              timeupEl.classList.remove('timeup-out');
+              hideShapesMode();
+            }, 400);
+          }, 1800);
+        } else {
+          hideShapesMode();
+        }
+      }
+    }, 1000);
   }); // end runShapesPregame
+}
+
+function hideShapesMode() {
+  // freeze & remove in-progress country display
+  document.querySelectorAll('.shapes-tag').forEach(t => t.remove());
+  if (shapesCurrentImg)   shapesCurrentImg.remove();
+  if (shapesCurrentImg2)  shapesCurrentImg2.parentElement?.remove(); // clip div
+  if (shapesCurrentClip)  shapesCurrentClip.remove();
+  if (shapesCurrentBoard) shapesCurrentBoard.remove();
+  if (shapesCurrentSvg)   shapesCurrentSvg.remove();
+  shapesCurrentImg = shapesCurrentImg2 = shapesCurrentClip = null;
+  shapesCurrentBoard = shapesCurrentSvg = null;
+
+  // remove countdown widget so it's recreated fresh next game
+  document.getElementById('shapes-countdown-widget')?.remove();
+
+  // hide shared UI
+  const scoreDisplay = document.getElementById('score-display');
+  if (scoreDisplay) scoreDisplay.style.display = 'none';
+  const rightPanel = document.getElementById('right-panel');
+  if (rightPanel) rightPanel.style.display = 'none';
+  if (shapesScoreRafId) { cancelAnimationFrame(shapesScoreRafId); shapesScoreRafId = null; }
+  clearTimeout(shapesSpeedBonusHideId);
+  const sbt = document.getElementById('speed-bonus-text');
+  if (sbt) sbt.classList.remove('visible');
+
+  // final score & highscore
+  const finalScore = Math.round(shapesScore);
+  const finalScoreEl = document.getElementById('final-score-value');
+  if (finalScoreEl) finalScoreEl.textContent = finalScore.toLocaleString();
+  const LS_HS = 'shapesHighscore';
+  const prevHS = parseInt(localStorage.getItem(LS_HS) || '0', 10);
+  const newHSBanner = document.getElementById('new-highscore-banner');
+  const newHSScore  = document.getElementById('new-highscore-score');
+  if (finalScore > prevHS) {
+    localStorage.setItem(LS_HS, String(finalScore));
+    if (newHSBanner) newHSBanner.style.display = 'flex';
+    if (newHSScore)  newHSScore.textContent = finalScore.toLocaleString();
+  } else {
+    if (newHSBanner) newHSBanner.style.display = 'none';
+  }
+
+  // gameover screen
+  if (typeof setModeCounts !== 'undefined') setModeCounts(shapesCorrectCount, shapesWrongAnswerCount);
+  const gameoverScreen = document.getElementById('gameover-screen');
+  if (gameoverScreen) {
+    gameoverScreen.style.display = 'flex';
+    const label = gameoverScreen.querySelector('.gameover-text1-label');
+    if (label) label.textContent = '¡Increíble! ¡Los turistas están de camino!';
+  }
+  if (typeof restartFlightAtt !== 'undefined') restartFlightAtt();
+  if (typeof buildChecksRow   !== 'undefined') buildChecksRow();
+  const checksEndTime = (shapesCorrectCount > 0 ? (shapesCorrectCount - 1) * 0.1 + 0.2 : 0) + 0.4;
+  if (typeof buildWrongsRow   !== 'undefined') buildWrongsRow(checksEndTime);
+  if (typeof playMusic        !== 'undefined') playMusic(sfxPostgame);
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
+document.getElementById('loading-shapes-btn').addEventListener('click', () => {
+  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.play(); }
+  if (typeof loadGameSFX !== 'undefined') loadGameSFX();
+  window.pendingGameMode = 'shapes';
+  document.getElementById('splash-screen').classList.add('mode-flags', 'mode-shapes');
+  document.getElementById('gameover-screen').classList.add('mode-flags', 'mode-shapes');
+  const howtoplayVideo = document.querySelector('.splash-howtoplay-video');
+  if (howtoplayVideo) { howtoplayVideo.src = 'images/howtoplay/howtoplay2.mp4'; howtoplayVideo.load(); }
+  document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men5.png');
+  document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men6.png');
+  document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl5.png');
+  document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl6.png');
+  document.querySelectorAll('.game-bg-women1').forEach(el => el.src = 'images/characters/women4.png');
+  document.querySelectorAll('.game-bg-women2').forEach(el => el.src = 'images/characters/women5.png');
+  document.querySelectorAll('.game-bg-city').forEach(el => el.src = 'images/bg/level2complete.png');
+  document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check2.png');
+  document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong2.png');
+  const label = document.querySelector('.splash-text2-label');
+  if (label) { label.textContent = '¿Adónde? Usando un mapa de cada país, veamos adónde vuelan nuestros turistas.'; label.classList.remove('step2'); }
+  const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
+  if (howtoWrap) howtoWrap.classList.remove('slide-down');
+  const howtoTitle = document.querySelector('.splash-howtoplay-title');
+  if (howtoTitle) howtoTitle.textContent = 'Map Mayhem';
+  document.getElementById('loading-screen').style.display = 'none';
+  const splashEl = document.getElementById('splash-screen');
+  splashEl.style.display = 'flex';
+  const animEls = splashEl.querySelectorAll('.flightatt-splash, .splash-text2-wrap');
+  animEls.forEach(el => el.classList.remove('animate-in'));
+  void splashEl.offsetWidth;
+  animEls.forEach(el => el.classList.add('animate-in'));
+  if (typeof playMusic !== 'undefined') playMusic(sfxPostgame);
 });
 
 document.getElementById('loading-shapes-btn').addEventListener('mouseenter', () => {

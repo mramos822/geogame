@@ -99,6 +99,17 @@
       const shapesBtn = document.getElementById('loading-shapes-btn');
       document.getElementById('loading-shapes-wrap').style.display = 'flex';
       shapesBtn.addEventListener('animationend', () => shapesBtn.classList.add('loaded'), { once: true });
+
+      const fmt = v => v > 0 ? '🏆 ' + v.toLocaleString() : '';
+      const playHs   = parseInt(localStorage.getItem('geochallenge_highscore') || '0', 10);
+      const flagsHs  = parseInt(localStorage.getItem('flagsHighscore')         || '0', 10);
+      const shapesHs = parseInt(localStorage.getItem('shapesHighscore')        || '0', 10);
+      const elPlay   = document.getElementById('loading-play-hs');
+      const elFlags  = document.getElementById('loading-flags-hs');
+      const elShapes = document.getElementById('loading-shapes-hs');
+      if (elPlay)   elPlay.textContent   = fmt(playHs);
+      if (elFlags)  elFlags.textContent  = fmt(flagsHs);
+      if (elShapes) elShapes.textContent = fmt(shapesHs);
     }
   }
 
@@ -123,12 +134,14 @@ document.getElementById('loading-play-btn').addEventListener('mouseenter', () =>
 document.getElementById('loading-play-btn').addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxCheck.play();
   window.pendingGameMode = 'game';
-  document.getElementById('splash-screen').classList.remove('mode-flags');
-  document.getElementById('gameover-screen').classList.remove('mode-flags');
+  document.getElementById('splash-screen').classList.remove('mode-flags', 'mode-shapes');
+  document.getElementById('gameover-screen').classList.remove('mode-flags', 'mode-shapes');
   document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men1.png');
   document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men2.png');
   document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl1.png');
   document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl2.png');
+  document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check3.png');
+  document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong3.png');
   document.getElementById('loading-screen').style.display = 'none';
   document.getElementById('splash-screen').style.display  = 'flex';
   playMusic(sfxPostgame);
@@ -316,6 +329,17 @@ function updateGradeCountsUI() {
 updateGradeCountsUI();
 updateWrongCountUI();
 
+function getModeCheckImg() {
+  if (window.pendingGameMode === 'flags')  return 'images/check1.png';
+  if (window.pendingGameMode === 'shapes') return 'images/check2.png';
+  return 'images/check3.png';
+}
+function getModeWrongImg() {
+  if (window.pendingGameMode === 'flags')  return 'images/wrong1.png';
+  if (window.pendingGameMode === 'shapes') return 'images/wrong2.png';
+  return 'images/wrong3.png';
+}
+
 function buildChecksRow() {
   const row = document.getElementById('gameover-checks-row');
   if (!row) return;
@@ -336,7 +360,7 @@ function buildChecksRow() {
   row.style.gap = '0px';
   for (let i = 0; i < total; i++) {
     const img = document.createElement('img');
-    img.src = 'images/check3.png';
+    img.src = getModeCheckImg();
     img.alt = '';
     img.style.animationDelay = `${i * 0.1}s`;
     img.style.zIndex = 16 + i;
@@ -387,7 +411,7 @@ function buildWrongsRow(startOffset = 0) {
   row.style.gap = '0px';
   for (let i = 0; i < total; i++) {
     const img = document.createElement('img');
-    img.src = 'images/wrong3.png';
+    img.src = getModeWrongImg();
     img.alt = '';
     img.style.animationDelay = `${startOffset + i * 0.1}s`;
     img.style.zIndex = 16 + i;
@@ -1398,6 +1422,8 @@ document.querySelector('.splash-confirm-wrap')?.addEventListener('click', () => 
     const label = document.querySelector('.splash-text2-label');
     if (window.pendingGameMode === 'flags') {
       if (label) { label.textContent = 'Haz clic sobre la bandera del país, estado o unión que corresponda al nombre que aparece arriba. ¿Todo listo? ¡Entonces haz clic sobre el icono VERDE para empezar!'; label.classList.add('step2'); }
+    } else if (window.pendingGameMode === 'shapes') {
+      if (label) { label.textContent = 'Observa la forma del país y haz click en el nombre correcto, ¡pero no te olvides de que cada segundo cuenta! ¡Haz click en el icono VERDE y comenzamos!'; label.classList.add('step2'); }
     } else {
       if (label) { label.textContent = 'Coloca un pin en el mapa donde creas que cada ciudad se ubica. ¡Haz click en el botón VERDE cuando estes listo!'; label.classList.add('step2'); }
     }
@@ -1410,6 +1436,9 @@ document.querySelector('.splash-confirm-wrap')?.addEventListener('click', () => 
     if (window.pendingGameMode === 'flags') {
       splashScreen.style.display = 'none';
       if (typeof showFlagsMode !== 'undefined') showFlagsMode();
+    } else if (window.pendingGameMode === 'shapes') {
+      splashScreen.style.display = 'none';
+      if (typeof showShapesMode !== 'undefined') showShapesMode();
     } else {
       startGame();
     }
@@ -1422,12 +1451,17 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
   const wrap = document.querySelector('.gameover-confirm-wrap');
   wrap.classList.add('confirm-pressed');
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
-  if (window.pendingGameMode === 'flags') {
-    gameoverScreen.style.display = 'none';
-    if (typeof showFlagsMode !== 'undefined') showFlagsMode();
-  } else {
-    startGame();
-  }
+  gameoverScreen.style.display = 'none';
+  document.getElementById('loading-screen').style.display = '';
+
+  // refresh highscore displays
+  const fmt = v => v > 0 ? '🏆 ' + v.toLocaleString() : '';
+  const elPlay   = document.getElementById('loading-play-hs');
+  const elFlags  = document.getElementById('loading-flags-hs');
+  const elShapes = document.getElementById('loading-shapes-hs');
+  if (elPlay)   elPlay.textContent   = fmt(parseInt(localStorage.getItem('geochallenge_highscore') || '0', 10));
+  if (elFlags)  elFlags.textContent  = fmt(parseInt(localStorage.getItem('flagsHighscore')         || '0', 10));
+  if (elShapes) elShapes.textContent = fmt(parseInt(localStorage.getItem('shapesHighscore')        || '0', 10));
 });
 
 /* ── COORD TOOLTIP ─────────────────────────────────────────────────────────────
