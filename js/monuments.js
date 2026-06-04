@@ -669,7 +669,7 @@ function easeOutBounce(t) {
 
 // ── TAG ANIMATION ────────────────────────────────────────────────────────────
 function slideTagIn(cityName, countryCode) {
-  const wasVisible = cityTagEl.style.left !== '' && cityTagEl.style.left !== '-420px';
+  const wasVisible = cityTagEl.style.left !== '' && cityTagEl.style.left !== '-525px';
   if (wasVisible) {
     const ghost = cityTagEl.cloneNode(true);
     ghost.className = 'city-tag-ghost';
@@ -677,7 +677,7 @@ function slideTagIn(cityName, countryCode) {
     ghost.style.zIndex = '9';
     ghost.style.transition = 'none';
     ghost.style.top  = cityTagEl.style.top  || '10px';
-    ghost.style.left = cityTagEl.style.left || '-80px';
+    ghost.style.left = cityTagEl.style.left || '-90px';
     gameWrapper.appendChild(ghost);
     setTimeout(() => {
       ghost.style.transition = 'opacity 0.3s';
@@ -711,15 +711,15 @@ function slideTagIn(cityName, countryCode) {
 
   cityTagEl.style.visibility = 'hidden';
   cityTagEl.style.transition = 'none';
-  cityTagEl.style.top  = '-130px';
-  cityTagEl.style.left = '-420px';
+  cityTagEl.style.top  = '-163px';
+  cityTagEl.style.left = '-525px';
   setTimeout(() => { sfxTag.currentTime = 0; sfxTag.play(); }, 200);
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       cityTagEl.style.visibility = 'visible';
       cityTagEl.style.transition = 'left 0.45s cubic-bezier(0.22,1,0.36,1), top 0.45s cubic-bezier(0.22,1,0.36,1)';
-      cityTagEl.style.left = '-80px';
-      cityTagEl.style.top  = '10px';
+      cityTagEl.style.left = '-90px';
+      cityTagEl.style.top  = '-50px';
     });
   });
 }
@@ -809,13 +809,17 @@ function spawnStars(cx, cy) {
 // ── NEXT CITY ─────────────────────────────────────────────────────────────────
 function nextCity() {
   if (window.pendingGameMode === 'monuments') {
-    if (state.poolIndex >= state.monumentPool.length) {
-      const base = state.monumentsUnlocked ? MONUMENTS : MONUMENTS_EASY;
-      const unseen = base.filter(m => !state.monumentsSeen.has(m.name));
-      state.monumentPool = shuffle(unseen.length ? unseen : [...base]);
-      state.poolIndex = 0;
+    if (document.body.classList.contains('recording-mode')) {
+      state.currentCity = MONUMENTS.find(m => m.name === 'Coliseo Romano') || MONUMENTS_EASY[0];
+    } else {
+      if (state.poolIndex >= state.monumentPool.length) {
+        const base = state.monumentsUnlocked ? MONUMENTS : MONUMENTS_EASY;
+        const unseen = base.filter(m => !state.monumentsSeen.has(m.name));
+        state.monumentPool = shuffle(unseen.length ? unseen : [...base]);
+        state.poolIndex = 0;
+      }
+      state.currentCity = state.monumentPool[state.poolIndex++];
     }
-    state.currentCity = state.monumentPool[state.poolIndex++];
     state.cityShownAt = Date.now();
     state.phase = 'waiting';
     slideMonumentIn(state.currentCity);
@@ -885,6 +889,7 @@ function slideMonumentIn(monument) {
 canvas.addEventListener('click', (e) => {
   if (!state || state.phase !== 'waiting') return;
   state.phase = 'animating';
+  const isRecordingMonuments = document.body.classList.contains('recording-mode') && window.pendingGameMode === 'monuments';
   if (slideTagIn._countryTimer) { clearTimeout(slideTagIn._countryTimer); slideTagIn._countryTimer = null; }
   if (slideMonumentIn._nameTimer) { clearTimeout(slideMonumentIn._nameTimer); slideMonumentIn._nameTimer = null; }
   sfxPin.currentTime = 0;
@@ -933,7 +938,7 @@ canvas.addEventListener('click', (e) => {
     name: state.currentCity.name,
     labelOpacity: 1,
     labelBorn: Date.now(),
-    permanent: grade === 'perfect',
+    permanent: grade === 'perfect' || isRecordingMonuments,
   });
 
   if (grade !== 'wayoff') {
@@ -942,7 +947,7 @@ canvas.addEventListener('click', (e) => {
       state.monumentsSeen.add(state.currentCity.name);
       if (!state.monumentsUnlocked) {
         state.monumentsCorrectCount++;
-        if (state.monumentsCorrectCount >= 5) {
+        if (state.monumentsCorrectCount >= 3) {
           state.monumentsUnlocked = true;
           const remaining = MONUMENTS.filter(m => !state.monumentsSeen.has(m.name));
           state.monumentPool = shuffle(remaining.length ? remaining : [...MONUMENTS]);
@@ -970,24 +975,26 @@ canvas.addEventListener('click', (e) => {
                       starsSpawned: false,
                       onLanded: () => {
                         spawnStars(correct.x, correct.y);
-                        setTimeout(() => {
-                          showResultLabel(correct.x, correct.y, grade, base, bonusAmt);
-                          if (badgeColor) {
-                            state.badgeAnim = { t: 0, img: badgeColor, streak: state.streak, inRowBonus };
-                            setTimeout(() => { sfxBonus.currentTime = 0; sfxBonus.play(); }, 800);
-                          }
-                        }, 300);
+                        if (!isRecordingMonuments) {
+                          setTimeout(() => {
+                            showResultLabel(correct.x, correct.y, grade, base, bonusAmt);
+                            if (badgeColor) {
+                              state.badgeAnim = { t: 0, img: badgeColor, streak: state.streak, inRowBonus };
+                              setTimeout(() => { sfxBonus.currentTime = 0; sfxBonus.play(); }, 800);
+                            }
+                          }, 300);
+                        }
                         setTimeout(() => {
                           state.phase = 'waiting';
-                          nextCity();
+                          if (!isRecordingMonuments) nextCity();
                         }, 500);
                       }
                     };
     const capturedPin2 = state.pin2Anim;
-    setTimeout(() => { if (state.pin2Anim === capturedPin2) capturedPin2.fading = true; }, 1000);
+    if (!isRecordingMonuments) setTimeout(() => { if (state.pin2Anim === capturedPin2) capturedPin2.fading = true; }, 1000);
   }, 300);
 
-  setTimeout(() => { if (state.pin1Anim === capturedPin1) capturedPin1.fading = true; }, 1000);
+  if (!isRecordingMonuments) setTimeout(() => { if (state.pin1Anim === capturedPin1) capturedPin1.fading = true; }, 1000);
 });
 
 // ── BADGE ─────────────────────────────────────────────────────────────────────
@@ -1049,7 +1056,7 @@ function render(timestamp) {
     ctx.stroke();
     ctx.globalAlpha = 1;
 
-    if (dot.permanent && age >= 2 && window.pendingGameMode === 'monuments') {
+    if (dot.permanent && age >= 2 && window.pendingGameMode === 'monuments' && !document.body.classList.contains('recording-mode')) {
       const flagAlpha = Math.min(1, (age - 2) / 0.1);
       const fw = (imgFlag.naturalWidth  || 24) * 0.8;
       const fh = (imgFlag.naturalHeight || 24) * 0.8;
@@ -1263,13 +1270,13 @@ if (state.sunburst) {
         badgeOverlayCtx.globalAlpha = alpha;
         badgeOverlayCtx.translate(bonusCX, bonusCY);
         badgeOverlayCtx.scale(bonusScale, bonusScale);
-        badgeOverlayCtx.font = 'bold 52px "Arial Black", Impact, sans-serif';
+        badgeOverlayCtx.font = '104px Dimbo, "Arial Black", sans-serif';
         badgeOverlayCtx.textAlign = 'center';
         badgeOverlayCtx.textBaseline = 'middle';
-        const shadowOffsets = [[-7,-7],[-7,0],[-7,7],[0,-7],[0,7],[7,-7],[7,0],[7,7]];
-        badgeOverlayCtx.fillStyle = '#183897';
-        for (const [ox, oy] of shadowOffsets) badgeOverlayCtx.fillText(bonusLabel, ox, oy);
-        badgeOverlayCtx.strokeStyle = '#ffaa00';
+        badgeOverlayCtx.strokeStyle = '#073A79';
+        badgeOverlayCtx.lineWidth = 14;
+        badgeOverlayCtx.strokeText(bonusLabel, 0, 0);
+        badgeOverlayCtx.strokeStyle = '#FD9C1A';
         badgeOverlayCtx.lineWidth = 7;
         badgeOverlayCtx.strokeText(bonusLabel, 0, 0);
         badgeOverlayCtx.fillStyle = '#ffffff';
@@ -1424,6 +1431,7 @@ function showScorePopup(amount) {
   const el = document.createElement('div');
   el.className = 'score-popup';
   el.textContent = '+' + amount.toLocaleString();
+  el.dataset.text = '+' + amount.toLocaleString();
   document.body.appendChild(el);
   el.addEventListener('animationend', () => el.remove());
 }
@@ -1496,8 +1504,8 @@ function startGame() {
   resultLabel.className        = '';
   speedBonusText.classList.remove('visible');
   cityTagEl.style.transition   = 'none';
-  cityTagEl.style.left         = '-420px';
-  cityTagEl.style.top          = '-130px';
+  cityTagEl.style.left         = '-525px';
+  cityTagEl.style.top          = '-163px';
   const tagImg = cityTagEl.querySelector('img');
   tagImg.src = 'images/tag3.png';
   tagImg.style.width  = '';
@@ -1521,9 +1529,18 @@ function startGame() {
 
   countdownImg.style.animationPlayState = 'paused';
 
+  const countdownWidget = document.getElementById('countdown-widget');
+  if (document.body.classList.contains('recording-mode') && window.pendingGameMode === 'monuments') {
+    if (countdownWidget) countdownWidget.style.visibility = 'hidden';
+  } else {
+    if (countdownWidget) countdownWidget.style.visibility = '';
+  }
+
   runPregameCountdown(() => {
     playMusic(sfxGameMusic);
-    startTimer();
+    if (!(document.body.classList.contains('recording-mode') && window.pendingGameMode === 'monuments')) {
+      startTimer();
+    }
     setTimeout(nextCity, 100);
   });
 }

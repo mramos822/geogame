@@ -57,7 +57,7 @@ function shapesAnimateScore() {
     const diff = shapesScore - shapesDisplayedScore;
     if (diff <= 0) { shapesScoreRafId = null; return; }
     shapesDisplayedScore = Math.min(shapesScore, shapesDisplayedScore + Math.max(1, Math.round(diff * 8 * dt)));
-    if (el) el.textContent = shapesDisplayedScore;
+    if (el) el.textContent = shapesDisplayedScore.toLocaleString();
     shapesScoreRafId = requestAnimationFrame(tick);
   }
   shapesScoreRafId = requestAnimationFrame(tick);
@@ -208,11 +208,18 @@ function showCountryShape(country, ext1, ext2, startDelay) {
     correctIdx = 0;
   } else {
     const correctLabel = SHAPE_COUNTRIES.find(c => c.name === country).label;
-    const distractors  = getActiveShapesPool()
-      .filter(c => c.name !== country)
-      .sort(() => Math.random() - 0.5)
-      .slice(0, 3)
-      .map(c => c.label);
+    const shuffled = getActiveShapesPool()
+      .filter(c => c.name !== country && c.label !== correctLabel)
+      .sort(() => Math.random() - 0.5);
+    const usedLabels = new Set([correctLabel]);
+    const distractors = [];
+    for (const c of shuffled) {
+      if (!usedLabels.has(c.label)) {
+        usedLabels.add(c.label);
+        distractors.push(c.label);
+        if (distractors.length === 3) break;
+      }
+    }
     correctIdx = Math.floor(Math.random() * 4);
     options    = [...distractors];
     options.splice(correctIdx, 0, correctLabel);
@@ -333,7 +340,7 @@ function showCountryShape(country, ext1, ext2, startDelay) {
         shapesCorrectCount++;
         shapesStreak++;
         if (sfxAcertar) { sfxAcertar.currentTime = 0; sfxAcertar.play(); }
-        const pts        = typeof getFlagsRoundPoints !== 'undefined' ? getFlagsRoundPoints(shapesStreak) : 10;
+        const pts        = typeof getFlagsRoundPoints !== 'undefined' ? getFlagsRoundPoints(shapesCorrectCount) : 10;
         const badgeImg   = typeof getBadgeImg         !== 'undefined' ? getBadgeImg(shapesStreak)         : null;
         const inRowBonus = typeof getInRowBonus       !== 'undefined' ? getInRowBonus(shapesStreak)       : 0;
         const elapsed    = shapesRoundStartTime ? Math.max(0, (performance.now() - shapesRoundStartTime) / 1000) : SHAPES_SPEED_WIN;

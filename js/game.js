@@ -662,7 +662,7 @@ function easeOutBounce(t) {
 
 // ── TAG ANIMATION ────────────────────────────────────────────────────────────
 function slideTagIn(cityName, countryCode) {
-  const wasVisible = cityTagEl.style.left !== '' && cityTagEl.style.left !== '-420px';
+  const wasVisible = cityTagEl.style.left !== '' && cityTagEl.style.left !== '-525px';
   if (wasVisible) {
     const ghost = cityTagEl.cloneNode(true);
     ghost.className = 'city-tag-ghost';
@@ -670,7 +670,7 @@ function slideTagIn(cityName, countryCode) {
     ghost.style.zIndex = '9';
     ghost.style.transition = 'none';
     ghost.style.top  = cityTagEl.style.top  || '10px';
-    ghost.style.left = cityTagEl.style.left || '-80px';
+    ghost.style.left = cityTagEl.style.left || '-90px';
     gameWrapper.appendChild(ghost);
     setTimeout(() => {
       ghost.style.transition = 'opacity 0.3s';
@@ -704,15 +704,15 @@ function slideTagIn(cityName, countryCode) {
 
   cityTagEl.style.visibility = 'hidden';
   cityTagEl.style.transition = 'none';
-  cityTagEl.style.top  = '-130px';
-  cityTagEl.style.left = '-420px';
+  cityTagEl.style.top  = '-163px';
+  cityTagEl.style.left = '-525px';
   setTimeout(() => { sfxTag.currentTime = 0; sfxTag.play(); }, 200);
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       cityTagEl.style.visibility = 'visible';
       cityTagEl.style.transition = 'left 0.45s cubic-bezier(0.22,1,0.36,1), top 0.45s cubic-bezier(0.22,1,0.36,1)';
-      cityTagEl.style.left = '-80px';
-      cityTagEl.style.top  = '10px';
+      cityTagEl.style.left = '-90px';
+      cityTagEl.style.top  = '-50px';
     });
   });
 }
@@ -1167,13 +1167,13 @@ if (state.sunburst) {
         badgeOverlayCtx.globalAlpha = alpha;
         badgeOverlayCtx.translate(bonusCX, bonusCY);
         badgeOverlayCtx.scale(bonusScale, bonusScale);
-        badgeOverlayCtx.font = 'bold 52px "Arial Black", Impact, sans-serif';
+        badgeOverlayCtx.font = '104px Dimbo, "Arial Black", sans-serif';
         badgeOverlayCtx.textAlign = 'center';
         badgeOverlayCtx.textBaseline = 'middle';
-        const shadowOffsets = [[-7,-7],[-7,0],[-7,7],[0,-7],[0,7],[7,-7],[7,0],[7,7]];
-        badgeOverlayCtx.fillStyle = '#183897';
-        for (const [ox, oy] of shadowOffsets) badgeOverlayCtx.fillText(bonusLabel, ox, oy);
-        badgeOverlayCtx.strokeStyle = '#ffaa00';
+        badgeOverlayCtx.strokeStyle = '#073A79';
+        badgeOverlayCtx.lineWidth = 14;
+        badgeOverlayCtx.strokeText(bonusLabel, 0, 0);
+        badgeOverlayCtx.strokeStyle = '#FD9C1A';
         badgeOverlayCtx.lineWidth = 7;
         badgeOverlayCtx.strokeText(bonusLabel, 0, 0);
         badgeOverlayCtx.fillStyle = '#ffffff';
@@ -1391,8 +1391,8 @@ function startGame() {
   resultLabel.className        = '';
   speedBonusText.classList.remove('visible');
   cityTagEl.style.transition   = 'none';
-  cityTagEl.style.left         = '-420px';
-  cityTagEl.style.top          = '-130px';
+  cityTagEl.style.left         = '-525px';
+  cityTagEl.style.top          = '-163px';
   gameWrapper.querySelectorAll('.city-tag-ghost').forEach(g => g.remove());
 
   // Resetear timer visualmente antes del pregame countdown

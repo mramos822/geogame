@@ -380,7 +380,7 @@ function flagsAnimateScore() {
     const diff = flagsScore - flagsDisplayedScore;
     if (diff <= 0) { flagsScoreRafId = null; return; }
     flagsDisplayedScore = Math.min(flagsScore, flagsDisplayedScore + Math.max(1, Math.round(diff * 8 * dt)));
-    flagsScoreEl.textContent = flagsDisplayedScore;
+    flagsScoreEl.textContent = flagsDisplayedScore.toLocaleString();
     flagsScoreRafId = requestAnimationFrame(tick);
   }
   flagsScoreRafId = requestAnimationFrame(tick);
@@ -443,13 +443,12 @@ function showFlagsBadge(badgeImg, bonus, streak, cxOverride, scaleOverride) {
       ctx2.globalAlpha = alpha;
       ctx2.translate(CX, bCY);
       ctx2.scale(bonusScale, bonusScale);
-      ctx2.font = 'bold 52px "Arial Black", Impact, sans-serif';
+      ctx2.font = '104px Dimbo, "Arial Black", sans-serif';
       ctx2.textAlign = 'center';
       ctx2.textBaseline = 'middle';
-      const offsets = [[-7,-7],[-7,0],[-7,7],[0,-7],[0,7],[7,-7],[7,0],[7,7]];
-      ctx2.fillStyle = '#183897';
-      for (const [ox,oy] of offsets) ctx2.fillText(bonusLabel, ox, oy);
-      ctx2.strokeStyle = '#ffaa00'; ctx2.lineWidth = 7;
+      ctx2.strokeStyle = '#073A79'; ctx2.lineWidth = 14;
+      ctx2.strokeText(bonusLabel, 0, 0);
+      ctx2.strokeStyle = '#FD9C1A'; ctx2.lineWidth = 7;
       ctx2.strokeText(bonusLabel, 0, 0);
       ctx2.fillStyle = '#ffffff'; ctx2.fillText(bonusLabel, 0, 0);
       ctx2.restore();
