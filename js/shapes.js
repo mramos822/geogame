@@ -940,6 +940,8 @@ document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   if (howtoWrap) howtoWrap.classList.remove('slide-down');
   const howtoTitle = document.querySelector('.splash-howtoplay-title');
   if (howtoTitle) howtoTitle.textContent = 'Landmark Loco';
+  const howtoVideo = document.querySelector('.splash-howtoplay-video');
+  if (howtoVideo) { howtoVideo.pause(); howtoVideo.src = 'images/howtoplay/howtoplay4.mp4'; howtoVideo.load(); }
   document.getElementById('loading-screen').style.display = 'none';
   const splashEl = document.getElementById('splash-screen');
   splashEl.style.display = 'flex';

@@ -496,9 +496,20 @@ body::after {
   to   { transform: scale(0.6) translate(-210vw, -150vh); }
 }
 
-.game-bg-city-flags {
+.game-bg-city-flags,
+.game-bg-city-monuments,
+.game-bg-city-monuments2 {
   display: none;
   z-index: 1;
+}
+
+@keyframes monuments-flicker {
+  0%, 49.9% { opacity: 1; }
+  50%, 100%  { opacity: 0; }
+}
+
+.game-bg-city-monuments2 {
+  z-index: 2;
 }
 
 
@@ -683,7 +694,7 @@ body::after {
   to   { clip-path: inset(0% 0 0 0); }
 }
 
-.game-bg-screen > *:not(.game-bg-city):not(.game-bg-plane):not(.game-bg-plane1):not(.game-bg-plane2):not(.game-bg-plane3):not(.game-bg-plane4):not(.game-bg-plane5):not(.game-bg-plane6):not(.game-bg-stairs):not(.game-bg-cloud):not(.game-bg-cloud1):not(.game-bg-cloud2):not(.game-bg-people):not(.game-bg-men):not(.game-bg-men1):not(.game-bg-men2):not(.game-bg-girl):not(.game-bg-girl1):not(.game-bg-girl2):not(.game-bg-women):not(.game-bg-women1):not(.game-bg-sky):not(.game-bg-plane7):not(.game-bg-table):not(.game-bg-check3):not(.game-bg-wrong3):not(.grade-count-total):not(.splash-confirm1):not(.splash-confirm2):not(.splash-confirm-wrap):not(.splash-howtoplaytable):not(.splash-howtoplay-wrap):not(.splash-howtoplay-video):not(.splash-text2-wrap):not(.gameover-confirm-wrap):not(.gameover-confirm1):not(.gameover-confirm2):not(.gameover-text1-wrap):not(.gameover-text1):not(.gameover-text1-label) {
+.game-bg-screen > *:not(.game-bg-city):not(.game-bg-plane):not(.game-bg-plane1):not(.game-bg-plane2):not(.game-bg-plane3):not(.game-bg-plane4):not(.game-bg-plane5):not(.game-bg-plane6):not(.game-bg-stairs):not(.game-bg-cloud):not(.game-bg-cloud1):not(.game-bg-cloud2):not(.game-bg-people):not(.game-bg-men):not(.game-bg-men1):not(.game-bg-men2):not(.game-bg-girl):not(.game-bg-girl1):not(.game-bg-girl2):not(.game-bg-women):not(.game-bg-women1):not(.game-bg-sky):not(.game-bg-plane7):not(.game-bg-table):not(.game-bg-check3):not(.game-bg-wrong3):not(.grade-count-total):not(.splash-confirm1):not(.splash-confirm2):not(.splash-confirm-wrap):not(.splash-howtoplaytable):not(.splash-howtoplay-wrap):not(.splash-howtoplay-video):not(.splash-text2-wrap):not(.gameover-confirm-wrap):not(.gameover-confirm1):not(.gameover-confirm2):not(.gameover-text1-wrap):not(.gameover-text1):not(.gameover-text1-label):not(.game-bg-bus):not(.game-bg-clouds-monuments):not(.game-bg-clouds-monuments2):not(.game-bg-clouds-monuments3) {
   position: relative;
   z-index: 20;
 }
@@ -2584,6 +2595,78 @@ body::after {
 .mode-flags .game-bg-plane7 { display: block; }
 .mode-flags .game-bg-city-flags { display: block; }
 .mode-flags .game-bg-city:not(.game-bg-city-flags) { display: none; }
+
+@keyframes bus-drive-in {
+  from { transform: translate(calc(-15vw - 50%), -50%); }
+  to   { transform: translate(calc(35vw - 50%),  -50%); }
+}
+
+.game-bg-bus {
+  display: none;
+  position: absolute;
+  top: 57%;
+  left: 0;
+  transform: translate(calc(-15vw - 50%), -50%);
+  width: 50.4%;
+  pointer-events: none;
+  z-index: 2;
+  will-change: transform;
+}
+
+.mode-monuments .game-bg-bus {
+  display: block;
+  animation: bus-drive-in 3.7s 0.2s ease-out forwards;
+}
+
+@keyframes clouds-monuments-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-70vw); }
+}
+
+.game-bg-clouds-monuments {
+  display: none;
+  position: absolute;
+  top: -30%;
+  left: 0;
+  width: 70vw;
+  pointer-events: none;
+  z-index: 0;
+  animation: clouds-monuments-scroll 18s linear infinite;
+}
+
+.game-bg-clouds-monuments2 {
+  left: calc(70vw - 2px);
+}
+
+.game-bg-clouds-monuments3 {
+  left: calc(140vw - 4px);
+}
+
+.mode-monuments .game-bg-clouds-monuments { display: block; }
+.mode-monuments .game-bg-cloud1,
+.mode-monuments .game-bg-cloud2 { display: none; }
+
+.mode-monuments .game-bg-girl,
+.mode-monuments .game-bg-girl1,
+.mode-monuments .game-bg-girl2 { left: 40%; }
+
+.mode-monuments .game-bg-women,
+.mode-monuments .game-bg-women1,
+.mode-monuments .game-bg-women2 { left: 31.5%; }
+
+.mode-monuments .game-bg-city-monuments { display: block; }
+.mode-monuments .game-bg-city-monuments2 { display: block; animation: monuments-flicker 0.2s steps(1, end) infinite; }
+.mode-monuments .game-bg-city:not(.game-bg-city-monuments):not(.game-bg-city-monuments2) { display: none; }
+
+.mode-monuments .game-bg-plane,
+.mode-monuments .game-bg-plane1,
+.mode-monuments .game-bg-plane2,
+.mode-monuments .game-bg-plane3,
+.mode-monuments .game-bg-plane4,
+.mode-monuments .game-bg-plane5,
+.mode-monuments .game-bg-plane6 { display: none; animation: none; }
+
+.mode-monuments .game-bg-stairs { display: none; }
 
 /* ── RECORDING TOGGLE BUTTON ─────────────────────────── */
 #recording-toggle {

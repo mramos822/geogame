@@ -3,7 +3,7 @@
   const IMAGES = [
     'images/checkerrortable.png','images/check3.png','images/wrong3.png',
     'images/bg/sky.png','images/bg/cloud1.png','images/bg/cloud2.png',
-    'images/bg/level3complete.png','images/bg/stairs.png',
+    'images/bg/level3complete.png','images/bg/level4complete.png','images/bg/level4complete2.png','images/bg/stairs.png',
     'images/bg/plane.png','images/bg/plane2.png','images/bg/plane3.png',
     'images/bg/plane4.png','images/bg/plane5.png','images/bg/plane6.png',
     'images/characters/people.png','images/characters/men1.png','images/characters/men2.png',
@@ -1618,7 +1618,7 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
   const label = document.querySelector('.splash-text2-label');
   if (label) { label.classList.remove('step2'); label.textContent = ''; }
   const howtoVideo = document.querySelector('.splash-howtoplay-video');
-  if (howtoVideo) { howtoVideo.pause(); howtoVideo.currentTime = 0; }
+  if (howtoVideo) { howtoVideo.pause(); howtoVideo.src = 'images/howtoplay/howtoplay3.mp4'; howtoVideo.load(); }
   const animEls = document.querySelectorAll('#splash-screen .flightatt-splash, .splash-text2-wrap');
   animEls.forEach(el => el.classList.remove('animate-in'));
 });
