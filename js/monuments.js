@@ -2,7 +2,7 @@
 (function () {
   const IMAGES = [
     'images/checkerrortable.png','images/check3.png','images/wrong3.png',
-    'images/bg/sky.png','images/bg/cloud1.png','images/bg/cloud2.png',
+    'images/bg/sky.png','images/bg/sky2.png','images/bg/cloud1.png','images/bg/cloud2.png',
     'images/bg/level3complete.png','images/bg/level4complete.png','images/bg/level4complete2.png','images/bg/stairs.png',
     'images/bg/plane.png','images/bg/plane2.png','images/bg/plane3.png',
     'images/bg/plane4.png','images/bg/plane5.png','images/bg/plane6.png',
@@ -1853,4 +1853,21 @@ document.getElementById('vol-btn')?.addEventListener('click', () => {
 
   window.addEventListener('resize', check);
   check();
+})();
+
+// ── TEST: open gameover screen from loading ───────────────────────────────────
+(function () {
+  const wrap = document.querySelector('.test-confirm-wrap');
+  if (!wrap) return;
+  wrap.addEventListener('click', () => {
+    if (confirmCooldown) return;
+    confirmCooldownLock();
+    const a = new Audio('sfx/check.mp3'); a.volume = isMuted ? 0 : 1; a.play();
+    wrap.classList.add('confirm-pressed');
+    setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
+    document.getElementById('loading-screen').style.display = 'none';
+    if (typeof showResultsScreen === 'function') showResultsScreen();
+  });
+  wrap.addEventListener('mouseenter', playSelect);
+  wrap.addEventListener('mouseleave', playSelect);
 })();

@@ -68,6 +68,10 @@
       </div>
     </div>
     <img class="loading-logo" src="images/logo.png" alt="City Blitz" draggable="false" oncontextmenu="return false">
+    <div class="test-confirm-wrap">
+      <img class="test-confirm1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
+      <img class="test-confirm2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
+    </div>
     <div class="loading-center-group">
       <img class="loading-plane" src="images/plane.png" alt="" draggable="false" oncontextmenu="return false">
       <div class="loading-bar-track">
@@ -95,6 +99,7 @@
     <img class="flightatt-splash" data-frame="10" src="images/characters/flightattpost2/10.png" alt="">
     <img class="flightatt-splash" data-frame="11" src="images/characters/flightattpost2/11.png" alt="">
     <img class="game-bg-sky" src="images/bg/sky.png" alt="">
+    <img class="game-bg-sky game-bg-sky-monuments" src="images/bg/sky2.png" alt="">
     <img class="game-bg-plane7" src="images/bg/plane7.png" alt="">
     <img class="game-bg-cloud game-bg-cloud1" src="images/bg/cloud1.png" alt="">
     <img class="game-bg-cloud game-bg-cloud2" src="images/bg/cloud2.png" alt="">
@@ -202,6 +207,58 @@
     <div class="gameover-confirm-wrap">
       <img class="gameover-confirm1" src="images/confirm1.png" alt="">
       <img class="gameover-confirm2" src="images/confirm2.png" alt="" loading="lazy">
+    </div>
+  </div>
+
+  <div id="results-screen" style="display:none;position:fixed;inset:0;z-index:150;">
+    <img class="results-sky" src="images/bg/sky3.png" alt="" draggable="false" oncontextmenu="return false">
+    <img class="loading-clouds" src="images/clouds.png" alt="">
+    <img class="loading-clouds loading-clouds2" src="images/clouds.png" alt="">
+    <img class="loading-clouds loading-clouds3" src="images/clouds.png" alt="">
+    <img class="loading-clouds-b" src="images/clouds.png" alt="">
+    <img class="loading-clouds-b loading-clouds-b2" src="images/clouds.png" alt="">
+    <img class="loading-clouds-b loading-clouds-b3" src="images/clouds.png" alt="">
+    <img class="loading-clouds-c" src="images/clouds.png" alt="">
+    <img class="loading-clouds-c loading-clouds-c2" src="images/clouds.png" alt="">
+    <img class="loading-clouds-c loading-clouds-c3" src="images/clouds.png" alt="">
+    <div class="loading-clouds-fade"></div>
+    <div class="loading-clouds-fade loading-clouds-fade2"></div>
+    <div class="loading-clouds-fade loading-clouds-fade3"></div>
+    <img class="results-table" src="images/howtoplaytable.png" alt="">
+    <img class="results-rank" id="results-rank" src="images/ranks/1.png" alt="" draggable="false" oncontextmenu="return false" style="display:none;">
+    <div class="results-back-wrap" id="results-back-wrap">
+      <img class="results-back1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
+      <img class="results-back2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
+    </div>
+    <span class="results-rank-label" id="results-rank-label">Agorafóbico</span>
+    <div class="results-points-wrap" id="results-points-wrap">
+      <span class="results-points-label">Puntuación total</span>
+      <img class="results-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">
+      <span class="results-total-score" id="results-total-score">0</span>
+    </div>
+    <div class="results-confirm-wrap">
+      <img class="results-confirm1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
+      <img class="results-confirm2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
+    </div>
+    <div class="results-content">
+      <span class="results-title">Gira mundial</span>
+      <img class="results-planet" src="images/planet2.png" alt="">
+      <img class="results-game results-game1" src="images/game1.png" alt="" draggable="false" oncontextmenu="return false">
+      <span class="results-mark-label results-mark-label1">Suitcase Shuffle</span>
+      <span class="results-hs results-hs1" id="results-hs1">0</span>
+      <img class="results-mark results-mark1" src="images/mark1.png" alt="">
+      <img class="results-game results-game2" src="images/game2.png" alt="" draggable="false" oncontextmenu="return false">
+      <span class="results-mark-label results-mark-label2">Map Mayhem</span>
+      <span class="results-hs results-hs2" id="results-hs2">0</span>
+      <img class="results-mark results-mark2" src="images/mark2.png" alt="">
+      <img class="results-game results-game3" src="images/game3.png" alt="" draggable="false" oncontextmenu="return false">
+      <span class="results-mark-label results-mark-label3">City Blitz</span>
+      <span class="results-hs results-hs3" id="results-hs3">0</span>
+      <img class="results-mark results-mark3" src="images/mark3.png" alt="">
+      <img class="results-game results-game4" src="images/game4.png" alt="" draggable="false" oncontextmenu="return false">
+      <span class="results-mark-label results-mark-label4">Landmark Loco</span>
+      <span class="results-hs results-hs4" id="results-hs4">0</span>
+      <img class="results-mark results-mark4" src="images/mark4.png" alt="">
     </div>
   </div>
 
@@ -360,8 +417,11 @@
   <script src="js/monuments.js"></script>
   <script src="js/flags.js"></script>
   <script src="js/shapes.js"></script>
+  <script src="js/ranks.js"></script>
+  <script src="js/results.js"></script>
 
   <button id="recording-toggle" onclick="document.body.classList.toggle('recording-mode');this.classList.toggle('active')">⏺</button>
+
 
 </body>
 </html>
