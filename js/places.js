@@ -85,7 +85,7 @@ const MONUMENTS = [
   { name: "Borobudur",              lat:  -7.6079, lon: 110.2038,  img: "84.jpg" },
   { name: "Gran Muralla China",     lat:  40.4319, lon: 116.5704,  img: "85.jpg" },
   { name: "Burj Khalifa",           lat:  25.1972, lon:  55.2744,  img: "86.jpg" },
-  { name: "Monte Everest",          lat:  27.9881, lon:  86.9250,  img: "87.jpg" },
+  { name: "Monte Everest",          lat:  27.9881, lon:  86.9250,  img: "87.jpeg" },
   { name: "Huascarán",              lat:  -9.1222, lon: -77.6044,  img: "88.jpg" },
   { name: "Big Ben",                lat:  51.5007, lon:  -0.1246,  img: "89.jpg" },
   { name: "Teotihuacán",            lat:  19.6925, lon: -98.8438,  img: "90.jpg" },
