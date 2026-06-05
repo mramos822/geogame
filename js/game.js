@@ -1469,6 +1469,7 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
   document.getElementById('loading-screen').style.display = '';
   document.getElementById('loading-screen').classList.remove('table-shown');
   document.getElementById('loading-table-group')?.classList.add('table-gone');
+  if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
 
   // refresh highscore displays
   const fmt = v => v > 0 ? '🏆 ' + v.toLocaleString() : '';

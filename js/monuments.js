@@ -118,51 +118,62 @@
       if (elFlags)  elFlags.textContent  = fmt(flagsHs);
       if (elShapes) elShapes.textContent = fmt(shapesHs);
       if (elMode4)  elMode4.textContent  = fmt(monumentsHs);
-      const elName = document.getElementById('loading-player-name');
-      if (elName) elName.textContent = localStorage.getItem('playerName') || 'John';
-      const elPlays = document.getElementById('loading-play-count');
-      if (elPlays) elPlays.textContent = `¡Has jugado ${parseInt(localStorage.getItem('playCount') || '0', 10)} veces!`;
-      const gamesHs = { 1: flagsHs, 2: shapesHs, 3: playHs, 4: monumentsHs };
-      // Columna derecha: highscore de cada modo
-      [1,2,3,4].forEach(i => {
-        const el = document.getElementById('loading-games-avg' + i);
-        if (el) el.textContent = gamesHs[i].toLocaleString();
-      });
-      // Columna izquierda: promedio de puntaje de cada modo
-      const avgKeys = { 1: 'flags', 2: 'shapes', 3: 'game', 4: 'monuments' };
-      [1,2,3,4].forEach(i => {
-        const el = document.getElementById('loading-games-hs' + i);
-        if (!el) return;
-        const sum   = parseInt(localStorage.getItem('avgSum_' + avgKeys[i])   || '0', 10);
-        const count = parseInt(localStorage.getItem('avgCount_' + avgKeys[i]) || '0', 10);
-        el.textContent = (count > 0 ? Math.round(sum / count) : 0).toLocaleString();
-      });
-      const rankEl = document.getElementById('loading-games-rank');
-      if (rankEl && typeof getRank === 'function') {
-        const totalHs = flagsHs + shapesHs + playHs + monumentsHs;
-        const totalEl = document.getElementById('loading-games-total');
-        if (totalEl) totalEl.textContent = totalHs.toLocaleString();
-        const rk = getRank(totalHs);
-        if (rk) rankEl.src = rk.img;
-        const rankLabel = document.getElementById('loading-games-rank-label');
-        if (rankLabel && rk) {
-          rankLabel.textContent = rk.name;
-          // Achicar el texto poco a poco si se sale del ancho del rank.png
-          const maxWidth = (document.getElementById('loading-games-rank')?.offsetWidth || 240) * 1.15;
-          let size = 36;
-          rankLabel.style.fontSize = size + 'px';
-          while (rankLabel.scrollWidth > maxWidth && size > 14) {
-            size -= 1;
-            rankLabel.style.fontSize = size + 'px';
-          }
-        }
-      }
+      if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
     }
   }
 
   promises.forEach(p => Promise.resolve(p).then(tick, tick));
 
 })();
+
+// Actualiza el panel de perfil (nombre, veces jugadas, promedios, highscores,
+// rango). Se llama al cargar y cada vez que se vuelve al loading screen, para
+// que refleje los datos guardados de la última partida.
+window.refreshProfileStats = function () {
+  const playHs      = parseInt(localStorage.getItem('geochallenge_highscore') || '0', 10);
+  const flagsHs     = parseInt(localStorage.getItem('flagsHighscore')         || '0', 10);
+  const shapesHs    = parseInt(localStorage.getItem('shapesHighscore')        || '0', 10);
+  const monumentsHs = parseInt(localStorage.getItem('monumentsHighscore')     || '0', 10);
+  const elName = document.getElementById('loading-player-name');
+  if (elName) elName.textContent = localStorage.getItem('playerName') || 'John';
+  const elPlays = document.getElementById('loading-play-count');
+  if (elPlays) elPlays.textContent = `¡Has jugado ${parseInt(localStorage.getItem('playCount') || '0', 10)} veces!`;
+  const gamesHs = { 1: flagsHs, 2: shapesHs, 3: playHs, 4: monumentsHs };
+  // Columna derecha: highscore de cada modo
+  [1,2,3,4].forEach(i => {
+    const el = document.getElementById('loading-games-avg' + i);
+    if (el) el.textContent = gamesHs[i].toLocaleString();
+  });
+  // Columna izquierda: promedio de puntaje de cada modo
+  const avgKeys = { 1: 'flags', 2: 'shapes', 3: 'game', 4: 'monuments' };
+  [1,2,3,4].forEach(i => {
+    const el = document.getElementById('loading-games-hs' + i);
+    if (!el) return;
+    const sum   = parseInt(localStorage.getItem('avgSum_' + avgKeys[i])   || '0', 10);
+    const count = parseInt(localStorage.getItem('avgCount_' + avgKeys[i]) || '0', 10);
+    el.textContent = (count > 0 ? Math.round(sum / count) : 0).toLocaleString();
+  });
+  const rankEl = document.getElementById('loading-games-rank');
+  if (rankEl && typeof getRank === 'function') {
+    const totalHs = flagsHs + shapesHs + playHs + monumentsHs;
+    const totalEl = document.getElementById('loading-games-total');
+    if (totalEl) totalEl.textContent = totalHs.toLocaleString();
+    const rk = getRank(totalHs);
+    if (rk) rankEl.src = rk.img;
+    const rankLabel = document.getElementById('loading-games-rank-label');
+    if (rankLabel && rk) {
+      rankLabel.textContent = rk.name;
+      // Achicar el texto poco a poco si se sale del ancho del rank.png
+      const maxWidth = (document.getElementById('loading-games-rank')?.offsetWidth || 240) * 1.15;
+      let size = 36;
+      rankLabel.style.fontSize = size + 'px';
+      while (rankLabel.scrollWidth > maxWidth && size > 14) {
+        size -= 1;
+        rankLabel.style.fontSize = size + 'px';
+      }
+    }
+  }
+};
 
 // ── SFX ───────────────────────────────────────────────────────────────────────
 // Solo check y postgame se necesitan en el splash — el resto se difiere al primer juego
@@ -1796,6 +1807,7 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
   if (elFlags)  elFlags.textContent  = fmt(parseInt(localStorage.getItem('flagsHighscore')         || '0', 10));
   if (elShapes) elShapes.textContent = fmt(parseInt(localStorage.getItem('shapesHighscore')        || '0', 10));
   if (elMode4)  elMode4.textContent  = fmt(parseInt(localStorage.getItem('monumentsHighscore')     || '0', 10));
+  if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
 
   confirmStep = 0;
   const howtoWrap = document.querySelector('.splash-howtoplay-wrap');

@@ -93,6 +93,14 @@ function showFlagsMode() {
   flagsTimerImg.style.animationPlayState = 'paused';
 
   if (typeof loadBadges !== 'undefined') loadBadges();
+
+  // Resetear el puntaje ANTES de la cuenta regresiva para que el widget no
+  // muestre el puntaje de la partida anterior durante el conteo.
+  flagsScore          = 0;
+  flagsDisplayedScore = 0;
+  flagsScoreEl.textContent = (((typeof window.campaignBase === 'function') ? window.campaignBase() : 0)).toLocaleString();
+  flagsLastLbScore = -1;
+
   initFlagsLeaderboard();
 
   runFlagsPregame(() => {

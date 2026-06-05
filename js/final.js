@@ -168,6 +168,7 @@ document.getElementById('final-confirm-back-wrap')?.addEventListener('click', ()
   document.getElementById('loading-screen').style.display = '';
   document.getElementById('loading-screen').classList.remove('table-shown');
   document.getElementById('loading-table-group')?.classList.add('table-gone');
+  if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
 });
 document.getElementById('final-confirm-back-wrap')?.addEventListener('mouseenter', () => { if (typeof playSelect === 'function') playSelect(); });
 document.getElementById('final-confirm-back-wrap')?.addEventListener('mouseleave', () => { if (typeof playSelect === 'function') playSelect(); });
