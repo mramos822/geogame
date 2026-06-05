@@ -896,17 +896,29 @@ body::after {
   filter: drop-shadow(0px 6px 12px rgba(0,0,0,0.5));
 }
 
-.loading-play-single {
-  display: none;
+/* Contenedor de acciones del loading: Play + (Social, Perfil) apilados. */
+.loading-actions {
+  display: none;            /* se muestra al llegar al 100% de carga */
   position: absolute;
   top: 100%;
   left: 50%;
-  transform: translateX(-50%);
   margin-top: 8vmin;
+  transform: translateX(-50%);
+  flex-direction: column;
+  align-items: center;
+  gap: 2.5vmin;
+}
+
+.loading-play-single {
   cursor: pointer;
   transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1);
+  /* Forzar capa GPU para evitar el blur de sub-pixel; sin esto el botón se ve
+     borroso hasta que el hover crea la capa. */
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  will-change: transform;
 }
-.loading-play-single:hover { transform: translateX(-50%) scale(1.08); }
+.loading-play-single:hover { transform: translateZ(0) scale(1.08); }
 .loading-play-single img {
   width: clamp(20vmin, 34vmin, 38vmin);
   height: auto;
@@ -917,12 +929,420 @@ body::after {
   animation: pop-in 0.35s cubic-bezier(0.34,1.56,0.64,1);
 }
 
+/* Fila de botones secundarios debajo de Play. */
+.loading-secondary-btns {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 3vmin;
+}
+.loading-secondary-btn {
+  cursor: pointer;
+  transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1);
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  will-change: transform;
+}
+.loading-secondary-btn:hover { transform: translateZ(0) scale(1.08); }
+.loading-secondary-btn img {
+  width: clamp(22vmin, 32vmin, 37vmin);
+  height: auto;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  animation: pop-in 0.35s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+/* Difuminar todo lo que queda detrás de la mesa. Se aplica filter:blur por
+   elemento (no backdrop-filter sobre toda la pantalla) para no recalcular el
+   desenfoque de contenido animado en cada frame -> sin lag. El blur de cada
+   capa se cachea y la animación solo desplaza la textura ya difuminada. */
+#loading-screen.table-shown > .loading-planet,
+#loading-screen.table-shown > .loading-clouds,
+#loading-screen.table-shown > .loading-clouds-b,
+#loading-screen.table-shown > .loading-clouds-c,
+#loading-screen.table-shown > .loading-clouds-fade,
+#loading-screen.table-shown > .flightatt-loading,
+#loading-screen.table-shown > .flightatt-loading-shadow,
+#loading-screen.table-shown > .loading-logo,
+#loading-screen.table-shown > .loading-center-group {
+  filter: blur(5px);
+}
+
+/* Con el perfil abierto, los botones Jugar/Social/Perfil quedan inutilizables */
+#loading-screen.table-shown .loading-actions {
+  pointer-events: none;
+}
+
+/* Al salir (back): la mesa se desliza hacia arriba y el fondo se desenfoca.
+   El blur NO se interpola (tween de filter:blur recalcula el desenfoque de las
+   nubes en cada frame -> lag). Se quita de golpe; solo se anima el transform,
+   que es barato en GPU. */
+#loading-table-group {
+  position: absolute;
+  inset: 0;
+  z-index: 210;
+  transition: transform 0.4s ease-out; /* bajada (vuelve la mesa) */
+  will-change: transform;
+  pointer-events: none; /* la capa no captura clicks; solo sus hijos interactivos */
+}
+#loading-table-group.table-gone {
+  transition: transform 0.4s ease-in; /* subida (sale la mesa) */
+}
+#loading-table-group .loading-name-edit,
+#loading-table-group .loading-name-input,
+#loading-table-group .loading-name-confirm,
+#loading-table-group .loading-play-confirm-wrap {
+  pointer-events: auto;
+}
+#loading-table-group.table-gone {
+  transform: translateY(-120%);
+}
+
+/* Mesa how-to-play centrada en el loading, sobre las nubes y detrás del contenido. */
+.loading-howtotable {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scaleX(1.26);
+  width: clamp(79vmin, 105vmin, 121vmin);
+  height: auto;
+  z-index: 210; /* por encima del center-group y de la flight attendant (z-index:201) */
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.loading-profile-pic {
+  position: absolute;
+  top: calc(50% - 30vmin);
+  left: calc(50% + 31vmin);
+  transform: translate(-50%, -50%);
+  width: 12vmin;
+  height: 12vmin;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 0.6vmin solid #fff;
+  z-index: 211; /* por encima de la mesa (z-index:210) */
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.loading-name-wrap {
+  position: absolute;
+  top: 18%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 212;
+  display: flex;
+  align-items: center;
+  gap: 1.4vmin;
+}
+
+.loading-player-name {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 56px;
+  color: #fde20e;
+  -webkit-text-stroke: 7px #8b6a00;
+  paint-order: stroke fill;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.loading-name-edit {
+  flex: none;
+  width: 6vmin;
+  height: 6vmin;
+  border-radius: 50%;
+  border: 0.5vmin solid #8b6a00;
+  background: #fde20e;
+  color: #8b6a00;
+  font-size: 3vmin;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: transform 0.1s;
+}
+.loading-name-edit:hover { transform: scale(1.1); }
+.loading-name-edit:active { transform: scale(0.95); }
+
+.loading-name-input {
+  display: none;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 40px;
+  color: #8b6a00;
+  background: #fffbe6;
+  border: 0.5vmin solid #8b6a00;
+  border-radius: 1.4vmin;
+  padding: 0.4vmin 1.6vmin;
+  width: 36vmin;
+  outline: none;
+  text-align: center;
+}
+
+.loading-name-confirm {
+  display: none;
+  position: relative;
+  flex: none;
+  width: 9vmin;
+  cursor: pointer;
+}
+.loading-name-confirm1 {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.loading-name-confirm2 {
+  position: absolute;
+  top: 49%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 118%;
+  height: auto;
+  opacity: 0;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.loading-name-confirm:hover .loading-name-confirm2 { opacity: 1; }
+.loading-name-confirm.confirm-pressed .loading-name-confirm2 { opacity: 0; }
+
+/* Modo edición: oculta el nombre y el lápiz, muestra el input y el confirm */
+.loading-name-wrap.editing .loading-player-name,
+.loading-name-wrap.editing .loading-name-edit {
+  display: none;
+}
+.loading-name-wrap.editing .loading-name-input {
+  display: block;
+}
+.loading-name-wrap.editing .loading-name-confirm {
+  display: flex;
+}
+
+.loading-games-col {
+  position: absolute;
+  top: 34%;
+  left: calc(50% - 37vmin);
+  transform: translateX(-50%);
+  z-index: 212;
+  display: flex;
+  flex-direction: column;
+  gap: 2vmin;
+  pointer-events: none;
+}
+
+.loading-games-row {
+  display: flex;
+  align-items: center;
+  gap: 2vmin;
+}
+
+.loading-games-col2 {
+  left: calc(50% - 13vmin);
+  top: 34%;
+}
+
+.loading-games-spacer {
+  visibility: hidden;
+}
+
+.loading-games-rank-label {
+  position: absolute;
+  top: 60%;
+  left: calc(50% + 33vmin);
+  transform: translate(-50%, -50%);
+  z-index: 212;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-weight: bold;
+  font-size: 36px;
+  color: #FFFF00;
+  -webkit-text-stroke: 6px #000080;
+  paint-order: stroke fill;
+  letter-spacing: -0.5px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.loading-games-hs-label {
+  position: absolute;
+  top: 70%;
+  left: calc(50% + 33vmin);
+  transform: translate(-50%, -50%) scaleY(1.1);
+  z-index: 212;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 28px;
+  font-weight: bold;
+  color: #000;
+  text-shadow: 0.2px 0 0 #000, -0.2px 0 0 #000, 0 0.2px 0 #000, 0 -0.2px 0 #000;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.loading-games-points {
+  position: absolute;
+  top: 79%;
+  left: calc(50% + 33vmin);
+  transform: translate(-50%, -50%) scaleY(1.2);
+  width: 26vmin;
+  height: auto;
+  z-index: 211;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.loading-games-total {
+  position: absolute;
+  top: 77.5%;
+  left: calc(50% + 33vmin);
+  transform: translate(-50%, -50%);
+  z-index: 212;
+  font-family: 'Dimbo', sans-serif;
+  font-size: 60px;
+  color: #fff;
+  -webkit-text-stroke: 7px #000;
+  paint-order: stroke fill;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.loading-games-rank {
+  position: absolute;
+  top: 44%;
+  left: calc(50% + 18vmin);
+  transform: translateY(-50%);
+  width: 30vmin;
+  height: auto;
+  z-index: 212;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.loading-games-title {
+  position: absolute;
+  bottom: 100%;
+  left: calc(50% + 1vmin);
+  transform: translateX(-50%) scaleY(0.9);
+  margin-bottom: 0.5vmin;
+  font-family: 'Dimbo', sans-serif;
+  font-size: 32px;
+  color: #000;
+  letter-spacing: 0;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.loading-games-game {
+  width: 7.7vmin;
+  height: auto;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.loading-games-mark-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.loading-games-mark {
+  width: 19.8vmin;
+  height: auto;
+  display: block;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.loading-games-hs {
+  position: absolute;
+  top: 25%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Dimbo', sans-serif;
+  font-size: 4.4vmin;
+  color: #fff;
+  -webkit-text-stroke: 0.7vmin #000;
+  paint-order: stroke fill;
+  letter-spacing: 0.4vmin;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.loading-games-hs1 { -webkit-text-stroke-color: #0a557f; }
+.loading-games-hs2 { -webkit-text-stroke-color: #8d132a; }
+.loading-games-hs3 { -webkit-text-stroke-color: #06522a; }
+.loading-games-hs4 { -webkit-text-stroke-color: #582f7f; }
+
+.loading-play-confirm-wrap {
+  position: absolute;
+  top: 22%;
+  left: calc(50% - 46vmin);
+  transform: translate(-50%, -50%);
+  width: 14vmin;
+  z-index: 212;
+  cursor: pointer;
+}
+
+.loading-play-confirm1 {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.loading-play-confirm2 {
+  position: absolute;
+  top: 49%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 118%;
+  height: auto;
+  pointer-events: none;
+  opacity: 0;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.loading-play-confirm-wrap:hover .loading-play-confirm2 {
+  opacity: 1;
+}
+
+.loading-play-confirm-wrap.confirm-pressed .loading-play-confirm2 {
+  opacity: 0;
+}
+
+.loading-play-count {
+  position: absolute;
+  top: 24%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 212;
+  font-family: 'Dimbo', sans-serif;
+  font-size: 42px;
+  color: #000;
+  transform: translate(-50%, -50%) scaleY(0.9);
+  letter-spacing: 0;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 .loading-center-group {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  z-index: 2;
+  z-index: 6; /* por encima de las nubes (loading-clouds-c z-index:5) */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2522,6 +2942,8 @@ body::after {
 #flags-machine  { left: 50%; transform: translateX(-50%); z-index: 3; }
 #flags-findluggage { position: absolute; left: calc(50% + 370px); bottom: 75px; transform: translateX(-50%) scaleX(0.95); width: 220px; z-index: 5; user-select: none; -webkit-user-select: none; -webkit-user-drag: none; }
 #flags-findluggage.scrolling { animation: findluggage-scroll 8.15s linear forwards; }
+/* Opción errónea descartada por el tiempo: se desvanece y queda deseleccionable. */
+.flags-faded { transition: opacity 0.3s ease !important; opacity: 0 !important; pointer-events: none !important; }
 @keyframes findluggage-scroll {
   from { transform: translateX(-50%); }
   to   { transform: translateX(calc(-50% - 1100px)); }

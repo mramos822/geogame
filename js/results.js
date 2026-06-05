@@ -11,13 +11,8 @@ const resultsReveal         = document.getElementById('results-reveal');
 let resultsBackStep = 0;
 
 const TOTAL_HS_KEY = 'totalHighscore';
-const MOCK_FRIENDS = [
-  { name: 'Alex', score: 3200 }, { name: 'Sam', score: 7800 },
-  { name: 'Jordan', score: 12500 }, { name: 'Taylor', score: 18000 },
-  { name: 'Morgan', score: 24000 }, { name: 'Casey', score: 31000 },
-  { name: 'Riley', score: 42000 }, { name: 'Drew', score: 55000 },
-  { name: 'Quinn', score: 68000 }, { name: 'Avery', score: 79000 },
-];
+// La lista de amigos vive en js/friends.js (capa de datos lista para servidor).
+// Se accede con getFriends(); MOCK_FRIENDS queda como respaldo allí.
 
 function buildResultsMessage(total) {
   const playerName = localStorage.getItem('playerName') || 'John';
@@ -29,7 +24,7 @@ function buildResultsMessage(total) {
     return `¡Excelente trabajo ${playerName}! ¡Acabas de batir un nuevo récord personal!`;
   }
 
-  const all = [...MOCK_FRIENDS, { name: playerName, score: total }]
+  const all = [...getFriends(), { name: playerName, score: total }]
     .sort((a, b) => b.score - a.score);
   const pos    = all.findIndex(p => p.name === playerName && p.score === total) + 1;
   const above  = all[pos - 2];

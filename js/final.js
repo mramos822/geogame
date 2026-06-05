@@ -18,6 +18,7 @@ let finalBackTimeout = null;
 
 function showFinalScreen() {
   finalScreen.style.display = 'block';
+  localStorage.setItem('playCount', String(parseInt(localStorage.getItem('playCount') || '0', 10) + 1));
   const backWrap = document.getElementById('final-confirm-back-wrap');
   if (backWrap) {
     backWrap.classList.remove('visible');
@@ -29,6 +30,11 @@ function showFinalScreen() {
   const hs2  = (cs.shapes    != null) ? cs.shapes    : (parseInt(localStorage.getItem('shapesHighscore'))        || 0);
   const hs3  = (cs.game      != null) ? cs.game      : (parseInt(localStorage.getItem('geochallenge_highscore')) || 0);
   const hs4  = (cs.monuments != null) ? cs.monuments : (parseInt(localStorage.getItem('monumentsHighscore'))     || 0);
+  // Acumular para promedios por modo (segunda columna del loading)
+  [['flags', hs1], ['shapes', hs2], ['game', hs3], ['monuments', hs4]].forEach(([k, v]) => {
+    localStorage.setItem('avgSum_' + k,   String(parseInt(localStorage.getItem('avgSum_' + k)   || '0', 10) + v));
+    localStorage.setItem('avgCount_' + k, String(parseInt(localStorage.getItem('avgCount_' + k) || '0', 10) + 1));
+  });
   const total = hs1 + hs2 + hs3 + hs4;
   const rank  = typeof getRank === 'function' ? getRank(total) : null;
   const label = document.getElementById('final-rank-label');
@@ -39,7 +45,7 @@ function showFinalScreen() {
   const nameEl = document.getElementById('final-player-name');
   if (nameEl) nameEl.textContent = playerName;
 
-  const friends = (typeof MOCK_FRIENDS !== 'undefined' ? MOCK_FRIENDS : []);
+  const friends = (typeof getFriends === 'function' ? getFriends() : []);
   const ranking = [...friends, { name: playerName, score: total }]
     .sort((a, b) => b.score - a.score);
   const pos = ranking.findIndex(p => p.name === playerName && p.score === total) + 1;
@@ -57,13 +63,26 @@ function buildFriendClouds(ranking, playerPos) {
   container.innerHTML = '';
   const STEP_X = 22;  // vw por puesto
   const STEP_Y = -11; // vw por puesto (2:1)
-  const N = ranking.length;
   const playerName = localStorage.getItem('playerName') || 'John';
 
+  // Ventana "top 11": yo + 5 por encima + 5 por debajo. En los bordes se
+  // desplaza para mantener 11 (si hay suficientes), sin sobrecargar de nubes.
+  const HALF = 5;
+  const fullN = ranking.length;
+  let start = playerPos - HALF;          // puesto real (1-based) del tope de la ventana
+  let end   = playerPos + HALF;
+  if (start < 1)      { end += (1 - start);     start = 1; }
+  if (end > fullN)    { start -= (end - fullN); end = fullN; }
+  if (start < 1)      start = 1;
+  const windowed = ranking.slice(start - 1, end); // sigue ordenado desc
+  const N = windowed.length;                       // <= 11
+  const localPlayerPos = playerPos - start + 1;    // mi puesto dentro de la ventana
+
   for (let i = N - 1; i >= 0; i--) {
-    const entry = ranking[i];
+    const entry = windowed[i];
+    const realPos = start + i; // puesto real en el ranking completo
     // dejar hueco en mi puesto
-    if (entry.name === playerName && (i + 1) === playerPos) continue;
+    if ((i + 1) === localPlayerPos && entry.name === playerName) continue;
     const k = (N - 1) - i; // 0 = más bajo
     const rk = typeof getRank === 'function' ? getRank(entry.score) : null;
     const labelId = `final-fc-label-${i}`;
@@ -74,7 +93,7 @@ function buildFriendClouds(ranking, playerPos) {
 
     group.innerHTML =
       `<img class="final-cloud5" src="images/bg/cloud5.png" alt="" draggable="false" oncontextmenu="return false">` +
-      `<span class="final2-position">${i + 1}</span>` +
+      `<span class="final2-position">${realPos}</span>` +
       `<span class="final2-player-name">${entry.name}</span>` +
       `<span class="final2-rank-label" id="${labelId}">${rk ? rk.name : ''}</span>` +
       `<div class="final2-avatar"><img class="final2-avatar-img" src="images/ppdefault.png" alt="" draggable="false" oncontextmenu="return false"></div>` +
@@ -93,8 +112,8 @@ function buildFriendClouds(ranking, playerPos) {
     }
   }
 
-  // mi puesto desde abajo (0 = más bajo)
-  const playerK = N - playerPos;
+  // mi puesto desde abajo (0 = más bajo), relativo a la ventana
+  const playerK = N - localPlayerPos;
   const endX = -(playerK * STEP_X);
   const endY = -(playerK * STEP_Y);
   const startX = endX + 240;
@@ -147,6 +166,8 @@ document.getElementById('final-confirm-back-wrap')?.addEventListener('click', ()
   if (typeof window.stopResultsMusic === 'function') window.stopResultsMusic();
   hideFinalScreen();
   document.getElementById('loading-screen').style.display = '';
+  document.getElementById('loading-screen').classList.remove('table-shown');
+  document.getElementById('loading-table-group')?.classList.add('table-gone');
 });
 document.getElementById('final-confirm-back-wrap')?.addEventListener('mouseenter', () => { if (typeof playSelect === 'function') playSelect(); });
 document.getElementById('final-confirm-back-wrap')?.addEventListener('mouseleave', () => { if (typeof playSelect === 'function') playSelect(); });

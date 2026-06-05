@@ -739,6 +739,7 @@ function showShapesMode() {
   shapesWrongCooldown  = new Map();
   shapesCorrectCount   = 0;
   shapesWrongAnswerCount = 0;
+  if (typeof setModeCounts !== 'undefined') setModeCounts(0, 0);
 
   const scoreEl = document.getElementById('score-value');
   if (scoreEl) scoreEl.textContent = (((typeof window.campaignBase === 'function') ? window.campaignBase() : 0)).toLocaleString();

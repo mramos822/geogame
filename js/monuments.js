@@ -91,8 +91,8 @@
     barFill.style.width = pct + '%';
     pctEl.textContent   = pct + '%';
     if (done >= total) {
-      const singlePlay = document.getElementById('loading-play-single');
-      if (singlePlay) singlePlay.style.display = 'block';
+      const actions = document.getElementById('loading-actions');
+      if (actions) actions.style.display = 'flex';
       document.getElementById('loading-play-wrap').style.display = 'flex';
       playBtn.addEventListener('animationend', () => playBtn.classList.add('loaded'), { once: true });
       const flagsBtn = document.getElementById('loading-flags-btn');
@@ -118,6 +118,45 @@
       if (elFlags)  elFlags.textContent  = fmt(flagsHs);
       if (elShapes) elShapes.textContent = fmt(shapesHs);
       if (elMode4)  elMode4.textContent  = fmt(monumentsHs);
+      const elName = document.getElementById('loading-player-name');
+      if (elName) elName.textContent = localStorage.getItem('playerName') || 'John';
+      const elPlays = document.getElementById('loading-play-count');
+      if (elPlays) elPlays.textContent = `¡Has jugado ${parseInt(localStorage.getItem('playCount') || '0', 10)} veces!`;
+      const gamesHs = { 1: flagsHs, 2: shapesHs, 3: playHs, 4: monumentsHs };
+      // Columna derecha: highscore de cada modo
+      [1,2,3,4].forEach(i => {
+        const el = document.getElementById('loading-games-avg' + i);
+        if (el) el.textContent = gamesHs[i].toLocaleString();
+      });
+      // Columna izquierda: promedio de puntaje de cada modo
+      const avgKeys = { 1: 'flags', 2: 'shapes', 3: 'game', 4: 'monuments' };
+      [1,2,3,4].forEach(i => {
+        const el = document.getElementById('loading-games-hs' + i);
+        if (!el) return;
+        const sum   = parseInt(localStorage.getItem('avgSum_' + avgKeys[i])   || '0', 10);
+        const count = parseInt(localStorage.getItem('avgCount_' + avgKeys[i]) || '0', 10);
+        el.textContent = (count > 0 ? Math.round(sum / count) : 0).toLocaleString();
+      });
+      const rankEl = document.getElementById('loading-games-rank');
+      if (rankEl && typeof getRank === 'function') {
+        const totalHs = flagsHs + shapesHs + playHs + monumentsHs;
+        const totalEl = document.getElementById('loading-games-total');
+        if (totalEl) totalEl.textContent = totalHs.toLocaleString();
+        const rk = getRank(totalHs);
+        if (rk) rankEl.src = rk.img;
+        const rankLabel = document.getElementById('loading-games-rank-label');
+        if (rankLabel && rk) {
+          rankLabel.textContent = rk.name;
+          // Achicar el texto poco a poco si se sale del ancho del rank.png
+          const maxWidth = (document.getElementById('loading-games-rank')?.offsetWidth || 240) * 1.15;
+          let size = 36;
+          rankLabel.style.fontSize = size + 'px';
+          while (rankLabel.scrollWidth > maxWidth && size > 14) {
+            size -= 1;
+            rankLabel.style.fontSize = size + 'px';
+          }
+        }
+      }
     }
   }
 
@@ -191,6 +230,57 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
   window.campaign.scores = {};
   window.lastModeScore = 0;
   document.getElementById('loading-flags-btn').click();
+});
+
+document.getElementById('loading-play-confirm-wrap')?.addEventListener('click', () => {
+  sfxCheck.currentTime = 0; sfxCheck.play();
+  const wrap = document.getElementById('loading-play-confirm-wrap');
+  wrap.classList.add('confirm-pressed');
+  setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
+  const screen = document.getElementById('loading-screen');
+  const tableGroup = document.getElementById('loading-table-group');
+  tableGroup.classList.add('table-gone');
+  screen.classList.remove('table-shown');
+});
+
+document.getElementById('loading-name-edit')?.addEventListener('click', () => {
+  sfxCheck.currentTime = 0; sfxCheck.play();
+  const wrap  = document.getElementById('loading-name-wrap');
+  const input = document.getElementById('loading-name-input');
+  input.value = localStorage.getItem('playerName') || 'John';
+  wrap.classList.add('editing');
+  input.focus();
+  input.select();
+});
+
+function confirmNameChange() {
+  const wrap  = document.getElementById('loading-name-wrap');
+  const input = document.getElementById('loading-name-input');
+  const limpio = input.value.trim().slice(0, 12);
+  if (limpio) {
+    localStorage.setItem('playerName', limpio);
+    const el = document.getElementById('loading-player-name');
+    if (el) el.textContent = limpio;
+  }
+  wrap.classList.remove('editing');
+}
+
+document.getElementById('loading-name-confirm')?.addEventListener('click', () => {
+  sfxCheck.currentTime = 0; sfxCheck.play();
+  const c = document.getElementById('loading-name-confirm');
+  c.classList.add('confirm-pressed');
+  setTimeout(() => c.classList.remove('confirm-pressed'), 50);
+  confirmNameChange();
+});
+
+document.getElementById('loading-name-input')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); confirmNameChange(); }
+});
+
+document.getElementById('loading-profile-btn')?.addEventListener('click', () => {
+  sfxCheck.currentTime = 0; sfxCheck.play();
+  document.getElementById('loading-table-group')?.classList.remove('table-gone');
+  document.getElementById('loading-screen').classList.add('table-shown');
 });
 
 let sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus, sfxTickdown, sfxTimesUp;
@@ -503,14 +593,28 @@ function buildWrongsRow(startOffset = 0) {
 // ── LEADERBOARD ──────────────────────────────────────────────────────────────────────────────
 const LB_COLORS = ['#e74c3c','#e67e22','#f1c40f','#2ecc71','#1abc9c',
                     '#3498db','#9b59b6','#e91e63','#00bcd4','#8bc34a'];
-const mockPlayers = Array.from({ length: 10 }, (_, i) => ({
-  id: `mock${i}`,
-  score: Math.floor(Math.random() * 9500) + 400,
-  color: LB_COLORS[i],
-  initial: 'ABCDEFGHIJ'[i],
-}));
+// La barra de amigos ingame se construye desde la capa de datos compartida
+// (js/friends.js -> getFriends()), la misma que usan las pantallas results/final.
+// friends.js se carga antes que este archivo, así getFriends() ya tiene datos.
+function buildFriendPlayers() {
+  const src = (typeof getFriends === 'function') ? getFriends() : [];
+  return src.map((f, i) => ({
+    id: `friend${i}`,
+    name: f.name,
+    score: f.score,
+    color: LB_COLORS[i % LB_COLORS.length],
+    initial: (f.name && f.name[0]) ? f.name[0].toUpperCase() : '?',
+  }));
+}
+let mockPlayers = buildFriendPlayers();
 
-const highscorePlayer = { id: 'best', score: highscore, color: '#6a0dad', initial: '★' };
+// Highscore global = mejor total de campaña (suma de los 4 modos), guardado por
+// results.js en localStorage 'totalHighscore'. La barra es universal, así que la
+// entrada ★ best usa ese total, no el highscore de un modo individual.
+function getTotalHighscore() {
+  return parseInt(localStorage.getItem('totalHighscore') || '0', 10) || 0;
+}
+const highscorePlayer = { id: 'best', score: getTotalHighscore(), color: '#6a0dad', initial: '★' };
 
 const LB_WINDOW  = 5;
 const LB_PIN_ROW = 2;
@@ -518,12 +622,12 @@ const LB_GAP     = 4;
 let lbElements   = {};
 
 const EMOTE_SRCS = [
-  'images/emotes/Gemini_Generated_Image_9dly9v9dly9v9dly (2).png',
-  'images/emotes/Gemini_Generated_Image_9uavb19uavb19uav.png',
-  'images/emotes/Gemini_Generated_Image_b2kisyb2kisyb2ki.png',
-  'images/emotes/Gemini_Generated_Image_o8jl8no8jl8no8jl.png',
-  'images/emotes/Gemini_Generated_Image_omvaevomvaevomva.png',
-  'images/emotes/Gemini_Generated_Image_wuzcs6wuzcs6wuzc.png',
+  'images/emotes/1.png',
+  'images/emotes/2.png',
+  'images/emotes/3.png',
+  'images/emotes/4.png',
+  'images/emotes/5.png',
+  'images/emotes/6.png',
 ];
 
 function spawnEmoteBubble(entryEl) {
@@ -551,6 +655,8 @@ function initLeaderboard() {
   const lb = document.getElementById('leaderboard');
   lb.innerHTML = '';
   lbElements = {};
+  mockPlayers = buildFriendPlayers(); // refrescar con la lista real de amigos
+  highscorePlayer.score = getTotalHighscore(); // ★ best = highscore global de campaña
 
   mockPlayers.forEach(p => {
     const el = document.createElement('div');
@@ -595,6 +701,9 @@ function initLeaderboard() {
 }
 
 function positionLeaderboard(playerScore, animate) {
+  // La barra es universal para toda la campaña: el jugador compite con el puntaje
+  // acumulado (base de modos previos + modo actual), no con el de cada juego.
+  playerScore += (window.campaignBase ? window.campaignBase() : 0);
   const lb   = document.getElementById('leaderboard');
   const rowH = getLbRowHeight();
 
@@ -644,6 +753,10 @@ function sortLeaderboard(playerScore) {
 }
 
 initLeaderboard();
+// Cuando la capa de datos refresque la lista (p.ej. al llegar amigos reales del
+// servidor vía loadFriends), reconstruir la barra automáticamente.
+if (typeof onFriendsUpdate === 'function') onFriendsUpdate(() => initLeaderboard());
+if (typeof loadFriends === 'function') loadFriends();
 
 function resetState() {
   state = {
@@ -1409,8 +1522,6 @@ function endGame() {
           highscore = state.score;
           localStorage.setItem('geochallenge_highscore', highscore);
           highscoreEl.textContent = highscore.toLocaleString();
-          highscorePlayer.score = highscore;
-          if (lbBestScoreEl) lbBestScoreEl.textContent = highscore.toLocaleString();
           updateSplashHighscore();
         }
       }
@@ -1536,6 +1647,8 @@ function startGame() {
   resetState();
   gradeCounts = { perfect: 0, good: 0, fair: 0 };
   wrongCount = 0;
+  updateGradeCountsUI();
+  updateWrongCountUI();
   updateDotsUI();
   scoreValueEl.textContent     = (window.campaignBase ? window.campaignBase() : 0).toLocaleString();
   lastLbScore = -1;
@@ -1671,6 +1784,8 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
 
   gameoverScreen.style.display = 'none';
   document.getElementById('loading-screen').style.display = '';
+  document.getElementById('loading-screen').classList.remove('table-shown');
+  document.getElementById('loading-table-group')?.classList.add('table-gone');
 
   const fmt = v => v > 0 ? '🏆 ' + v.toLocaleString() : '';
   const elPlay   = document.getElementById('loading-play-hs');

@@ -126,6 +126,7 @@ function showFlagsMode() {
     flagsLuggageWrap.classList.remove('flags-six-mode');
     // Reset all group inline styles that may be stuck from a previous game's
     // mid-round cleanup being skipped by the !flagsRunning guard.
+    clearFlagsElimination();
     ;[...flagsTopGroupIds, ...flagsBottomGroupIds].forEach(id => {
       const g = document.getElementById(id);
       if (!g) return;
@@ -133,6 +134,7 @@ function showFlagsMode() {
       g.style.transition = '';
       g.style.transform  = '';
       g.style.opacity    = '';
+      g.classList.remove('flags-faded');
     });
     flagsBottomGroupIds.forEach(id => {
       const g = document.getElementById(id);
@@ -214,6 +216,16 @@ let flagsIsFirstRound = true;
 let flagsAnswered = new Set();
 let flagsLastChosen = null;
 
+// Ventana de respuesta por ronda, en segundos. Debe coincidir con la duración de
+// la animación #flags-findluggage.scrolling (css/style.css) que marca el wrong por demora.
+const FLAGS_ROUND_TIME = 8.15;
+// Eliminación progresiva de opciones erróneas (se desvanecen y quedan deseleccionables).
+let flagsEliminationTimeouts = [];
+function clearFlagsElimination() {
+  flagsEliminationTimeouts.forEach(clearTimeout);
+  flagsEliminationTimeouts = [];
+}
+
 const flagsSlotImgIds = {
   'flags-luggage-left-group':  'flags-flag-img-left',
   'flags-luggage-group':       'flags-flag-img',
@@ -229,12 +241,19 @@ const FLAGS_LB_WINDOW  = 5;
 const FLAGS_LB_PIN_ROW = 2;
 const FLAGS_LB_GAP     = 4;
 
-const flagsMockPlayers = Array.from({ length: 10 }, (_, i) => ({
-  id: `flagsmock${i}`,
-  score: Math.floor(Math.random() * 600) + 50,
-  color: FLAGS_LB_COLORS[i],
-  initial: 'ABCDEFGHIJ'[i],
-}));
+// Amigos desde la capa de datos compartida (js/friends.js -> getFriends()),
+// la misma que usan la barra de monuments y las pantallas results/final.
+function buildFlagsFriendPlayers() {
+  const src = (typeof getFriends === 'function') ? getFriends() : [];
+  return src.map((f, i) => ({
+    id: `friend${i}`,
+    name: f.name,
+    score: f.score,
+    color: FLAGS_LB_COLORS[i % FLAGS_LB_COLORS.length],
+    initial: (f.name && f.name[0]) ? f.name[0].toUpperCase() : '?',
+  }));
+}
+let flagsMockPlayers = buildFlagsFriendPlayers();
 
 let flagsLbElements    = {};
 let flagsLastLbScore   = -1;
@@ -252,6 +271,7 @@ function initFlagsLeaderboard() {
   flagsLbElements = {};
   flagsLastLbScore = -1;
   flagsLastPlayerRank = -1;
+  flagsMockPlayers = buildFlagsFriendPlayers(); // refrescar con la lista real de amigos
 
   flagsMockPlayers.forEach(p => {
     const el = document.createElement('div');
@@ -285,7 +305,16 @@ function initFlagsLeaderboard() {
   });
 }
 
+// Si la lista de amigos cambia (datos reales del servidor) mientras se juega flags,
+// reconstruir su barra. Fuera de flags se reconstruye sola al iniciar la partida.
+if (typeof onFriendsUpdate === 'function') {
+  onFriendsUpdate(() => { if (flagsRunning) initFlagsLeaderboard(); });
+}
+
 function flagsPositionLeaderboard(playerScore, animate) {
+  // Barra universal: el jugador compite con el puntaje acumulado de la campaña
+  // (base de modos previos + modo actual), no solo con el de flags.
+  playerScore += ((typeof window.campaignBase === 'function') ? window.campaignBase() : 0);
   const lb   = document.getElementById('flags-leaderboard');
   const rowH = getFlagsLbRowHeight();
   lb.style.height = (FLAGS_LB_WINDOW * rowH - FLAGS_LB_GAP) + 'px';
@@ -553,6 +582,7 @@ function startFlagsRound() {
   // Si la animación termina sin que se haya seleccionado nada → wrong
   const onFindLuggageEnd = () => {
     flagsFindLuggage.removeEventListener('animationend', onFindLuggageEnd);
+    clearFlagsElimination();
     if (!flagsRunning) return;
     // Simular wrong: misma lógica que click incorrecto
     flagsGroupIds.forEach(gid => {
@@ -695,6 +725,7 @@ function startFlagsRound() {
     group.style.display = '';
     group.style.pointerEvents = 'auto';
     group.style.cursor = 'pointer';
+    group.classList.remove('flags-faded');
     group.classList.remove('luggage-enter-active');
     void group.offsetWidth;
     group.classList.add('luggage-enter-active');
@@ -707,6 +738,7 @@ function startFlagsRound() {
       group.style.display = '';
       group.style.pointerEvents = 'auto';
       group.style.cursor = 'pointer';
+      group.classList.remove('flags-faded');
       group.classList.remove('luggage-enter-active');
       void group.offsetWidth;
       group.classList.add('luggage-enter-active');
@@ -732,12 +764,44 @@ function startFlagsRound() {
   flagsRoundStartTime = performance.now() + 200; // empieza a contar tras la animación de entrada
 
   let flagsPicked = false;
+
+  // ── Eliminación progresiva de opciones erróneas ───────────────────────────────
+  // 6 opciones: cada 1/3 del tiempo se desvanecen 2 erróneas (0.3s) y quedan
+  //             deseleccionables, hasta dejar solo 2 (correcta + 1 errónea).
+  // 3 opciones: a la 1/2 del tiempo se desvanece 1 errónea, dejando 2.
+  clearFlagsElimination();
+  const wrongSlots = [];
+  for (let s = 0; s < slotCount; s++) if (s !== correctSlot) wrongSlots.push(s);
+  wrongSlots.sort(() => Math.random() - 0.5);
+  const fadeSlot = (slotIdx) => {
+    const g = document.getElementById(flagsGroupIds[slotIdx]);
+    if (g) { g.classList.add('flags-faded'); g.style.pointerEvents = 'none'; g.style.cursor = 'default'; }
+  };
+  const roundMs = FLAGS_ROUND_TIME * 1000;
+  if (slotCount >= 6) {
+    [1, 2].forEach(step => {
+      const slice = wrongSlots.slice((step - 1) * 2, step * 2);
+      flagsEliminationTimeouts.push(setTimeout(() => {
+        if (!flagsRunning || flagsPicked) return;
+        slice.forEach(fadeSlot);
+      }, roundMs * step / 3));
+    });
+  } else if (slotCount === 3) {
+    flagsEliminationTimeouts.push(setTimeout(() => {
+      if (!flagsRunning || flagsPicked) return;
+      fadeSlot(wrongSlots[0]);
+    }, roundMs / 2));
+  }
+
   flagsGroupIds.forEach((id, i) => {
     const group = document.getElementById(id);
     if (!group) return;
     group.onclick = () => {
-      if (!flagsRunning || flagsPicked) return;
+      // Ignorar opciones ya desvanecidas: aunque el grupo tenga pointer-events:none,
+      // un hijo con pointer-events:auto deja que el click burbujee hasta acá.
+      if (!flagsRunning || flagsPicked || group.classList.contains('flags-faded')) return;
       flagsPicked = true;
+      clearFlagsElimination();
       flagsFindLuggage.removeEventListener('animationend', onFindLuggageEnd);
       // Animate selected luggage toward findluggage position
       group.classList.remove('luggage-enter-active');
@@ -887,6 +951,7 @@ function hideFlagsMode() {
   flagsSpeedBonusText.classList.remove('visible');
   clearInterval(flagsTimerIntervalId);
   flagsRunning = false;
+  clearFlagsElimination();
 
   const finalScore = Math.round(flagsScore);
   window.lastModeScore = finalScore;
@@ -951,6 +1016,7 @@ function startFlagsTimer() {
   flagsScore          = 0;
   flagsDisplayedScore = 0;
   flagsWrongCount     = 0;
+  if (typeof setModeCounts !== 'undefined') setModeCounts(0, 0);
   flagsScoreEl.textContent = (((typeof window.campaignBase === 'function') ? window.campaignBase() : 0)).toLocaleString();
   flagsRunning  = true;
 
@@ -966,6 +1032,7 @@ function startFlagsTimer() {
     if (flagsTimeLeft <= 0) {
       clearInterval(flagsTimerIntervalId);
       flagsRunning = false;
+      clearFlagsElimination();
       flagsLuggageWrap.style.pointerEvents = 'none';
       flagsLuggageWrap.classList.add('flags-game-ended');
       if (typeof sfxTimesUp !== 'undefined') { sfxTimesUp.currentTime = 0; sfxTimesUp.play(); }

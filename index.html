@@ -73,7 +73,7 @@
         <img class="test-confirm1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
         <img class="test-confirm2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
-      <div class="final-confirm-wrap" id="final-confirm-wrap" style="position:relative;">
+      <div class="final-confirm-wrap" id="final-confirm-wrap" style="position:relative;display:none;">
         <img class="final-confirm1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
         <img class="final-confirm2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
@@ -84,9 +84,104 @@
         <div class="loading-bar-fill" id="loading-bar-fill"></div>
       </div>
       <div class="loading-pct" id="loading-pct">0%</div>
-      <div class="loading-play-single" id="loading-play-single">
-        <img src="images/buttons/es-play.png" alt="Jugar" draggable="false" oncontextmenu="return false">
+      <div class="loading-actions" id="loading-actions">
+        <div class="loading-play-single" id="loading-play-single">
+          <img src="images/buttons/es-play.png" alt="Jugar" draggable="false" oncontextmenu="return false">
+        </div>
+        <div class="loading-secondary-btns">
+          <div class="loading-secondary-btn" id="loading-social-btn">
+            <img src="images/buttons/es-social.png" alt="Social" draggable="false" oncontextmenu="return false">
+          </div>
+          <div class="loading-secondary-btn" id="loading-profile-btn">
+            <img src="images/buttons/es-profile.png" alt="Perfil" draggable="false" oncontextmenu="return false">
+          </div>
+        </div>
       </div>
+    </div>
+    <div id="loading-table-group" class="table-gone">
+    <img class="loading-howtotable" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
+    <img class="loading-profile-pic" src="images/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
+    <div class="loading-name-wrap" id="loading-name-wrap">
+      <span class="loading-player-name" id="loading-player-name"></span>
+      <button class="loading-name-edit" id="loading-name-edit" type="button" aria-label="Cambiar nombre">✎</button>
+      <input class="loading-name-input" id="loading-name-input" type="text" maxlength="12" autocomplete="off" spellcheck="false">
+      <div class="loading-name-confirm" id="loading-name-confirm" role="button" aria-label="Confirmar nombre">
+        <img class="loading-name-confirm1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
+        <img class="loading-name-confirm2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+    </div>
+    <div class="loading-play-confirm-wrap" id="loading-play-confirm-wrap">
+      <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+      <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+    </div>
+    <span class="loading-play-count" id="loading-play-count"></span>
+    <div class="loading-games-col">
+      <span class="loading-games-title">Promedio</span>
+      <div class="loading-games-row">
+        <img class="loading-games-game" src="images/game1.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark1.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs1" id="loading-games-hs1">0</span>
+        </div>
+      </div>
+      <div class="loading-games-row">
+        <img class="loading-games-game" src="images/game2.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark2.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs2" id="loading-games-hs2">0</span>
+        </div>
+      </div>
+      <div class="loading-games-row">
+        <img class="loading-games-game" src="images/game3.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark3.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs3" id="loading-games-hs3">0</span>
+        </div>
+      </div>
+      <div class="loading-games-row">
+        <img class="loading-games-game" src="images/game4.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark4.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs4" id="loading-games-hs4">0</span>
+        </div>
+      </div>
+    </div>
+    <div class="loading-games-col loading-games-col2">
+      <span class="loading-games-title">Highscore</span>
+      <div class="loading-games-row">
+        <img class="loading-games-game loading-games-spacer" src="images/game1.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark1.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs1" id="loading-games-avg1">0</span>
+        </div>
+      </div>
+      <div class="loading-games-row">
+        <img class="loading-games-game loading-games-spacer" src="images/game2.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark2.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs2" id="loading-games-avg2">0</span>
+        </div>
+      </div>
+      <div class="loading-games-row">
+        <img class="loading-games-game loading-games-spacer" src="images/game3.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark3.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs3" id="loading-games-avg3">0</span>
+        </div>
+      </div>
+      <div class="loading-games-row">
+        <img class="loading-games-game loading-games-spacer" src="images/game4.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark4.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs4" id="loading-games-avg4">0</span>
+        </div>
+      </div>
+    </div>
+    <img class="loading-games-rank" id="loading-games-rank" src="images/ranks/1.png" alt="" draggable="false" oncontextmenu="return false">
+    <span class="loading-games-rank-label" id="loading-games-rank-label"></span>
+    <span class="loading-games-hs-label">Highscore</span>
+    <img class="loading-games-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">
+    <span class="loading-games-total" id="loading-games-total">0</span>
     </div>
   </div>
 
@@ -470,6 +565,7 @@
   <script src="js/cities.js"></script>
   <script src="js/countries.js"></script>
   <script src="js/places.js"></script>
+  <script src="js/friends.js"></script>
   <script src="js/monuments.js"></script>
   <script src="js/flags.js"></script>
   <script src="js/shapes.js"></script>

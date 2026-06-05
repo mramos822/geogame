@@ -465,12 +465,12 @@ const LB_GAP     = 4; // px
 let lbElements   = {};
 
 const EMOTE_SRCS = [
-  'images/emotes/Gemini_Generated_Image_9dly9v9dly9v9dly (2).png',
-  'images/emotes/Gemini_Generated_Image_9uavb19uavb19uav.png',
-  'images/emotes/Gemini_Generated_Image_b2kisyb2kisyb2ki.png',
-  'images/emotes/Gemini_Generated_Image_o8jl8no8jl8no8jl.png',
-  'images/emotes/Gemini_Generated_Image_omvaevomvaevomva.png',
-  'images/emotes/Gemini_Generated_Image_wuzcs6wuzcs6wuzc.png',
+  'images/emotes/1.png',
+  'images/emotes/2.png',
+  'images/emotes/3.png',
+  'images/emotes/4.png',
+  'images/emotes/5.png',
+  'images/emotes/6.png',
 ];
 
 // Lanza un globo de emote sobre el elemento del leaderboard indicado.
@@ -1467,6 +1467,8 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
   gameoverScreen.style.display = 'none';
   document.getElementById('loading-screen').style.display = '';
+  document.getElementById('loading-screen').classList.remove('table-shown');
+  document.getElementById('loading-table-group')?.classList.add('table-gone');
 
   // refresh highscore displays
   const fmt = v => v > 0 ? '🏆 ' + v.toLocaleString() : '';
