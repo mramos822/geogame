@@ -45,7 +45,7 @@
     <img class="flightatt-loading" data-frame="10" src="images/characters/flightattpost2/10.png" alt="" loading="lazy">
     <img class="flightatt-loading" data-frame="11" src="images/characters/flightattpost2/11.png" alt="" loading="lazy">
     <div class="flightatt-loading-shadow"></div>
-    <div class="loading-btn-row">
+    <div class="loading-btn-row" style="display:none">
       <div class="loading-btn-wrap" style="display:none" id="loading-shapes-wrap">
         <span class="loading-btn-label">Países</span>
         <img id="loading-shapes-btn" src="images/buttons/es-play.png" alt="Modo Siluetas" draggable="false" oncontextmenu="return false">
@@ -68,9 +68,15 @@
       </div>
     </div>
     <img class="loading-logo" src="images/logo.png" alt="City Blitz" draggable="false" oncontextmenu="return false">
-    <div class="test-confirm-wrap">
-      <img class="test-confirm1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
-      <img class="test-confirm2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
+    <div style="display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);gap:20px;z-index:9999;">
+      <div class="test-confirm-wrap" style="position:relative;transform:none;top:auto;left:auto;">
+        <img class="test-confirm1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
+        <img class="test-confirm2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+      <div class="final-confirm-wrap" id="final-confirm-wrap" style="position:relative;">
+        <img class="final-confirm1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
+        <img class="final-confirm2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
     </div>
     <div class="loading-center-group">
       <img class="loading-plane" src="images/plane.png" alt="" draggable="false" oncontextmenu="return false">
@@ -78,6 +84,9 @@
         <div class="loading-bar-fill" id="loading-bar-fill"></div>
       </div>
       <div class="loading-pct" id="loading-pct">0%</div>
+      <div class="loading-play-single" id="loading-play-single">
+        <img src="images/buttons/es-play.png" alt="Jugar" draggable="false" oncontextmenu="return false">
+      </div>
     </div>
   </div>
 
@@ -210,6 +219,32 @@
     </div>
   </div>
 
+  <div id="final-screen" style="display:none;position:fixed;inset:0;z-index:160;">
+    <img class="results-sky" src="images/bg/sky3.png" alt="" draggable="false" oncontextmenu="return false">
+    <img class="final-cloud4" src="images/bg/cloud4.png" alt="" draggable="false" oncontextmenu="return false">
+    <img class="final-cloud4 final-cloud4b" src="images/bg/cloud4.png" alt="" draggable="false" oncontextmenu="return false">
+    <img class="final-cloud4 final-cloud4c" src="images/bg/cloud4.png" alt="" draggable="false" oncontextmenu="return false">
+    <div id="final-clouds5"></div>
+    <div id="final-group">
+      <div class="final-plane-wrap">
+        <img class="final-plane" src="images/plane.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+      <span class="final-position" id="final-position"></span>
+      <span class="final-player-name" id="final-player-name"></span>
+      <span class="final-rank-label" id="final-rank-label"></span>
+      <img class="final-cloud3-fg" src="images/bg/cloud3.png" alt="" draggable="false" oncontextmenu="return false">
+      <div class="final-avatar"><img class="final-avatar-img" src="images/ppdefault.png" alt="" draggable="false" oncontextmenu="return false"></div>
+      <div class="final-points-wrap">
+        <img class="final-points-img" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">
+        <span class="final-points-score" id="final-points-score">0</span>
+      </div>
+    </div>
+    <div class="final-confirm-back-wrap" id="final-confirm-back-wrap">
+      <img class="final-confirm-back1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
+      <img class="final-confirm-back2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
+    </div>
+  </div>
+
   <div id="results-screen" style="display:none;position:fixed;inset:0;z-index:150;">
     <img class="results-sky" src="images/bg/sky3.png" alt="" draggable="false" oncontextmenu="return false">
     <img class="loading-clouds" src="images/clouds.png" alt="">
@@ -225,16 +260,37 @@
     <div class="loading-clouds-fade loading-clouds-fade2"></div>
     <div class="loading-clouds-fade loading-clouds-fade3"></div>
     <img class="results-table" src="images/howtoplaytable.png" alt="">
-    <img class="results-rank" id="results-rank" src="images/ranks/1.png" alt="" draggable="false" oncontextmenu="return false" style="display:none;">
-    <div class="results-back-wrap" id="results-back-wrap">
-      <img class="results-back1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
-      <img class="results-back2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
+    <div class="results-text3-wrap">
+      <img class="results-text3" src="images/text3.png" alt="" draggable="false" oncontextmenu="return false">
+      <p class="results-rank-desc" id="results-rank-desc"></p>
     </div>
+    <img class="results-flightatt" data-frame="1"  src="images/characters/flightattpost/1.png"  alt="" draggable="false">
+    <img class="results-flightatt" data-frame="2"  src="images/characters/flightattpost/2.png"  alt="" draggable="false">
+    <img class="results-flightatt" data-frame="3"  src="images/characters/flightattpost/3.png"  alt="" draggable="false">
+    <img class="results-flightatt" data-frame="4"  src="images/characters/flightattpost/4.png"  alt="" draggable="false">
+    <img class="results-flightatt" data-frame="5"  src="images/characters/flightattpost/5.png"  alt="" draggable="false">
+    <img class="results-flightatt" data-frame="6"  src="images/characters/flightattpost/6.png"  alt="" draggable="false">
+    <img class="results-flightatt" data-frame="7"  src="images/characters/flightattpost/7.png"  alt="" draggable="false">
+    <img class="results-flightatt" data-frame="8"  src="images/characters/flightattpost/8.png"  alt="" draggable="false">
+    <img class="results-flightatt" data-frame="9"  src="images/characters/flightattpost/9.png"  alt="" draggable="false">
+    <img class="results-flightatt" data-frame="10" src="images/characters/flightattpost/10.png" alt="" draggable="false">
+    <img class="results-flightatt" data-frame="11" src="images/characters/flightattpost/11.png" alt="" draggable="false">
+    <img class="results-flightatt" data-frame="12" src="images/characters/flightattpost/12.png" alt="" draggable="false">
+    <img class="results-flightatt" data-frame="13" src="images/characters/flightattpost/13.png" alt="" draggable="false">
+    <img class="results-flightatt" data-frame="14" src="images/characters/flightattpost/14.png" alt="" draggable="false">
+    <img class="results-flightatt" data-frame="15" src="images/characters/flightattpost/15.png" alt="" draggable="false">
+    <div id="results-reveal">
+    <img class="results-rank" id="results-rank" src="images/ranks/1.png" alt="" draggable="false" oncontextmenu="return false" style="display:none;">
     <span class="results-rank-label" id="results-rank-label">Agorafóbico</span>
     <div class="results-points-wrap" id="results-points-wrap">
       <span class="results-points-label">Puntuación total</span>
       <img class="results-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">
       <span class="results-total-score" id="results-total-score">0</span>
+    </div>
+    </div><!-- #results-reveal -->
+    <div class="results-back-wrap" id="results-back-wrap">
+      <img class="results-back1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
+      <img class="results-back2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
     </div>
     <div class="results-confirm-wrap">
       <img class="results-confirm1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
@@ -419,8 +475,9 @@
   <script src="js/shapes.js"></script>
   <script src="js/ranks.js"></script>
   <script src="js/results.js"></script>
+  <script src="js/final.js"></script>
 
-  <button id="recording-toggle" onclick="document.body.classList.toggle('recording-mode');this.classList.toggle('active')">⏺</button>
+  <button id="recording-toggle" style="display:none" onclick="document.body.classList.toggle('recording-mode');this.classList.toggle('active')">⏺</button>
 
 
 </body>

@@ -91,6 +91,8 @@
     barFill.style.width = pct + '%';
     pctEl.textContent   = pct + '%';
     if (done >= total) {
+      const singlePlay = document.getElementById('loading-play-single');
+      if (singlePlay) singlePlay.style.display = 'block';
       document.getElementById('loading-play-wrap').style.display = 'flex';
       playBtn.addEventListener('animationend', () => playBtn.classList.add('loaded'), { once: true });
       const flagsBtn = document.getElementById('loading-flags-btn');
@@ -146,8 +148,15 @@ document.getElementById('loading-play-btn').addEventListener('click', () => {
   document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men2.png');
   document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl1.png');
   document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl2.png');
+  document.querySelectorAll('.game-bg-women1').forEach(el => el.src = 'images/characters/women1.png');
+  document.querySelectorAll('.game-bg-women2').forEach(el => el.src = 'images/characters/women1.png');
+  document.querySelectorAll('.game-bg-city').forEach(el => el.src = 'images/bg/level3complete.png');
   document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check3.png');
   document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong3.png');
+  const howtoVideoCity = document.querySelector('.splash-howtoplay-video');
+  if (howtoVideoCity) { howtoVideoCity.pause(); howtoVideoCity.src = 'images/howtoplay/howtoplay3.mp4'; howtoVideoCity.load(); }
+  const howtoTitleCity = document.querySelector('.splash-howtoplay-title');
+  if (howtoTitleCity) howtoTitleCity.textContent = 'City Blitz';
   const label = document.querySelector('.splash-text2-label');
   if (label) { label.textContent = '¡Veamos a qué ciudad va cada uno! Aquí es donde tú entras a formar parte.'; label.classList.remove('step2'); }
   document.getElementById('loading-screen').style.display = 'none';
@@ -158,6 +167,30 @@ document.getElementById('loading-play-btn').addEventListener('click', () => {
   void splashElCity.offsetWidth;
   animElsCity.forEach(el => el.classList.add('animate-in'));
   playMusic(sfxPostgame);
+});
+
+// ── CAMPAÑA: 4 modos encadenados ─────────────────────────────────────────────
+window.campaign = {
+  active: false,
+  idx: 0,
+  base: 0,
+  btns:  ['loading-flags-btn', 'loading-shapes-btn', 'loading-play-btn', 'loading-mode4-btn'],
+  modes: ['flags', 'shapes', 'game', 'monuments'],
+  scores: {},
+};
+// puntaje acumulado de rondas anteriores (0 si no hay campaña activa)
+window.campaignBase = function () {
+  return (window.campaign && window.campaign.active) ? (window.campaign.base || 0) : 0;
+};
+
+document.getElementById('loading-play-single')?.addEventListener('click', () => {
+  sfxCheck.currentTime = 0; sfxCheck.play();
+  window.campaign.active = true;
+  window.campaign.idx = 0;
+  window.campaign.base = 0;
+  window.campaign.scores = {};
+  window.lastModeScore = 0;
+  document.getElementById('loading-flags-btn').click();
 });
 
 let sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus, sfxTickdown, sfxTimesUp;
@@ -179,6 +212,12 @@ function loadGameSFX() {
 function playMusic(track) {
   [sfxPostgame, sfxGameMusic].forEach(t => { if (t !== track) { t.pause(); t.currentTime = 0; } });
   if (!track) return;
+  // si el mismo track ya está sonando, dejarlo continuar (no reiniciar el loop)
+  if (!track.paused && !track.ended) {
+    const p = track.play();
+    if (p) p.catch(() => {});
+    return;
+  }
   track.currentTime = 0;
   const p = track.play();
   if (p) p.catch(() => {});
@@ -1036,7 +1075,7 @@ function render(timestamp) {
   if (state.displayedScore < state.score) {
     const diff = state.score - state.displayedScore;
     state.displayedScore = Math.min(state.score, state.displayedScore + Math.max(1, Math.round(diff * 8 * dt)));
-    scoreValueEl.textContent = state.displayedScore.toLocaleString();
+    scoreValueEl.textContent = (state.displayedScore + (window.campaignBase ? window.campaignBase() : 0)).toLocaleString();
     sortLeaderboard(state.score);
   }
 
@@ -1355,7 +1394,8 @@ function endGame() {
       animFrameId = null;
       gameWrapper.style.display = 'none';
       scoreDisplayEl.style.display = 'none';
-      finalScoreEl.textContent = state.score.toLocaleString();
+      window.lastModeScore = state.score;
+      finalScoreEl.textContent = (state.score + (window.campaignBase ? window.campaignBase() : 0)).toLocaleString();
       let isNewHighscore = false;
       if (window.pendingGameMode === 'monuments') {
         isNewHighscore = state.score > monumentsHighscore;
@@ -1497,7 +1537,7 @@ function startGame() {
   gradeCounts = { perfect: 0, good: 0, fair: 0 };
   wrongCount = 0;
   updateDotsUI();
-  scoreValueEl.textContent     = '0';
+  scoreValueEl.textContent     = (window.campaignBase ? window.campaignBase() : 0).toLocaleString();
   lastLbScore = -1;
   lastPlayerRank = -1;
   sortLeaderboard(0);
@@ -1599,6 +1639,36 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
   const wrap = document.querySelector('.gameover-confirm-wrap');
   wrap.classList.add('confirm-pressed');
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
+
+  // ── Encadenamiento de campaña ──
+  if (window.campaign && window.campaign.active) {
+    const mode = window.pendingGameMode;
+    const sc = window.lastModeScore || 0; // puntaje individual de esta ronda
+    window.campaign.scores[mode] = sc;
+    window.campaign.base = (window.campaign.base || 0) + sc;
+    window.campaign.idx++;
+    gameoverScreen.style.display = 'none';
+    // resetear estado del splash para que el segundo diálogo no se saltee
+    confirmStep = 0;
+    const howtoWrapC = document.querySelector('.splash-howtoplay-wrap');
+    if (howtoWrapC) howtoWrapC.classList.remove('slide-down');
+    const labelC = document.querySelector('.splash-text2-label');
+    if (labelC) { labelC.classList.remove('step2'); labelC.textContent = ''; }
+    const animElsC = document.querySelectorAll('#splash-screen .flightatt-splash, .splash-text2-wrap');
+    animElsC.forEach(el => el.classList.remove('animate-in'));
+    if (window.campaign.idx < window.campaign.btns.length) {
+      // silenciar el check del botón del siguiente modo (ya sonó uno arriba)
+      sfxCheck.volume = 0;
+      document.getElementById(window.campaign.btns[window.campaign.idx]).click();
+      setTimeout(() => { sfxCheck.volume = isMuted ? 0 : 1; }, 150);
+    } else {
+      window.campaign.active = false;
+      playMusic(null);
+      if (typeof showResultsScreen === 'function') showResultsScreen();
+    }
+    return;
+  }
+
   gameoverScreen.style.display = 'none';
   document.getElementById('loading-screen').style.display = '';
 

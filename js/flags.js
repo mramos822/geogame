@@ -380,7 +380,7 @@ function flagsAnimateScore() {
     const diff = flagsScore - flagsDisplayedScore;
     if (diff <= 0) { flagsScoreRafId = null; return; }
     flagsDisplayedScore = Math.min(flagsScore, flagsDisplayedScore + Math.max(1, Math.round(diff * 8 * dt)));
-    flagsScoreEl.textContent = flagsDisplayedScore.toLocaleString();
+    flagsScoreEl.textContent = (flagsDisplayedScore + ((typeof window.campaignBase === 'function') ? window.campaignBase() : 0)).toLocaleString();
     flagsScoreRafId = requestAnimationFrame(tick);
   }
   flagsScoreRafId = requestAnimationFrame(tick);
@@ -889,8 +889,10 @@ function hideFlagsMode() {
   flagsRunning = false;
 
   const finalScore = Math.round(flagsScore);
+  window.lastModeScore = finalScore;
+  const base = (typeof window.campaignBase === 'function') ? window.campaignBase() : 0;
   const finalScoreEl = document.getElementById('final-score-value');
-  if (finalScoreEl) finalScoreEl.textContent = finalScore.toLocaleString();
+  if (finalScoreEl) finalScoreEl.textContent = (finalScore + base).toLocaleString();
 
   const LS_HIGHSCORE = 'flagsHighscore';
   const prevHighscore = parseInt(localStorage.getItem(LS_HIGHSCORE) || '0', 10);
@@ -949,7 +951,7 @@ function startFlagsTimer() {
   flagsScore          = 0;
   flagsDisplayedScore = 0;
   flagsWrongCount     = 0;
-  flagsScoreEl.textContent = '0';
+  flagsScoreEl.textContent = (((typeof window.campaignBase === 'function') ? window.campaignBase() : 0)).toLocaleString();
   flagsRunning  = true;
 
   flagsTimerIntervalId = setInterval(() => {
@@ -992,9 +994,9 @@ document.getElementById('loading-flags-btn').addEventListener('click', () => {
   if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.play(); }
   window.pendingGameMode = 'flags';
   document.getElementById('splash-screen').classList.add('mode-flags');
-  document.getElementById('splash-screen').classList.remove('mode-shapes');
+  document.getElementById('splash-screen').classList.remove('mode-shapes', 'mode-monuments');
   document.getElementById('gameover-screen').classList.add('mode-flags');
-  document.getElementById('gameover-screen').classList.remove('mode-shapes');
+  document.getElementById('gameover-screen').classList.remove('mode-shapes', 'mode-monuments');
   const howtoplayVideo = document.querySelector('.splash-howtoplay-video');
   if (howtoplayVideo) { howtoplayVideo.src = 'images/howtoplay/howtoplay1.mp4'; howtoplayVideo.load(); }
   document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men3.png');

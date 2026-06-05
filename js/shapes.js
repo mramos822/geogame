@@ -57,7 +57,7 @@ function shapesAnimateScore() {
     const diff = shapesScore - shapesDisplayedScore;
     if (diff <= 0) { shapesScoreRafId = null; return; }
     shapesDisplayedScore = Math.min(shapesScore, shapesDisplayedScore + Math.max(1, Math.round(diff * 8 * dt)));
-    if (el) el.textContent = shapesDisplayedScore.toLocaleString();
+    if (el) el.textContent = (shapesDisplayedScore + ((typeof window.campaignBase === 'function') ? window.campaignBase() : 0)).toLocaleString();
     shapesScoreRafId = requestAnimationFrame(tick);
   }
   shapesScoreRafId = requestAnimationFrame(tick);
@@ -741,7 +741,7 @@ function showShapesMode() {
   shapesWrongAnswerCount = 0;
 
   const scoreEl = document.getElementById('score-value');
-  if (scoreEl) scoreEl.textContent = '0';
+  if (scoreEl) scoreEl.textContent = (((typeof window.campaignBase === 'function') ? window.campaignBase() : 0)).toLocaleString();
   if (typeof lastLbScore    !== 'undefined') lastLbScore    = -1;
   if (typeof lastPlayerRank !== 'undefined') lastPlayerRank = -1;
   if (typeof lbElements !== 'undefined') {
@@ -849,8 +849,10 @@ function hideShapesMode() {
 
   // final score & highscore
   const finalScore = Math.round(shapesScore);
+  window.lastModeScore = finalScore;
+  const baseShapes = (typeof window.campaignBase === 'function') ? window.campaignBase() : 0;
   const finalScoreEl = document.getElementById('final-score-value');
-  if (finalScoreEl) finalScoreEl.textContent = finalScore.toLocaleString();
+  if (finalScoreEl) finalScoreEl.textContent = (finalScore + baseShapes).toLocaleString();
   const LS_HS = 'shapesHighscore';
   const prevHS = parseInt(localStorage.getItem(LS_HS) || '0', 10);
   const newHSBanner = document.getElementById('new-highscore-banner');
@@ -932,6 +934,10 @@ document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men2.png');
   document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl1.png');
   document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl2.png');
+  document.querySelectorAll('.game-bg-women1').forEach(el => el.src = 'images/characters/women1.png');
+  document.querySelectorAll('.game-bg-women2').forEach(el => el.src = 'images/characters/women1.png');
+  document.querySelectorAll('.game-bg-city-monuments').forEach(el => el.src = 'images/bg/level4complete.png');
+  document.querySelectorAll('.game-bg-city-monuments2').forEach(el => el.src = 'images/bg/level4complete2.png');
   document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check4.png');
   document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong4.png');
   const label = document.querySelector('.splash-text2-label');

@@ -1,0 +1,53 @@
+/* BACKUP: estilos de splash-screen (antes de cambios de fondo) */
+
+/* ── SPLASH ─────────────────────────────────────────── */
+#splash-screen {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at center, #4a2c0a 0%, #1a0d00 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+  gap: 28px;
+}
+
+#splash-screen h1 {
+  font-size: 56px;
+  color: #f5d98b;
+  text-shadow: 0 0 30px #c8860a, 2px 2px 0 #7a4400;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+}
+
+#splash-screen p {
+  color: #c8a060;
+  font-size: 18px;
+  text-align: center;
+  max-width: 460px;
+  line-height: 1.7;
+}
+
+/* ── SPLASH HIGHSCORE ───────────────────────────────── */
+#splash-highscore-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+#splash-highscore-label {
+  color: #c8a060;
+  font-size: 15px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+#splash-highscore-value {
+  font-size: 40px;
+  font-weight: bold;
+  color: #f0c040;
+  text-shadow: 0 0 16px #c8860a;
+  font-family: 'Arial Black', Impact, sans-serif;
+}
