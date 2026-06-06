@@ -64,6 +64,7 @@ function shapesAnimateScore() {
 }
 
 function showCountryShape(country, ext1, ext2, startDelay) {
+  if (shapesAborted) return; // se abandonó la partida
   ext1 = ext1 || 'png';
   ext2 = ext2 || 'jpg';
   startDelay = startDelay || 0;
@@ -242,7 +243,8 @@ function showCountryShape(country, ext1, ext2, startDelay) {
   let anyClicked = false;
   const tagEls = [];
 
-  setTimeout(() => {
+  shapesTagsTimeout = setTimeout(() => {
+  if (shapesAborted) return; // se abandonó durante el 3-2-1
   const tImgStart = document.getElementById('shapes-timer-img');
   if (tImgStart) tImgStart.style.animationPlayState = 'running';
 
@@ -701,7 +703,12 @@ const SHAPES_PREGAME_STEPS = [
   { src: 'images/countdown/go.png', hold: 950,  size: 490 },
 ];
 
+let shapesPregameTimeout = null;
+let shapesAborted = false;
+let shapesEndTimeout1 = null, shapesEndTimeout2 = null;
+let shapesTagsTimeout = null;
 function runShapesPregame(onDone) {
+  shapesAborted = false;
   const el  = document.getElementById('pregame-countdown');
   const img = document.getElementById('pregame-countdown-img');
   if (!el || !img) { onDone(); return; }
@@ -709,6 +716,7 @@ function runShapesPregame(onDone) {
   if (typeof sfxCountdown !== 'undefined') { sfxCountdown.currentTime = 0; sfxCountdown.play(); }
   let step = 0;
   function showStep() {
+    if (shapesAborted) return; // se abandonó durante el 3-2-1
     if (step >= SHAPES_PREGAME_STEPS.length) { el.style.display = 'none'; onDone(); return; }
     const { src, hold, size } = SHAPES_PREGAME_STEPS[step++];
     img.style.animation = 'none';
@@ -717,13 +725,45 @@ function runShapesPregame(onDone) {
     img.src = src;
     void img.offsetWidth;
     img.style.animation = '';
-    setTimeout(showStep, hold);
+    shapesPregameTimeout = setTimeout(showStep, hold);
   }
   showStep();
 }
 
+// Detiene y resetea TODO el modo siluetas (sin scoring ni gameover). Lo usa quitToMenu.
+function shapesHardReset() {
+  shapesAborted = true;
+  clearTimeout(shapesPregameTimeout); shapesPregameTimeout = null;
+  clearTimeout(shapesEndTimeout1); clearTimeout(shapesEndTimeout2);
+  clearTimeout(shapesTagsTimeout); shapesTagsTimeout = null;
+  clearInterval(shapesTimerIntervalId);
+  if (shapesScoreRafId) { cancelAnimationFrame(shapesScoreRafId); shapesScoreRafId = null; }
+  clearTimeout(shapesCurrentAnimTimeout);
+  clearTimeout(shapesCurrentClipFadeTimeout);
+  clearTimeout(shapesSpeedBonusHideId);
+  if (typeof sfxCountdown !== 'undefined') { try { sfxCountdown.pause(); sfxCountdown.currentTime = 0; } catch (e) {} }
+  // Quitar silueta/tag/board en curso y el countdown widget
+  document.querySelectorAll('.shapes-tag').forEach(t => t.remove());
+  try { if (shapesCurrentImg)  shapesCurrentImg.remove(); } catch (e) {}
+  try { if (shapesCurrentImg2) shapesCurrentImg2.parentElement?.remove(); } catch (e) {}
+  try { if (shapesCurrentClip) shapesCurrentClip.remove(); } catch (e) {}
+  try { if (shapesCurrentBoard) shapesCurrentBoard.remove(); } catch (e) {}
+  try { if (shapesCurrentSvg)  shapesCurrentSvg.remove(); } catch (e) {}
+  shapesCurrentImg = shapesCurrentImg2 = shapesCurrentClip = null;
+  shapesCurrentBoard = shapesCurrentSvg = null;
+  document.getElementById('shapes-countdown-widget')?.remove();
+  document.getElementById('pregame-countdown') && (document.getElementById('pregame-countdown').style.display = 'none');
+  const shTimeup = document.getElementById('timeup-overlay');
+  if (shTimeup) { shTimeup.style.display = 'none'; shTimeup.classList.remove('timeup-in','timeup-out'); shTimeup.style.zIndex = ''; }
+  const sbt = document.getElementById('speed-bonus-text');
+  if (sbt) sbt.classList.remove('visible');
+}
+window.gameStoppers = window.gameStoppers || [];
+window.gameStoppers.push(shapesHardReset);
+
 // ── SHOW / HIDE SHAPES MODE ───────────────────────────────────────────────────
 function showShapesMode() {
+  shapesAborted = false; // nueva sesión: habilitar de nuevo
   if (typeof loadGameSFX !== 'undefined') loadGameSFX();
   if (typeof playMusic   !== 'undefined') playMusic(null);
 
@@ -807,10 +847,12 @@ function showShapesMode() {
           timeupEl.style.display = 'flex';
           timeupEl.classList.remove('timeup-out');
           timeupEl.classList.add('timeup-in');
-          setTimeout(() => {
+          shapesEndTimeout1 = setTimeout(() => {
+            if (shapesAborted) return;
             timeupEl.classList.remove('timeup-in');
             timeupEl.classList.add('timeup-out');
-            setTimeout(() => {
+            shapesEndTimeout2 = setTimeout(() => {
+              if (shapesAborted) return;
               timeupEl.style.display = 'none';
               timeupEl.classList.remove('timeup-out');
               hideShapesMode();

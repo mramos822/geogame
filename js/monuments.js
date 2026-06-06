@@ -55,34 +55,43 @@
     planet.style.animation = `planet-spin 25s linear -${(randomDeg / 360) * 25}s infinite`;
   }
 
-  // Cada promesa representa un asset completamente cargado
-  const promises = [];
+  // Lista COMPLETA de assets: usa el manifest auto-generado (todos los archivos de
+  // images/ y sfx/). Si por algo falta, cae a la lista mínima embebida.
+  const M = window.ASSET_MANIFEST || {};
+  const imgList   = (M.images && M.images.length) ? M.images : IMAGES;
+  const audioList = (M.audio  && M.audio.length)  ? M.audio  : AUDIO;
+  const videoList = M.video || [];
 
-  IMAGES.forEach(src => {
-    promises.push(new Promise(resolve => {
+  // Mantener vivas las imágenes ya decodificadas para que el navegador no las
+  // descarte de memoria antes de usarlas en el juego (evita el "titileo").
+  window.__preloadedImages = window.__preloadedImages || [];
+
+  // Carga una imagen y la decodifica por completo (decode() evita el flash al
+  // pintarla por primera vez).
+  function loadImage(src) {
+    return new Promise(resolve => {
       const img = new Image();
-      img.onload = img.onerror = resolve;
+      const finish = () => { window.__preloadedImages.push(img); resolve(); };
+      img.onload = () => { (img.decode ? img.decode().then(finish, finish) : finish()); };
+      img.onerror = finish;
       img.src = src;
-    }));
-  });
+    });
+  }
 
-  // fetch garantiza descarga completa del archivo de audio
-  AUDIO.forEach(src => {
-    promises.push(
-      fetch(src).then(r => r.arrayBuffer()).catch(() => {})
-    );
-  });
+  // Ejecuta tareas con un límite de concurrencia para no saturar la red/decoder.
+  function runPool(items, worker, concurrency, onEach) {
+    let i = 0;
+    const next = () => {
+      if (i >= items.length) return Promise.resolve();
+      const item = items[i++];
+      return worker(item).then(() => { onEach(); return next(); });
+    };
+    const runners = [];
+    for (let k = 0; k < Math.min(concurrency, items.length); k++) runners.push(next());
+    return Promise.all(runners);
+  }
 
-  // Fuentes completamente renderizadas
-  promises.push(document.fonts.ready);
-
-  // Página y todos sus sub-recursos listos
-  promises.push(new Promise(resolve => {
-    if (document.readyState === 'complete') resolve();
-    else window.addEventListener('load', resolve, { once: true });
-  }));
-
-  const total = promises.length;
+  const total = imgList.length + audioList.length + videoList.length + 2; // +fonts +load
   let done = 0;
 
   function tick() {
@@ -122,7 +131,18 @@
     }
   }
 
-  promises.forEach(p => Promise.resolve(p).then(tick, tick));
+  // Imágenes: hasta 24 en paralelo, decodificadas. Audio/video: descarga completa.
+  runPool(imgList, loadImage, 24, tick);
+  runPool(audioList, src => fetch(src).then(r => r.arrayBuffer()).catch(() => {}), 8, tick);
+  runPool(videoList, src => fetch(src).then(r => r.blob()).catch(() => {}), 3, tick);
+
+  // Fuentes completamente renderizadas
+  Promise.resolve(document.fonts.ready).then(tick, tick);
+
+  // Página y todos sus sub-recursos listos
+  (document.readyState === 'complete')
+    ? tick()
+    : window.addEventListener('load', tick, { once: true });
 
 })();
 
@@ -163,13 +183,14 @@ window.refreshProfileStats = function () {
     const rankLabel = document.getElementById('loading-games-rank-label');
     if (rankLabel && rk) {
       rankLabel.textContent = rk.name;
-      // Achicar el texto poco a poco si se sale del ancho del rank.png
+      // Achicar el texto poco a poco si se sale del ancho del rank.png.
+      // Trabajamos en vmin para que el rango escale igual que el resto del menú.
       const maxWidth = (document.getElementById('loading-games-rank')?.offsetWidth || 240) * 1.15;
-      let size = 36;
-      rankLabel.style.fontSize = size + 'px';
-      while (rankLabel.scrollWidth > maxWidth && size > 14) {
-        size -= 1;
-        rankLabel.style.fontSize = size + 'px';
+      let size = 4; // vmin
+      rankLabel.style.fontSize = size + 'vmin';
+      while (rankLabel.scrollWidth > maxWidth && size > 1.6) {
+        size -= 0.1;
+        rankLabel.style.fontSize = size + 'vmin';
       }
     }
   }
@@ -293,6 +314,427 @@ document.getElementById('loading-profile-btn')?.addEventListener('click', () => 
   document.getElementById('loading-table-group')?.classList.remove('table-gone');
   document.getElementById('loading-screen').classList.add('table-shown');
 });
+
+document.getElementById('loading-social-btn')?.addEventListener('click', () => {
+  sfxCheck.currentTime = 0; sfxCheck.play();
+  document.getElementById('loading-social-group')?.classList.remove('table-gone');
+  document.getElementById('loading-screen').classList.add('table-shown');
+});
+
+document.getElementById('loading-social-back-wrap')?.addEventListener('click', () => {
+  sfxCheck.currentTime = 0; sfxCheck.play();
+  const wrap = document.getElementById('loading-social-back-wrap');
+  wrap.classList.add('confirm-pressed');
+  setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
+  document.getElementById('loading-social-group')?.classList.add('table-gone');
+  document.getElementById('loading-screen').classList.remove('table-shown');
+});
+
+// ── Lista de amigos del panel social ─────────────────────────────────────────
+const SOCIAL_AVATARS = [
+  'images/characters/men1.png', 'images/characters/girl1.png',
+  'images/characters/women1.png', 'images/characters/men2.png',
+  'images/characters/girl2.png', 'images/characters/women2.png',
+  'images/characters/men3.png', 'images/characters/girl3.png',
+];
+// rank: orden de conexión (0 = más "presente"). minsAgo: antigüedad para
+// desempatar a los desconectados (menor = visto hace menos tiempo).
+const SOCIAL_STATUSES = [
+  { cls: 'playing', text: 'Jugando',            rank: 0, minsAgo: 0 },
+  { cls: 'online',  text: 'En línea',           rank: 1, minsAgo: 0 },
+  { cls: 'offline', text: 'Última vez hace 2h', rank: 2, minsAgo: 120 },
+  { cls: 'offline', text: 'Última vez ayer',    rank: 2, minsAgo: 1440 },
+  { cls: 'online',  text: 'En línea',           rank: 1, minsAgo: 0 },
+  { cls: 'offline', text: 'Última vez hace 5h', rank: 2, minsAgo: 300 },
+];
+
+// Solicitudes de amistad pendientes (mock; reemplazar con datos del backend).
+let SOCIAL_REQUESTS = [
+  { name: 'Diego',  score: 4820 },
+  { name: 'Valentina', score: 19250 },
+  { name: 'Mateo',  score: 11340 },
+];
+
+let socialActiveTab = 'friends';
+let socialSort = localStorage.getItem('socialSort') || 'conn';
+
+function updateSocialTabCounts() {
+  const friendsTab  = document.getElementById('loading-social-tab-friends');
+  const requestsTab = document.getElementById('loading-social-tab-requests');
+  if (friendsTab)  friendsTab.textContent  = `Mis Amigos (${(typeof getFriends === 'function' ? getFriends() : []).length})`;
+  if (requestsTab) requestsTab.textContent = `Solicitudes (${SOCIAL_REQUESTS.length})`;
+}
+
+// Pinta la pestaña activa (amigos o solicitudes).
+function renderSocial(filter = '') {
+  if (socialActiveTab === 'requests') renderSocialRequests(filter);
+  else renderSocialFriends(filter);
+}
+
+function renderSocialRequests(filter = '') {
+  const list = document.getElementById('loading-social-list');
+  if (!list) return;
+  updateSocialTabCounts();
+  const reqs = SOCIAL_REQUESTS
+    .map((f, i) => ({ f, i }))
+    .filter(o => o.f.name.toLowerCase().includes(filter.toLowerCase()));
+  list.innerHTML = '';
+  reqs.forEach(({ f, i }) => {
+    const row = document.createElement('div');
+    row.className = 'loading-social-row loading-social-request';
+    row.innerHTML =
+      `<img class="loading-social-avatar" src="${SOCIAL_AVATARS[i % SOCIAL_AVATARS.length]}" alt="" draggable="false" oncontextmenu="return false">` +
+      `<div class="loading-social-info">` +
+        `<span class="loading-social-name">${f.name}</span>` +
+        `<span class="loading-social-status">Te envió una solicitud</span>` +
+      `</div>` +
+      `<div class="loading-social-req-actions">` +
+        `<button class="loading-social-req-btn accept" type="button" aria-label="Aceptar">✓</button>` +
+        `<button class="loading-social-req-btn reject" type="button" aria-label="Rechazar">✕</button>` +
+      `</div>`;
+    row.querySelector('.accept').addEventListener('click', () => respondRequest(f, true));
+    row.querySelector('.reject').addEventListener('click', () => respondRequest(f, false));
+    list.appendChild(row);
+  });
+}
+
+// Acepta (suma a amigos) o rechaza una solicitud y refresca la lista.
+function respondRequest(friend, accepted) {
+  sfxCheck.currentTime = 0; sfxCheck.play();
+  SOCIAL_REQUESTS = SOCIAL_REQUESTS.filter(r => r !== friend);
+  if (accepted && typeof getFriends === 'function') {
+    getFriends().push({ name: friend.name, score: friend.score });
+  }
+  updateSocialTabCounts();
+  renderSocial(document.getElementById('loading-social-search-input')?.value || '');
+}
+
+function renderSocialFriends(filter = '') {
+  const list = document.getElementById('loading-social-list');
+  if (!list) return;
+  updateSocialTabCounts();
+  const all = (typeof getFriends === 'function' ? getFriends() : []);
+  const sortFns = {
+    conn:        (a, b) => (a.st.rank - b.st.rank) || (a.st.minsAgo - b.st.minsAgo),
+    'score-desc':(a, b) => b.f.score - a.f.score,
+    'score-asc': (a, b) => a.f.score - b.f.score,
+    'name-asc':  (a, b) => a.f.name.localeCompare(b.f.name),
+    'name-desc': (a, b) => b.f.name.localeCompare(a.f.name),
+  };
+  const friends = all
+    .map((f, i) => ({ f, i, st: SOCIAL_STATUSES[i % SOCIAL_STATUSES.length] }))
+    .filter(o => o.f.name.toLowerCase().includes(filter.toLowerCase()))
+    .sort(sortFns[socialSort] || sortFns.conn);
+  list.innerHTML = '';
+  friends.forEach(({ f, i, st }) => {
+    const row = document.createElement('div');
+    row.className = 'loading-social-row status-' + st.cls;
+    row.innerHTML =
+      `<img class="loading-social-avatar" src="${SOCIAL_AVATARS[i % SOCIAL_AVATARS.length]}" alt="" draggable="false" oncontextmenu="return false">` +
+      `<div class="loading-social-info">` +
+        `<span class="loading-social-name">${f.name}</span>` +
+        `<span class="loading-social-status"><span class="dot ${st.cls}"></span>${st.text}</span>` +
+      `</div>` +
+      `<div class="loading-social-score">` +
+        `<img class="loading-social-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">` +
+        `<span class="loading-social-score-val">${f.score.toLocaleString()}</span>` +
+      `</div>` +
+      `<span class="loading-social-rankname">${(typeof getRank === 'function' ? getRank(f.score).name : '')}</span>` +
+      `<img class="loading-social-emote" src="${(typeof getRank === 'function' ? getRank(f.score).img : 'images/ranks/1.png')}" alt="" draggable="false" oncontextmenu="return false">`;
+    row.addEventListener('click', () => openFriendProfile(f, st, SOCIAL_AVATARS[i % SOCIAL_AVATARS.length]));
+    list.appendChild(row);
+  });
+}
+
+// Abre el table (copia del perfil) con los datos del amigo seleccionado.
+function openFriendProfile(friend, st, avatarSrc) {
+  sfxCheck.currentTime = 0; sfxCheck.play();
+  const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+
+  const pic = document.getElementById('loading-friend-pic');
+  if (pic) pic.src = avatarSrc;
+  setText('loading-friend-name', friend.name);
+
+  const statusEl = document.getElementById('loading-friend-status');
+  if (statusEl) {
+    statusEl.textContent = st.cls === 'offline' ? st.text.replace('Última vez', 'Última conexión') : st.text;
+    statusEl.className = 'loading-friend-status ' + st.cls;
+  }
+
+  const total = friend.score;
+  setText('loading-friend-total', total.toLocaleString());
+  // Veces jugadas estimadas a partir del puntaje (mock; reemplazar con dato real).
+  setText('loading-friend-play-count', `¡Ha jugado ${Math.max(1, Math.round(total / 1500))} veces!`);
+
+  // Repartimos el total entre los 4 modos para los highscores y derivamos el
+  // promedio (~62%). Cuando el backend traiga highscores por modo, usar esos.
+  const split = [0.30, 0.20, 0.28, 0.22];
+  split.forEach((p, k) => {
+    const hs = Math.round(total * p);
+    setText('loading-friend-avg' + (k + 1), hs.toLocaleString());          // columna Highscore
+    setText('loading-friend-hs'  + (k + 1), Math.round(hs * 0.62).toLocaleString()); // columna Promedio
+  });
+
+  const rk = (typeof getRank === 'function') ? getRank(total) : null;
+  const rankImg = document.getElementById('loading-friend-rank');
+  if (rankImg && rk) rankImg.src = rk.img;
+  const rankLabel = document.getElementById('loading-friend-rank-label');
+  if (rankLabel && rk) {
+    rankLabel.textContent = rk.name;
+    const maxWidth = (rankImg?.offsetWidth || 240) * 1.15;
+    let size = 4;
+    rankLabel.style.fontSize = size + 'vmin';
+    while (rankLabel.scrollWidth > maxWidth && size > 1.6) {
+      size -= 0.1;
+      rankLabel.style.fontSize = size + 'vmin';
+    }
+  }
+
+  document.getElementById('loading-friend-group')?.classList.remove('table-gone');
+}
+
+document.getElementById('loading-friend-back-wrap')?.addEventListener('click', () => {
+  sfxCheck.currentTime = 0; sfxCheck.play();
+  const wrap = document.getElementById('loading-friend-back-wrap');
+  wrap.classList.add('confirm-pressed');
+  setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
+  document.getElementById('loading-friend-group')?.classList.add('table-gone');
+});
+
+document.getElementById('loading-social-search-input')?.addEventListener('input', (e) => {
+  renderSocial(e.target.value);
+});
+
+const SOCIAL_SORTS = [
+  { value: 'conn',       label: 'Conexión'    },
+  { value: 'score-desc', label: 'Puntaje ↓'   },
+  { value: 'score-asc',  label: 'Puntaje ↑'   },
+  { value: 'name-asc',   label: 'Nombre A-Z'  },
+  { value: 'name-desc',  label: 'Nombre Z-A'  },
+];
+document.getElementById('loading-social-sort')?.addEventListener('click', () => {
+  // Clonamos el audio para que clicks rápidos no se corten entre sí
+  const s = sfxSelect.cloneNode();
+  s.volume = sfxSelect.volume;
+  s.play();
+  const idx = SOCIAL_SORTS.findIndex(s => s.value === socialSort);
+  const next = SOCIAL_SORTS[(idx + 1) % SOCIAL_SORTS.length];
+  socialSort = next.value;
+  localStorage.setItem('socialSort', socialSort);
+  const btn = document.getElementById('loading-social-sort');
+  if (btn) btn.textContent = next.label;
+  renderSocial(document.getElementById('loading-social-search-input')?.value || '');
+});
+
+// Restaura la etiqueta del botón con el orden guardado
+(() => {
+  const btn = document.getElementById('loading-social-sort');
+  const cur = SOCIAL_SORTS.find(s => s.value === socialSort);
+  if (btn && cur) btn.textContent = cur.label;
+})();
+
+document.getElementById('loading-social-tab-friends')?.addEventListener('click', () => {
+  sfxSelect.currentTime = 0; sfxSelect.play();
+  socialActiveTab = 'friends';
+  document.querySelectorAll('.loading-social-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('loading-social-tab-friends').classList.add('active');
+  renderSocial(document.getElementById('loading-social-search-input')?.value || '');
+});
+
+document.getElementById('loading-social-tab-requests')?.addEventListener('click', () => {
+  sfxSelect.currentTime = 0; sfxSelect.play();
+  socialActiveTab = 'requests';
+  document.querySelectorAll('.loading-social-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('loading-social-tab-requests').classList.add('active');
+  renderSocial(document.getElementById('loading-social-search-input')?.value || '');
+});
+
+// ── Panel Añadir Amigo ────────────────────────────────────────────────────────
+document.getElementById('loading-social-invite')?.addEventListener('click', () => {
+  sfxCheck.currentTime = 0; sfxCheck.play();
+  const input = document.getElementById('loading-addfriend-input');
+  const fb = document.getElementById('loading-addfriend-feedback');
+  if (input) input.value = '';
+  if (fb) fb.className = 'loading-addfriend-feedback';
+  document.getElementById('loading-addfriend-group')?.classList.remove('table-gone');
+  input?.focus();
+});
+
+function sendFriendRequest() {
+  const input = document.getElementById('loading-addfriend-input');
+  const fb = document.getElementById('loading-addfriend-feedback');
+  const name = (input?.value || '').trim();
+  if (!fb) return;
+  if (!name) {
+    fb.textContent = 'Escribe un nombre';
+    fb.className = 'loading-addfriend-feedback err show';
+    return;
+  }
+  const friends = (typeof getFriends === 'function' ? getFriends() : []);
+  const taken = friends.some(f => f.name.toLowerCase() === name.toLowerCase()) ||
+                SOCIAL_REQUESTS.some(r => r.name.toLowerCase() === name.toLowerCase());
+  if (taken) {
+    fb.textContent = 'Ya está en tu lista';
+    fb.className = 'loading-addfriend-feedback err show';
+    return;
+  }
+  sfxCheck.currentTime = 0; sfxCheck.play();
+  fb.textContent = `¡Solicitud enviada a ${name}!`;
+  fb.className = 'loading-addfriend-feedback ok show';
+  if (input) input.value = '';
+}
+
+document.getElementById('loading-addfriend-send')?.addEventListener('click', sendFriendRequest);
+document.getElementById('loading-addfriend-input')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); sendFriendRequest(); }
+});
+
+document.getElementById('loading-addfriend-back-wrap')?.addEventListener('click', () => {
+  sfxCheck.currentTime = 0; sfxCheck.play();
+  const wrap = document.getElementById('loading-addfriend-back-wrap');
+  wrap.classList.add('confirm-pressed');
+  setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
+  document.getElementById('loading-addfriend-group')?.classList.add('table-gone');
+});
+
+// Cada modo registra aquí cómo detener sus loops (timers/animaciones)
+window.gameStoppers = window.gameStoppers || [];
+window.gameStoppers.push(() => {
+  try { pregameAborted = true; clearTimeout(pregameTimeout); pregameTimeout = null; } catch (e) {}
+  try { gameAborted = true; clearTimeout(endGameTimeout1); clearTimeout(endGameTimeout2); } catch (e) {}
+  try { clearInterval(timerIntervalId); } catch (e) {}
+  try { if (animFrameId) cancelAnimationFrame(animFrameId); animFrameId = null; } catch (e) {}
+  try { if (typeof pregameCountdownEl !== 'undefined' && pregameCountdownEl) pregameCountdownEl.style.display = 'none'; } catch (e) {}
+  try { if (typeof timeupOverlay !== 'undefined' && timeupOverlay) { timeupOverlay.style.display = 'none'; timeupOverlay.classList.remove('timeup-in','timeup-out'); } } catch (e) {}
+});
+
+// Termina la partida en curso (cualquier modo) y vuelve al menú principal sin recargar.
+function quitToMenu() {
+  // Invalida cualquier callback diferido (nextCity, pines, badges, etc.) en vuelo
+  window.gameSession = (window.gameSession || 0) + 1;
+
+  // 1) Detener loops (timers/animaciones) de todos los modos
+  window.gameStoppers.forEach(fn => { try { fn(); } catch (e) {} });
+
+  // 2) Cortar TODO el audio del juego y poner la música del menú
+  [sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus,
+   sfxTickdown, sfxTimesUp, sfxGameMusic].forEach(s => {
+    try { if (s) { s.pause(); s.currentTime = 0; } } catch (e) {}
+  });
+  try { playMusic(sfxPostgame); } catch (e) {}
+
+  // 3) Resetear el estado de juego de monuments/cities
+  try { resetState(); } catch (e) {}
+
+  // 4) Limpiar diálogos, overlays, animaciones y movimiento ingame
+  const reset = (id, fn) => { const el = document.getElementById(id); if (el) fn(el); };
+  reset('city-tag',         el => { el.style.left = '-525px'; });
+  reset('result-label',     el => { el.textContent = ''; el.style.animation = ''; });
+  reset('coord-tooltip',    el => { el.style.display = 'none'; });
+  reset('monument-img',     el => { el.style.display = 'none'; });
+  reset('speed-bonus-text', el => el.classList.remove('visible'));
+  reset('flags-speed-bonus-text', el => el.classList.remove('visible'));
+  // Reconstruir la barra de amigos (no vaciarla: shapes/cities no la re-inicializan
+  // por partida, solo la reposicionan, así que vaciarla la dejaría vacía).
+  try { initLeaderboard(); } catch (e) {}
+  reset('pregame-countdown',       el => { el.style.display = 'none'; });
+  reset('flags-pregame-countdown', el => { el.style.display = 'none'; });
+  reset('timeup-overlay',       el => { el.style.display = 'none'; el.classList.remove('timeup-in','timeup-out'); });
+  reset('flags-timeup-overlay', el => { el.style.display = 'none'; el.classList.remove('timeup-in','timeup-out'); });
+  reset('flags-check-overlay',  el => { el.classList.remove('animate'); el.style.display = 'none'; el.style.opacity = ''; });
+  reset('flags-wrong-overlay',  el => { el.classList.remove('animate'); el.style.display = 'none'; el.style.opacity = ''; });
+  // Apagar los puntos del progreso y el "trencito" (todos los modos)
+  document.querySelectorAll('.dot').forEach(d => d.classList.remove('filled'));
+  ['progress-dots','flags-progress-dots'].forEach(id => {
+    document.getElementById(id)?.classList.remove('train-animation', 'dots-fade-out');
+  });
+  // Limpiar el canvas principal (puntos, pines, partículas, badges dibujados)
+  try { if (typeof ctx !== 'undefined' && ctx) ctx.clearRect(0, 0, canvas.width, canvas.height); } catch (e) {}
+
+  // 5) Resetear el estado de los diálogos del splash (pregame)
+  try { confirmStep = 0; } catch (e) {}
+  document.querySelector('.splash-howtoplay-wrap')?.classList.remove('slide-down');
+  const lbl = document.querySelector('.splash-text2-label');
+  if (lbl) { lbl.classList.remove('step2'); lbl.textContent = ''; }
+  document.querySelectorAll('#splash-screen .flightatt-splash, .splash-text2-wrap')
+    .forEach(el => el.classList.remove('animate-in'));
+
+  // 6) Cortar música/animaciones de campaña
+  if (window.campaign) window.campaign.active = false;
+
+  // 7) Ocultar todas las pantallas de juego/resultados y el HUD
+  ['game-wrapper','flags-wrapper','splash-screen','gameover-screen','results-screen',
+   'final-screen','score-display','right-panel','flags-score-display',
+   'flags-right-panel','new-highscore-banner'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+
+  // 8) Mostrar el menú principal limpio
+  const ls = document.getElementById('loading-screen');
+  if (ls) { ls.style.display = ''; ls.classList.remove('table-shown'); }
+  ['loading-table-group','loading-social-group','loading-friend-group','loading-addfriend-group']
+    .forEach(id => document.getElementById(id)?.classList.add('table-gone'));
+  if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
+  if (typeof window.refreshIngamePower === 'function') window.refreshIngamePower();
+}
+window.quitToMenu = quitToMenu;
+
+// ── Power.png ingame (fijo arriba al centro, como el botón de silencio) ────────
+// Visible solo en pre/in/postgame; oculto en loading, results y final.
+(() => {
+  const powerEl = document.getElementById('ingame-power');
+  if (!powerEl) return;
+  const isVisible = id => {
+    const el = document.getElementById(id);
+    return el && getComputedStyle(el).display !== 'none';
+  };
+  const refreshIngamePower = () => {
+    const blocked = isVisible('loading-screen') || isVisible('results-screen') || isVisible('final-screen');
+    const prepost = isVisible('splash-screen') || isVisible('gameover-screen');
+    // score-display / flags-score-display están visibles durante el juego de
+    // cualquier modo (shapes agrega sus piezas al body, no usa game-wrapper).
+    const ingame  = prepost || isVisible('game-wrapper') || isVisible('flags-wrapper') ||
+                    isVisible('score-display') || isVisible('flags-score-display');
+    powerEl.style.display = (ingame && !blocked) ? 'block' : 'none';
+    // En pre/postgame va un poco más a la derecha que durante el juego
+    powerEl.style.left = prepost ? '82%' : '74%';
+  };
+  window.refreshIngamePower = refreshIngamePower;
+
+  // Click en power: abre la pestañita de confirmación (el juego sigue corriendo)
+  const quitPopup = document.getElementById('ingame-quit-popup');
+  powerEl.addEventListener('click', () => {
+    const a = new Audio('sfx/select.mp3'); a.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; a.play();
+    if (quitPopup) quitPopup.style.display = 'flex';
+    document.body.classList.add('quit-open');
+  });
+  document.getElementById('ingame-quit-cancel')?.addEventListener('click', () => {
+    const a = new Audio('sfx/select.mp3'); a.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; a.play();
+    if (quitPopup) quitPopup.style.display = 'none';
+    document.body.classList.remove('quit-open');
+  });
+  document.getElementById('ingame-quit-confirm')?.addEventListener('click', () => {
+    const a = new Audio('sfx/check.mp3'); a.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; a.play();
+    if (quitPopup) quitPopup.style.display = 'none';
+    document.body.classList.remove('quit-open');
+    quitToMenu();
+  });
+  // Reacciona a cualquier cambio de display (las pantallas se togglean por estilo inline)
+  const obs = new MutationObserver(refreshIngamePower);
+  ['loading-screen','splash-screen','game-wrapper','flags-wrapper',
+   'gameover-screen','results-screen','final-screen','score-display',
+   'flags-score-display'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) obs.observe(el, { attributes: true, attributeFilter: ['style'] });
+  });
+  refreshIngamePower();
+})();
+
+// ranks.js se carga después de este archivo; esperamos a que todo esté listo
+// para que getRank() exista al pintar los rangos de cada amigo.
+window.addEventListener('load', () => renderSocial());
+if (typeof onFriendsUpdate === 'function') onFriendsUpdate(() => renderSocial());
 
 let sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus, sfxTickdown, sfxTimesUp;
 
@@ -444,6 +886,7 @@ let state          = null;
 let animFrameId    = null;
 let timerIntervalId = null;
 let speedBonusHideId = null;
+let gameAborted = false;
 
 let highscore = parseInt(localStorage.getItem('geochallenge_highscore') || '0', 10);
 let monumentsHighscore = parseInt(localStorage.getItem('monumentsHighscore') || '0', 10);
@@ -971,6 +1414,8 @@ function spawnStars(cx, cy) {
 
 // ── NEXT CITY ─────────────────────────────────────────────────────────────────
 function nextCity() {
+  // Si se abandonó la partida (volvió al menú), no reactivar nada
+  if (!state || document.getElementById('loading-screen')?.style.display !== 'none') return;
   if (window.pendingGameMode === 'monuments') {
     if (document.body.classList.contains('recording-mode')) {
       state.currentCity = MONUMENTS.find(m => m.name === 'Coliseo Romano') || MONUMENTS_EASY[0];
@@ -1492,7 +1937,9 @@ function startTimer() {
   }, 1000);
 }
 
+let endGameTimeout1 = null, endGameTimeout2 = null;
 function endGame() {
+  gameAborted = false;
   clearInterval(timerIntervalId);
   if (slideMonumentIn._nameTimer) { clearTimeout(slideMonumentIn._nameTimer); slideMonumentIn._nameTimer = null; }
   monumentNameEl.style.opacity = '0';
@@ -1506,11 +1953,13 @@ function endGame() {
   timeupOverlay.classList.remove('timeup-out');
   timeupOverlay.classList.add('timeup-in');
 
-  setTimeout(() => {
+  endGameTimeout1 = setTimeout(() => {
+    if (gameAborted) return;
     timeupOverlay.classList.remove('timeup-in');
     timeupOverlay.classList.add('timeup-out');
 
-    setTimeout(() => {
+    endGameTimeout2 = setTimeout(() => {
+      if (gameAborted) return;
       timeupOverlay.style.display = 'none';
       timeupOverlay.classList.remove('timeup-out');
 
@@ -1600,6 +2049,18 @@ function showScorePopup(amount) {
 
 window.addEventListener('resize', redimensionarJuego);
 
+// Reposicionar la barra de amigos al hacer zoom/redimensionar (los top se calculan
+// en px desde el alto real, así que hay que recalcularlos para que la separación
+// no cambie).
+window.addEventListener('resize', () => {
+  const rp = document.getElementById('right-panel');
+  if (!rp || getComputedStyle(rp).display === 'none') return;
+  positionLeaderboard(lastLbScore >= 0 ? lastLbScore : 0, false);
+  requestAnimationFrame(() => {
+    Object.values(lbElements).forEach(el => { el.style.transition = 'top 0.7s cubic-bezier(0.22,1,0.36,1)'; });
+  });
+});
+
 
 // ── PREGAME COUNTDOWN ─────────────────────────────────────────────────────────
 const pregameCountdownEl    = document.getElementById('pregame-countdown');
@@ -1611,13 +2072,17 @@ const PREGAME_STEPS = [
   { src: 'images/countdown/go.png', hold: 950, size: 490 },
 ];
 
+let pregameTimeout = null;
+let pregameAborted = false;
 function runPregameCountdown(onDone) {
+  pregameAborted = false;
   pregameCountdownEl.style.display = 'flex';
   sfxCountdown.currentTime = 0;
   sfxCountdown.play();
   let step = 0;
 
   function showStep() {
+    if (pregameAborted) return; // se abandonó durante el 3-2-1
     if (step >= PREGAME_STEPS.length) {
       pregameCountdownEl.style.display = 'none';
       onDone();
@@ -1630,7 +2095,7 @@ function runPregameCountdown(onDone) {
     pregameCountdownImg.src = src;
     void pregameCountdownImg.offsetWidth;
     pregameCountdownImg.style.animation = '';
-    setTimeout(showStep, hold);
+    pregameTimeout = setTimeout(showStep, hold);
   }
 
   showStep();
@@ -1797,6 +2262,9 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
   document.getElementById('loading-screen').style.display = '';
   document.getElementById('loading-screen').classList.remove('table-shown');
   document.getElementById('loading-table-group')?.classList.add('table-gone');
+  document.getElementById('loading-social-group')?.classList.add('table-gone');
+  document.getElementById('loading-friend-group')?.classList.add('table-gone');
+  document.getElementById('loading-addfriend-group')?.classList.add('table-gone');
 
   const fmt = v => v > 0 ? '🏆 ' + v.toLocaleString() : '';
   const elPlay   = document.getElementById('loading-play-hs');

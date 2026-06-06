@@ -994,12 +994,17 @@ function hideFlagsMode() {
 }
 
 // ── PREGAME COUNTDOWN ─────────────────────────────────────────────────────────
+let flagsPregameTimeout = null;
+let flagsAborted = false;
+
 function runFlagsPregame(onDone) {
+  flagsAborted = false;
   flagsPregameEl.style.display = 'flex';
   if (typeof sfxCountdown !== 'undefined') { sfxCountdown.currentTime = 0; sfxCountdown.play(); }
   let step = 0;
 
   function showStep() {
+    if (flagsAborted) return; // se abandonó la partida durante el 3-2-1
     if (step >= FLAGS_PREGAME_STEPS.length) {
       flagsPregameEl.style.display = 'none';
       onDone();
@@ -1012,11 +1017,50 @@ function runFlagsPregame(onDone) {
     flagsPregameImg.src = src;
     void flagsPregameImg.offsetWidth;
     flagsPregameImg.style.animation = '';
-    setTimeout(showStep, hold);
+    flagsPregameTimeout = setTimeout(showStep, hold);
   }
 
   showStep();
 }
+
+// Detiene y resetea TODO el modo banderas (sin scoring ni gameover). Lo usa quitToMenu.
+function flagsHardReset() {
+  flagsAborted = true;
+  flagsRunning = false;
+  flagsDots = 0;
+  clearTimeout(flagsEndTimeout1); clearTimeout(flagsEndTimeout2);
+  if (flagsProgressDots) flagsProgressDots.forEach(d => d.classList.remove('filled'));
+  if (flagsProgressContainer) flagsProgressContainer.classList.remove('train-animation', 'dots-fade-out');
+  clearTimeout(flagsPregameTimeout); flagsPregameTimeout = null;
+  clearInterval(flagsTimerIntervalId);
+  if (flagsScoreRafId) { cancelAnimationFrame(flagsScoreRafId); flagsScoreRafId = null; }
+  clearTimeout(flagsSpeedBonusHideId);
+  try { clearFlagsElimination(); } catch (e) {}
+  if (typeof sfxCountdown !== 'undefined') { try { sfxCountdown.pause(); sfxCountdown.currentTime = 0; } catch (e) {} }
+  // Ocultar/parar máquina, equipaje, banderas, overlays y countdown
+  [flagsMachine, flagsMachine2, flagsMachine3, flagsMachine3b].forEach(m => {
+    if (!m) return;
+    m.style.display = 'none';
+    m.style.animationPlayState = '';
+    m.classList.remove('scrolling');
+  });
+  flagsFindLuggage.style.display = 'none';
+  flagsFindLuggage.classList.remove('scrolling');
+  flagsLuggageWrap.style.display = 'none';
+  flagsLuggageWrap.classList.remove('flags-six-mode');
+  flagsFlagImg.style.display = 'none'; flagsFlagImg.src = '';
+  flagsFlagidWrap.style.display = 'none';
+  flagsPregameEl.style.display = 'none';
+  flagsTimeupEl.style.display = 'none';
+  flagsSpeedBonusText.classList.remove('visible');
+  ['flags-check-overlay','flags-wrong-overlay'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.classList.remove('animate'); el.style.display = 'none'; el.style.opacity = ''; }
+  });
+  flagsBottomGroupIds.forEach(id => { const g = document.getElementById(id); if (g) g.style.display = 'none'; });
+}
+window.gameStoppers = window.gameStoppers || [];
+window.gameStoppers.push(flagsHardReset);
 
 // ── TIMER ─────────────────────────────────────────────────────────────────────
 function startFlagsTimer() {
@@ -1050,17 +1094,20 @@ function startFlagsTimer() {
 }
 
 // ── GAME OVER ─────────────────────────────────────────────────────────────────
+let flagsEndTimeout1 = null, flagsEndTimeout2 = null;
 function endFlagsGame() {
+  flagsAborted = false;
   flagsTimerImg.style.animationPlayState = 'paused';
   if (typeof playMusic !== 'undefined') playMusic(null);
   flagsTimeupEl.classList.remove('timeup-out');
   flagsTimeupEl.classList.add('timeup-in');
   flagsTimeupEl.style.display = 'flex';
 
-  setTimeout(() => {
+  flagsEndTimeout1 = setTimeout(() => {
+    if (flagsAborted) return;
     flagsTimeupEl.classList.remove('timeup-in');
     flagsTimeupEl.classList.add('timeup-out');
-    setTimeout(() => hideFlagsMode(), 400);
+    flagsEndTimeout2 = setTimeout(() => { if (!flagsAborted) hideFlagsMode(); }, 400);
   }, 1800);
 }
 
@@ -1103,3 +1150,13 @@ document.getElementById('loading-flags-btn').addEventListener('mouseenter', () =
   if (typeof sfxSelect !== 'undefined') { sfxSelect.currentTime = 0; sfxSelect.play(); }
 });
 
+
+// Reposicionar la barra de amigos de banderas al hacer zoom/redimensionar
+window.addEventListener('resize', () => {
+  const rp = document.getElementById('flags-right-panel');
+  if (!rp || getComputedStyle(rp).display === 'none') return;
+  flagsPositionLeaderboard(flagsLastLbScore >= 0 ? flagsLastLbScore : 0, false);
+  requestAnimationFrame(() => {
+    Object.values(flagsLbElements).forEach(el => { el.style.transition = 'top 0.7s cubic-bezier(0.22,1,0.36,1)'; });
+  });
+});

@@ -34,16 +34,16 @@
     <div class="loading-clouds-fade loading-clouds-fade2"></div>
     <div class="loading-clouds-fade loading-clouds-fade3"></div>
     <img class="flightatt-loading" data-frame="1" src="images/characters/flightattpost2/1.png" alt="">
-    <img class="flightatt-loading" data-frame="2" src="images/characters/flightattpost2/2.png" alt="" loading="lazy">
-    <img class="flightatt-loading" data-frame="3" src="images/characters/flightattpost2/3.png" alt="" loading="lazy">
-    <img class="flightatt-loading" data-frame="4" src="images/characters/flightattpost2/4.png" alt="" loading="lazy">
-    <img class="flightatt-loading" data-frame="5" src="images/characters/flightattpost2/5.png" alt="" loading="lazy">
-    <img class="flightatt-loading" data-frame="6" src="images/characters/flightattpost2/6.png" alt="" loading="lazy">
-    <img class="flightatt-loading" data-frame="7" src="images/characters/flightattpost2/7.png" alt="" loading="lazy">
-    <img class="flightatt-loading" data-frame="8" src="images/characters/flightattpost2/8.png" alt="" loading="lazy">
-    <img class="flightatt-loading" data-frame="9" src="images/characters/flightattpost2/9.png" alt="" loading="lazy">
-    <img class="flightatt-loading" data-frame="10" src="images/characters/flightattpost2/10.png" alt="" loading="lazy">
-    <img class="flightatt-loading" data-frame="11" src="images/characters/flightattpost2/11.png" alt="" loading="lazy">
+    <img class="flightatt-loading" data-frame="2" src="images/characters/flightattpost2/2.png" alt="">
+    <img class="flightatt-loading" data-frame="3" src="images/characters/flightattpost2/3.png" alt="">
+    <img class="flightatt-loading" data-frame="4" src="images/characters/flightattpost2/4.png" alt="">
+    <img class="flightatt-loading" data-frame="5" src="images/characters/flightattpost2/5.png" alt="">
+    <img class="flightatt-loading" data-frame="6" src="images/characters/flightattpost2/6.png" alt="">
+    <img class="flightatt-loading" data-frame="7" src="images/characters/flightattpost2/7.png" alt="">
+    <img class="flightatt-loading" data-frame="8" src="images/characters/flightattpost2/8.png" alt="">
+    <img class="flightatt-loading" data-frame="9" src="images/characters/flightattpost2/9.png" alt="">
+    <img class="flightatt-loading" data-frame="10" src="images/characters/flightattpost2/10.png" alt="">
+    <img class="flightatt-loading" data-frame="11" src="images/characters/flightattpost2/11.png" alt="">
     <div class="flightatt-loading-shadow"></div>
     <div class="loading-btn-row" style="display:none">
       <div class="loading-btn-wrap" style="display:none" id="loading-shapes-wrap">
@@ -153,6 +153,7 @@
         <div class="loading-games-mark-wrap">
           <img class="loading-games-mark" src="images/mark1.png" alt="" draggable="false" oncontextmenu="return false">
           <span class="loading-games-hs loading-games-hs1" id="loading-games-avg1">0</span>
+          <span class="loading-games-crown">👑</span>
         </div>
       </div>
       <div class="loading-games-row">
@@ -160,6 +161,7 @@
         <div class="loading-games-mark-wrap">
           <img class="loading-games-mark" src="images/mark2.png" alt="" draggable="false" oncontextmenu="return false">
           <span class="loading-games-hs loading-games-hs2" id="loading-games-avg2">0</span>
+          <span class="loading-games-crown">👑</span>
         </div>
       </div>
       <div class="loading-games-row">
@@ -167,6 +169,7 @@
         <div class="loading-games-mark-wrap">
           <img class="loading-games-mark" src="images/mark3.png" alt="" draggable="false" oncontextmenu="return false">
           <span class="loading-games-hs loading-games-hs3" id="loading-games-avg3">0</span>
+          <span class="loading-games-crown">👑</span>
         </div>
       </div>
       <div class="loading-games-row">
@@ -174,6 +177,7 @@
         <div class="loading-games-mark-wrap">
           <img class="loading-games-mark" src="images/mark4.png" alt="" draggable="false" oncontextmenu="return false">
           <span class="loading-games-hs loading-games-hs4" id="loading-games-avg4">0</span>
+          <span class="loading-games-crown">👑</span>
         </div>
       </div>
     </div>
@@ -183,13 +187,150 @@
     <img class="loading-games-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">
     <span class="loading-games-total" id="loading-games-total">0</span>
     </div>
+    <div id="loading-social-group" class="table-gone">
+      <img class="loading-howtotable" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
+      <img class="loading-social-logo" src="images/logo.png" alt="City Blitz" draggable="false" oncontextmenu="return false">
+      <div class="loading-social-titlebar">
+        <img class="loading-social-planet" src="images/planet2.png" alt="" draggable="false" oncontextmenu="return false">
+        <span class="loading-social-title">Panel de Amigos</span>
+        <img class="loading-social-planet" src="images/planet2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+      <div class="loading-social-search">
+        <svg class="loading-social-search-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="10.5" cy="10.5" r="6.5" stroke="#8b6a00" stroke-width="2.4"/>
+          <line x1="15.6" y1="15.6" x2="21" y2="21" stroke="#8b6a00" stroke-width="2.8" stroke-linecap="round"/>
+        </svg>
+        <input class="loading-social-search-input" id="loading-social-search-input" type="text" placeholder="Buscar Amigos..." maxlength="12" autocomplete="off" spellcheck="false">
+      </div>
+      <button class="loading-social-sort" id="loading-social-sort" type="button" title="Ordenar">Conexión</button>
+      <div class="loading-social-panel">
+        <div class="loading-social-tabs">
+          <button class="loading-social-tab active" id="loading-social-tab-friends" type="button">Mis Amigos</button>
+          <button class="loading-social-tab" id="loading-social-tab-requests" type="button">Solicitudes (3)</button>
+        </div>
+        <div class="loading-social-list" id="loading-social-list"></div>
+        <div class="loading-social-footer">
+          <button class="loading-social-action" id="loading-social-invite" type="button">Añadir Amigo</button>
+        </div>
+      </div>
+      <div class="loading-social-back-wrap" id="loading-social-back-wrap">
+        <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+        <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+    </div>
+    <div id="loading-friend-group" class="table-gone">
+    <img class="loading-howtotable" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
+    <img class="loading-profile-pic" id="loading-friend-pic" src="images/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
+    <span class="loading-friend-status" id="loading-friend-status"></span>
+    <div class="loading-name-wrap">
+      <span class="loading-player-name" id="loading-friend-name"></span>
+    </div>
+    <div class="loading-play-confirm-wrap" id="loading-friend-back-wrap">
+      <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+      <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+    </div>
+    <span class="loading-play-count" id="loading-friend-play-count"></span>
+    <div class="loading-games-col">
+      <span class="loading-games-title">Promedio</span>
+      <div class="loading-games-row">
+        <img class="loading-games-game" src="images/game1.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark1.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs1" id="loading-friend-hs1">0</span>
+        </div>
+      </div>
+      <div class="loading-games-row">
+        <img class="loading-games-game" src="images/game2.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark2.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs2" id="loading-friend-hs2">0</span>
+        </div>
+      </div>
+      <div class="loading-games-row">
+        <img class="loading-games-game" src="images/game3.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark3.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs3" id="loading-friend-hs3">0</span>
+        </div>
+      </div>
+      <div class="loading-games-row">
+        <img class="loading-games-game" src="images/game4.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark4.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs4" id="loading-friend-hs4">0</span>
+        </div>
+      </div>
+    </div>
+    <div class="loading-games-col loading-games-col2">
+      <span class="loading-games-title">Highscore</span>
+      <div class="loading-games-row">
+        <img class="loading-games-game loading-games-spacer" src="images/game1.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark1.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs1" id="loading-friend-avg1">0</span>
+          <span class="loading-games-crown">👑</span>
+        </div>
+      </div>
+      <div class="loading-games-row">
+        <img class="loading-games-game loading-games-spacer" src="images/game2.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark2.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs2" id="loading-friend-avg2">0</span>
+          <span class="loading-games-crown">👑</span>
+        </div>
+      </div>
+      <div class="loading-games-row">
+        <img class="loading-games-game loading-games-spacer" src="images/game3.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark3.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs3" id="loading-friend-avg3">0</span>
+          <span class="loading-games-crown">👑</span>
+        </div>
+      </div>
+      <div class="loading-games-row">
+        <img class="loading-games-game loading-games-spacer" src="images/game4.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark4.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs4" id="loading-friend-avg4">0</span>
+          <span class="loading-games-crown">👑</span>
+        </div>
+      </div>
+    </div>
+    <img class="loading-games-rank" id="loading-friend-rank" src="images/ranks/1.png" alt="" draggable="false" oncontextmenu="return false">
+    <span class="loading-games-rank-label" id="loading-friend-rank-label"></span>
+    <span class="loading-games-hs-label">Highscore</span>
+    <img class="loading-games-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">
+    <span class="loading-games-total" id="loading-friend-total">0</span>
+    </div>
+    <div id="loading-addfriend-group" class="table-gone">
+      <img class="loading-howtotable" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
+      <div class="loading-addfriend-titlebar">
+        <img class="loading-social-planet" src="images/planet2.png" alt="" draggable="false" oncontextmenu="return false">
+        <span class="loading-social-title">Añadir Amigo</span>
+        <img class="loading-social-planet" src="images/planet2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+      <span class="loading-addfriend-label">Escribe el nombre de usuario</span>
+      <div class="loading-addfriend-search">
+        <svg class="loading-social-search-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="10.5" cy="10.5" r="6.5" stroke="#8b6a00" stroke-width="2.4"/>
+          <line x1="15.6" y1="15.6" x2="21" y2="21" stroke="#8b6a00" stroke-width="2.8" stroke-linecap="round"/>
+        </svg>
+        <input class="loading-social-search-input" id="loading-addfriend-input" type="text" placeholder="Nombre de usuario..." maxlength="12" autocomplete="off" spellcheck="false">
+      </div>
+      <button class="loading-social-action loading-addfriend-send" id="loading-addfriend-send" type="button">Enviar Solicitud</button>
+      <span class="loading-addfriend-feedback" id="loading-addfriend-feedback"></span>
+      <div class="loading-social-back-wrap" id="loading-addfriend-back-wrap">
+        <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+        <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+    </div>
   </div>
 
   <div id="splash-screen" class="game-bg-screen" style="display:none">
-    <img class="game-bg-table" src="images/checkerrortable.png" alt="" loading="lazy">
-    <img class="game-bg-check3" src="images/check3.png" alt="" loading="lazy">
+    <img class="game-bg-table" src="images/checkerrortable.png" alt="">
+    <img class="game-bg-check3" src="images/check3.png" alt="">
     <span class="grade-count-total"><span class="grade-count-x">x</span><span id="splash-count-total">0</span></span>
-    <img class="game-bg-wrong3" src="images/wrong3.png" alt="" loading="lazy">
+    <img class="game-bg-wrong3" src="images/wrong3.png" alt="">
     <span class="wrong-count-total"><span class="wrong-count-x">x</span><span id="splash-wrong-total">0</span></span>
     <img class="flightatt-splash" data-frame="1" src="images/characters/flightattpost2/1.png" alt="">
     <img class="flightatt-splash" data-frame="2" src="images/characters/flightattpost2/2.png" alt="">
@@ -240,7 +381,7 @@
     </div>
 <div class="splash-confirm-wrap">
       <img class="splash-confirm1" src="images/confirm1.png" alt="">
-      <img class="splash-confirm2" src="images/confirm2.png" alt="" loading="lazy">
+      <img class="splash-confirm2" src="images/confirm2.png" alt="">
     </div><button id="btn-start" style="display:none">Jugar</button>
 <div class="splash-text2-wrap">
       <img class="splash-text2" src="images/text2.png" alt="">
@@ -249,54 +390,55 @@
   </div>
 
   <div id="gameover-screen" class="game-bg-screen">
-    <img class="game-bg-table" src="images/checkerrortable.png" alt="" loading="lazy">
-    <img class="game-bg-check3" src="images/check3.png" alt="" loading="lazy">
+    <img class="game-bg-table" src="images/checkerrortable.png" alt="">
+    <img class="game-bg-check3" src="images/check3.png" alt="">
     <span class="grade-count-total"><span class="grade-count-x">x</span><span id="gameover-count-total">0</span></span>
     <div id="gameover-checks-row" class="checks-row"></div>
-    <img class="game-bg-wrong3" src="images/wrong3.png" alt="" loading="lazy">
+    <img class="game-bg-wrong3" src="images/wrong3.png" alt="">
     <span class="wrong-count-total"><span class="wrong-count-x">x</span><span id="gameover-wrong-total">0</span></span>
     <div id="gameover-wrongs-row" class="wrongs-row"></div>
-    <img class="flightatt" src="images/characters/flightattpost/1.png" alt="" loading="lazy">
-    <img class="flightatt" src="images/characters/flightattpost/2.png" alt="" loading="lazy">
-    <img class="flightatt" src="images/characters/flightattpost/3.png" alt="" loading="lazy">
-    <img class="flightatt" src="images/characters/flightattpost/4.png" alt="" loading="lazy">
-    <img class="flightatt" src="images/characters/flightattpost/5.png" alt="" loading="lazy">
-    <img class="flightatt" src="images/characters/flightattpost/6.png" alt="" loading="lazy">
-    <img class="flightatt" src="images/characters/flightattpost/7.png" alt="" loading="lazy">
-    <img class="flightatt" src="images/characters/flightattpost/8.png" alt="" loading="lazy">
-    <img class="flightatt" src="images/characters/flightattpost/9.png" alt="" loading="lazy">
-    <img class="flightatt" src="images/characters/flightattpost/10.png" alt="" loading="lazy">
-    <img class="flightatt" src="images/characters/flightattpost/11.png" alt="" loading="lazy">
-    <img class="flightatt" src="images/characters/flightattpost/12.png" alt="" loading="lazy">
-    <img class="flightatt" src="images/characters/flightattpost/13.png" alt="" loading="lazy">
-    <img class="flightatt" src="images/characters/flightattpost/14.png" alt="" loading="lazy">
-    <img class="flightatt" src="images/characters/flightattpost/15.png" alt="" loading="lazy">
-    <img class="game-bg-sky" src="images/bg/sky.png" alt="" loading="lazy">
-    <img class="game-bg-plane7" src="images/bg/plane7.png" alt="" loading="lazy">
-    <img class="game-bg-cloud game-bg-cloud1" src="images/bg/cloud1.png" alt="" loading="lazy">
-    <img class="game-bg-cloud game-bg-cloud2" src="images/bg/cloud2.png" alt="" loading="lazy">
-    <img class="game-bg-clouds-monuments" src="images/clouds.png" alt="" loading="lazy">
-    <img class="game-bg-clouds-monuments game-bg-clouds-monuments2" src="images/clouds.png" alt="" loading="lazy">
-    <img class="game-bg-clouds-monuments game-bg-clouds-monuments3" src="images/clouds.png" alt="" loading="lazy">
-    <img class="game-bg-city" src="images/bg/level3complete.png" alt="" loading="lazy">
-    <img class="game-bg-city game-bg-city-flags" src="images/bg/level1complete.png" alt="" loading="lazy">
-    <img class="game-bg-city game-bg-city-monuments" src="images/bg/level4complete.png" alt="" loading="lazy">
-    <img class="game-bg-city game-bg-city-monuments2" src="images/bg/level4complete2.png" alt="" loading="lazy">
-    <img class="game-bg-bus" src="images/bg/bus.png" alt="" loading="lazy">
-    <img class="game-bg-people" src="images/characters/people.png" alt="" loading="lazy">
-    <img class="game-bg-men game-bg-men2" src="images/characters/men2.png" alt="" loading="lazy">
-    <img class="game-bg-men game-bg-men1" src="images/characters/men1.png" alt="" loading="lazy">
-    <img class="game-bg-women game-bg-women2" src="images/characters/women1.png" alt="" loading="lazy">
-    <img class="game-bg-women game-bg-women1" src="images/characters/women1.png" alt="" loading="lazy">
-    <img class="game-bg-girl game-bg-girl2" src="images/characters/girl2.png" alt="" loading="lazy">
-    <img class="game-bg-girl game-bg-girl1" src="images/characters/girl1.png" alt="" loading="lazy">
-    <img class="game-bg-plane game-bg-plane1" src="images/bg/plane.png" alt="" loading="lazy">
-    <img class="game-bg-plane game-bg-plane2" src="images/bg/plane2.png" alt="" loading="lazy">
-    <img class="game-bg-plane game-bg-plane3" src="images/bg/plane3.png" alt="" loading="lazy">
-    <img class="game-bg-plane game-bg-plane4" src="images/bg/plane4.png" alt="" loading="lazy">
-    <img class="game-bg-plane game-bg-plane5" src="images/bg/plane5.png" alt="" loading="lazy">
-    <img class="game-bg-plane game-bg-plane6" src="images/bg/plane6.png" alt="" loading="lazy">
-    <img class="game-bg-stairs" src="images/bg/stairs.png" alt="" loading="lazy">
+    <img class="flightatt" src="images/characters/flightattpost/1.png" alt="">
+    <img class="flightatt" src="images/characters/flightattpost/2.png" alt="">
+    <img class="flightatt" src="images/characters/flightattpost/3.png" alt="">
+    <img class="flightatt" src="images/characters/flightattpost/4.png" alt="">
+    <img class="flightatt" src="images/characters/flightattpost/5.png" alt="">
+    <img class="flightatt" src="images/characters/flightattpost/6.png" alt="">
+    <img class="flightatt" src="images/characters/flightattpost/7.png" alt="">
+    <img class="flightatt" src="images/characters/flightattpost/8.png" alt="">
+    <img class="flightatt" src="images/characters/flightattpost/9.png" alt="">
+    <img class="flightatt" src="images/characters/flightattpost/10.png" alt="">
+    <img class="flightatt" src="images/characters/flightattpost/11.png" alt="">
+    <img class="flightatt" src="images/characters/flightattpost/12.png" alt="">
+    <img class="flightatt" src="images/characters/flightattpost/13.png" alt="">
+    <img class="flightatt" src="images/characters/flightattpost/14.png" alt="">
+    <img class="flightatt" src="images/characters/flightattpost/15.png" alt="">
+    <img class="game-bg-sky" src="images/bg/sky.png" alt="">
+    <img class="game-bg-sky game-bg-sky-monuments" src="images/bg/sky2.png" alt="">
+    <img class="game-bg-plane7" src="images/bg/plane7.png" alt="">
+    <img class="game-bg-cloud game-bg-cloud1" src="images/bg/cloud1.png" alt="">
+    <img class="game-bg-cloud game-bg-cloud2" src="images/bg/cloud2.png" alt="">
+    <img class="game-bg-clouds-monuments" src="images/clouds.png" alt="">
+    <img class="game-bg-clouds-monuments game-bg-clouds-monuments2" src="images/clouds.png" alt="">
+    <img class="game-bg-clouds-monuments game-bg-clouds-monuments3" src="images/clouds.png" alt="">
+    <img class="game-bg-city" src="images/bg/level3complete.png" alt="">
+    <img class="game-bg-city game-bg-city-flags" src="images/bg/level1complete.png" alt="">
+    <img class="game-bg-city game-bg-city-monuments" src="images/bg/level4complete.png" alt="">
+    <img class="game-bg-city game-bg-city-monuments2" src="images/bg/level4complete2.png" alt="">
+    <img class="game-bg-bus" src="images/bg/bus.png" alt="">
+    <img class="game-bg-people" src="images/characters/people.png" alt="">
+    <img class="game-bg-men game-bg-men2" src="images/characters/men2.png" alt="">
+    <img class="game-bg-men game-bg-men1" src="images/characters/men1.png" alt="">
+    <img class="game-bg-women game-bg-women2" src="images/characters/women1.png" alt="">
+    <img class="game-bg-women game-bg-women1" src="images/characters/women1.png" alt="">
+    <img class="game-bg-girl game-bg-girl2" src="images/characters/girl2.png" alt="">
+    <img class="game-bg-girl game-bg-girl1" src="images/characters/girl1.png" alt="">
+    <img class="game-bg-plane game-bg-plane1" src="images/bg/plane.png" alt="">
+    <img class="game-bg-plane game-bg-plane2" src="images/bg/plane2.png" alt="">
+    <img class="game-bg-plane game-bg-plane3" src="images/bg/plane3.png" alt="">
+    <img class="game-bg-plane game-bg-plane4" src="images/bg/plane4.png" alt="">
+    <img class="game-bg-plane game-bg-plane5" src="images/bg/plane5.png" alt="">
+    <img class="game-bg-plane game-bg-plane6" src="images/bg/plane6.png" alt="">
+    <img class="game-bg-stairs" src="images/bg/stairs.png" alt="">
     <h2>¡Tiempo!</h2>
     <div id="final-score-label">Puntaje final</div>
     <div id="final-score-value">0</div>
@@ -310,7 +452,7 @@
     </div>
     <div class="gameover-confirm-wrap">
       <img class="gameover-confirm1" src="images/confirm1.png" alt="">
-      <img class="gameover-confirm2" src="images/confirm2.png" alt="" loading="lazy">
+      <img class="gameover-confirm2" src="images/confirm2.png" alt="">
     </div>
   </div>
 
@@ -457,11 +599,23 @@
   </div>
 
   <div id="timeup-overlay" style="display:none">
-    <img src="images/countdown/timeup.png" alt="Time Up" loading="lazy">
+    <img src="images/countdown/timeup.png" alt="Time Up">
   </div>
 
   <div id="vol-btn">
     <img id="vol-img" src="images/vol1.png" alt="">
+  </div>
+
+  <img id="ingame-power" src="images/power.png" alt="" draggable="false" oncontextmenu="return false" style="display:none">
+
+  <div id="ingame-quit-popup" style="display:none">
+    <div class="ingame-quit-box">
+      <span class="ingame-quit-text">¿Quieres terminar la partida y volver al menú principal?</span>
+      <div class="ingame-quit-actions">
+        <button class="ingame-quit-btn confirm" id="ingame-quit-confirm" type="button" aria-label="Sí">✓</button>
+        <button class="ingame-quit-btn cancel" id="ingame-quit-cancel" type="button" aria-label="No">✕</button>
+      </div>
+    </div>
   </div>
 
   <!-- ── MODO BANDERAS ──────────────────────────────────── -->
@@ -499,7 +653,7 @@
   </div>
 
   <div id="flags-timeup-overlay" style="display:none">
-    <img src="images/countdown/timeup.png" alt="Time Up" loading="lazy">
+    <img src="images/countdown/timeup.png" alt="Time Up">
   </div>
 
   <img id="flags-machine" src="images/machine1.png" alt="" style="display:none">
@@ -562,6 +716,7 @@
     </div>
   </div>
 
+  <script src="js/manifest.js"></script>
   <script src="js/cities.js"></script>
   <script src="js/countries.js"></script>
   <script src="js/places.js"></script>

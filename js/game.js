@@ -610,8 +610,8 @@ function resetState() {
     score: 0,
     displayedScore: 0,
     dots: 0,
-    cityPool: shuffle([...CITIES]),
-    poolIndex: 0,
+    cityQueues: makeCityQueues(),
+    correctCount: 0,
     currentCity: null,
     cityShownAt: 0,
     placedDots: [],
@@ -809,11 +809,7 @@ function spawnStars(cx, cy) {
 
 // ── NEXT CITY ─────────────────────────────────────────────────────────────────
 function nextCity() {
-  if (state.poolIndex >= state.cityPool.length) {
-    state.cityPool = shuffle([...CITIES]);
-    state.poolIndex = 0;
-  }
-  state.currentCity = state.cityPool[state.poolIndex++];
+  state.currentCity = pickCity(state.cityQueues, state.correctCount);
   state.cityShownAt = Date.now();
   state.phase = 'waiting';
   slideTagIn(state.currentCity.name, state.currentCity.country);
@@ -846,6 +842,7 @@ canvas.addEventListener('click', (e) => {
     state.streak = 0;
   } else {
     state.streak++;
+    state.correctCount++;
   }
   const streakMult = 1 + Math.floor(state.streak / 4) * 0.3;
 
