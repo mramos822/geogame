@@ -25,6 +25,19 @@ const flagsFindLuggage   = document.getElementById('flags-findluggage');
 flagsFindLuggage.addEventListener('dragstart', e => e.preventDefault());
 const flagsLuggageWrap   = document.getElementById('flags-luggage-wrap');
 flagsLuggageWrap.addEventListener('dragstart', e => e.preventDefault());
+
+// El maletín y sus banderas usan un sistema de coordenadas en px (offsets de los
+// grupos, clip-path: path(...) y matrix3d) que NO se puede expresar en vmin. Para
+// que escale con el viewport como el resto, se escala el wrap completo como unidad.
+// Factor = min(vw,vh)/911 → 1.0 en el viewport de referencia (9.11px por vmin).
+function flagsLuggageScale() {
+  return Math.min(window.innerWidth, window.innerHeight) / 911;
+}
+function scaleFlagsLuggage() {
+  flagsLuggageWrap.style.transform = `translate(-50%, -50%) scale(${flagsLuggageScale()})`;
+}
+window.addEventListener('resize', scaleFlagsLuggage);
+scaleFlagsLuggage();
 const flagsFlagImg       = document.getElementById('flags-flag-img');
 const flagsFlagidWrap    = document.getElementById('flags-flagid-wrap');
 const flagsFlagidLabel   = document.getElementById('flags-flagid-label');
@@ -45,10 +58,10 @@ let flagsRunning         = false;
 let flagsWrongCount      = 0;
 
 const FLAGS_PREGAME_STEPS = [
-  { src: 'images/countdown/3.png',  hold: 800,  size: 420 },
-  { src: 'images/countdown/2.png',  hold: 800,  size: 420 },
-  { src: 'images/countdown/1.png',  hold: 800,  size: 420 },
-  { src: 'images/countdown/go.png', hold: 950,  size: 490 },
+  { src: 'images/countdown/3.png',  hold: 800,  size: 46 },
+  { src: 'images/countdown/2.png',  hold: 800,  size: 46 },
+  { src: 'images/countdown/1.png',  hold: 800,  size: 46 },
+  { src: 'images/countdown/go.png', hold: 950,  size: 54 },
 ];
 
 // ── SHOW / HIDE ───────────────────────────────────────────────────────────────
@@ -77,6 +90,7 @@ function showFlagsMode() {
   flagsWrapper.style.transform       = `scale(${escala})`;
   flagsWrapper.style.transformOrigin = 'center center';
   flagsScoreDisplay.style.display = 'block';
+  document.getElementById('flags-countdown-widget').style.display = 'block';
   flagsRightPanel.style.display   = 'flex';
   mainRightPanel.style.display    = 'none';
   flagsMachine.style.display      = 'block';
@@ -439,7 +453,9 @@ function showFlagsBadge(badgeImg, bonus, streak, cxOverride, scaleOverride) {
   canvas.style.display = 'block';
   const ctx2 = canvas.getContext('2d');
   const CX = cxOverride !== undefined ? cxOverride : canvas.width / 2, CY = (scaleOverride !== undefined ? canvas.height * 0.44 : canvas.height / 2);
-  const W = 405, H = 333, CW = 477, CH = 405;
+  // Medidas en vmin (px = valor_vmin * vmin) para que escale con el viewport.
+  const vmin = Math.min(window.innerWidth, window.innerHeight) / 100;
+  const W = 44.5 * vmin, H = 36.6 * vmin, CW = 52.4 * vmin, CH = 44.5 * vmin;
   const IN_END = 0.2, HOLD_END = 0.60, SHRINK_DUR = 0.22, TOTAL = HOLD_END + SHRINK_DUR;
   const BZ_IN = 0.18, BZ_HOLD = 0.42, BZ_OUT = 0.72;
   const strokeColor = typeof getBadgeStrokeColor !== 'undefined' ? getBadgeStrokeColor(streak) : '#623103';
@@ -475,17 +491,17 @@ function showFlagsBadge(badgeImg, bonus, streak, cxOverride, scaleOverride) {
     else if (t < BZ_HOLD) bonusScale = 1;
     else if (t < BZ_OUT)  bonusScale = 1 - (t - BZ_HOLD) / (BZ_OUT - BZ_HOLD);
     if (bonusScale > 0 && bonusLabel) {
-      const bCY = CY + CH / 2 + 20;
+      const bCY = CY + CH / 2 + 2.2 * vmin;
       ctx2.save();
       ctx2.globalAlpha = alpha;
       ctx2.translate(CX, bCY);
       ctx2.scale(bonusScale, bonusScale);
-      ctx2.font = '104px Dimbo, "Arial Black", sans-serif';
+      ctx2.font = `${11.4 * vmin}px Dimbo, "Arial Black", sans-serif`;
       ctx2.textAlign = 'center';
       ctx2.textBaseline = 'middle';
-      ctx2.strokeStyle = '#073A79'; ctx2.lineWidth = 14;
+      ctx2.strokeStyle = '#073A79'; ctx2.lineWidth = 1.54 * vmin;
       ctx2.strokeText(bonusLabel, 0, 0);
-      ctx2.strokeStyle = '#FD9C1A'; ctx2.lineWidth = 7;
+      ctx2.strokeStyle = '#FD9C1A'; ctx2.lineWidth = 0.77 * vmin;
       ctx2.strokeText(bonusLabel, 0, 0);
       ctx2.fillStyle = '#ffffff'; ctx2.fillText(bonusLabel, 0, 0);
       ctx2.restore();
@@ -495,14 +511,14 @@ function showFlagsBadge(badgeImg, bonus, streak, cxOverride, scaleOverride) {
     if (badgeImg) {
       ctx2.save();
       ctx2.globalAlpha = alpha;
-      ctx2.translate(CX + 30, CY - 30);
+      ctx2.translate(CX + 3.3 * vmin, CY - 3.3 * vmin);
       ctx2.scale(scale, scale);
       ctx2.drawImage(badgeImg, -W / 2, -H / 2, W, H);
-      ctx2.font = 'bold 67px Fredoka, sans-serif';
+      ctx2.font = `bold ${7.4 * vmin}px Fredoka, sans-serif`;
       ctx2.textAlign = 'center';
       ctx2.textBaseline = 'middle';
       ctx2.scale(1, 1.2);
-      ctx2.strokeStyle = strokeColor; ctx2.lineWidth = 11;
+      ctx2.strokeStyle = strokeColor; ctx2.lineWidth = 1.21 * vmin;
       ctx2.strokeText(`${streak} IN A ROW`, 0, 0);
       ctx2.fillStyle = '#ffffff'; ctx2.fillText(`${streak} IN A ROW`, 0, 0);
       ctx2.restore();
@@ -525,7 +541,7 @@ function startFlagsRoundRecording() {
   flagsFindLuggage.classList.add('scrolling');
 
   flagsFlagidLabel.textContent         = 'Italy';
-  flagsFlagidLabel.style.fontSize      = '38px';
+  flagsFlagidLabel.style.fontSize      = '4.2vmin';
   flagsFlagidLabel.style.letterSpacing = '';
 
   flagsTopGroupIds.forEach((id, i) => {
@@ -562,8 +578,9 @@ function startFlagsRoundRecording() {
       void group.offsetWidth;
       const groupRect = group.getBoundingClientRect();
       const findRect  = flagsFindLuggage.getBoundingClientRect();
-      const dx = findRect.left - groupRect.left;
-      const dy = findRect.top  - groupRect.top;
+      const lugScale = flagsLuggageScale();
+      const dx = (findRect.left - groupRect.left) / lugScale;
+      const dy = (findRect.top  - groupRect.top)  / lugScale;
       group.style.transition = 'transform 0.1s linear';
       group.style.transform  = `translate(${dx}px, ${dy}px)`;
       flagsMachine2.style.animationPlayState     = 'paused';
@@ -698,16 +715,18 @@ function startFlagsRound() {
   }
   flagsLastChosen = chosen;
   flagsFlagidLabel.textContent = chosen;
-  // Ajustar tamaño si el nombre es largo
-  const maxW = 380;
-  let fs = 38;
-  flagsFlagidLabel.style.fontSize = fs + 'px';
+  // Ajustar tamaño si el nombre es largo. Todo en vmin para escalar con el
+  // viewport igual que la imagen de flagid (49.4vmin); maxW = 41.7vmin en px.
+  const vminPx = Math.min(window.innerWidth, window.innerHeight) / 100;
+  const maxW = 41.7 * vminPx;
+  let fs = 4.2;
+  flagsFlagidLabel.style.fontSize = fs + 'vmin';
   flagsFlagidLabel.style.letterSpacing = '';
-  while (flagsFlagidLabel.scrollWidth > maxW && fs > 16) {
-    fs -= 2;
-    flagsFlagidLabel.style.fontSize = fs + 'px';
-    if (fs < 30) flagsFlagidLabel.style.letterSpacing = '-1px';
-    if (fs < 22) flagsFlagidLabel.style.letterSpacing = '-2px';
+  while (flagsFlagidLabel.scrollWidth > maxW && fs > 1.8) {
+    fs -= 0.22;
+    flagsFlagidLabel.style.fontSize = fs + 'vmin';
+    if (fs < 3.3) flagsFlagidLabel.style.letterSpacing = '-1px';
+    if (fs < 2.4) flagsFlagidLabel.style.letterSpacing = '-2px';
   }
 
   // Distractors: prefer visually similar flags from correcta 23 onward
@@ -817,8 +836,9 @@ function startFlagsRound() {
       void group.offsetWidth; // reflow — group is now at natural CSS position
       const groupRect = group.getBoundingClientRect();
       const findRect  = flagsFindLuggage.getBoundingClientRect();
-      const dx = findRect.left - groupRect.left;
-      const dy = findRect.top  - groupRect.top;
+      const lugScale = flagsLuggageScale();
+      const dx = (findRect.left - groupRect.left) / lugScale;
+      const dy = (findRect.top  - groupRect.top)  / lugScale;
       group.style.transition = 'transform 0.1s linear';
       group.style.transform  = `translate(${dx}px, ${dy}px)`;
       flagsMachine2.style.animationPlayState = 'paused';
@@ -840,7 +860,7 @@ function startFlagsRound() {
         // Whoosh selected group -1000px from findluggage position
         if (!document.body.classList.contains('recording-mode')) {
           group.style.transition = 'transform 0.15s linear';
-          group.style.transform  = `translate(${dx - 1000}px, ${dy}px)`;
+          group.style.transform  = `translate(${dx - 1000 / lugScale}px, ${dy}px)`;
         }
       }, 600);
       flagsGroupIds.forEach(gid => {
@@ -934,6 +954,7 @@ function startFlagsRound() {
 function hideFlagsMode() {
   flagsWrapper.style.display      = 'none';
   flagsScoreDisplay.style.display = 'none';
+  document.getElementById('flags-countdown-widget').style.display = 'none';
   flagsRightPanel.style.display   = 'none';
   mainRightPanel.style.display    = 'none';
   flagsTimeupEl.style.display     = 'none';
@@ -1012,8 +1033,8 @@ function runFlagsPregame(onDone) {
     }
     const { src, hold, size } = FLAGS_PREGAME_STEPS[step++];
     flagsPregameImg.style.animation = 'none';
-    flagsPregameImg.style.width     = size + 'px';
-    flagsPregameImg.style.height    = size + 'px';
+    flagsPregameImg.style.width     = size + 'vmin';
+    flagsPregameImg.style.height    = size + 'vmin';
     flagsPregameImg.src = src;
     void flagsPregameImg.offsetWidth;
     flagsPregameImg.style.animation = '';

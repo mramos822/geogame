@@ -665,7 +665,8 @@ function quitToMenu() {
   // 7) Ocultar todas las pantallas de juego/resultados y el HUD
   ['game-wrapper','flags-wrapper','splash-screen','gameover-screen','results-screen',
    'final-screen','score-display','right-panel','flags-score-display',
-   'flags-right-panel','new-highscore-banner'].forEach(id => {
+   'flags-right-panel','new-highscore-banner','countdown-widget',
+   'flags-countdown-widget','shapes-countdown-widget'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
@@ -1967,6 +1968,8 @@ function endGame() {
       animFrameId = null;
       gameWrapper.style.display = 'none';
       scoreDisplayEl.style.display = 'none';
+      const cwHide = document.getElementById('countdown-widget');
+      if (cwHide) cwHide.style.display = 'none';
       window.lastModeScore = state.score;
       finalScoreEl.textContent = (state.score + (window.campaignBase ? window.campaignBase() : 0)).toLocaleString();
       let isNewHighscore = false;
@@ -2066,10 +2069,10 @@ window.addEventListener('resize', () => {
 const pregameCountdownEl    = document.getElementById('pregame-countdown');
 const pregameCountdownImg   = document.getElementById('pregame-countdown-img');
 const PREGAME_STEPS = [
-  { src: 'images/countdown/3.png', hold: 750,  size: 420 },
-  { src: 'images/countdown/2.png', hold: 750,  size: 420 },
-  { src: 'images/countdown/1.png', hold: 750,  size: 420 },
-  { src: 'images/countdown/go.png', hold: 950, size: 490 },
+  { src: 'images/countdown/3.png', hold: 750,  size: 46 },
+  { src: 'images/countdown/2.png', hold: 750,  size: 46 },
+  { src: 'images/countdown/1.png', hold: 750,  size: 46 },
+  { src: 'images/countdown/go.png', hold: 950, size: 54 },
 ];
 
 let pregameTimeout = null;
@@ -2090,8 +2093,8 @@ function runPregameCountdown(onDone) {
     }
     const { src, hold, size } = PREGAME_STEPS[step++];
     pregameCountdownImg.style.animation = 'none';
-    pregameCountdownImg.style.width  = size + 'px';
-    pregameCountdownImg.style.height = size + 'px';
+    pregameCountdownImg.style.width  = size + 'vmin';
+    pregameCountdownImg.style.height = size + 'vmin';
     pregameCountdownImg.src = src;
     void pregameCountdownImg.offsetWidth;
     pregameCountdownImg.style.animation = '';
@@ -2115,6 +2118,8 @@ function startGame() {
   newHighscoreBanner.style.display = 'none';
   gameWrapper.style.display     = 'block';
   scoreDisplayEl.style.display  = 'block';
+  const cwEl = document.getElementById('countdown-widget');
+  if (cwEl) cwEl.style.display = 'block';
   const rpEl = document.getElementById('right-panel');
   if (rpEl) rpEl.style.display = 'flex';
 
@@ -2409,26 +2414,10 @@ let restartFlightAtt;
 })();
 
 // ── SPLASH TEXT2 RESPONSIVE ──────────────────────────────────────────────────
-(function () {
-  const wrap  = document.querySelector('.splash-text2-wrap');
-  const label = document.querySelector('.splash-text2-label');
-  if (!wrap || !label) return;
-  const ro = new ResizeObserver(() => {
-    label.style.fontSize = (wrap.offsetWidth * 0.055) + 'px';
-  });
-  ro.observe(wrap);
-})();
-
-// ── GAMEOVER TEXT1 RESPONSIVE ─────────────────────────────────────────────────
-(function () {
-  const wrap  = document.querySelector('.gameover-text1-wrap');
-  const label = document.querySelector('.gameover-text1-label');
-  if (!wrap || !label) return;
-  const ro = new ResizeObserver(() => {
-    label.style.fontSize = (wrap.offsetWidth * 0.055) + 'px';
-  });
-  ro.observe(wrap);
-})();
+// El tamaño del texto de los carteles (text2/text1) se controla en CSS con vw:
+// el globo mide 25vw/21vw (su width:% sobre #splash-screen, que es full viewport),
+// así que la fuente en vw (1.375vw/1.155vw = 0.055×ancho) queda SIEMPRE en la
+// misma proporción que el globo, sin atascarse con el zoom como el ResizeObserver.
 
 // ── VOLUME TOGGLE ─────────────────────────────────────────────────────────────
 let isMuted = localStorage.getItem('muted') === 'true';

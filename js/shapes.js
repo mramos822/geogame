@@ -26,23 +26,16 @@ let shapesCorrectCount = 0;
 function positionShapesCountdown() {
   const cwEl = document.getElementById('shapes-countdown-widget');
   if (!cwEl) return;
-  const gw = document.getElementById('game-wrapper');
-  if (!gw) return;
-  const prev = gw.style.display;
-  gw.style.display = 'block';
-  gw.style.opacity = '0';
-  gw.style.pointerEvents = 'none';
-  const rect = gw.getBoundingClientRect();
-  gw.style.display = prev || 'none';
-  gw.style.opacity = '';
-  gw.style.pointerEvents = '';
+  // Overlay fijo en vmin, igual que #countdown-widget (monuments/flags). Escala
+  // con el viewport y no se mueve/agranda con el zoom como cuando se anclaba al
+  // game-wrapper escalado.
   cwEl.style.position      = 'fixed';
-  cwEl.style.top           = (rect.top - 50) + 'px';
-  cwEl.style.right         = (window.innerWidth - rect.right - 18) + 'px';
-  cwEl.style.width         = '240px';
-  cwEl.style.height        = '132px';
+  cwEl.style.top           = '2.8vmin';
+  cwEl.style.right         = '57.5vmin';
+  cwEl.style.width         = '26.3vmin';
+  cwEl.style.height        = '14.5vmin';
   cwEl.style.pointerEvents = 'none';
-  cwEl.style.zIndex        = '200';
+  cwEl.style.zIndex        = '1000';
 }
 
 window.addEventListener('resize', positionShapesCountdown);
@@ -159,16 +152,16 @@ function showCountryShape(country, ext1, ext2, startDelay) {
         position: absolute;
         top: 45%; left: 69%;
         transform: translate(-50%, -50%);
-        font-size: 67px; font-weight: 900;
+        font-size: 7.4vmin; font-weight: 900;
         font-family: 'Arial Black', Impact, sans-serif;
         color: white;
-        -webkit-text-stroke: 2.5px black;
+        -webkit-text-stroke: 0.27vmin black;
         text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
-        pointer-events: none; min-width: 44px; text-align: center; transition: color 0.3s;
+        pointer-events: none; min-width: 4.8vmin; text-align: center; transition: color 0.3s;
       }
       #shapes-progress-dots {
-        position: absolute; bottom: 10px; left: 9px; width: 100%;
-        display: flex; justify-content: center; gap: 4px; padding: 0 6px;
+        position: absolute; bottom: 1.1vmin; left: 1vmin; width: 100%;
+        display: flex; justify-content: center; gap: 0.44vmin; padding: 0 0.66vmin;
         pointer-events: none; z-index: 11; transition: opacity 0.5s ease; opacity: 1;
       }
       #shapes-progress-dots.dots-fade-out { opacity: 0; }
@@ -697,10 +690,10 @@ function getActiveShapesPool() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SHAPES_PREGAME_STEPS = [
-  { src: 'images/countdown/3.png',  hold: 800,  size: 420 },
-  { src: 'images/countdown/2.png',  hold: 800,  size: 420 },
-  { src: 'images/countdown/1.png',  hold: 800,  size: 420 },
-  { src: 'images/countdown/go.png', hold: 950,  size: 490 },
+  { src: 'images/countdown/3.png',  hold: 800,  size: 46 },
+  { src: 'images/countdown/2.png',  hold: 800,  size: 46 },
+  { src: 'images/countdown/1.png',  hold: 800,  size: 46 },
+  { src: 'images/countdown/go.png', hold: 950,  size: 54 },
 ];
 
 let shapesPregameTimeout = null;
@@ -720,8 +713,8 @@ function runShapesPregame(onDone) {
     if (step >= SHAPES_PREGAME_STEPS.length) { el.style.display = 'none'; onDone(); return; }
     const { src, hold, size } = SHAPES_PREGAME_STEPS[step++];
     img.style.animation = 'none';
-    img.style.width     = size + 'px';
-    img.style.height    = size + 'px';
+    img.style.width     = size + 'vmin';
+    img.style.height    = size + 'vmin';
     img.src = src;
     void img.offsetWidth;
     img.style.animation = '';
