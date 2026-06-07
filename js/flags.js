@@ -81,13 +81,11 @@ function showFlagsMode() {
   // Aplicar el mismo scale que redimensionarJuego calcula
   const anchoVentana = window.innerWidth;
   const altoVentana  = window.innerHeight;
-  let margenHorizontal = 40;
-  if (anchoVentana > 1024)     margenHorizontal = anchoVentana * 0.35;
-  else if (anchoVentana > 768) margenHorizontal = anchoVentana * 0.20;
+  const margenHorizontal = anchoVentana * 0.35;
   const escalaW = (anchoVentana - margenHorizontal) / gameCanvas.width;
-  const escalaH = (altoVentana - 80) / gameCanvas.height;
+  const escalaH = (altoVentana - altoVentana * 0.08) / gameCanvas.height;
   const escala  = Math.min(escalaW, escalaH) * 0.92;
-  flagsWrapper.style.transform       = `scale(${escala})`;
+  flagsWrapper.style.transform       = `translate(-50%, -50%) scale(${escala})`;
   flagsWrapper.style.transformOrigin = 'center center';
   flagsScoreDisplay.style.display = 'block';
   document.getElementById('flags-countdown-widget').style.display = 'block';

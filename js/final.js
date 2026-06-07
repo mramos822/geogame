@@ -2,15 +2,18 @@
 
 const finalScreen = document.getElementById('final-screen');
 
-function fitRankLabel(id, maxWidth) {
+function fitRankLabel(id, maxWidthVmin) {
   const el = document.getElementById(id);
   if (!el) return;
+  // Todo en vmin para que escale con el viewport. maxWidthVmin en vmin → px.
+  const vminPx = Math.min(window.innerWidth, window.innerHeight) / 100;
+  const maxW = maxWidthVmin * vminPx;
   el.style.fontSize = '';
-  let size = 40;
-  el.style.fontSize = size + 'px';
-  while (el.scrollWidth > maxWidth && size > 14) {
-    size -= 1;
-    el.style.fontSize = size + 'px';
+  let size = 4.39; // vmin (= 40px ref)
+  el.style.fontSize = size + 'vmin';
+  while (el.scrollWidth > maxW && size > 1.54) {
+    size -= 0.11;
+    el.style.fontSize = size + 'vmin';
   }
 }
 
@@ -38,7 +41,7 @@ function showFinalScreen() {
   const total = hs1 + hs2 + hs3 + hs4;
   const rank  = typeof getRank === 'function' ? getRank(total) : null;
   const label = document.getElementById('final-rank-label');
-  if (label && rank) { label.textContent = rank.name; fitRankLabel('final-rank-label', 480); }
+  if (label && rank) { label.textContent = rank.name; fitRankLabel('final-rank-label', 52.7); }
   const scoreEl = document.getElementById('final-points-score');
   if (scoreEl) scoreEl.textContent = total.toLocaleString();
   const playerName = localStorage.getItem('playerName') || 'John';
@@ -102,7 +105,7 @@ function buildFriendClouds(ranking, playerPos) {
         `<span class="final2-points-score">${entry.score.toLocaleString()}</span>` +
       `</div>`;
     container.appendChild(group);
-    fitRankLabel(labelId, 360);
+    fitRankLabel(labelId, 39.5);
     const cloudImg = group.querySelector('.final-cloud5');
     if (cloudImg) {
       const dur = 6 + Math.random() * 5;       // 6–11s

@@ -262,7 +262,7 @@ function showCountryShape(country, ext1, ext2, startDelay) {
     const isCorrect = (i === correctIdx);
     const base = `scaleX(1.05) scaleY(0.95) rotate(${cfg.rot})`;
     const tag = document.createElement('div');
-    tag.style.cssText = `position:fixed;top:${cfg.top};right:${cfg.right};width:368px;z-index:110;pointer-events:auto;transform:translateX(300%) scaleX(1.05) scaleY(0.95) rotate(${cfg.rot});transform-origin:center center;transition:transform 0.15s ease;cursor:pointer;--tag-rot:${cfg.rot};`;
+    tag.style.cssText = `position:fixed;top:${cfg.top};right:${cfg.right};width:40.4vmin;z-index:110;pointer-events:auto;transform:translateX(300%) scaleX(1.05) scaleY(0.95) rotate(${cfg.rot});transform-origin:center center;transition:transform 0.15s ease;cursor:pointer;--tag-rot:${cfg.rot};`;
     tag.classList.add('shape-tag-enter', 'shapes-tag');
     tag.style.animationDelay = `${i * 80}ms`;
     tag.style.pointerEvents = 'none';
@@ -281,7 +281,7 @@ function showCountryShape(country, ext1, ext2, startDelay) {
 
     const tagLabel = document.createElement('span');
     tagLabel.textContent = options[i];
-    tagLabel.style.cssText = 'position:absolute;top:50%;left:52%;transform:translate(-50%,-50%);font-family:"VAGRoundBold","Arial Black",sans-serif;font-size:34px;color:#2a1a00;font-weight:bold;white-space:nowrap;pointer-events:none;';
+    tagLabel.style.cssText = 'position:absolute;top:50%;left:52%;transform:translate(-50%,-50%);font-family:"VAGRoundBold","Arial Black",sans-serif;font-size:3.7vmin;color:#2a1a00;font-weight:bold;white-space:nowrap;pointer-events:none;';
 
     tag.addEventListener('mouseenter', () => {
       if (anyClicked || !shapesRunning) return;
@@ -416,14 +416,13 @@ function showCountryShape(country, ext1, ext2, startDelay) {
       }, 500);
       clearTimeout(animTimeout);
       clearTimeout(clipFadeTimeout);
-      const frozenImg     = getComputedStyle(img).transform;
-      const frozenImg2    = getComputedStyle(img2).transform;
+      // Cortar la transición SIN pinear el transform como matriz px (rompía el
+      // vmin: el translate(-50%,-50%) se volvía px fijos). Se conserva el
+      // style.transform actual, que está en %.
       const frozenOpacity = getComputedStyle(clip).opacity;
       img.style.transition  = 'none';
       img2.style.transition = 'none';
       clip.style.transition = 'none';
-      img.style.transform   = frozenImg;
-      img2.style.transform  = frozenImg2;
       clip.style.opacity    = frozenOpacity;
     });
 
@@ -431,12 +430,16 @@ function showCountryShape(country, ext1, ext2, startDelay) {
     tag.appendChild(tagLabel);
     document.body.appendChild(tag);
 
-    let fs = 34;
-    while (tagLabel.scrollWidth > 290 && fs > 16) {
-      fs -= 2;
-      tagLabel.style.fontSize = fs + 'px';
-      if (fs < 26) tagLabel.style.letterSpacing = '-1px';
-      if (fs < 20) tagLabel.style.letterSpacing = '-2px';
+    // Ajuste de nombres largos en vmin (no px) para que escale con el viewport
+    // igual que el tag (40.4vmin) y no se encoja distinto según el zoom.
+    const tagVminPx = Math.min(window.innerWidth, window.innerHeight) / 100;
+    const tagMaxW = 31.8 * tagVminPx;
+    let fs = 3.7;
+    while (tagLabel.scrollWidth > tagMaxW && fs > 1.76) {
+      fs -= 0.22;
+      tagLabel.style.fontSize = fs + 'vmin';
+      if (fs < 2.85) tagLabel.style.letterSpacing = '-1px';
+      if (fs < 2.2) tagLabel.style.letterSpacing = '-2px';
     }
 
     tagEls.push(tag);
@@ -828,8 +831,11 @@ function showShapesMode() {
         document.querySelectorAll('.shapes-tag').forEach(el => { el.style.cursor = 'default'; el.style.pointerEvents = 'none'; });
         clearTimeout(shapesCurrentAnimTimeout);
         clearTimeout(shapesCurrentClipFadeTimeout);
-        if (shapesCurrentImg)  { const f = getComputedStyle(shapesCurrentImg).transform;  shapesCurrentImg.style.transition  = 'none'; shapesCurrentImg.style.transform  = f; }
-        if (shapesCurrentImg2) { const f = getComputedStyle(shapesCurrentImg2).transform; shapesCurrentImg2.style.transition = 'none'; shapesCurrentImg2.style.transform = f; }
+        // Cortar la transición sin pinear el transform como matriz px (eso
+        // convertía el translate(-50%,-50%) en px fijos y rompía el vmin al
+        // zoomear). Dejamos el style.transform actual, que ya está en %.
+        if (shapesCurrentImg)  { shapesCurrentImg.style.transition  = 'none'; }
+        if (shapesCurrentImg2) { shapesCurrentImg2.style.transition = 'none'; }
         if (shapesCurrentClip) { const f = getComputedStyle(shapesCurrentClip).opacity;   shapesCurrentClip.style.transition = 'none'; shapesCurrentClip.style.opacity   = f; }
         if (tImg) tImg.style.animationPlayState = 'paused';
         if (typeof sfxTimesUp !== 'undefined') { sfxTimesUp.currentTime = 0; sfxTimesUp.play(); }

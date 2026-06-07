@@ -146,6 +146,24 @@
 
 })();
 
+// ── OPTIMIZACIÓN ANTI-TITILEO ────────────────────────────────────────────────
+// El preloader decodifica copias Image() (para tener el recurso en caché), pero
+// los <img> reales del DOM se decodifican recién al mostrarse → titilan. Acá los
+// decodificamos de antemano y marcamos como decoding="sync" las imágenes cuyo
+// src se intercambia entre modos, para que al cambiar de juego no muestren un
+// frame en blanco.
+window.addEventListener('load', () => {
+  // Warming: decodificar todos los <img> ya presentes en el DOM.
+  document.querySelectorAll('img').forEach(img => {
+    if (img.decode) img.decode().catch(() => {});
+  });
+  // Imágenes que cambian de src al pasar de modo: decodificación síncrona.
+  document.querySelectorAll(
+    '.game-bg-city, .game-bg-check3, .game-bg-wrong3, .game-bg-men, ' +
+    '.game-bg-girl, .game-bg-women, #pregame-countdown-img, #flags-pregame-countdown-img'
+  ).forEach(img => { img.decoding = 'sync'; });
+}, { once: true });
+
 // Actualiza el panel de perfil (nombre, veces jugadas, promedios, highscores,
 // rango). Se llama al cargar y cada vez que se vuelve al loading screen, para
 // que refleje los datos guardados de la última partida.
@@ -956,14 +974,14 @@ function buildChecksRow() {
   if (!row) return;
   row.innerHTML = '';
   const total = gradeCounts.perfect + gradeCounts.good + gradeCounts.fair;
-  const IMG_W = 58;
-  const BASE_GAP = 3;
+  const IMG_W = 6.4;   // vmin (coincide con .checks-row/.wrongs-row img)
+  const BASE_GAP = 0.33; // vmin
   const MAX_W = 12 * IMG_W + 11 * BASE_GAP;
   const gap = total > 1 ? (total > 12 ? (MAX_W - total * IMG_W) / (total - 1) : BASE_GAP) : 0;
   if (total === 0) {
     const none = document.createElement('span');
     none.textContent = 'None';
-    none.style.cssText = 'color:#ffffff;-webkit-text-stroke:7px #132886;paint-order:stroke fill;font-family:VAGRoundBold,"Arial Black",Impact,sans-serif;font-size:41px;font-weight:bold;position:relative;left:20px;';
+    none.style.cssText = 'color:#ffffff;-webkit-text-stroke:0.77vmin #132886;paint-order:stroke fill;font-family:VAGRoundBold,"Arial Black",Impact,sans-serif;font-size:4.5vmin;font-weight:bold;position:relative;left:2.2vmin;';
     row.appendChild(none);
     return;
   }
@@ -975,7 +993,7 @@ function buildChecksRow() {
     img.alt = '';
     img.style.animationDelay = `${i * 0.1}s`;
     img.style.zIndex = 16 + i;
-    if (i < total - 1) img.style.marginRight = `${gap}px`;
+    if (i < total - 1) img.style.marginRight = `${gap}vmin`;
     row.appendChild(img);
   }
 
@@ -996,15 +1014,15 @@ function buildWrongsRow(startOffset = 0) {
   if (!row) return;
   row.innerHTML = '';
   const total = wrongCount;
-  const IMG_W = 58;
-  const BASE_GAP = 3;
+  const IMG_W = 6.4;   // vmin (coincide con .checks-row/.wrongs-row img)
+  const BASE_GAP = 0.33; // vmin
   const MAX_W = 12 * IMG_W + 11 * BASE_GAP;
   const gap = total > 1 ? (total > 12 ? (MAX_W - total * IMG_W) / (total - 1) : BASE_GAP) : 0;
 
   if (total === 0) {
     const none = document.createElement('span');
     none.textContent = 'None';
-    none.style.cssText = 'color:#ffffff;-webkit-text-stroke:7px #132886;paint-order:stroke fill;font-family:VAGRoundBold,"Arial Black",Impact,sans-serif;font-size:41px;font-weight:bold;position:relative;left:20px;opacity:0;';
+    none.style.cssText = 'color:#ffffff;-webkit-text-stroke:0.77vmin #132886;paint-order:stroke fill;font-family:VAGRoundBold,"Arial Black",Impact,sans-serif;font-size:4.5vmin;font-weight:bold;position:relative;left:2.2vmin;opacity:0;';
     row.appendChild(none);
     const w3s = gameoverScreen.querySelector('.game-bg-wrong3');
     const wce = gameoverScreen.querySelector('.wrong-count-total');
@@ -1025,7 +1043,7 @@ function buildWrongsRow(startOffset = 0) {
     img.alt = '';
     img.style.animationDelay = `${startOffset + i * 0.1}s`;
     img.style.zIndex = 16 + i;
-    if (i < total - 1) img.style.marginRight = `${gap}px`;
+    if (i < total - 1) img.style.marginRight = `${gap}vmin`;
     row.appendChild(img);
   }
 
@@ -1834,7 +1852,12 @@ if (state.sunburst) {
     ctx.globalAlpha = 1;
   }
 
-  badgeOverlayCtx.clearRect(0, 0, DISPLAY_W, DISPLAY_H);
+  // Limpiar el overlay del badge solo si hay algo dibujado (o lo hubo el frame
+  // anterior, para borrarlo), en vez de un clearRect full en cada frame.
+  if (state.badgeAnim || render._badgeDirty) {
+    badgeOverlayCtx.clearRect(0, 0, DISPLAY_W, DISPLAY_H);
+  }
+  render._badgeDirty = !!state.badgeAnim;
   if (state.badgeAnim) {
     const ba = state.badgeAnim;
     ba.t += dt;
@@ -2022,14 +2045,10 @@ function redimensionarJuego() {
   const anchoVentana = window.innerWidth;
   const altoVentana = window.innerHeight;
 
-  let margenHorizontal = 40;
-  if (anchoVentana > 1024) {
-    margenHorizontal = anchoVentana * 0.35;
-  } else if (anchoVentana > 768) {
-    margenHorizontal = anchoVentana * 0.20;
-  }
-
-  const margenVertical = 80;
+  // Márgenes proporcionales (sin px fijos ni saltos por breakpoint) para que la
+  // escala sea 100% proporcional al viewport y no "zoomee" de más al hacer zoom.
+  const margenHorizontal = anchoVentana * 0.35;
+  const margenVertical = altoVentana * 0.08;
 
   const escalaW = (anchoVentana - margenHorizontal) / DISPLAY_W;
   const escalaH = (altoVentana - margenVertical) / DISPLAY_H;
@@ -2037,7 +2056,7 @@ function redimensionarJuego() {
   let escalaFinal = Math.min(escalaW, escalaH);
   escalaFinal = escalaFinal * 0.92;
 
-  gameWrapper.style.transform = `scale(${escalaFinal})`;
+  gameWrapper.style.transform = `translate(-50%, -50%) scale(${escalaFinal})`;
   gameWrapper.style.transformOrigin = 'center center';
 }
 
