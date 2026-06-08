@@ -571,13 +571,13 @@ function startFlagsRoundRecording() {
       group.classList.remove('luggage-enter-active');
       group.style.animation = 'none';
       void group.offsetWidth;
-      // Ver handler real: X al centro de pantalla, Y a la altura de findluggage.
+      // Ver handler real: centrar el maletín sobre findluggage (medir la imagen real).
       const lugImg    = group.querySelector('#flags-luggage, .flags-luggage-side');
       const groupRect = (lugImg || group).getBoundingClientRect();
       const findRect  = flagsFindLuggage.getBoundingClientRect();
       const lugScale  = flagsLuggageWrap.getBoundingClientRect().width / 220;
-      const dx = ((window.innerWidth / 2) - (groupRect.left + groupRect.width  / 2)) / lugScale;
-      const dy = ((findRect.top + findRect.height / 2) - (groupRect.top + groupRect.height / 2)) / lugScale;
+      const dx = ((findRect.left + findRect.width  / 2) - (groupRect.left + groupRect.width  / 2)) / lugScale;
+      const dy = ((findRect.top  + findRect.height / 2) - (groupRect.top  + groupRect.height / 2)) / lugScale;
       group.style.willChange = 'transform';                 // capa GPU (suaviza iOS)
       group.style.transition = 'transform 0.1s linear';
       group.style.transform  = `translate3d(${dx}px, ${dy}px, 0)`;
@@ -839,10 +839,10 @@ function startFlagsRound() {
       const groupRect = (lugImg || group).getBoundingClientRect();
       const findRect  = flagsFindLuggage.getBoundingClientRect();
       const lugScale  = flagsLuggageWrap.getBoundingClientRect().width / 220;
-      // X: centrar en el centro de la pantalla (findluggage scrollea, su X varía y
-      // dejaba el maletín corrido). Y: a la altura de findluggage (el cinturón).
-      const dx = ((window.innerWidth / 2) - (groupRect.left + groupRect.width  / 2)) / lugScale;
-      const dy = ((findRect.top + findRect.height / 2) - (groupRect.top + groupRect.height / 2)) / lugScale;
+      // Centrar el maletín sobre findluggage (medimos la imagen real del maletín
+      // porque el <div> del grupo mide 0). Correcto en PC y muy cercano en iOS.
+      const dx = ((findRect.left + findRect.width  / 2) - (groupRect.left + groupRect.width  / 2)) / lugScale;
+      const dy = ((findRect.top  + findRect.height / 2) - (groupRect.top  + groupRect.height / 2)) / lugScale;
       group.style.willChange = 'transform';                 // capa GPU (suaviza iOS)
       group.style.transition = 'transform 0.1s linear';
       group.style.transform  = `translate3d(${dx}px, ${dy}px, 0)`;
