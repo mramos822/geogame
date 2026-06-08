@@ -843,6 +843,10 @@ function startFlagsRound() {
         // el maletín y el molde quedan juntos donde tocaste, sin la deriva del lag.
         flagsTapFindRect = flagsFindLuggage.getBoundingClientRect();
         flagsFindLuggage.style.animationPlayState = 'paused';
+        // Pausar el movimiento de las máquinas a la par que findluggage.
+        flagsMachine2.style.animationPlayState  = 'paused';
+        flagsMachine3.style.animationPlayState  = 'paused';
+        flagsMachine3b.style.animationPlayState = 'paused';
       }
     };
     group.onclick = () => {
