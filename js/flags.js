@@ -30,8 +30,14 @@ flagsLuggageWrap.addEventListener('dragstart', e => e.preventDefault());
 // grupos, clip-path: path(...) y matrix3d) que NO se puede expresar en vmin. Para
 // que escale con el viewport como el resto, se escala el wrap completo como unidad.
 // Factor = min(vw,vh)/911 → 1.0 en el viewport de referencia (9.11px por vmin).
+// IMPORTANTE: usamos documentElement.clientWidth/clientHeight (viewport de LAYOUT,
+// la misma base que el `vmin` de CSS) y NO window.innerWidth/innerHeight (viewport
+// VISUAL). En iOS la barra de Safari hace que ambos difieran, dejando el maletín
+// con distinta proporción que findluggage (que está en vmin). Con clientW/H la
+// proporción maletín/findluggage es idéntica en PC e iOS.
 function flagsLuggageScale() {
-  return Math.min(window.innerWidth, window.innerHeight) / 911;
+  const de = document.documentElement;
+  return Math.min(de.clientWidth, de.clientHeight) / 911;
 }
 function scaleFlagsLuggage() {
   flagsLuggageWrap.style.transform = `translate(-50%, -50%) scale(${flagsLuggageScale()})`;
