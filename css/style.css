@@ -764,6 +764,20 @@ body::after {
   transform-origin: 0 0;
 }
 
+/* Etiqueta de versión: abajo al centro del menú de carga */
+#loading-version {
+  position: absolute;
+  bottom: 1vmin;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 220;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 1.6vmin;
+  color: #000000;
+  pointer-events: none;
+  user-select: none;
+}
+
 #loading-screen::after {
   content: "";
   position: absolute;
