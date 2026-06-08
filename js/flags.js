@@ -800,6 +800,11 @@ function startFlagsRound() {
   flagsRoundStartTime = performance.now() + 200; // empieza a contar tras la animación de entrada
 
   let flagsPicked = false;
+  // findluggage scrollea en X. En iOS el click llega ~300ms tarde (lag de toque) y
+  // para entonces findluggage ya se corrió → el maletín caía a una X posterior. Lo
+  // congelamos en pointerdown (toque real, inmediato). Solo afecta X; la Y no cambia
+  // porque findluggage no se mueve en vertical.
+  let flagsTapFindRect = null;
 
   // ── Eliminación progresiva de opciones erróneas ───────────────────────────────
   // 6 opciones: cada 1/3 del tiempo se desvanecen 2 erróneas (0.3s) y quedan
@@ -832,6 +837,14 @@ function startFlagsRound() {
   flagsGroupIds.forEach((id, i) => {
     const group = document.getElementById(id);
     if (!group) return;
+    group.onpointerdown = () => {
+      if (flagsRunning && !flagsPicked && !group.classList.contains('flags-faded')) {
+        // Congelar findluggage en el toque real (el molde deja de scrollear ya), así
+        // el maletín y el molde quedan juntos donde tocaste, sin la deriva del lag.
+        flagsTapFindRect = flagsFindLuggage.getBoundingClientRect();
+        flagsFindLuggage.style.animationPlayState = 'paused';
+      }
+    };
     group.onclick = () => {
       // Ignorar opciones ya desvanecidas: aunque el grupo tenga pointer-events:none,
       // un hijo con pointer-events:auto deja que el click burbujee hasta acá.
@@ -854,7 +867,10 @@ function startFlagsRound() {
       const lugImg    = group.querySelector('#flags-luggage, .flags-luggage-side');
       const lugRect   = (lugImg || group).getBoundingClientRect();
       const grpRect   = group.getBoundingClientRect();   // punto de origen (w0) del grupo
-      const findRect  = flagsFindLuggage.getBoundingClientRect();
+      // Posición de findluggage CONGELADA en el toque (pointerdown) para que el lag
+      // de iOS no la deje correr en X; si no hubo pointerdown, leer al instante.
+      const findRect  = flagsTapFindRect || flagsFindLuggage.getBoundingClientRect();
+      flagsTapFindRect = null;
       const lugScale  = flagsLuggageWrap.getBoundingClientRect().width / 220;
       // Escala para que el maletín iguale el tamaño de findluggage (≈1 en PC, donde
       // ya coinciden; >1 en iOS donde el maletín salía algo más chico). Esto fuerza
