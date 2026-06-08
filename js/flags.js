@@ -867,28 +867,27 @@ function startFlagsRound() {
       const lugCy  = (lugRect.top  + lugRect.height / 2 - grpRect.top)  / lugScale;
       const findCx = (findRect.left + findRect.width  / 2 - grpRect.left) / lugScale;
       const findCy = (findRect.top  + findRect.height / 2 - grpRect.top)  / lugScale;
-      const dx = findCx - fit * lugCx;
-      const dy = findCy - fit * lugCy;
+      let dx = findCx - fit * lugCx;
+      let dy = findCy - fit * lugCy;
       group.style.willChange = 'transform';                 // capa GPU (suaviza iOS)
       group.style.transformOrigin = '0 0';
       group.style.transition = 'transform 0.1s linear';
       group.style.transform  = `translate3d(${dx}px, ${dy}px, 0) scale(${fit})`;
-      // ── DEBUG TEMPORAL (quitar luego) ──
-      try {
-        let dbg = document.getElementById('flags-debug');
-        if (!dbg) { dbg = document.createElement('div'); dbg.id = 'flags-debug';
-          dbg.style.cssText = 'position:fixed;top:4px;left:4px;z-index:99999;background:rgba(0,0,0,.85);color:#0f0;font:11px monospace;padding:6px;white-space:pre;pointer-events:none;line-height:1.35'; document.body.appendChild(dbg); }
-        const li = group.querySelector('#flags-luggage, .flags-luggage-side');
-        setTimeout(() => {
-          const after = li.getBoundingClientRect();
-          dbg.textContent =
-            'PRE  lug w' + Math.round(lugRect.width) + ' find w' + Math.round(findRect.width) + ' fit ' + fit.toFixed(3) + '\n' +
-            'lugScale ' + lugScale.toFixed(3) + '\n' +
-            'POST lug w' + Math.round(after.width) + ' center ' + Math.round(after.left + after.width / 2) + ',' + Math.round(after.top + after.height / 2) + '\n' +
-            'findCenter ' + Math.round(findRect.left + findRect.width / 2) + ',' + Math.round(findRect.top + findRect.height / 2) + '\n' +
-            'dx ' + Math.round(dx) + ' dy ' + Math.round(dy);
-        }, 160);
-      } catch (e) {}
+      // Medir-y-corregir: tras el move, mido el centro REAL del maletín vs findluggage
+      // y ajusto el remanente. Esto auto-corrige cualquier offset sistemático (en iOS
+      // findluggage está anclado al bottom y el wrap al centro → desfase en Y).
+      setTimeout(() => {
+        if (flagsAborted) return;
+        const a = (group.querySelector('#flags-luggage, .flags-luggage-side')).getBoundingClientRect();
+        const f = flagsFindLuggage.getBoundingClientRect();
+        const rx = ((f.left + f.width / 2) - (a.left + a.width / 2)) / lugScale;
+        const ry = ((f.top  + f.height / 2) - (a.top  + a.height / 2)) / lugScale;
+        if (Math.abs(rx) > 0.5 || Math.abs(ry) > 0.5) {
+          dx += rx; dy += ry;
+          group.style.transition = 'transform 0.06s linear';
+          group.style.transform  = `translate3d(${dx}px, ${dy}px, 0) scale(${fit})`;
+        }
+      }, 120);
       flagsMachine2.style.animationPlayState = 'paused';
       flagsMachine3.style.animationPlayState = 'paused';
       flagsMachine3b.style.animationPlayState = 'paused';
