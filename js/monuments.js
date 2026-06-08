@@ -2680,9 +2680,11 @@ document.getElementById('vol-btn')?.addEventListener('click', () => {
 (function () {
   const warning = document.getElementById('screen-warning');
   const msg     = document.getElementById('screen-warning-msg');
-  const MIN_W   = 480;
-  const MIN_H   = 320;
-  const MAX_RATIO = 2.8;
+  // TEMP: límites bajados para testear en pantallas chicas (iOS).
+  // REACTIVAR a 480 / 320 / 2.8 antes de push final.
+  const MIN_W   = 200;
+  const MIN_H   = 150;
+  const MAX_RATIO = 5;
 
   function check() {
     const w = window.innerWidth;
