@@ -196,14 +196,23 @@ function animateTotal(target) {
   countRaf = requestAnimationFrame(tick);
 }
 
+function startResultsLoop() {
+  if (loopStarted) return;
+  loopStarted = true;
+  sfxLoop.currentTime = 0;
+  sfxLoop.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1;
+  sfxLoop.play().catch(e => console.error('loop play failed:', e));
+}
+
+// Arranca el loop un pelín antes de que termine el cheer (overlap suave)…
 sfxCheer.addEventListener('timeupdate', () => {
   if (!loopStarted && sfxCheer.duration && sfxCheer.currentTime >= sfxCheer.duration - 0.22) {
-    loopStarted = true;
-    sfxLoop.currentTime = 0;
-    sfxLoop.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1;
-    sfxLoop.play().catch(e => console.error('loop play failed:', e));
+    startResultsLoop();
   }
 });
+// …y fallback robusto: si timeupdate no disparó (en iOS es poco frecuente y a veces
+// duration es NaN), arrancar el loop al terminar el cheer.
+sfxCheer.addEventListener('ended', startResultsLoop);
 
 resultsConfirm?.addEventListener('click', () => {
   if (confirmCooldown) return;
@@ -295,6 +304,10 @@ function showResultsScreen() {
   loopStarted = false;
   sfxLoop.pause();
   sfxLoop.currentTime = 0;
+  // Primar sfxLoop DENTRO de este gesto: iOS bloquea reproducir un 2º audio fuera de
+  // un gesto, así que lo "desbloqueamos" acá (play+pause) para que luego (al terminar
+  // el cheer) pueda sonar sin gesto.
+  sfxLoop.play().then(() => { if (!loopStarted) { sfxLoop.pause(); sfxLoop.currentTime = 0; } }).catch(() => {});
   sfxCheer.currentTime = 0;
   sfxCheer.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1;
   sfxCheer.play().catch(e => console.error('cheer play failed:', e));

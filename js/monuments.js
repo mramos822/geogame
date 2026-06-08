@@ -2050,8 +2050,11 @@ if (state.sunburst) {
         alpha = 1; scale = 1 - p;
       }
 
-      const W = 405, H = 333;
-      const CW = 477, CH = 405;
+      // Escala proporcional a DISPLAY_W (clamp a 1): en desktop queda igual, en
+      // pantallas chicas (iOS) el check/IN A ROW dejan de salir gigantes.
+      const BADGE_K = Math.min(1, DISPLAY_W / 1190);
+      const W = 405 * BADGE_K, H = 333 * BADGE_K;
+      const CW = 477 * BADGE_K, CH = 405 * BADGE_K;
 
       badgeOverlayCtx.save();
       badgeOverlayCtx.globalAlpha = alpha;
@@ -2070,19 +2073,19 @@ if (state.sunburst) {
       if (bonusScale > 0) {
         const bonusLabel = `+${ba.inRowBonus}`;
         const bonusCX = DISPLAY_W / 2;
-        const bonusCY = DISPLAY_H / 2 + CH / 2 + 20;
+        const bonusCY = DISPLAY_H / 2 + CH / 2 + 20 * BADGE_K;
         badgeOverlayCtx.save();
         badgeOverlayCtx.globalAlpha = alpha;
         badgeOverlayCtx.translate(bonusCX, bonusCY);
         badgeOverlayCtx.scale(bonusScale, bonusScale);
-        badgeOverlayCtx.font = '104px Dimbo, "Arial Black", sans-serif';
+        badgeOverlayCtx.font = `${104 * BADGE_K}px Dimbo, "Arial Black", sans-serif`;
         badgeOverlayCtx.textAlign = 'center';
         badgeOverlayCtx.textBaseline = 'middle';
         badgeOverlayCtx.strokeStyle = '#073A79';
-        badgeOverlayCtx.lineWidth = 14;
+        badgeOverlayCtx.lineWidth = 14 * BADGE_K;
         badgeOverlayCtx.strokeText(bonusLabel, 0, 0);
         badgeOverlayCtx.strokeStyle = '#FD9C1A';
-        badgeOverlayCtx.lineWidth = 7;
+        badgeOverlayCtx.lineWidth = 7 * BADGE_K;
         badgeOverlayCtx.strokeText(bonusLabel, 0, 0);
         badgeOverlayCtx.fillStyle = '#ffffff';
         badgeOverlayCtx.fillText(bonusLabel, 0, 0);
@@ -2091,15 +2094,15 @@ if (state.sunburst) {
 
       badgeOverlayCtx.save();
       badgeOverlayCtx.globalAlpha = alpha;
-      badgeOverlayCtx.translate(DISPLAY_W / 2 + 30, DISPLAY_H / 2 - 30);
+      badgeOverlayCtx.translate(DISPLAY_W / 2 + 30 * BADGE_K, DISPLAY_H / 2 - 30 * BADGE_K);
       badgeOverlayCtx.scale(scale, scale);
       badgeOverlayCtx.drawImage(ba.img, -W / 2, -H / 2, W, H);
-      badgeOverlayCtx.font = 'bold 67px Fredoka, sans-serif';
+      badgeOverlayCtx.font = `bold ${67 * BADGE_K}px Fredoka, sans-serif`;
       badgeOverlayCtx.textAlign = 'center';
       badgeOverlayCtx.textBaseline = 'middle';
       badgeOverlayCtx.scale(1, 1.2);
       badgeOverlayCtx.strokeStyle = getBadgeStrokeColor(ba.streak);
-      badgeOverlayCtx.lineWidth = 11;
+      badgeOverlayCtx.lineWidth = 11 * BADGE_K;
       badgeOverlayCtx.strokeText(`${ba.streak} IN A ROW`, 0, 0);
       badgeOverlayCtx.fillStyle = '#ffffff';
       badgeOverlayCtx.fillText(`${ba.streak} IN A ROW`, 0, 0);
