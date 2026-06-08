@@ -214,7 +214,7 @@ body::after {
   position: absolute;
   /* Mismo Y que la fila de checks (centro del check de la tabla) para que queden
      a nivel; en vmin, no viewport-% (que en iOS los dejaba altos). */
-  top: 16.4vmin;
+  top: 18.4vmin;
   left: 70%;
   width: 6.67vmin;
   height: auto;
@@ -226,7 +226,7 @@ body::after {
 
 .game-bg-wrong3 {
   position: absolute;
-  top: 29.5vmin;
+  top: 31.5vmin;
   left: 70%;
   width: 6.67vmin;
   height: auto;
@@ -238,7 +238,7 @@ body::after {
 
 .grade-count-total {
   position: absolute;
-  top: 16.4vmin;
+  top: 18.4vmin;
   left: 72%;
   transform: translateY(-50%);
   color: #A4D300;
@@ -259,7 +259,7 @@ body::after {
 
 .wrong-count-total {
   position: absolute !important;
-  top: 29.5vmin;
+  top: 31.5vmin;
   left: 72%;
   transform: translateY(-50%);
   color: #ff4444;
