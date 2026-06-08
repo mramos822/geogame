@@ -287,8 +287,11 @@ body::after {
 
 .checks-row {
   position: absolute !important;
-  top: 16.5%;
-  left: 28%;
+  /* Ancladas a la tabla (140.7vmin ancho, 43vmin alto, top:0, centrada) en vmin —
+     no en viewport-% — para que trackeen el check/X de la tabla en cualquier aspect
+     ratio (en iOS el % derivaba en Y y el rango X). 16.4vmin = centro del check. */
+  top: 16.4vmin;
+  left: calc(50% - 46vmin);
   transform: translateY(-50%);
   display: flex;
   flex-direction: row;
@@ -312,8 +315,9 @@ body::after {
 
 .wrongs-row {
   position: absolute !important;
-  top: 29.4%;
-  left: 28%;
+  /* 29.5vmin = centro de la X roja de la tabla (ver .checks-row). */
+  top: 29.5vmin;
+  left: calc(50% - 46vmin);
   transform: translateY(-50%);
   display: flex;
   flex-direction: row;
