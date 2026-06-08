@@ -30,14 +30,8 @@ flagsLuggageWrap.addEventListener('dragstart', e => e.preventDefault());
 // grupos, clip-path: path(...) y matrix3d) que NO se puede expresar en vmin. Para
 // que escale con el viewport como el resto, se escala el wrap completo como unidad.
 // Factor = min(vw,vh)/911 → 1.0 en el viewport de referencia (9.11px por vmin).
-// IMPORTANTE: usamos documentElement.clientWidth/clientHeight (viewport de LAYOUT,
-// la misma base que el `vmin` de CSS) y NO window.innerWidth/innerHeight (viewport
-// VISUAL). En iOS la barra de Safari hace que ambos difieran, dejando el maletín
-// con distinta proporción que findluggage (que está en vmin). Con clientW/H la
-// proporción maletín/findluggage es idéntica en PC e iOS.
 function flagsLuggageScale() {
-  const de = document.documentElement;
-  return Math.min(de.clientWidth, de.clientHeight) / 911;
+  return Math.min(window.innerWidth, window.innerHeight) / 911;
 }
 function scaleFlagsLuggage() {
   flagsLuggageWrap.style.transform = `translate(-50%, -50%) scale(${flagsLuggageScale()})`;
@@ -159,6 +153,7 @@ function showFlagsMode() {
       g.style.animation  = '';
       g.style.transition = '';
       g.style.transform  = '';
+      g.style.transformOrigin = '';
       g.style.opacity    = '';
       g.style.willChange = '';
       g.classList.remove('flags-faded');
@@ -577,16 +572,21 @@ function startFlagsRoundRecording() {
       group.classList.remove('luggage-enter-active');
       group.style.animation = 'none';
       void group.offsetWidth;
-      // Ver handler real: centrar el maletín sobre findluggage (medir la imagen real).
+      // Ver handler real: centrar el maletín sobre findluggage e igualar su tamaño.
       const lugImg    = group.querySelector('#flags-luggage, .flags-luggage-side');
-      const groupRect = (lugImg || group).getBoundingClientRect();
+      const lugRect   = (lugImg || group).getBoundingClientRect();
+      const grpRect   = group.getBoundingClientRect();
       const findRect  = flagsFindLuggage.getBoundingClientRect();
       const lugScale  = flagsLuggageWrap.getBoundingClientRect().width / 220;
-      const dx = ((findRect.left + findRect.width  / 2) - (groupRect.left + groupRect.width  / 2)) / lugScale;
-      const dy = ((findRect.top  + findRect.height / 2) - (groupRect.top  + groupRect.height / 2)) / lugScale;
+      const fit = lugRect.width ? (findRect.width / lugRect.width) : 1;
+      const dx = ((findRect.left + findRect.width  / 2) - (lugRect.left + lugRect.width  / 2)) / lugScale;
+      const dy = ((findRect.top  + findRect.height / 2) - (lugRect.top  + lugRect.height / 2)) / lugScale;
+      const originX = (lugRect.left + lugRect.width  / 2 - grpRect.left) / lugScale;
+      const originY = (lugRect.top  + lugRect.height / 2 - grpRect.top)  / lugScale;
       group.style.willChange = 'transform';                 // capa GPU (suaviza iOS)
+      group.style.transformOrigin = `${originX}px ${originY}px`;
       group.style.transition = 'transform 0.1s linear';
-      group.style.transform  = `translate3d(${dx}px, ${dy}px, 0)`;
+      group.style.transform  = `translate3d(${dx}px, ${dy}px, 0) scale(${fit})`;
       flagsMachine2.style.animationPlayState     = 'paused';
       flagsMachine3.style.animationPlayState     = 'paused';
       flagsMachine3b.style.animationPlayState    = 'paused';
@@ -635,7 +635,7 @@ function startFlagsRound() {
         const allGroupIds = [...flagsTopGroupIds, ...flagsBottomGroupIds];
         allGroupIds.forEach(gid => {
           const g = document.getElementById(gid);
-          if (g) { g.classList.remove('luggage-enter-active'); g.style.animation = ''; g.style.transition = ''; g.style.transform = ''; g.style.opacity = '0'; g.style.willChange = ''; }
+          if (g) { g.classList.remove('luggage-enter-active'); g.style.animation = ''; g.style.transition = ''; g.style.transform = ''; g.style.transformOrigin = ''; g.style.opacity = '0'; g.style.willChange = ''; }
         });
         setTimeout(() => {
           if (!flagsRunning) return;
@@ -838,20 +838,27 @@ function startFlagsRound() {
       group.classList.remove('luggage-enter-active');
       group.style.animation  = 'none';
       void group.offsetWidth; // reflow — group is now at natural CSS position
-      // El <div> del grupo tiene tamaño 0 (sus maletines son position:absolute),
-      // así que medimos la IMAGEN del maletín (tamaño real) y centramos su centro
-      // sobre el centro de findluggage. Funciona igual en PC e iOS.
+      // findluggage es el MOLDE (contorno) donde el maletín debe encajar: centrado
+      // y del MISMO tamaño. El <div> del grupo mide 0, así que medimos la imagen.
       const lugImg    = group.querySelector('#flags-luggage, .flags-luggage-side');
-      const groupRect = (lugImg || group).getBoundingClientRect();
+      const lugRect   = (lugImg || group).getBoundingClientRect();
+      const grpRect   = group.getBoundingClientRect();   // punto de origen (w0) del grupo
       const findRect  = flagsFindLuggage.getBoundingClientRect();
       const lugScale  = flagsLuggageWrap.getBoundingClientRect().width / 220;
-      // Centrar el maletín sobre findluggage (medimos la imagen real del maletín
-      // porque el <div> del grupo mide 0). Correcto en PC y muy cercano en iOS.
-      const dx = ((findRect.left + findRect.width  / 2) - (groupRect.left + groupRect.width  / 2)) / lugScale;
-      const dy = ((findRect.top  + findRect.height / 2) - (groupRect.top  + groupRect.height / 2)) / lugScale;
+      // Escala para que el maletín iguale el tamaño de findluggage (≈1 en PC, donde
+      // ya coinciden; >1 en iOS donde el maletín salía algo más chico). Esto fuerza
+      // que la proporción maletín/molde sea idéntica en cualquier pantalla.
+      const fit = lugRect.width ? (findRect.width / lugRect.width) : 1;
+      // Centrar el maletín sobre findluggage. Pivote del scale = centro del maletín
+      // (en coords locales del grupo) para que al escalar no se descentre.
+      const dx = ((findRect.left + findRect.width  / 2) - (lugRect.left + lugRect.width  / 2)) / lugScale;
+      const dy = ((findRect.top  + findRect.height / 2) - (lugRect.top  + lugRect.height / 2)) / lugScale;
+      const originX = (lugRect.left + lugRect.width  / 2 - grpRect.left) / lugScale;
+      const originY = (lugRect.top  + lugRect.height / 2 - grpRect.top)  / lugScale;
       group.style.willChange = 'transform';                 // capa GPU (suaviza iOS)
+      group.style.transformOrigin = `${originX}px ${originY}px`;
       group.style.transition = 'transform 0.1s linear';
-      group.style.transform  = `translate3d(${dx}px, ${dy}px, 0)`;
+      group.style.transform  = `translate3d(${dx}px, ${dy}px, 0) scale(${fit})`;
       flagsMachine2.style.animationPlayState = 'paused';
       flagsMachine3.style.animationPlayState = 'paused';
       flagsMachine3b.style.animationPlayState = 'paused';
@@ -871,7 +878,7 @@ function startFlagsRound() {
         // Whoosh selected group -1000px from findluggage position
         if (!document.body.classList.contains('recording-mode')) {
           group.style.transition = 'transform 0.15s linear';
-          group.style.transform  = `translate3d(${dx - 1000 / lugScale}px, ${dy}px, 0)`;
+          group.style.transform  = `translate3d(${dx - 1000 / lugScale}px, ${dy}px, 0) scale(${fit})`;
         }
       }, 600);
       flagsGroupIds.forEach(gid => {
@@ -937,7 +944,7 @@ function startFlagsRound() {
           if (!document.body.classList.contains('recording-mode')) {
             allGroupIds.forEach(gid => {
               const g = document.getElementById(gid);
-              if (g) { g.classList.remove('luggage-enter-active'); g.style.animation = ''; g.style.transition = ''; g.style.transform = ''; g.style.opacity = '0'; g.style.willChange = ''; }
+              if (g) { g.classList.remove('luggage-enter-active'); g.style.animation = ''; g.style.transition = ''; g.style.transform = ''; g.style.transformOrigin = ''; g.style.opacity = '0'; g.style.willChange = ''; }
             });
           }
           setTimeout(() => {
