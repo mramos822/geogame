@@ -837,13 +837,13 @@ function startFlagsRound() {
   flagsGroupIds.forEach((id, i) => {
     const group = document.getElementById(id);
     if (!group) return;
-    group.onpointerdown = () => {
+    // pointerup = al SOLTAR sobre el maletín (confirmación), inmediato en iOS (sin el
+    // lag del click). Acá congelamos findluggage y las máquinas, y capturamos la
+    // posición del molde, así el maletín cae donde estaba al confirmar, sin deriva.
+    group.onpointerup = () => {
       if (flagsRunning && !flagsPicked && !group.classList.contains('flags-faded')) {
-        // Congelar findluggage en el toque real (el molde deja de scrollear ya), así
-        // el maletín y el molde quedan juntos donde tocaste, sin la deriva del lag.
         flagsTapFindRect = flagsFindLuggage.getBoundingClientRect();
         flagsFindLuggage.style.animationPlayState = 'paused';
-        // Pausar el movimiento de las máquinas a la par que findluggage.
         flagsMachine2.style.animationPlayState  = 'paused';
         flagsMachine3.style.animationPlayState  = 'paused';
         flagsMachine3b.style.animationPlayState = 'paused';
