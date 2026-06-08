@@ -753,7 +753,7 @@ function quitToMenu() {
 
   // 4) Limpiar diálogos, overlays, animaciones y movimiento ingame
   const reset = (id, fn) => { const el = document.getElementById(id); if (el) fn(el); };
-  reset('city-tag',         el => { el.style.left = '-525px'; });
+  reset('city-tag',         el => { el.style.left = tpx(-525); });
   reset('result-label',     el => { el.textContent = ''; el.style.animation = ''; });
   reset('coord-tooltip',    el => { el.style.display = 'none'; });
   reset('monument-img',     el => { el.style.display = 'none'; });
@@ -935,6 +935,15 @@ const DISPLAY_W = Math.min(
 );
 const DISPLAY_H = Math.round(DISPLAY_W / MAP_ASPECT);
 
+// El cartel (tag3.png), la foto (photo.png) y la imagen del monumento estaban en
+// px fijos, pero el canvas/mapa mide DISPLAY_W (variable según pantalla). En
+// pantallas chicas (iOS landscape) esos px quedaban enormes respecto al mapa.
+// Escalamos su geometría proporcional a DISPLAY_W, con clamp a 1 para que en
+// desktop quede idéntico a antes y solo se achique en pantallas pequeñas.
+// 1190 ≈ DISPLAY_W de un desktop típico (donde 525px ya se veía bien).
+const TAG_SCALE = Math.min(1, DISPLAY_W / 1190);
+const tpx = v => Math.round(v * TAG_SCALE) + 'px';
+
 const PIN_W = 48, PIN_H = 48;
 
 // Fraction (0–1) within the image where the needle tip sits
@@ -952,6 +961,24 @@ const cityTagEl      = document.getElementById('city-tag');
 const cityTagText    = document.getElementById('city-tag-text');
 const monumentImgEl  = document.getElementById('monument-img');
 const monumentNameEl = document.getElementById('monument-name');
+
+// Aplica la geometría del cartel/foto/monumento escalada a DISPLAY_W (ver TAG_SCALE).
+// Se ejecuta una vez; los clones (ghosts) heredan estos estilos inline.
+(function applyTagScale() {
+  if (TAG_SCALE >= 1) return; // desktop: dejar los px del CSS/HTML tal cual
+  cityTagEl.style.width      = tpx(525);
+  cityTagEl.style.height     = tpx(163);
+  cityTagText.style.fontSize = tpx(26);
+  monumentNameEl.style.top      = tpx(238);
+  monumentNameEl.style.left     = tpx(87);
+  monumentNameEl.style.width    = tpx(282);
+  monumentNameEl.style.fontSize = tpx(18);
+  monumentImgEl.style.width  = tpx(282);
+  monumentImgEl.style.height = tpx(180);
+  monumentImgEl.style.top    = tpx(51);
+  monumentImgEl.style.left   = tpx(87);
+})();
+
 const timerNumberEl  = document.getElementById('timer-number');
 const countdownImg   = document.querySelector('#countdown-widget img');
 const progressDots   = document.querySelectorAll('.dot');
@@ -1407,15 +1434,15 @@ function easeOutBounce(t) {
 
 // ── TAG ANIMATION ────────────────────────────────────────────────────────────
 function slideTagIn(cityName, countryCode) {
-  const wasVisible = cityTagEl.style.left !== '' && cityTagEl.style.left !== '-525px';
+  const wasVisible = cityTagEl.style.left !== '' && cityTagEl.style.left !== tpx(-525);
   if (wasVisible) {
     const ghost = cityTagEl.cloneNode(true);
     ghost.className = 'city-tag-ghost';
     ghost.style.visibility = 'visible';
     ghost.style.zIndex = '9';
     ghost.style.transition = 'none';
-    ghost.style.top  = cityTagEl.style.top  || '10px';
-    ghost.style.left = cityTagEl.style.left || '-90px';
+    ghost.style.top  = cityTagEl.style.top  || tpx(10);
+    ghost.style.left = cityTagEl.style.left || tpx(-90);
     gameWrapper.appendChild(ghost);
     setTimeout(() => {
       ghost.style.transition = 'opacity 0.3s';
@@ -1429,12 +1456,13 @@ function slideTagIn(cityName, countryCode) {
 
   function setTagText(text) {
     cityTagText.textContent = text;
-    const baseSize = 26;
-    const maxWidth = 230;
+    const baseSize = 26 * TAG_SCALE;
+    const maxWidth = 230 * TAG_SCALE;
+    const minSize  = 14 * TAG_SCALE;
     cityTagText.style.fontSize = baseSize + 'px';
     let fs = baseSize;
-    while (fs > 14 && cityTagText.scrollWidth > maxWidth) {
-      fs--;
+    while (fs > minSize && cityTagText.scrollWidth > maxWidth) {
+      fs -= TAG_SCALE;
       cityTagText.style.fontSize = fs + 'px';
     }
   }
@@ -1449,15 +1477,15 @@ function slideTagIn(cityName, countryCode) {
 
   cityTagEl.style.visibility = 'hidden';
   cityTagEl.style.transition = 'none';
-  cityTagEl.style.top  = '-163px';
-  cityTagEl.style.left = '-525px';
+  cityTagEl.style.top  = tpx(-163);
+  cityTagEl.style.left = tpx(-525);
   setTimeout(() => { sfxTag.currentTime = 0; sfxTag.play(); }, 200);
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       cityTagEl.style.visibility = 'visible';
       cityTagEl.style.transition = 'left 0.45s cubic-bezier(0.22,1,0.36,1), top 0.45s cubic-bezier(0.22,1,0.36,1)';
-      cityTagEl.style.left = '-90px';
-      cityTagEl.style.top  = '-50px';
+      cityTagEl.style.left = tpx(-90);
+      cityTagEl.style.top  = tpx(-50);
     });
   });
 }
@@ -1598,15 +1626,15 @@ function slideMonumentIn(monument) {
 
   const tagImg = cityTagEl.querySelector('img');
   tagImg.src = 'images/photo.png';
-  tagImg.style.width  = '431px';
+  tagImg.style.width  = tpx(431);
   tagImg.style.height = 'auto';
   cityTagText.style.display = 'none';
   monumentImgEl.src = `images/places/${monument.img}`;
   monumentImgEl.style.display = 'block';
 
   cityTagEl.style.transition  = 'none';
-  cityTagEl.style.left        = '-50px';
-  cityTagEl.style.top         = '-55px';
+  cityTagEl.style.left        = tpx(-50);
+  cityTagEl.style.top         = tpx(-55);
   cityTagEl.style.visibility  = 'visible';
   setTimeout(() => { sfxTag.currentTime = 0; sfxTag.play(); }, 200);
 
@@ -2270,8 +2298,8 @@ function startGame() {
   resultLabel.className        = '';
   speedBonusText.classList.remove('visible');
   cityTagEl.style.transition   = 'none';
-  cityTagEl.style.left         = '-525px';
-  cityTagEl.style.top          = '-163px';
+  cityTagEl.style.left         = tpx(-525);
+  cityTagEl.style.top          = tpx(-163);
   const tagImg = cityTagEl.querySelector('img');
   tagImg.src = 'images/tag3.png';
   tagImg.style.width  = '';
