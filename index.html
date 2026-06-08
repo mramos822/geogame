@@ -211,6 +211,12 @@
         <div class="loading-social-list" id="loading-social-list"></div>
         <div class="loading-social-footer">
           <button class="loading-social-action" id="loading-social-invite" type="button">Añadir Amigo</button>
+          <button class="loading-social-blockbtn" id="loading-social-sentbtn" type="button" title="Solicitudes enviadas" aria-label="Solicitudes enviadas">
+            <img src="images/friendsent.png" alt="Enviadas" draggable="false" oncontextmenu="return false">
+          </button>
+          <button class="loading-social-blockbtn" id="loading-social-blockbtn" type="button" title="Bloqueados" aria-label="Bloqueados">
+            <img src="images/friendblock.png" alt="Bloqueados" draggable="false" oncontextmenu="return false">
+          </button>
         </div>
       </div>
       <div class="loading-social-back-wrap" id="loading-social-back-wrap">
@@ -301,6 +307,11 @@
     <span class="loading-games-hs-label">Highscore</span>
     <img class="loading-games-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">
     <span class="loading-games-total" id="loading-friend-total">0</span>
+    <div class="loading-friend-actions" id="loading-friend-actions">
+      <img class="loading-friend-act loading-friend-fav"   id="loading-friend-fav"   src="images/bestfriend.png" alt="Mejor amigo" draggable="false" oncontextmenu="return false">
+      <img class="loading-friend-act loading-friend-rel"   id="loading-friend-rel"   src="images/friendadd.png"  alt="" draggable="false" oncontextmenu="return false">
+      <img class="loading-friend-act loading-friend-block" id="loading-friend-block" src="images/friendblock.png" alt="Bloquear" draggable="false" oncontextmenu="return false">
+    </div>
     </div>
     <div id="loading-addfriend-group" class="table-gone">
       <img class="loading-howtotable" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
@@ -324,7 +335,59 @@
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
     </div>
-    <div id="loading-version">Ver. 1.17.0</div>
+
+    <div id="loading-blocked-group" class="table-gone">
+      <img class="loading-howtotable" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
+      <div class="loading-addfriend-titlebar loading-blocked-titlebar">
+        <img class="loading-social-planet" src="images/planet2.png" alt="" draggable="false" oncontextmenu="return false">
+        <span class="loading-social-title">Bloqueados</span>
+        <img class="loading-social-planet" src="images/planet2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+      <div class="loading-social-panel loading-blocked-panel">
+        <div class="loading-blocked-toolbar">
+          <div class="loading-social-search loading-blocked-search">
+            <svg class="loading-social-search-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="10.5" cy="10.5" r="6.5" stroke="#8b6a00" stroke-width="2.4"/>
+              <line x1="15.6" y1="15.6" x2="21" y2="21" stroke="#8b6a00" stroke-width="2.8" stroke-linecap="round"/>
+            </svg>
+            <input class="loading-social-search-input" id="loading-blocked-search-input" type="text" placeholder="Buscar Bloqueados..." maxlength="12" autocomplete="off" spellcheck="false">
+          </div>
+          <button class="loading-social-sort loading-blocked-sort" id="loading-blocked-sort" type="button" title="Ordenar">A-Z</button>
+        </div>
+        <div class="loading-social-list" id="loading-blocked-list"></div>
+      </div>
+      <div class="loading-social-back-wrap" id="loading-blocked-back-wrap">
+        <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+        <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+    </div>
+
+    <div id="loading-sent-group" class="table-gone">
+      <img class="loading-howtotable" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
+      <div class="loading-addfriend-titlebar loading-blocked-titlebar">
+        <img class="loading-social-planet" src="images/planet2.png" alt="" draggable="false" oncontextmenu="return false">
+        <span class="loading-social-title">Solicitudes Enviadas</span>
+        <img class="loading-social-planet" src="images/planet2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+      <div class="loading-social-panel loading-blocked-panel">
+        <div class="loading-blocked-toolbar">
+          <div class="loading-social-search loading-blocked-search">
+            <svg class="loading-social-search-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="10.5" cy="10.5" r="6.5" stroke="#8b6a00" stroke-width="2.4"/>
+              <line x1="15.6" y1="15.6" x2="21" y2="21" stroke="#8b6a00" stroke-width="2.8" stroke-linecap="round"/>
+            </svg>
+            <input class="loading-social-search-input" id="loading-sent-search-input" type="text" placeholder="Buscar Enviadas..." maxlength="12" autocomplete="off" spellcheck="false">
+          </div>
+          <button class="loading-social-sort loading-blocked-sort" id="loading-sent-sort" type="button" title="Ordenar">A-Z</button>
+        </div>
+        <div class="loading-social-list" id="loading-sent-list"></div>
+      </div>
+      <div class="loading-social-back-wrap" id="loading-sent-back-wrap">
+        <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+        <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+    </div>
+    <div id="loading-version">Ver. 1.18.0</div>
   </div>
 
   <div id="splash-screen" class="game-bg-screen" style="display:none">
@@ -616,6 +679,17 @@
       <div class="ingame-quit-actions">
         <button class="ingame-quit-btn confirm" id="ingame-quit-confirm" type="button" aria-label="Sí">✓</button>
         <button class="ingame-quit-btn cancel" id="ingame-quit-cancel" type="button" aria-label="No">✕</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="friend-confirm-popup" style="display:none">
+    <div class="ingame-quit-box friend-confirm-box">
+      <button class="friend-confirm-close" id="friend-confirm-close" type="button" aria-label="Cerrar">✕</button>
+      <span class="ingame-quit-text" id="friend-confirm-text"></span>
+      <div class="ingame-quit-actions">
+        <button class="ingame-quit-btn confirm" id="friend-confirm-yes" type="button" aria-label="Sí">✓</button>
+        <button class="ingame-quit-btn cancel" id="friend-confirm-no" type="button" aria-label="No">✕</button>
       </div>
     </div>
   </div>

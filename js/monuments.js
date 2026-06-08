@@ -484,6 +484,29 @@ let SOCIAL_REQUESTS = [
 let socialActiveTab = 'friends';
 let socialSort = localStorage.getItem('socialSort') || 'conn';
 
+// ── Estado de relaciones (favoritos / bloqueados) ────────────────────────────
+// Mock persistido en localStorage; al haber backend, reemplazar por datos reales.
+// Estado de relaciones: MOCK en memoria (se reinicia al recargar). NO se persiste:
+// más adelante esto vendrá del backend/servidor. Ver project_social_backend_todo.
+let socialFavorites = new Set();      // nombres marcados como mejor amigo
+let socialBlocked   = [];             // [{name,score}] bloqueados
+let socialSent      = [];             // [{name,score}] solicitudes que YO envié
+function saveSocialRel() { /* no-op: mock en memoria, sin persistir (futuro: server) */ }
+function isBlockedName(name) { return socialBlocked.some(b => b.name === name); }
+function isSentName(name)    { return socialSent.some(s => s.name === name); }
+function isFriendName(name)  { return (typeof getFriends === 'function' ? getFriends() : []).some(f => f.name === name); }
+function hasRequestName(name){ return SOCIAL_REQUESTS.some(r => r.name === name); }
+function relStatus(name) {
+  if (isBlockedName(name))  return 'blocked';
+  if (isFriendName(name))   return 'friend';
+  if (hasRequestName(name)) return 'request';   // solicitud que me enviaron a mí
+  if (isSentName(name))     return 'sent';      // solicitud que yo envié (pendiente)
+  return 'none';
+}
+
+// El amigo cuyo perfil está abierto (para los botones de relación).
+let currentFriendProfile = null;
+
 function updateSocialTabCounts() {
   const friendsTab  = document.getElementById('loading-social-tab-friends');
   const requestsTab = document.getElementById('loading-social-tab-requests');
@@ -518,8 +541,13 @@ function renderSocialRequests(filter = '') {
         `<button class="loading-social-req-btn accept" type="button" aria-label="Aceptar">✓</button>` +
         `<button class="loading-social-req-btn reject" type="button" aria-label="Rechazar">✕</button>` +
       `</div>`;
-    row.querySelector('.accept').addEventListener('click', () => respondRequest(f, true));
-    row.querySelector('.reject').addEventListener('click', () => respondRequest(f, false));
+    // Click en los botones ✓/✕: acepta/rechaza inline (sin abrir el perfil).
+    row.querySelector('.accept').addEventListener('click', (e) => { e.stopPropagation(); respondRequest(f, true); });
+    row.querySelector('.reject').addEventListener('click', (e) => { e.stopPropagation(); respondRequest(f, false); });
+    // Click en el nombre/celda: abre el perfil (ahí el botón del medio muestra
+    // friendreq → al clickearlo pregunta si querés agregarlo).
+    const avatar = SOCIAL_AVATARS[i % SOCIAL_AVATARS.length];
+    row.addEventListener('click', () => openFriendProfile(f, { cls: 'online', text: 'En línea', rank: 1, minsAgo: 0 }, avatar));
     list.appendChild(row);
   });
 }
@@ -547,18 +575,26 @@ function renderSocialFriends(filter = '') {
     'name-asc':  (a, b) => a.f.name.localeCompare(b.f.name),
     'name-desc': (a, b) => b.f.name.localeCompare(a.f.name),
   };
+  const baseSort = sortFns[socialSort] || sortFns.conn;
   const friends = all
     .map((f, i) => ({ f, i, st: SOCIAL_STATUSES[i % SOCIAL_STATUSES.length] }))
     .filter(o => o.f.name.toLowerCase().includes(filter.toLowerCase()))
-    .sort(sortFns[socialSort] || sortFns.conn);
+    .filter(o => !isBlockedName(o.f.name))               // los bloqueados van aparte, al fondo
+    // Favoritos (mejor amigo) SIEMPRE arriba, sin importar el sort elegido.
+    .sort((a, b) => {
+      const fa = socialFavorites.has(a.f.name) ? 0 : 1;
+      const fb = socialFavorites.has(b.f.name) ? 0 : 1;
+      return (fa - fb) || baseSort(a, b);
+    });
   list.innerHTML = '';
   friends.forEach(({ f, i, st }) => {
+    const fav = socialFavorites.has(f.name);
     const row = document.createElement('div');
-    row.className = 'loading-social-row status-' + st.cls;
+    row.className = 'loading-social-row status-' + st.cls + (fav ? ' is-fav' : '');
     row.innerHTML =
       `<img class="loading-social-avatar" src="${SOCIAL_AVATARS[i % SOCIAL_AVATARS.length]}" alt="" draggable="false" oncontextmenu="return false">` +
       `<div class="loading-social-info">` +
-        `<span class="loading-social-name">${f.name}</span>` +
+        `<span class="loading-social-name">${fav ? '★ ' : ''}${f.name}</span>` +
         `<span class="loading-social-status"><span class="dot ${st.cls}"></span>${st.text}</span>` +
       `</div>` +
       `<div class="loading-social-score">` +
@@ -570,22 +606,41 @@ function renderSocialFriends(filter = '') {
     row.addEventListener('click', () => openFriendProfile(f, st, SOCIAL_AVATARS[i % SOCIAL_AVATARS.length]));
     list.appendChild(row);
   });
+
+  // Bloqueados al fondo, en gris, clickeables para abrir su perfil y desbloquear.
+  socialBlocked
+    .filter(b => b.name.toLowerCase().includes(filter.toLowerCase()))
+    .forEach((b, k) => {
+      const st = { cls: 'offline', text: 'Bloqueado', rank: 9, minsAgo: 0 };
+      const avatar = SOCIAL_AVATARS[k % SOCIAL_AVATARS.length];
+      const row = document.createElement('div');
+      row.className = 'loading-social-row status-offline is-blocked-row';
+      row.innerHTML =
+        `<img class="loading-social-avatar" src="${avatar}" alt="" draggable="false" oncontextmenu="return false">` +
+        `<div class="loading-social-info">` +
+          `<span class="loading-social-name">${b.name}</span>` +
+          `<span class="loading-social-status">Bloqueado</span>` +
+        `</div>` +
+        `<div class="loading-social-score">` +
+          `<img class="loading-social-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">` +
+          `<span class="loading-social-score-val">${b.score.toLocaleString()}</span>` +
+        `</div>` +
+        `<span class="loading-social-rankname">${(typeof getRank === 'function' ? getRank(b.score).name : '')}</span>` +
+        `<img class="loading-social-emote" src="${(typeof getRank === 'function' ? getRank(b.score).img : 'images/ranks/1.png')}" alt="" draggable="false" oncontextmenu="return false">`;
+      row.addEventListener('click', () => openFriendProfile(b, st, avatar));
+      list.appendChild(row);
+    });
 }
 
 // Abre el table (copia del perfil) con los datos del amigo seleccionado.
 function openFriendProfile(friend, st, avatarSrc) {
   sfxCheck.currentTime = 0; sfxCheck.play();
+  currentFriendProfile = { name: friend.name, score: friend.score, avatar: avatarSrc, st };
   const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
 
   const pic = document.getElementById('loading-friend-pic');
   if (pic) pic.src = avatarSrc;
   setText('loading-friend-name', friend.name);
-
-  const statusEl = document.getElementById('loading-friend-status');
-  if (statusEl) {
-    statusEl.textContent = st.cls === 'offline' ? st.text.replace('Última vez', 'Última conexión') : st.text;
-    statusEl.className = 'loading-friend-status ' + st.cls;
-  }
 
   const total = friend.score;
   setText('loading-friend-total', total.toLocaleString());
@@ -616,8 +671,161 @@ function openFriendProfile(friend, st, avatarSrc) {
     }
   }
 
+  updateFriendButtons();
   document.getElementById('loading-friend-group')?.classList.remove('table-gone');
 }
+
+// ── Botones de relación del perfil de amigo (fav / añadir-aceptar-borrar / bloquear) ──
+function updateFriendButtons() {
+  const actions = document.getElementById('loading-friend-actions');
+  const favBtn  = document.getElementById('loading-friend-fav');
+  const relBtn  = document.getElementById('loading-friend-rel');
+  const blockBtn= document.getElementById('loading-friend-block');
+  if (!actions || !currentFriendProfile) return;
+  const name = currentFriendProfile.name;
+  const status = relStatus(name);
+
+  // El estado (en línea/desconectado) solo se muestra si es tu amigo; si no lo
+  // tenés agregado o está bloqueado, no se muestra.
+  const statusEl = document.getElementById('loading-friend-status');
+  if (statusEl) {
+    const st = currentFriendProfile.st;
+    if (status === 'friend' && st) {
+      statusEl.style.display = '';
+      statusEl.textContent = st.cls === 'offline' ? st.text.replace('Última vez', 'Última conexión') : st.text;
+      statusEl.className = 'loading-friend-status ' + st.cls;
+    } else {
+      statusEl.style.display = 'none';
+      statusEl.textContent = '';
+    }
+  }
+
+  actions.classList.toggle('is-blocked', status === 'blocked');
+
+  // Botón mejor amigo: solo si la persona es amiga (no bloqueada).
+  if (status === 'friend') {
+    favBtn.classList.remove('hidden');
+    favBtn.src = socialFavorites.has(name) ? 'images/bestfriend2.png' : 'images/bestfriend.png';
+  } else {
+    favBtn.classList.add('hidden');
+  }
+
+  // Botón del medio según relación.
+  if (status === 'friend')       relBtn.src = 'images/nofriend.png';   // borrar amigo
+  else if (status === 'request') relBtn.src = 'images/friendreq.png';  // aceptar solicitud
+  else if (status === 'sent')    relBtn.src = 'images/friendsent.png'; // solicitud enviada (pendiente)
+  else                           relBtn.src = 'images/friendadd.png';  // añadir
+  // (bloqueado: el medio queda en gris vía .is-blocked)
+
+  // Botón de bloquear: si ya está bloqueado, muestra friendunblock.png.
+  blockBtn.src = status === 'blocked' ? 'images/friendunblock.png' : 'images/friendblock.png';
+}
+
+// Popup de confirmación reutilizable (sí/no).
+function showFriendConfirm(text, onYes, showClose = false, onNo = null) {
+  const popup = document.getElementById('friend-confirm-popup');
+  const txt   = document.getElementById('friend-confirm-text');
+  const yes   = document.getElementById('friend-confirm-yes');
+  const no    = document.getElementById('friend-confirm-no');
+  const xbtn  = document.getElementById('friend-confirm-close');
+  if (!popup) return;
+  txt.textContent = text;
+  popup.style.display = 'flex';
+  if (xbtn) xbtn.style.display = showClose ? 'block' : 'none';  // X solo en aceptar solicitud
+  const close = () => { popup.style.display = 'none'; yes.onclick = null; no.onclick = null; if (xbtn) xbtn.onclick = null; };
+  yes.onclick = () => { sfxCheck.currentTime = 0; sfxCheck.play(); close(); onYes(); };
+  no.onclick  = () => { sfxCheck.currentTime = 0; sfxCheck.play(); close(); if (onNo) onNo(); };  // ✕ = acción "no" (si la hay)
+  if (xbtn) xbtn.onclick = () => { sfxCheck.currentTime = 0; sfxCheck.play(); close(); };          // X = cerrar sin hacer nada
+}
+
+function refreshSocialAfterRel() {
+  saveSocialRel();
+  updateFriendButtons();
+  updateSocialTabCounts();
+  renderSocial(document.getElementById('loading-social-search-input')?.value || '');
+  renderBlockedList(); // mantener el tablero de bloqueados al día
+  renderSentList();    // y el de solicitudes enviadas
+}
+
+// Sonido al pasar el cursor por los 3 botones de relación.
+['loading-friend-fav', 'loading-friend-rel', 'loading-friend-block'].forEach(id => {
+  document.getElementById(id)?.addEventListener('mouseenter', () => {
+    sfxSelect.currentTime = 0; sfxSelect.play();
+  });
+});
+
+// Botón mejor amigo: alterna favorito (solo si es amigo).
+document.getElementById('loading-friend-fav')?.addEventListener('click', () => {
+  if (!currentFriendProfile || relStatus(currentFriendProfile.name) !== 'friend') return;
+  sfxCheck.currentTime = 0; sfxCheck.play();
+  const name = currentFriendProfile.name;
+  if (socialFavorites.has(name)) socialFavorites.delete(name); else socialFavorites.add(name);
+  refreshSocialAfterRel();
+});
+
+// Botón del medio: añadir / aceptar solicitud / borrar amigo.
+document.getElementById('loading-friend-rel')?.addEventListener('click', () => {
+  if (!currentFriendProfile) return;
+  sfxCheck.currentTime = 0; sfxCheck.play();
+  const fp = currentFriendProfile;
+  const status = relStatus(fp.name);
+  if (status === 'blocked') return;
+  if (status === 'friend') {
+    showFriendConfirm(`¿Seguro que quieres eliminar a ${fp.name} de tus amigos?`, () => {
+      if (typeof getFriends === 'function') {
+        const arr = getFriends();
+        const idx = arr.findIndex(f => f.name === fp.name);
+        if (idx >= 0) arr.splice(idx, 1);
+      }
+      socialFavorites.delete(fp.name);
+      refreshSocialAfterRel();
+    });
+  } else if (status === 'request') {
+    showFriendConfirm(`¿Aceptar la solicitud de amistad de ${fp.name}?`, () => {
+      SOCIAL_REQUESTS = SOCIAL_REQUESTS.filter(r => r.name !== fp.name);
+      if (typeof getFriends === 'function') getFriends().push({ name: fp.name, score: fp.score });
+      refreshSocialAfterRel();
+    }, true, () => {
+      // ✕ (no) = rechazar: se elimina su solicitud y vuelve friendadd para poder enviarle.
+      SOCIAL_REQUESTS = SOCIAL_REQUESTS.filter(r => r.name !== fp.name);
+      refreshSocialAfterRel();
+    });
+  } else if (status === 'sent') {
+    showFriendConfirm(`¿Cancelar tu solicitud de amistad a ${fp.name}?`, () => {
+      socialSent = socialSent.filter(s => s.name !== fp.name);
+      refreshSocialAfterRel();
+    });
+  } else { // none → enviar solicitud (queda pendiente hasta que la acepten)
+    socialSent.push({ name: fp.name, score: fp.score });
+    refreshSocialAfterRel();
+  }
+});
+
+// Botón bloquear / desbloquear.
+document.getElementById('loading-friend-block')?.addEventListener('click', () => {
+  if (!currentFriendProfile) return;
+  sfxCheck.currentTime = 0; sfxCheck.play();
+  const fp = currentFriendProfile;
+  if (isBlockedName(fp.name)) {
+    showFriendConfirm(`¿Quieres desbloquear a ${fp.name}?`, () => {
+      socialBlocked = socialBlocked.filter(b => b.name !== fp.name);
+      refreshSocialAfterRel();
+    });
+  } else {
+    showFriendConfirm(`¿Quieres bloquear a ${fp.name}?`, () => {
+      socialBlocked.push({ name: fp.name, score: fp.score });
+      socialFavorites.delete(fp.name);            // pierde el favorito
+      socialSent = socialSent.filter(s => s.name !== fp.name); // cancela tu solicitud enviada
+      if (typeof getFriends === 'function') {      // se rompe la amistad
+        const arr = getFriends();
+        const idx = arr.findIndex(f => f.name === fp.name);
+        if (idx >= 0) arr.splice(idx, 1);
+      }
+      SOCIAL_REQUESTS = SOCIAL_REQUESTS.filter(r => r.name !== fp.name); // descarta solicitud entrante
+      refreshSocialAfterRel();
+    });
+  }
+});
 
 document.getElementById('loading-friend-back-wrap')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxCheck.play();
@@ -698,13 +906,18 @@ function sendFriendRequest() {
   }
   const friends = (typeof getFriends === 'function' ? getFriends() : []);
   const taken = friends.some(f => f.name.toLowerCase() === name.toLowerCase()) ||
-                SOCIAL_REQUESTS.some(r => r.name.toLowerCase() === name.toLowerCase());
+                SOCIAL_REQUESTS.some(r => r.name.toLowerCase() === name.toLowerCase()) ||
+                socialSent.some(s => s.name.toLowerCase() === name.toLowerCase()) ||
+                isBlockedName(name);
   if (taken) {
     fb.textContent = 'Ya está en tu lista';
     fb.className = 'loading-addfriend-feedback err show';
     return;
   }
   sfxCheck.currentTime = 0; sfxCheck.play();
+  // Queda como solicitud enviada (pendiente) → aparece en el tablero de enviadas.
+  socialSent.push({ name, score: Math.floor(Math.random() * 50000) });
+  saveSocialRel();
   fb.textContent = `¡Solicitud enviada a ${name}!`;
   fb.className = 'loading-addfriend-feedback ok show';
   if (input) input.value = '';
@@ -721,6 +934,155 @@ document.getElementById('loading-addfriend-back-wrap')?.addEventListener('click'
   wrap.classList.add('confirm-pressed');
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
   document.getElementById('loading-addfriend-group')?.classList.add('table-gone');
+});
+
+// ── Tablero de bloqueados ─────────────────────────────────────────────────────
+let blockedSort = 'az'; // 'az' | 'za'
+function renderBlockedList() {
+  const list = document.getElementById('loading-blocked-list');
+  if (!list) return;
+  const filter = (document.getElementById('loading-blocked-search-input')?.value || '').toLowerCase();
+  list.innerHTML = '';
+  const entries = socialBlocked
+    .filter(b => b.name.toLowerCase().includes(filter))
+    .slice()
+    .sort((a, b) => blockedSort === 'za' ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name));
+  if (entries.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'loading-social-empty';
+    empty.textContent = socialBlocked.length === 0 ? 'No tienes a nadie bloqueado.' : 'Sin resultados.';
+    list.appendChild(empty);
+    return;
+  }
+  entries.forEach((b, k) => {
+    const avatar = SOCIAL_AVATARS[k % SOCIAL_AVATARS.length];
+    const row = document.createElement('div');
+    row.className = 'loading-social-row is-blocked-row';
+    row.innerHTML =
+      `<img class="loading-social-avatar" src="${avatar}" alt="" draggable="false" oncontextmenu="return false">` +
+      `<div class="loading-social-info">` +
+        `<span class="loading-social-name">${b.name}</span>` +
+        `<span class="loading-social-status">Bloqueado</span>` +
+      `</div>` +
+      `<div class="loading-social-score">` +
+        `<img class="loading-social-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">` +
+        `<span class="loading-social-score-val">${b.score.toLocaleString()}</span>` +
+      `</div>` +
+      `<span class="loading-social-rankname">${(typeof getRank === 'function' ? getRank(b.score).name : '')}</span>` +
+      `<img class="loading-social-emote" src="${(typeof getRank === 'function' ? getRank(b.score).img : 'images/ranks/1.png')}" alt="" draggable="false" oncontextmenu="return false">`;
+    row.addEventListener('click', () => openFriendProfile(b, { cls: 'offline', text: 'Bloqueado', rank: 9, minsAgo: 0 }, avatar));
+    list.appendChild(row);
+  });
+}
+
+// Bloquea/restaura los clicks de la lista de amigos (para no clickear un amigo
+// durante la transición de entrada de un sub-tablero).
+function setSocialListClickable(on) {
+  const list = document.getElementById('loading-social-list');
+  if (list) list.style.pointerEvents = on ? '' : 'none';
+}
+
+document.getElementById('loading-social-blockbtn')?.addEventListener('click', () => {
+  sfxCheck.currentTime = 0; sfxCheck.play();
+  renderBlockedList();
+  setSocialListClickable(false);
+  document.getElementById('loading-blocked-group')?.classList.remove('table-gone');
+});
+document.getElementById('loading-social-blockbtn')?.addEventListener('mouseenter', () => {
+  sfxSelect.currentTime = 0; sfxSelect.play();
+});
+
+document.getElementById('loading-blocked-back-wrap')?.addEventListener('click', () => {
+  sfxCheck.currentTime = 0; sfxCheck.play();
+  const wrap = document.getElementById('loading-blocked-back-wrap');
+  wrap.classList.add('confirm-pressed');
+  setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
+  document.getElementById('loading-blocked-group')?.classList.add('table-gone');
+  setSocialListClickable(true);
+});
+
+document.getElementById('loading-blocked-search-input')?.addEventListener('input', () => renderBlockedList());
+
+document.getElementById('loading-blocked-sort')?.addEventListener('click', () => {
+  sfxCheck.currentTime = 0; sfxCheck.play();
+  blockedSort = blockedSort === 'az' ? 'za' : 'az';
+  const btn = document.getElementById('loading-blocked-sort');
+  if (btn) btn.textContent = blockedSort === 'az' ? 'A-Z' : 'Z-A';
+  renderBlockedList();
+});
+document.getElementById('loading-blocked-sort')?.addEventListener('mouseenter', () => {
+  sfxSelect.currentTime = 0; sfxSelect.play();
+});
+
+// ── Tablero de solicitudes enviadas (pendientes) ──────────────────────────────
+let sentSort = 'az'; // 'az' | 'za'
+function renderSentList() {
+  const list = document.getElementById('loading-sent-list');
+  if (!list) return;
+  const filter = (document.getElementById('loading-sent-search-input')?.value || '').toLowerCase();
+  list.innerHTML = '';
+  const entries = socialSent
+    .filter(s => s.name.toLowerCase().includes(filter))
+    .slice()
+    .sort((a, b) => sentSort === 'za' ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name));
+  if (entries.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'loading-social-empty';
+    empty.textContent = socialSent.length === 0 ? 'No tienes solicitudes pendientes.' : 'Sin resultados.';
+    list.appendChild(empty);
+    return;
+  }
+  entries.forEach((s, k) => {
+    const avatar = SOCIAL_AVATARS[k % SOCIAL_AVATARS.length];
+    const row = document.createElement('div');
+    row.className = 'loading-social-row';
+    row.innerHTML =
+      `<img class="loading-social-avatar" src="${avatar}" alt="" draggable="false" oncontextmenu="return false">` +
+      `<div class="loading-social-info">` +
+        `<span class="loading-social-name">${s.name}</span>` +
+        `<span class="loading-social-status">Solicitud pendiente</span>` +
+      `</div>` +
+      `<div class="loading-social-score">` +
+        `<img class="loading-social-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">` +
+        `<span class="loading-social-score-val">${s.score.toLocaleString()}</span>` +
+      `</div>` +
+      `<span class="loading-social-rankname">${(typeof getRank === 'function' ? getRank(s.score).name : '')}</span>` +
+      `<img class="loading-social-emote" src="${(typeof getRank === 'function' ? getRank(s.score).img : 'images/ranks/1.png')}" alt="" draggable="false" oncontextmenu="return false">`;
+    row.addEventListener('click', () => openFriendProfile(s, { cls: 'online', text: 'En línea', rank: 1, minsAgo: 0 }, avatar));
+    list.appendChild(row);
+  });
+}
+
+document.getElementById('loading-social-sentbtn')?.addEventListener('click', () => {
+  sfxCheck.currentTime = 0; sfxCheck.play();
+  renderSentList();
+  setSocialListClickable(false);
+  document.getElementById('loading-sent-group')?.classList.remove('table-gone');
+});
+document.getElementById('loading-social-sentbtn')?.addEventListener('mouseenter', () => {
+  sfxSelect.currentTime = 0; sfxSelect.play();
+});
+
+document.getElementById('loading-sent-back-wrap')?.addEventListener('click', () => {
+  sfxCheck.currentTime = 0; sfxCheck.play();
+  const wrap = document.getElementById('loading-sent-back-wrap');
+  wrap.classList.add('confirm-pressed');
+  setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
+  document.getElementById('loading-sent-group')?.classList.add('table-gone');
+  setSocialListClickable(true);
+});
+
+document.getElementById('loading-sent-search-input')?.addEventListener('input', () => renderSentList());
+
+document.getElementById('loading-sent-sort')?.addEventListener('click', () => {
+  sfxCheck.currentTime = 0; sfxCheck.play();
+  sentSort = sentSort === 'az' ? 'za' : 'az';
+  const btn = document.getElementById('loading-sent-sort');
+  if (btn) btn.textContent = sentSort === 'az' ? 'A-Z' : 'Z-A';
+  renderSentList();
+});
+document.getElementById('loading-sent-sort')?.addEventListener('mouseenter', () => {
+  sfxSelect.currentTime = 0; sfxSelect.play();
 });
 
 // Cada modo registra aquí cómo detener sus loops (timers/animaciones)
@@ -800,7 +1162,7 @@ function quitToMenu() {
   // 8) Mostrar el menú principal limpio
   const ls = document.getElementById('loading-screen');
   if (ls) { ls.style.display = ''; ls.classList.remove('table-shown'); }
-  ['loading-table-group','loading-social-group','loading-friend-group','loading-addfriend-group']
+  ['loading-table-group','loading-social-group','loading-friend-group','loading-addfriend-group','loading-blocked-group','loading-sent-group']
     .forEach(id => document.getElementById(id)?.classList.add('table-gone'));
   if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
   if (typeof window.refreshIngamePower === 'function') window.refreshIngamePower();
@@ -2474,6 +2836,8 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
   document.getElementById('loading-social-group')?.classList.add('table-gone');
   document.getElementById('loading-friend-group')?.classList.add('table-gone');
   document.getElementById('loading-addfriend-group')?.classList.add('table-gone');
+  document.getElementById('loading-blocked-group')?.classList.add('table-gone');
+  document.getElementById('loading-sent-group')?.classList.add('table-gone');
 
   const fmt = v => v > 0 ? '🏆 ' + v.toLocaleString() : '';
   const elPlay   = document.getElementById('loading-play-hs');

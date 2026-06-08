@@ -1262,6 +1262,10 @@ body.is-ios .wrong-count-total { top: 31.5vmin; }
   transition: transform 0.1s;
 }
 .loading-social-row:hover { transform: scale(1.015); }
+/* Filas de personas bloqueadas: en gris, al fondo de la lista */
+.loading-social-row.is-blocked-row { filter: grayscale(1); opacity: 0.6; }
+/* Marca de mejor amigo */
+.loading-social-row.is-fav { border-color: #f0b800; box-shadow: 0 0 0 0.2vmin #f0b80055; }
 .loading-social-avatar {
   flex: none;
   width: 6vmin;
@@ -1447,11 +1451,28 @@ body.is-ios .wrong-count-total { top: 31.5vmin; }
 .loading-social-action:hover { transform: translateY(-0.2vmin); }
 .loading-social-action:active { transform: scale(0.97); }
 
+/* Botón de acceso a "Bloqueados" (al lado de Añadir Amigo): solo el png */
+.loading-social-blockbtn {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 6vmin;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+.loading-social-blockbtn:hover  { transform: scale(1.08); }
+.loading-social-blockbtn:active { transform: scale(0.94); }
+.loading-social-blockbtn img { width: 100%; height: auto; display: block; }
+
 /* ── Panel de perfil de un amigo (se desliza desde arriba sobre el social) ────── */
 #loading-friend-group {
   position: absolute;
   inset: 0;
-  z-index: 215; /* por encima del panel social (210) */
+  z-index: 220; /* por encima del social (210), añadir-amigo y bloqueados (216) */
   transition: transform 0.4s ease-out;
   will-change: transform;
   pointer-events: auto; /* captura todos los clicks: nada detrás es seleccionable */
@@ -1498,7 +1519,9 @@ body.is-ios .wrong-count-total { top: 31.5vmin; }
 }
 
 /* ── Panel Añadir Amigo (se desliza desde arriba sobre el social) ─────────────── */
-#loading-addfriend-group {
+#loading-addfriend-group,
+#loading-blocked-group,
+#loading-sent-group {
   position: absolute;
   inset: 0;
   z-index: 216;
@@ -1507,9 +1530,48 @@ body.is-ios .wrong-count-total { top: 31.5vmin; }
   pointer-events: auto;
   font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
 }
-#loading-addfriend-group.table-gone {
+#loading-addfriend-group.table-gone,
+#loading-blocked-group.table-gone,
+#loading-sent-group.table-gone {
   transition: transform 0.4s ease-in;
   transform: translateY(-120%);
+}
+/* Título de Bloqueados/Enviadas, bien arriba (doble clase = más específico que
+   la regla base .loading-addfriend-titlebar que viene después en el archivo). */
+.loading-addfriend-titlebar.loading-blocked-titlebar { top: calc(50% - 29vmin); }
+
+/* Panel de la lista de bloqueados: mismo tamaño que el panel de amigos */
+.loading-blocked-panel {
+  position: absolute;
+  top: calc(50% + 6vmin);
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 94vmin;
+  display: flex;
+  flex-direction: column;
+  gap: 1.4vmin;
+}
+.loading-blocked-panel .loading-social-list { height: 44vmin; border-radius: 1.2vmin; }
+.loading-blocked-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 1.2vmin;
+}
+.loading-blocked-search {
+  position: relative; top: auto; left: auto; transform: none;
+  width: auto; flex: 1; margin: 0;
+}
+.loading-blocked-sort {
+  position: relative; top: auto; left: auto; transform: none;
+  width: auto; flex: none; margin: 0; padding: 0 2.4vmin;
+}
+.loading-blocked-sort:hover  { transform: translateY(-0.2vmin); }
+.loading-blocked-sort:active { transform: scale(0.97); }
+.loading-social-empty {
+  text-align: center;
+  color: #8b6a00;
+  font-size: 2.2vmin;
+  padding: 4vmin 0;
 }
 .loading-addfriend-titlebar {
   position: absolute;
@@ -1735,6 +1797,67 @@ body.is-ios .wrong-count-total { top: 31.5vmin; }
 .loading-games-spacer {
   visibility: hidden;
 }
+
+/* ── Botones de relación en el perfil de amigo (abajo de los marks) ── */
+.loading-friend-actions {
+  position: absolute;
+  top: 80%;
+  left: calc(50% - 25vmin);
+  transform: translate(-50%, -50%);
+  z-index: 213;
+  display: flex;
+  align-items: center;
+  gap: 4vmin;
+}
+.loading-friend-act {
+  width: 11vmin;
+  height: auto;
+  cursor: pointer;
+  transition: transform 0.1s, filter 0.15s;
+  -webkit-user-drag: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.loading-friend-act:hover  { transform: scale(1.08); }
+.loading-friend-act:active { transform: scale(0.94); }
+.loading-friend-act.hidden { visibility: hidden; pointer-events: none; }
+/* Persona bloqueada: fav y relación quedan en gris e inútiles */
+.loading-friend-actions.is-blocked .loading-friend-fav,
+.loading-friend-actions.is-blocked .loading-friend-rel {
+  filter: grayscale(1) brightness(0.85);
+  pointer-events: none;
+}
+/* El botón de bloquear muestra friendunblock.png cuando ya está bloqueado (sin gris). */
+
+#friend-confirm-popup {
+  position: fixed;
+  inset: 0;
+  z-index: 2100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+}
+.friend-confirm-box { position: relative; }
+.friend-confirm-close {
+  position: absolute;
+  top: -2vmin;
+  left: -2vmin;
+  width: 5vmin;
+  height: 5vmin;
+  border-radius: 50%;
+  border: 0.4vmin solid #a32a26;
+  background: #e8504a;
+  color: #fff;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2.6vmin;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+.friend-confirm-close:hover  { transform: scale(1.1); }
+.friend-confirm-close:active { transform: scale(0.95); }
 
 .loading-games-rank-label {
   position: absolute;
