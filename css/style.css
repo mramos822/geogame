@@ -212,32 +212,35 @@ body::after {
 
 .game-bg-check3 {
   position: absolute;
-  top: 13%;
+  /* Mismo Y que la fila de checks (centro del check de la tabla) para que queden
+     a nivel; en vmin, no viewport-% (que en iOS los dejaba altos). */
+  top: 16.4vmin;
   left: 70%;
   width: 6.67vmin;
   height: auto;
-  transform: translateX(-50%);
-  transform-origin: top center;
+  transform: translate(-50%, -50%);
+  transform-origin: center center;
   pointer-events: none;
   z-index: 16;
 }
 
 .game-bg-wrong3 {
   position: absolute;
-  top: 26%;
+  top: 29.5vmin;
   left: 70%;
   width: 6.67vmin;
   height: auto;
-  transform: translateX(-50%);
-  transform-origin: top center;
+  transform: translate(-50%, -50%);
+  transform-origin: center center;
   pointer-events: none;
   z-index: 16;
 }
 
 .grade-count-total {
   position: absolute;
-  top: 13%;
+  top: 16.4vmin;
   left: 72%;
+  transform: translateY(-50%);
   color: #A4D300;
   font-family: 'VAGRoundBold', 'Arial Black', Impact, sans-serif;
   font-size: 4.5vmin;
@@ -256,9 +259,9 @@ body::after {
 
 .wrong-count-total {
   position: absolute !important;
-  top: 26%;
+  top: 29.5vmin;
   left: 72%;
-  transform: none;
+  transform: translateY(-50%);
   color: #ff4444;
   font-family: 'VAGRoundBold', 'Arial Black', Impact, sans-serif;
   font-size: 4.5vmin;
