@@ -154,6 +154,7 @@ function showFlagsMode() {
       g.style.transition = '';
       g.style.transform  = '';
       g.style.opacity    = '';
+      g.style.willChange = '';
       g.classList.remove('flags-faded');
     });
     flagsBottomGroupIds.forEach(id => {
@@ -399,6 +400,7 @@ function flagsAdvanceDot() {
 
     flagsTimeLeft = Math.min(flagsTimeLeft + FLAGS_BONUS_TIME, 99);
     flagsTimerEl.textContent = flagsTimeLeft;
+    if (typeof playTimeBonus === 'function') playTimeBonus(document.getElementById('flags-time-bonus'), FLAGS_BONUS_TIME);
     const prevColor = flagsTimerEl.style.color;
     flagsTimerEl.style.color = '#00ff88';
 
@@ -574,8 +576,9 @@ function startFlagsRoundRecording() {
       const lugScale = flagsLuggageScale();
       const dx = (findRect.left - groupRect.left) / lugScale;
       const dy = (findRect.top  - groupRect.top)  / lugScale;
+      group.style.willChange = 'transform';                 // capa GPU (suaviza iOS)
       group.style.transition = 'transform 0.1s linear';
-      group.style.transform  = `translate(${dx}px, ${dy}px)`;
+      group.style.transform  = `translate3d(${dx}px, ${dy}px, 0)`;
       flagsMachine2.style.animationPlayState     = 'paused';
       flagsMachine3.style.animationPlayState     = 'paused';
       flagsMachine3b.style.animationPlayState    = 'paused';
@@ -624,7 +627,7 @@ function startFlagsRound() {
         const allGroupIds = [...flagsTopGroupIds, ...flagsBottomGroupIds];
         allGroupIds.forEach(gid => {
           const g = document.getElementById(gid);
-          if (g) { g.classList.remove('luggage-enter-active'); g.style.animation = ''; g.style.transition = ''; g.style.transform = ''; g.style.opacity = '0'; }
+          if (g) { g.classList.remove('luggage-enter-active'); g.style.animation = ''; g.style.transition = ''; g.style.transform = ''; g.style.opacity = '0'; g.style.willChange = ''; }
         });
         setTimeout(() => {
           if (!flagsRunning) return;
@@ -832,8 +835,9 @@ function startFlagsRound() {
       const lugScale = flagsLuggageScale();
       const dx = (findRect.left - groupRect.left) / lugScale;
       const dy = (findRect.top  - groupRect.top)  / lugScale;
+      group.style.willChange = 'transform';                 // capa GPU (suaviza iOS)
       group.style.transition = 'transform 0.1s linear';
-      group.style.transform  = `translate(${dx}px, ${dy}px)`;
+      group.style.transform  = `translate3d(${dx}px, ${dy}px, 0)`;
       flagsMachine2.style.animationPlayState = 'paused';
       flagsMachine3.style.animationPlayState = 'paused';
       flagsMachine3b.style.animationPlayState = 'paused';
@@ -853,7 +857,7 @@ function startFlagsRound() {
         // Whoosh selected group -1000px from findluggage position
         if (!document.body.classList.contains('recording-mode')) {
           group.style.transition = 'transform 0.15s linear';
-          group.style.transform  = `translate(${dx - 1000 / lugScale}px, ${dy}px)`;
+          group.style.transform  = `translate3d(${dx - 1000 / lugScale}px, ${dy}px, 0)`;
         }
       }, 600);
       flagsGroupIds.forEach(gid => {
@@ -919,7 +923,7 @@ function startFlagsRound() {
           if (!document.body.classList.contains('recording-mode')) {
             allGroupIds.forEach(gid => {
               const g = document.getElementById(gid);
-              if (g) { g.classList.remove('luggage-enter-active'); g.style.animation = ''; g.style.transition = ''; g.style.transform = ''; g.style.opacity = '0'; }
+              if (g) { g.classList.remove('luggage-enter-active'); g.style.animation = ''; g.style.transition = ''; g.style.transform = ''; g.style.opacity = '0'; g.style.willChange = ''; }
             });
           }
           setTimeout(() => {

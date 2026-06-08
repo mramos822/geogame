@@ -2562,12 +2562,47 @@ body::after {
                1px -1px 0 #000, 
               -1px  1px 0 #000, 
                1px  1px 0 #000;
-               
+
   pointer-events: none;
   min-width: 4.8vmin;
   text-align: center;
   transition: color 0.3s;
 }
+
+/* Extra de tiempo (+5s) que aparece bajo el contador al completar 10 dots.
+   Clase compartida por los 4 modos (cities/monuments, flags, shapes). */
+.time-bonus {
+  position: absolute;
+  top: 102%;
+  left: 55%;
+  transform: translateX(-50%);
+  display: none;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 1001;
+
+  /* Mismo font del contador, proporción tipo puntaje, contorno verde */
+  font-family: 'Arial Black', Impact, sans-serif;
+  font-weight: 900;
+  font-size: 5.2vmin;
+  color: #ffffff;
+  -webkit-text-stroke: 0.55vmin #3da83d;
+  paint-order: stroke fill;
+}
+
+.time-bonus span { display: inline-block; transform: scale(0.5); }
+
+/* Trayectoria: de 0.5x con backout hasta 1.75x y cierre en 1x */
+@keyframes tb-pop {
+  0%   { transform: scale(0.5); }
+  60%  { transform: scale(1.75); }
+  100% { transform: scale(1); }
+}
+
+.time-bonus.show .tb-plus { animation: tb-pop 0.32s ease-out forwards; }
+.time-bonus.show .tb-num  { animation: tb-pop 0.55s ease-out forwards; }
+
+.time-bonus.fade { transition: opacity 0.1s linear; }
 
 
 /* Progress dots overlaid on countdown widget's bottom row */

@@ -91,9 +91,16 @@ function showCountryShape(country, ext1, ext2, startDelay) {
       dotsEl.appendChild(dot);
     }
 
+    const tbEl = document.createElement('div');
+    tbEl.id = 'shapes-time-bonus';
+    tbEl.className = 'time-bonus';
+    tbEl.setAttribute('aria-hidden', 'true');
+    tbEl.innerHTML = '<span class="tb-plus">+</span><span class="tb-num">5s</span>';
+
     cw.appendChild(cwImg);
     cw.appendChild(cwNum);
     cw.appendChild(dotsEl);
+    cw.appendChild(tbEl);
     document.body.appendChild(cw);
   }
 
@@ -351,6 +358,7 @@ function showCountryShape(country, ext1, ext2, startDelay) {
           if (shapesDots >= 10 && !dotsContainer.classList.contains('train-animation')) {
             dotsContainer.classList.add('train-animation');
             shapesTimeLeft = Math.min(shapesTimeLeft + 5, 99);
+            if (typeof playTimeBonus === 'function') playTimeBonus(document.getElementById('shapes-time-bonus'), 5);
             const tEl = document.getElementById('shapes-timer-number');
             const tImg = document.getElementById('shapes-timer-img');
             if (tEl) { const orig = tEl.style.color; tEl.textContent = shapesTimeLeft; tEl.style.color = '#00ff88';

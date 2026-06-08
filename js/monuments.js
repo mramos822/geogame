@@ -940,8 +940,10 @@ const DISPLAY_H = Math.round(DISPLAY_W / MAP_ASPECT);
 // pantallas chicas (iOS landscape) esos px quedaban enormes respecto al mapa.
 // Escalamos su geometría proporcional a DISPLAY_W, con clamp a 1 para que en
 // desktop quede idéntico a antes y solo se achique en pantallas pequeñas.
-// 1190 ≈ DISPLAY_W de un desktop típico (donde 525px ya se veía bien).
-const TAG_SCALE = Math.min(1, DISPLAY_W / 1190);
+// 1190 ≈ DISPLAY_W de un desktop típico; el factor 1.15 agranda el cartel/foto un
+// 15% en todas las pantallas (en PC se veían algo chicos) manteniendo la
+// proporción responsiva en pantallas pequeñas.
+const TAG_SCALE = 1.15 * Math.min(1, DISPLAY_W / 1190);
 const tpx = v => Math.round(v * TAG_SCALE) + 'px';
 
 const PIN_W = 48, PIN_H = 48;
@@ -965,7 +967,6 @@ const monumentNameEl = document.getElementById('monument-name');
 // Aplica la geometría del cartel/foto/monumento escalada a DISPLAY_W (ver TAG_SCALE).
 // Se ejecuta una vez; los clones (ghosts) heredan estos estilos inline.
 (function applyTagScale() {
-  if (TAG_SCALE >= 1) return; // desktop: dejar los px del CSS/HTML tal cual
   cityTagEl.style.width      = tpx(525);
   cityTagEl.style.height     = tpx(163);
   cityTagText.style.fontSize = tpx(26);
@@ -1495,6 +1496,36 @@ function updateDotsUI() {
   progressDots.forEach((d, i) => d.classList.toggle('filled', i < state.dots));
 }
 
+// Extra de tiempo "+Ns" bajo el contador al completar 10 dots. Genérico para los
+// 4 modos (cities/monuments, flags, shapes). + (0.1s) y Ns (0.2s) hacen pop de
+// 0.5x→1.75x→1x; al terminar ambos, 1s quieto y luego fade out de 0.1s.
+function playTimeBonus(el, seconds) {
+  if (!el) return;
+  const num = el.querySelector('.tb-num');
+  if (num) num.textContent = seconds + 's';
+  if (el._tbT1) clearTimeout(el._tbT1);
+  if (el._tbT2) clearTimeout(el._tbT2);
+  el.classList.remove('show', 'fade');
+  el.style.display = 'block';
+  el.style.opacity = '1';
+  void el.offsetWidth;            // reinicia las animaciones
+  el.classList.add('show');
+  el._tbT1 = setTimeout(() => {
+    el.classList.add('fade');
+    void el.offsetWidth;
+    el.style.opacity = '0';
+    el._tbT2 = setTimeout(() => {
+      el.style.display = 'none';
+      el.classList.remove('show', 'fade');
+    }, 100);
+  }, 550 + 1000);
+}
+window.playTimeBonus = playTimeBonus;
+
+function showTimeBonus() {
+  playTimeBonus(document.getElementById('time-bonus'), BONUS_TIME);
+}
+
 function advanceDot() {
   state.dots++;
   updateDotsUI();
@@ -1504,6 +1535,7 @@ function advanceDot() {
 
     state.timeLeft = Math.min(state.timeLeft + BONUS_TIME, 99);
     timerNumberEl.textContent = state.timeLeft;
+    showTimeBonus();
 
     const originalColor = timerNumberEl.style.color;
     timerNumberEl.style.color = '#00ff88';
@@ -2312,6 +2344,14 @@ function startGame() {
   monumentNameEl.style.opacity = '0';
   if (slideMonumentIn._nameTimer) { clearTimeout(slideMonumentIn._nameTimer); slideMonumentIn._nameTimer = null; }
   gameWrapper.querySelectorAll('.city-tag-ghost').forEach(g => g.remove());
+
+  const tbReset = document.getElementById('time-bonus');
+  if (tbReset) {
+    if (tbReset._tbT1) clearTimeout(tbReset._tbT1);
+    if (tbReset._tbT2) clearTimeout(tbReset._tbT2);
+    tbReset.style.display = 'none';
+    tbReset.classList.remove('show', 'fade');
+  }
 
   timerNumberEl.textContent = GAME_DURATION;
   timerNumberEl.style.color = '';
