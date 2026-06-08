@@ -214,7 +214,7 @@ body::after {
   position: absolute;
   /* Mismo Y que la fila de checks (centro del check de la tabla) para que queden
      a nivel; en vmin, no viewport-% (que en iOS los dejaba altos). */
-  top: 18.4vmin;
+  top: 16.4vmin;
   left: 70%;
   width: 6.67vmin;
   height: auto;
@@ -226,7 +226,7 @@ body::after {
 
 .game-bg-wrong3 {
   position: absolute;
-  top: 31.5vmin;
+  top: 29.5vmin;
   left: 70%;
   width: 6.67vmin;
   height: auto;
@@ -238,7 +238,7 @@ body::after {
 
 .grade-count-total {
   position: absolute;
-  top: 18.4vmin;
+  top: 16.4vmin;
   left: 72%;
   transform: translateY(-50%);
   color: #A4D300;
@@ -259,7 +259,7 @@ body::after {
 
 .wrong-count-total {
   position: absolute !important;
-  top: 31.5vmin;
+  top: 29.5vmin;
   left: 72%;
   transform: translateY(-50%);
   color: #ff4444;
@@ -282,6 +282,14 @@ body::after {
   position: relative;
   top: 0.44vmin;
 }
+
+/* iOS: Safari renderiza el check/conteo ~2vmin más arriba que PC (métricas de
+   fuente/imagen), las filas no. Bajamos solo el check/wrong + conteo en iOS para
+   nivelarlos con sus filas, sin tocar PC. */
+body.is-ios .game-bg-check3    { top: 18.4vmin; }
+body.is-ios .game-bg-wrong3    { top: 31.5vmin; }
+body.is-ios .grade-count-total { top: 18.4vmin; }
+body.is-ios .wrong-count-total { top: 31.5vmin; }
 
 .game-bg-check3-mid {
   left: 31%;

@@ -230,6 +230,7 @@ if (localStorage.getItem('muted') === 'true') { sfxCheck.volume = 0; sfxPostgame
 // el buffer una vez y lo reproducimos con AudioBufferSourceNode.loop (gapless).
 const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) ||
   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+if (IS_IOS) document.body.classList.add('is-ios');
 
 const _iosMusicURL = new Map([
   [sfxGameMusic, 'sfx/gamemusic.mp3'],
