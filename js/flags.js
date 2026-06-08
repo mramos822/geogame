@@ -573,7 +573,10 @@ function startFlagsRoundRecording() {
       void group.offsetWidth;
       const groupRect = group.getBoundingClientRect();
       const findRect  = flagsFindLuggage.getBoundingClientRect();
-      const lugScale = flagsLuggageScale();
+      // Escala REAL del wrap renderizado (ancho/220 del CSS), no la recalculada de
+      // window: en iOS la barra de Safari cambia innerHeight sin re-escalar el wrap,
+      // y usar flagsLuggageScale() dejaba el maletín descentrado/abajo.
+      const lugScale = flagsLuggageWrap.getBoundingClientRect().width / 220;
       const dx = (findRect.left - groupRect.left) / lugScale;
       const dy = (findRect.top  - groupRect.top)  / lugScale;
       group.style.willChange = 'transform';                 // capa GPU (suaviza iOS)
@@ -832,7 +835,10 @@ function startFlagsRound() {
       void group.offsetWidth; // reflow — group is now at natural CSS position
       const groupRect = group.getBoundingClientRect();
       const findRect  = flagsFindLuggage.getBoundingClientRect();
-      const lugScale = flagsLuggageScale();
+      // Escala REAL del wrap renderizado (ancho/220 del CSS), no la recalculada de
+      // window: en iOS la barra de Safari cambia innerHeight sin re-escalar el wrap,
+      // y usar flagsLuggageScale() dejaba el maletín descentrado/abajo.
+      const lugScale = flagsLuggageWrap.getBoundingClientRect().width / 220;
       const dx = (findRect.left - groupRect.left) / lugScale;
       const dy = (findRect.top  - groupRect.top)  / lugScale;
       group.style.willChange = 'transform';                 // capa GPU (suaviza iOS)
