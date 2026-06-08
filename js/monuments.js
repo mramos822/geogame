@@ -224,6 +224,113 @@ sfxGameMusic.loop  = true;
 const sfxSelect    = new Audio('sfx/select.mp3');
 if (localStorage.getItem('muted') === 'true') { sfxCheck.volume = 0; sfxPostgame.volume = 0; sfxGameMusic.volume = 0; sfxSelect.volume = 0; }
 
+// ── MÚSICA EN LOOP: motor Web Audio SOLO en iOS ───────────────────────────────
+// En PC se usa el <audio loop> de siempre (camino intacto, sin riesgo). En iOS el
+// <audio loop> deja gaps al repetir, llega tarde o se congela; ahí decodificamos
+// el buffer una vez y lo reproducimos con AudioBufferSourceNode.loop (gapless).
+const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+const _iosMusicURL = new Map([
+  [sfxGameMusic, 'sfx/gamemusic.mp3'],
+  [sfxPostgame,  'sfx/postgameloop.mp3'],
+]);
+let _iosCtx    = null;
+const _iosBufs = new Map();   // url -> AudioBuffer
+let _iosGain   = null;
+let _iosNode   = null;        // AudioBufferSourceNode sonando
+let _iosToken  = null;        // track (HTMLAudio) que representa lo que suena
+let _iosWanted = null;        // último track pedido (decode es async)
+
+function iosCtx() {
+  if (_iosCtx) return _iosCtx;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  try {
+    _iosCtx = new AC();
+    _iosGain = _iosCtx.createGain();
+    _iosGain.connect(_iosCtx.destination);
+  } catch (e) { _iosCtx = null; }
+  return _iosCtx;
+}
+
+function iosMusicMuted() {
+  return (typeof isMuted !== 'undefined') ? isMuted : (localStorage.getItem('muted') === 'true');
+}
+
+function applyMusicMute() {
+  if (_iosGain) _iosGain.gain.value = iosMusicMuted() ? 0 : 1;
+}
+
+function iosLoadBuf(url) {
+  const ctx = iosCtx();
+  if (!ctx) return Promise.reject();
+  if (_iosBufs.has(url)) return Promise.resolve(_iosBufs.get(url));
+  return fetch(url)
+    .then(r => r.arrayBuffer())
+    .then(ab => new Promise((res, rej) => ctx.decodeAudioData(ab, res, rej)))
+    .then(buf => { _iosBufs.set(url, buf); return buf; });
+}
+
+function iosStopMusic() {
+  if (_iosNode) {
+    try { _iosNode.stop(); } catch (e) {}
+    try { _iosNode.disconnect(); } catch (e) {}
+    _iosNode = null;
+  }
+  _iosToken = null;
+}
+
+function iosStartMusic(token, buf) {
+  const ctx = iosCtx();
+  if (!ctx) return;
+  iosStopMusic();
+  const node = ctx.createBufferSource();
+  node.buffer = buf;
+  node.loop = true;
+  node.connect(_iosGain);
+  applyMusicMute();
+  node.start(0);
+  _iosNode = node;
+  _iosToken = token;
+}
+
+function playMusicIOS(track) {
+  const ctx = iosCtx();
+  if (!ctx || (track && !_iosMusicURL.has(track))) {
+    // sin Web Audio o track desconocido: caer al <audio> de siempre
+    iosStopMusic();
+    return playMusicHTML(track);
+  }
+  _iosWanted = track;
+  // que ningún <audio> de música suene en paralelo al motor
+  [sfxPostgame, sfxGameMusic].forEach(t => t.pause());
+  if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+
+  if (!track) { iosStopMusic(); return; }                       // corte inmediato
+  if (_iosToken === track && _iosNode) { applyMusicMute(); return; } // ya suena: no reiniciar
+
+  iosLoadBuf(_iosMusicURL.get(track)).then(buf => {
+    if (_iosWanted !== track) return;
+    if (_iosToken === track && _iosNode) return;
+    iosStartMusic(track, buf);
+  }).catch(() => playMusicHTML(track));
+}
+
+// Desbloqueo en iOS: reanudar el contexto y precargar/decodificar los loops en el
+// primer gesto, para que el primer playMusic sea instantáneo y no se quede mudo.
+if (IS_IOS) {
+  const iosUnlock = () => {
+    const ctx = iosCtx();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    _iosMusicURL.forEach((url) => iosLoadBuf(url).catch(() => {}));
+  };
+  ['touchend', 'pointerdown', 'click'].forEach(ev =>
+    document.addEventListener(ev, iosUnlock, { once: true, passive: true })
+  );
+}
+
 document.getElementById('loading-play-btn').addEventListener('mouseenter', () => {
   sfxSelect.currentTime = 0; sfxSelect.play();
 });
@@ -771,7 +878,8 @@ function loadGameSFX() {
   if (isMuted) getAllSfx().forEach(sfx => { sfx.volume = 0; });
 }
 
-function playMusic(track) {
+// Camino PC (y fallback): <audio> HTML de siempre. NO TOCAR.
+function playMusicHTML(track) {
   [sfxPostgame, sfxGameMusic].forEach(t => { if (t !== track) { t.pause(); t.currentTime = 0; } });
   if (!track) return;
   // si el mismo track ya está sonando, dejarlo continuar (no reiniciar el loop)
@@ -783,6 +891,11 @@ function playMusic(track) {
   track.currentTime = 0;
   const p = track.play();
   if (p) p.catch(() => {});
+}
+
+function playMusic(track) {
+  if (IS_IOS) return playMusicIOS(track);
+  return playMusicHTML(track);
 }
 
 // ── CONFIG ──────────────────────────────────────────────────────────────────
@@ -1609,12 +1722,12 @@ canvas.addEventListener('click', (e) => {
                               state.badgeAnim = { t: 0, img: badgeColor, streak: state.streak, inRowBonus };
                               setTimeout(() => { sfxBonus.currentTime = 0; sfxBonus.play(); }, 800);
                             }
-                          }, 300);
+                          }, 200);
                         }
                         setTimeout(() => {
                           state.phase = 'waiting';
                           if (!isRecordingMonuments) nextCity();
-                        }, 500);
+                        }, 350);
                       }
                     };
     const capturedPin2 = state.pin2Anim;
@@ -2473,6 +2586,7 @@ document.getElementById('vol-btn')?.addEventListener('click', () => {
   localStorage.setItem('muted', isMuted);
   const vol = isMuted ? 0 : 1;
   getAllSfx().forEach(sfx => { sfx.volume = vol; });
+  applyMusicMute(); // iOS: la música va por Web Audio (gain); en PC es no-op
   document.getElementById('vol-img').src = isMuted ? 'images/vol2.png' : 'images/vol1.png';
   const a = new Audio('sfx/check.mp3'); a.volume = 1; a.play();
 });

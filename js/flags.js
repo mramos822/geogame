@@ -475,13 +475,8 @@ function showFlagsBadge(badgeImg, bonus, streak, cxOverride, scaleOverride) {
     else if (t < HOLD_END) { scale = 1 * sxMult; alpha = 1; }
     else                   { const p = (t - HOLD_END) / SHRINK_DUR; scale = (1 - p) * sxMult; alpha = 1; }
 
-    // check.png
-    ctx2.save();
-    ctx2.globalAlpha = alpha;
-    ctx2.translate(CX, CY);
-    ctx2.scale(scale, scale);
-    ctx2.drawImage(imgCheck, -CW / 2, -CH / 2, CW, CH);
-    ctx2.restore();
+    // El check ya lo muestra flags-check-overlay en cada respuesta; aquí solo
+    // dibujamos el badge + "IN A ROW" + bonus para no duplicar el check.
 
     // +bonus
     let bonusScale = 0;
