@@ -873,24 +873,6 @@ function startFlagsRound() {
       group.style.transformOrigin = '0 0';
       group.style.transition = 'transform 0.1s linear';
       group.style.transform  = `translate3d(${dx}px, ${dy}px, 0) scale(${fit})`;
-      // Medir-y-corregir SOLO en iOS: ahí findluggage (fixed bottom) y el wrap (fixed
-      // center) reportan un desfase ~constante en Y por la barra de Safari. En PC no
-      // hay desfase, así que NO corregimos (evita un salto falso al final de la
-      // transición). Medimos a 150ms, ya terminada la transición de 0.1s.
-      if (typeof IS_IOS !== 'undefined' && IS_IOS) {
-        setTimeout(() => {
-          if (flagsAborted || flagsPicked === false) return;
-          const a = (group.querySelector('#flags-luggage, .flags-luggage-side')).getBoundingClientRect();
-          const f = flagsFindLuggage.getBoundingClientRect();
-          const rx = ((f.left + f.width / 2) - (a.left + a.width / 2)) / lugScale;
-          const ry = ((f.top  + f.height / 2) - (a.top  + a.height / 2)) / lugScale;
-          if (Math.abs(rx) > 1 || Math.abs(ry) > 1) {
-            dx += rx; dy += ry;
-            group.style.transition = 'transform 0.06s linear';
-            group.style.transform  = `translate3d(${dx}px, ${dy}px, 0) scale(${fit})`;
-          }
-        }, 150);
-      }
       flagsMachine2.style.animationPlayState = 'paused';
       flagsMachine3.style.animationPlayState = 'paused';
       flagsMachine3b.style.animationPlayState = 'paused';
