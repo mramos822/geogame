@@ -579,12 +579,14 @@ function startFlagsRoundRecording() {
       const findRect  = flagsFindLuggage.getBoundingClientRect();
       const lugScale  = flagsLuggageWrap.getBoundingClientRect().width / 220;
       const fit = lugRect.width ? (findRect.width / lugRect.width) : 1;
-      const dx = ((findRect.left + findRect.width  / 2) - (lugRect.left + lugRect.width  / 2)) / lugScale;
-      const dy = ((findRect.top  + findRect.height / 2) - (lugRect.top  + lugRect.height / 2)) / lugScale;
-      const originX = (lugRect.left + lugRect.width  / 2 - grpRect.left) / lugScale;
-      const originY = (lugRect.top  + lugRect.height / 2 - grpRect.top)  / lugScale;
+      const lugCx  = (lugRect.left + lugRect.width  / 2 - grpRect.left) / lugScale;
+      const lugCy  = (lugRect.top  + lugRect.height / 2 - grpRect.top)  / lugScale;
+      const findCx = (findRect.left + findRect.width  / 2 - grpRect.left) / lugScale;
+      const findCy = (findRect.top  + findRect.height / 2 - grpRect.top)  / lugScale;
+      const dx = findCx - fit * lugCx;
+      const dy = findCy - fit * lugCy;
       group.style.willChange = 'transform';                 // capa GPU (suaviza iOS)
-      group.style.transformOrigin = `${originX}px ${originY}px`;
+      group.style.transformOrigin = '0 0';
       group.style.transition = 'transform 0.1s linear';
       group.style.transform  = `translate3d(${dx}px, ${dy}px, 0) scale(${fit})`;
       flagsMachine2.style.animationPlayState     = 'paused';
@@ -849,14 +851,17 @@ function startFlagsRound() {
       // ya coinciden; >1 en iOS donde el maletín salía algo más chico). Esto fuerza
       // que la proporción maletín/molde sea idéntica en cualquier pantalla.
       const fit = lugRect.width ? (findRect.width / lugRect.width) : 1;
-      // Centrar el maletín sobre findluggage. Pivote del scale = centro del maletín
-      // (en coords locales del grupo) para que al escalar no se descentre.
-      const dx = ((findRect.left + findRect.width  / 2) - (lugRect.left + lugRect.width  / 2)) / lugScale;
-      const dy = ((findRect.top  + findRect.height / 2) - (lugRect.top  + lugRect.height / 2)) / lugScale;
-      const originX = (lugRect.left + lugRect.width  / 2 - grpRect.left) / lugScale;
-      const originY = (lugRect.top  + lugRect.height / 2 - grpRect.top)  / lugScale;
+      // Con transform-origin 0 0, el translate se calcula compensando el scale:
+      // centro escalado del maletín = fit·lugCenter + t  →  t = findCenter − fit·lugCenter.
+      // (todo en coords locales del grupo = screen/lugScale relativo a grpRect)
+      const lugCx  = (lugRect.left + lugRect.width  / 2 - grpRect.left) / lugScale;
+      const lugCy  = (lugRect.top  + lugRect.height / 2 - grpRect.top)  / lugScale;
+      const findCx = (findRect.left + findRect.width  / 2 - grpRect.left) / lugScale;
+      const findCy = (findRect.top  + findRect.height / 2 - grpRect.top)  / lugScale;
+      const dx = findCx - fit * lugCx;
+      const dy = findCy - fit * lugCy;
       group.style.willChange = 'transform';                 // capa GPU (suaviza iOS)
-      group.style.transformOrigin = `${originX}px ${originY}px`;
+      group.style.transformOrigin = '0 0';
       group.style.transition = 'transform 0.1s linear';
       group.style.transform  = `translate3d(${dx}px, ${dy}px, 0) scale(${fit})`;
       // ── DEBUG TEMPORAL (quitar luego) ──
