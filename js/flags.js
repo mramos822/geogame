@@ -841,15 +841,24 @@ function startFlagsRound() {
       const lugScale  = flagsLuggageWrap.getBoundingClientRect().width / 220;
       const dx = ((findRect.left + findRect.width  / 2) - (groupRect.left + groupRect.width  / 2)) / lugScale;
       const dy = ((findRect.top  + findRect.height / 2) - (groupRect.top  + groupRect.height / 2)) / lugScale;
-      // ── DEBUG TEMPORAL: punto rojo = centro de findluggage (destino), azul = centro del maletín ──
+      // ── DEBUG TEMPORAL (quitar luego): números reales en pantalla ──
       try {
-        const mk = (id, x, y, color) => {
-          let d = document.getElementById(id);
-          if (!d) { d = document.createElement('div'); d.id = id; document.body.appendChild(d); }
-          d.style.cssText = `position:fixed;left:${x}px;top:${y}px;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:${color};z-index:99999;pointer-events:none;border:1px solid #fff`;
-        };
-        mk('dbg-find', findRect.left + findRect.width / 2,  findRect.top + findRect.height / 2,  'red');
-        mk('dbg-lug',  groupRect.left + groupRect.width / 2, groupRect.top + groupRect.height / 2, 'blue');
+        let dbg = document.getElementById('flags-debug');
+        if (!dbg) {
+          dbg = document.createElement('div');
+          dbg.id = 'flags-debug';
+          dbg.style.cssText = 'position:fixed;top:4px;left:4px;z-index:99999;background:rgba(0,0,0,.85);color:#0f0;font:11px monospace;padding:6px;white-space:pre;pointer-events:none;line-height:1.35';
+          document.body.appendChild(dbg);
+        }
+        dbg.textContent =
+          'group ' + group.id + '\n' +
+          'screen center ' + Math.round(window.innerWidth / 2) + ',' + Math.round(window.innerHeight / 2) + '\n' +
+          'lugScale ' + lugScale.toFixed(3) + '\n' +
+          'lug  x' + Math.round(groupRect.left) + ' y' + Math.round(groupRect.top) + ' w' + Math.round(groupRect.width) + ' h' + Math.round(groupRect.height) + '\n' +
+          'lugCenter ' + Math.round(groupRect.left + groupRect.width / 2) + ',' + Math.round(groupRect.top + groupRect.height / 2) + '\n' +
+          'find x' + Math.round(findRect.left) + ' y' + Math.round(findRect.top) + ' w' + Math.round(findRect.width) + ' h' + Math.round(findRect.height) + '\n' +
+          'findCenter ' + Math.round(findRect.left + findRect.width / 2) + ',' + Math.round(findRect.top + findRect.height / 2) + '\n' +
+          'dx ' + Math.round(dx) + ' dy ' + Math.round(dy);
       } catch (e) {}
       group.style.willChange = 'transform';                 // capa GPU (suaviza iOS)
       group.style.transition = 'transform 0.1s linear';
