@@ -841,6 +841,16 @@ function startFlagsRound() {
       const lugScale  = flagsLuggageWrap.getBoundingClientRect().width / 220;
       const dx = ((findRect.left + findRect.width  / 2) - (groupRect.left + groupRect.width  / 2)) / lugScale;
       const dy = ((findRect.top  + findRect.height / 2) - (groupRect.top  + groupRect.height / 2)) / lugScale;
+      // ── DEBUG TEMPORAL: punto rojo = centro de findluggage (destino), azul = centro del maletín ──
+      try {
+        const mk = (id, x, y, color) => {
+          let d = document.getElementById(id);
+          if (!d) { d = document.createElement('div'); d.id = id; document.body.appendChild(d); }
+          d.style.cssText = `position:fixed;left:${x}px;top:${y}px;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:${color};z-index:99999;pointer-events:none;border:1px solid #fff`;
+        };
+        mk('dbg-find', findRect.left + findRect.width / 2,  findRect.top + findRect.height / 2,  'red');
+        mk('dbg-lug',  groupRect.left + groupRect.width / 2, groupRect.top + groupRect.height / 2, 'blue');
+      } catch (e) {}
       group.style.willChange = 'transform';                 // capa GPU (suaviza iOS)
       group.style.transition = 'transform 0.1s linear';
       group.style.transform  = `translate3d(${dx}px, ${dy}px, 0)`;
