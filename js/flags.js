@@ -571,6 +571,9 @@ function startFlagsRoundRecording() {
       // Igual que el juego real: freeze inmediato + translate hacia findluggage
       group.classList.remove('luggage-enter-active');
       group.style.animation = 'none';
+      group.style.transition = 'none';
+      group.style.transform  = 'none';
+      group.style.transformOrigin = '0 0';
       void group.offsetWidth;
       // Ver handler real: centrar el maletín sobre findluggage e igualar su tamaño.
       const lugImg    = group.querySelector('#flags-luggage, .flags-luggage-side');
@@ -837,9 +840,15 @@ function startFlagsRound() {
       clearFlagsElimination();
       flagsFindLuggage.removeEventListener('animationend', onFindLuggageEnd);
       // Animate selected luggage toward findluggage position
+      // Resetear a posición BASE (sin transform/transición) ANTES de medir: en iOS
+      // la animación de entrada dejaba un transform residual y medíamos corrido →
+      // el maletín quedaba descolocado "a veces". Así medimos siempre la base real.
       group.classList.remove('luggage-enter-active');
       group.style.animation  = 'none';
-      void group.offsetWidth; // reflow — group is now at natural CSS position
+      group.style.transition = 'none';
+      group.style.transform  = 'none';
+      group.style.transformOrigin = '0 0';
+      void group.offsetWidth; // reflow — group fijado en su posición base
       // findluggage es el MOLDE (contorno) donde el maletín debe encajar: centrado
       // y del MISMO tamaño. El <div> del grupo mide 0, así que medimos la imagen.
       const lugImg    = group.querySelector('#flags-luggage, .flags-luggage-side');
