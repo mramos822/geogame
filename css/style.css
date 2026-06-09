@@ -766,6 +766,8 @@ body.is-ios .wrong-count-total { top: 31.5cqmin; }
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;
+  contain: layout style;
+  will-change: contents;
 }
 
 /* Selector de idioma, arriba al centro del loading */
@@ -1052,7 +1054,6 @@ body.is-ios .wrong-count-total { top: 31.5cqmin; }
      borroso hasta que el hover crea la capa. */
   transform: translateZ(0);
   backface-visibility: hidden;
-  will-change: transform;
 }
 .loading-play-single:hover { transform: translateZ(0) scale(1.08); }
 .loading-play-single img {
@@ -1077,7 +1078,6 @@ body.is-ios .wrong-count-total { top: 31.5cqmin; }
   transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1);
   transform: translateZ(0);
   backface-visibility: hidden;
-  will-change: transform;
 }
 .loading-secondary-btn:hover { transform: translateZ(0) scale(1.08); }
 .loading-secondary-btn img {
@@ -1394,18 +1394,20 @@ body.is-ios .wrong-count-total { top: 31.5cqmin; }
 
 /* Amigo jugando: fila titilando en verde, texto verde y punto con luz brillante */
 @keyframes social-playing-row {
-  0%, 100% { border-color: #d8c47e; background: #fffef5; box-shadow: 0 0 0 rgba(43, 209, 75, 0); }
-  50%      { border-color: #2bd14b; background: #e3f8e6; box-shadow: 0 0 1.6cqmin rgba(43, 209, 75, 0.65); }
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.6; }
 }
 .loading-social-row.status-playing {
+  border-color: #2bd14b;
+  background: #e3f8e6;
   animation: social-playing-row 1.4s ease-in-out infinite;
 }
 .loading-social-row.status-playing .loading-social-status {
   color: #1ea53a;
 }
 @keyframes social-playing-dot {
-  0%, 100% { box-shadow: 0 0 0.3cqmin 0.1cqmin rgba(43, 209, 75, 0.7); }
-  50%      { box-shadow: 0 0 1cqmin 0.35cqmin rgba(43, 209, 75, 1); }
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50%      { opacity: 1;   transform: scale(1.4); }
 }
 .loading-social-row.status-playing .dot.playing {
   animation: social-playing-dot 1.1s ease-in-out infinite;
@@ -1569,7 +1571,21 @@ body.is-ios .wrong-count-total { top: 31.5cqmin; }
   transform: translateY(-120%);
 }
 /* Bloque superior del perfil de amigo desplazado a la izquierda para centrarlo */
-#loading-friend-group .loading-profile-pic { left: calc(50% + 19cqmin); }
+#loading-friend-group .loading-profile-pic {
+  position: absolute;
+  top: calc(50% - 30cqmin);
+  left: calc(50% + 19cqmin);
+  transform: translate(-50%, -50%);
+  width: 12cqmin;
+  height: 12cqmin;
+  border-radius: 50%;
+  object-fit: cover;
+  overflow: hidden;
+  border: 0.6cqmin solid #fff;
+  display: block;
+  pointer-events: none;
+  z-index: 221;
+}
 #loading-friend-group .loading-name-wrap   { left: calc(50% - 12cqmin); }
 #loading-friend-group .loading-play-count  { left: calc(50% - 12cqmin); }
 
@@ -1778,15 +1794,13 @@ body.is-ios .wrong-count-total { top: 31.5cqmin; }
   font-size: 4cqmin;
   color: #fff;
   background: rgba(0, 0, 0, 0);
-  backdrop-filter: blur(0px);
   opacity: 0;
-  transition: opacity 0.2s, background 0.2s, backdrop-filter 0.2s;
+  transition: opacity 0.2s, background 0.2s;
   pointer-events: none;
 }
 .loading-profile-pic-wrap:hover .loading-profile-pic-overlay {
   opacity: 1;
   background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(2px);
 }
 
 .loading-name-wrap {
@@ -2441,15 +2455,13 @@ body.is-ios .wrong-count-total { top: 31.5cqmin; }
   font-size: 4cqmin;
   color: #fff;
   background: rgba(0, 0, 0, 0);
-  backdrop-filter: blur(0px);
   opacity: 0;
-  transition: opacity 0.2s, background 0.2s, backdrop-filter 0.2s;
+  transition: opacity 0.2s, background 0.2s;
   pointer-events: none;
 }
 .name-prompt-pic-wrap:hover .name-prompt-pic-overlay {
   opacity: 1;
   background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(2px);
 }
 .name-prompt-welcome {
   font-size: 2.4cqmin;
@@ -3530,12 +3542,12 @@ body.is-ios .wrong-count-total { top: 31.5cqmin; }
 
 /* EL EFECTO TRENCITO DEBE IR FUERA DE CUALQUIER MEDIA QUERY */
 @keyframes trencito-colors {
-  0%   { background-color: rgba(40, 220, 40, 0.9);  box-shadow: 0 0 12px rgba(40, 220, 40, 0.8); }
-  20%  { background-color: rgba(180, 220, 0, 0.9);  box-shadow: 0 0 12px rgba(180, 220, 0, 0.8); }
-  40%  { background-color: rgba(255, 180, 0, 0.9);  box-shadow: 0 0 12px rgba(255, 180, 0, 0.8); }
-  60%  { background-color: rgba(255, 120, 0, 0.9);  box-shadow: 0 0 12px rgba(255, 120, 0, 0.8); }
-  80%  { background-color: rgba(255, 40, 40, 0.9);  box-shadow: 0 0 12px rgba(255, 40, 40, 0.8); }
-  100% { background-color: rgba(40, 220, 40, 0.9);  box-shadow: 0 0 12px rgba(40, 220, 40, 0.8); }
+  0%   { background-color: rgba(40, 220, 40, 0.9); }
+  20%  { background-color: rgba(180, 220, 0, 0.9); }
+  40%  { background-color: rgba(255, 180, 0, 0.9); }
+  60%  { background-color: rgba(255, 120, 0, 0.9); }
+  80%  { background-color: rgba(255, 40, 40, 0.9); }
+  100% { background-color: rgba(40, 220, 40, 0.9); }
 }
 
 /* Usamos .dot directamente para que todos bailen durante la animación */
@@ -4601,6 +4613,7 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   right: -40%;
   height: 48%;
   width: auto;
+  contain: layout style;
   z-index: 16;
   pointer-events: none;
   transition: right 0.4s ease-out;
