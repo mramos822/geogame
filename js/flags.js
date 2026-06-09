@@ -844,15 +844,21 @@ function startFlagsRound() {
     group.onpointerup = (ev) => {
       if (!flagsRunning || flagsPicked || group.classList.contains('flags-faded')) return;
       ev.preventDefault(); // evita que dispare click posterior en iOS
-      // Pausar PRIMERO, luego forzar reflow para que el DOM sincronice la posición
-      // visual del compositor (iOS usa compositing asíncrono: getBCR sin reflow previo
-      // devuelve la posición de layout que puede diferir de lo que el usuario ve).
-      flagsFindLuggage.style.animationPlayState = 'paused';
+      // En iOS el compositor anima findluggage de forma asíncrona: pausar la animación
+      // y forzar reflow no es suficiente para sincronizar la posición visual cuando el
+      // usuario responde muy rápido (el layout devuelve la X base, no la X animada).
+      // Solución: capturar la matrix exacta del compositor con getComputedStyle ANTES
+      // de tocar nada, luego fijar el transform inline → getBCR refleja la X real.
+      const _fmat = new DOMMatrix(window.getComputedStyle(flagsFindLuggage).transform);
+      flagsFindLuggage.classList.remove('scrolling');
+      flagsFindLuggage.style.animation  = 'none';
+      flagsFindLuggage.style.transition = 'none';
+      flagsFindLuggage.style.transform  = `matrix(${_fmat.a},${_fmat.b},${_fmat.c},${_fmat.d},${_fmat.e},${_fmat.f})`;
       flagsMachine2.style.animationPlayState  = 'paused';
       flagsMachine3.style.animationPlayState  = 'paused';
       flagsMachine3b.style.animationPlayState = 'paused';
-      void flagsFindLuggage.offsetWidth; // commit posición pausada al DOM
-      flagsTapFindRect = flagsFindLuggage.getBoundingClientRect(); // ahora es exacto
+      void flagsFindLuggage.offsetWidth; // commit freeze al DOM/layout
+      flagsTapFindRect = flagsFindLuggage.getBoundingClientRect(); // exacto
       handleLuggagePick();
     };
     function handleLuggagePick() {

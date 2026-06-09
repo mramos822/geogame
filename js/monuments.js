@@ -93,6 +93,7 @@
 
   const total = imgList.length + audioList.length + videoList.length + 2; // +fonts +load
   let done = 0;
+  window.__loadingReady = false;
 
   function tick() {
     done++;
@@ -100,6 +101,7 @@
     barFill.style.width = pct + '%';
     pctEl.textContent   = pct + '%';
     if (done >= total) {
+      window.__loadingReady = true;
       const actions = document.getElementById('loading-actions');
       if (actions) actions.style.display = 'flex';
       document.getElementById('loading-play-wrap').style.display = 'flex';
@@ -2999,12 +3001,20 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
     if (window.campaign.idx < window.campaign.btns.length) {
       // silenciar el check del botón del siguiente modo (ya sonó uno arriba)
       sfxCheck.volume = 0;
-      // Diferir al siguiente frame: disparar .click() síncrono dentro de un handler
-      // causa reflows + WebAudio anidados que crashean iOS.
-      setTimeout(() => {
-        document.getElementById(window.campaign.btns[window.campaign.idx]).click();
+      const _nextBtn = window.campaign.btns[window.campaign.idx];
+      const _fireNext = () => {
+        document.getElementById(_nextBtn).click();
         setTimeout(() => { sfxCheck.volume = isMuted ? 0 : 1; }, 150);
-      }, 0);
+      };
+      // Esperar a que la carga inicial llegue al 100% antes de pasar al siguiente modo.
+      // En flujo normal ya está lista; el poll actúa solo en redes muy lentas.
+      if (window.__loadingReady) {
+        setTimeout(_fireNext, 0);
+      } else {
+        const _pollId = setInterval(() => {
+          if (window.__loadingReady) { clearInterval(_pollId); setTimeout(_fireNext, 0); }
+        }, 100);
+      }
     } else {
       window.campaign.active = false;
       playMusic(null);

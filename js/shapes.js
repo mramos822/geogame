@@ -109,6 +109,7 @@ function showCountryShape(country, ext1, ext2, startDelay) {
   const clipId = 'archedShape_' + (_shapeGroupCount++);
 
   const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svgEl.setAttribute('class', 'shapes-stage-el');
   svgEl.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;';
   const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
   const clipPathEl = document.createElementNS('http://www.w3.org/2000/svg', 'clipPath');
@@ -123,6 +124,7 @@ function showCountryShape(country, ext1, ext2, startDelay) {
   shapesCurrentSvg = svgEl;
 
   const board = document.createElement('img');
+  board.className = 'shapes-stage-el';
   board.src = 'images/countryboard.png';
   board.style.cssText = 'position:absolute;top:50%;left:36%;transform:translate(-50%,-50%) scaleX(0.96);width:85.15cqmin;height:auto;z-index:99;';
   board.draggable = false;
@@ -131,12 +133,14 @@ function showCountryShape(country, ext1, ext2, startDelay) {
 
 
   const img = document.createElement('img');
+  img.className = 'shapes-stage-el';
   img.src = 'images/countries/' + country + '1.' + ext1;
   img.style.cssText = 'position:absolute;top:52%;left:36.3%;transform:translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01);width:59.4cqmin;height:59.4cqmin;z-index:103;transition:transform 3s linear;display:none;';
   img.draggable = false;
   (window.appStage || document.body).appendChild(img);
 
   const clip = document.createElement('div');
+  clip.className = 'shapes-stage-el';
   clip.style.cssText = 'position:absolute;top:52%;left:36.3%;transform:translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01);width:59.4cqmin;height:59.4cqmin;clip-path:url(#' + clipId + ');z-index:102;opacity:0;transition:opacity 2s ease;display:none;';
   (window.appStage || document.body).appendChild(clip);
 
@@ -751,11 +755,7 @@ function shapesHardReset() {
   // Quitar silueta/tag/board en curso y el countdown widget
   document.querySelectorAll('.shapes-tag').forEach(t => t.remove());
   document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
-  try { if (shapesCurrentImg)  shapesCurrentImg.remove(); } catch (e) {}
-  try { if (shapesCurrentImg2) shapesCurrentImg2.parentElement?.remove(); } catch (e) {}
-  try { if (shapesCurrentClip) shapesCurrentClip.remove(); } catch (e) {}
-  try { if (shapesCurrentBoard) shapesCurrentBoard.remove(); } catch (e) {}
-  try { if (shapesCurrentSvg)  shapesCurrentSvg.remove(); } catch (e) {}
+  document.querySelectorAll('.shapes-stage-el').forEach(el => { try { el.remove(); } catch (e) {} });
   shapesCurrentImg = shapesCurrentImg2 = shapesCurrentClip = null;
   shapesCurrentBoard = shapesCurrentSvg = null;
   document.getElementById('shapes-countdown-widget')?.remove();
@@ -882,11 +882,10 @@ function hideShapesMode() {
   // freeze & remove in-progress country display
   document.querySelectorAll('.shapes-tag').forEach(t => t.remove());
   document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
-  if (shapesCurrentImg)   shapesCurrentImg.remove();
-  if (shapesCurrentImg2)  shapesCurrentImg2.parentElement?.remove(); // clip div
-  if (shapesCurrentClip)  shapesCurrentClip.remove();
-  if (shapesCurrentBoard) shapesCurrentBoard.remove();
-  if (shapesCurrentSvg)   shapesCurrentSvg.remove();
+  // Limpiar todos los elementos de ronda (no solo el último): en la transición
+  // entre formas puede quedar svgEl/board/img/clip de la ronda anterior si el
+  // setTimeout(200) no disparó a tiempo.
+  document.querySelectorAll('.shapes-stage-el').forEach(el => el.remove());
   shapesCurrentImg = shapesCurrentImg2 = shapesCurrentClip = null;
   shapesCurrentBoard = shapesCurrentSvg = null;
 
