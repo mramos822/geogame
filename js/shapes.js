@@ -3,7 +3,7 @@ const sfxLevel2 = new Audio('sfx/level2.mp3');
 if (typeof isMuted !== 'undefined' && isMuted) sfxLevel2.volume = 0;
 let shapesStreak = 0;
 let shapesRoundStartTime = null;
-let shapesTimeLeft = 60;
+let shapesTimeLeft = 10; // TEMP: 10s para testear (volver a 60)
 let shapesTimerIntervalId = null;
 let shapesRunning = false;
 let shapesDots = 0;
@@ -29,11 +29,11 @@ function positionShapesCountdown() {
   // Overlay fijo en vmin, igual que #countdown-widget (monuments/flags). Escala
   // con el viewport y no se mueve/agranda con el zoom como cuando se anclaba al
   // game-wrapper escalado.
-  cwEl.style.position      = 'fixed';
-  cwEl.style.top           = '2.8vmin';
-  cwEl.style.right         = '57.5vmin';
-  cwEl.style.width         = '26.3vmin';
-  cwEl.style.height        = '14.5vmin';
+  cwEl.style.position      = 'absolute';
+  cwEl.style.top           = '2.8cqmin';
+  cwEl.style.right         = '57.5cqmin';
+  cwEl.style.width         = '26.3cqmin';
+  cwEl.style.height        = '14.5cqmin';
   cwEl.style.pointerEvents = 'none';
   cwEl.style.zIndex        = '1000';
 }
@@ -101,7 +101,7 @@ function showCountryShape(country, ext1, ext2, startDelay) {
     cw.appendChild(cwNum);
     cw.appendChild(dotsEl);
     cw.appendChild(tbEl);
-    document.body.appendChild(cw);
+    (window.appStage || document.body).appendChild(cw);
   }
 
   positionShapesCountdown();
@@ -119,30 +119,30 @@ function showCountryShape(country, ext1, ext2, startDelay) {
   clipPathEl.appendChild(pathEl);
   defs.appendChild(clipPathEl);
   svgEl.appendChild(defs);
-  document.body.appendChild(svgEl);
+  (window.appStage || document.body).appendChild(svgEl);
   shapesCurrentSvg = svgEl;
 
   const board = document.createElement('img');
   board.src = 'images/countryboard.png';
-  board.style.cssText = 'position:fixed;top:50%;left:36%;transform:translate(-50%,-50%) scaleX(0.96);width:85.15vmin;height:auto;z-index:99;';
+  board.style.cssText = 'position:absolute;top:50%;left:36%;transform:translate(-50%,-50%) scaleX(0.96);width:85.15cqmin;height:auto;z-index:99;';
   board.draggable = false;
-  document.body.appendChild(board);
+  (window.appStage || document.body).appendChild(board);
   shapesCurrentBoard = board;
 
 
   const img = document.createElement('img');
   img.src = 'images/countries/' + country + '1.' + ext1;
-  img.style.cssText = 'position:fixed;top:52%;left:36.3%;transform:translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01);width:59.4vmin;height:59.4vmin;z-index:103;transition:transform 3s linear;display:none;';
+  img.style.cssText = 'position:absolute;top:52%;left:36.3%;transform:translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01);width:59.4cqmin;height:59.4cqmin;z-index:103;transition:transform 3s linear;display:none;';
   img.draggable = false;
-  document.body.appendChild(img);
+  (window.appStage || document.body).appendChild(img);
 
   const clip = document.createElement('div');
-  clip.style.cssText = 'position:fixed;top:52%;left:36.3%;transform:translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01);width:59.4vmin;height:59.4vmin;clip-path:url(#' + clipId + ');z-index:102;opacity:0;transition:opacity 2s ease;display:none;';
-  document.body.appendChild(clip);
+  clip.style.cssText = 'position:absolute;top:52%;left:36.3%;transform:translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01);width:59.4cqmin;height:59.4cqmin;clip-path:url(#' + clipId + ');z-index:102;opacity:0;transition:opacity 2s ease;display:none;';
+  (window.appStage || document.body).appendChild(clip);
 
   const img2 = document.createElement('img');
   img2.src = 'images/countries/' + country + '2.' + ext2;
-  img2.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)' + (country === 'Rusia' ? ' scale(0.5)' : '') + ';width:118.8vmin;height:118.8vmin;transition:transform 3s linear;';
+  img2.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)' + (country === 'Rusia' ? ' scale(0.5)' : '') + ';width:118.8cqmin;height:118.8cqmin;transition:transform 3s linear;';
   img2.draggable = false;
   clip.appendChild(img2);
 
@@ -159,16 +159,16 @@ function showCountryShape(country, ext1, ext2, startDelay) {
         position: absolute;
         top: 45%; left: 69%;
         transform: translate(-50%, -50%);
-        font-size: 7.4vmin; font-weight: 900;
+        font-size: 7.4cqmin; font-weight: 900;
         font-family: 'Arial Black', Impact, sans-serif;
         color: white;
-        -webkit-text-stroke: 0.27vmin black;
+        -webkit-text-stroke: 0.27cqmin black;
         text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
-        pointer-events: none; min-width: 4.8vmin; text-align: center; transition: color 0.3s;
+        pointer-events: none; min-width: 4.8cqmin; text-align: center; transition: color 0.3s;
       }
       #shapes-progress-dots {
-        position: absolute; bottom: 1.1vmin; left: 1vmin; width: 100%;
-        display: flex; justify-content: center; gap: 0.44vmin; padding: 0 0.66vmin;
+        position: absolute; bottom: 1.1cqmin; left: 1cqmin; width: 100%;
+        display: flex; justify-content: center; gap: 0.44cqmin; padding: 0 0.66cqmin;
         pointer-events: none; z-index: 11; transition: opacity 0.5s ease; opacity: 1;
       }
       #shapes-progress-dots.dots-fade-out { opacity: 0; }
@@ -249,8 +249,8 @@ function showCountryShape(country, ext1, ext2, startDelay) {
   if (tImgStart) tImgStart.style.animationPlayState = 'running';
 
   const whiteBg = document.createElement('div');
-  whiteBg.style.cssText = 'position:fixed;top:52%;left:36.3%;transform:translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01);width:62vmin;height:62vmin;background:#FCFAF4;clip-path:url(#' + clipId + ');z-index:100;opacity:1;transition:opacity 0.5s ease;pointer-events:none;';
-  document.body.appendChild(whiteBg);
+  whiteBg.style.cssText = 'position:absolute;top:52%;left:36.3%;transform:translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01);width:62cqmin;height:62cqmin;background:#FCFAF4;clip-path:url(#' + clipId + ');z-index:100;opacity:1;transition:opacity 0.5s ease;pointer-events:none;';
+  (window.appStage || document.body).appendChild(whiteBg);
   setTimeout(() => { whiteBg.style.opacity = '0'; }, 60);
   setTimeout(() => { whiteBg.remove(); }, 660);
 
@@ -258,8 +258,8 @@ function showCountryShape(country, ext1, ext2, startDelay) {
   clip.style.display = '';
 
   const flash = document.createElement('div');
-  flash.style.cssText = 'position:fixed;top:52%;left:36.3%;transform:translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01);width:59.4vmin;height:59.4vmin;background:white;clip-path:url(#' + clipId + ');z-index:104;opacity:1;transition:opacity 0.5s ease;pointer-events:none;';
-  document.body.appendChild(flash);
+  flash.style.cssText = 'position:absolute;top:52%;left:36.3%;transform:translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01);width:59.4cqmin;height:59.4cqmin;background:white;clip-path:url(#' + clipId + ');z-index:104;opacity:1;transition:opacity 0.5s ease;pointer-events:none;';
+  (window.appStage || document.body).appendChild(flash);
   requestAnimationFrame(() => requestAnimationFrame(() => { flash.style.opacity = '0'; }));
   setTimeout(() => { flash.remove(); }, 600);
   sfxLevel2.currentTime = 0;
@@ -269,7 +269,7 @@ function showCountryShape(country, ext1, ext2, startDelay) {
     const isCorrect = (i === correctIdx);
     const base = `scaleX(1.05) scaleY(0.95) rotate(${cfg.rot})`;
     const tag = document.createElement('div');
-    tag.style.cssText = `position:fixed;top:${cfg.top};right:${cfg.right};width:40.4vmin;z-index:110;pointer-events:auto;transform:translateX(300%) scaleX(1.05) scaleY(0.95) rotate(${cfg.rot});transform-origin:center center;transition:transform 0.15s ease;cursor:pointer;--tag-rot:${cfg.rot};`;
+    tag.style.cssText = `position:absolute;top:${cfg.top};right:${cfg.right};width:40.4cqmin;z-index:110;pointer-events:auto;transform:translateX(300%) scaleX(1.05) scaleY(0.95) rotate(${cfg.rot});transform-origin:center center;transition:transform 0.15s ease;cursor:pointer;--tag-rot:${cfg.rot};`;
     tag.classList.add('shape-tag-enter', 'shapes-tag');
     tag.style.animationDelay = `${i * 80}ms`;
     tag.style.pointerEvents = 'none';
@@ -287,8 +287,8 @@ function showCountryShape(country, ext1, ext2, startDelay) {
     tagImg.style.cssText = 'display:block;width:100%;';
 
     const tagLabel = document.createElement('span');
-    tagLabel.textContent = options[i];
-    tagLabel.style.cssText = 'position:absolute;top:50%;left:52%;transform:translate(-50%,-50%);font-family:"VAGRoundBold","Arial Black",sans-serif;font-size:3.7vmin;color:#2a1a00;font-weight:bold;white-space:nowrap;pointer-events:none;';
+    tagLabel.textContent = (typeof tCountry === 'function') ? tCountry(options[i]) : options[i];
+    tagLabel.style.cssText = 'position:absolute;top:50%;left:52%;transform:translate(-50%,-50%);font-family:"VAGRoundBold","Arial Black",sans-serif;font-size:3.7cqmin;color:#2a1a00;font-weight:bold;white-space:nowrap;pointer-events:none;';
 
     tag.addEventListener('mouseenter', () => {
       if (anyClicked || !shapesRunning) return;
@@ -393,7 +393,7 @@ function showCountryShape(country, ext1, ext2, startDelay) {
         if (badgeImg && typeof showFlagsBadge !== 'undefined') {
           const bc = document.getElementById('flags-badge-canvas');
           if (bc) bc.style.zIndex = '999';
-          showFlagsBadge(badgeImg, inRowBonus, shapesStreak, window.innerWidth * 0.39, 0.85);
+          showFlagsBadge(badgeImg, inRowBonus, shapesStreak, window.STAGE_W * 0.39, 0.85);
         }
       } else {
         shapesWrongCooldown.set(country, 5);
@@ -436,16 +436,16 @@ function showCountryShape(country, ext1, ext2, startDelay) {
 
     tag.appendChild(tagImg);
     tag.appendChild(tagLabel);
-    document.body.appendChild(tag);
+    (window.appStage || document.body).appendChild(tag);
 
     // Ajuste de nombres largos en vmin (no px) para que escale con el viewport
-    // igual que el tag (40.4vmin) y no se encoja distinto según el zoom.
-    const tagVminPx = Math.min(window.innerWidth, window.innerHeight) / 100;
+    // igual que el tag (40.4cqmin) y no se encoja distinto según el zoom.
+    const tagVminPx = Math.min(window.STAGE_W, window.STAGE_H) / 100;
     const tagMaxW = 31.8 * tagVminPx;
     let fs = 3.7;
     while (tagLabel.scrollWidth > tagMaxW && fs > 1.76) {
       fs -= 0.22;
-      tagLabel.style.fontSize = fs + 'vmin';
+      tagLabel.style.fontSize = fs + 'cqmin';
       if (fs < 2.85) tagLabel.style.letterSpacing = '-1px';
       if (fs < 2.2) tagLabel.style.letterSpacing = '-2px';
     }
@@ -724,8 +724,8 @@ function runShapesPregame(onDone) {
     if (step >= SHAPES_PREGAME_STEPS.length) { el.style.display = 'none'; onDone(); return; }
     const { src, hold, size } = SHAPES_PREGAME_STEPS[step++];
     img.style.animation = 'none';
-    img.style.width     = size + 'vmin';
-    img.style.height    = size + 'vmin';
+    img.style.width     = size + 'cqmin';
+    img.style.height    = size + 'cqmin';
     img.src = src;
     void img.offsetWidth;
     img.style.animation = '';
@@ -817,11 +817,7 @@ function showShapesMode() {
 
   runShapesPregame(() => {
     if (typeof playMusic !== 'undefined') playMusic(sfxGameMusic);
-<<<<<<< Updated upstream
-    shapesTimeLeft = 60;
-=======
     shapesTimeLeft = 60; // TEMP: 10s para testear (volver a 60)
->>>>>>> Stashed changes
     shapesRunning  = true;
 
     clearInterval(shapesTimerIntervalId);
@@ -925,7 +921,7 @@ function hideShapesMode() {
   if (gameoverScreen) {
     gameoverScreen.style.display = 'flex';
     const label = gameoverScreen.querySelector('.gameover-text1-label');
-    if (label) label.textContent = '¡Increíble! ¡Los turistas están de camino!';
+    if (label) label.textContent = t('gameover.shapes');
   }
   if (typeof restartFlightAtt !== 'undefined') restartFlightAtt();
   if (typeof buildChecksRow   !== 'undefined') buildChecksRow();
@@ -953,7 +949,7 @@ document.getElementById('loading-shapes-btn').addEventListener('click', () => {
   document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check2.png');
   document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong2.png');
   const label = document.querySelector('.splash-text2-label');
-  if (label) { label.textContent = '¿Adónde? Usando un mapa de cada país, veamos adónde vuelan nuestros turistas.'; label.classList.remove('step2'); }
+  if (label) { label.textContent = t('splash.shapes.1'); label.classList.remove('step2'); }
   const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
   if (howtoWrap) howtoWrap.classList.remove('slide-down');
   const howtoTitle = document.querySelector('.splash-howtoplay-title');
@@ -995,7 +991,7 @@ document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check4.png');
   document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong4.png');
   const label = document.querySelector('.splash-text2-label');
-  if (label) { label.textContent = '¡Vale, es hora de hacer un poco de turismo! ¿Qué tal es tu conocimiento de monumentos famosos?'; label.classList.remove('step2'); }
+  if (label) { label.textContent = t('splash.monuments.1'); label.classList.remove('step2'); }
   const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
   if (howtoWrap) howtoWrap.classList.remove('slide-down');
   const howtoTitle = document.querySelector('.splash-howtoplay-title');
