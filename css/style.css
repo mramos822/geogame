@@ -1412,8 +1412,8 @@ body:not(.is-ios) #loading-screen.table-shown > .loading-center-group {
 
 /* Amigo jugando: fila titilando en verde, texto verde y punto con luz brillante */
 @keyframes social-playing-row {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.6; }
+  0%, 100% { background-color: #e3f8e6; }
+  50%      { background-color: #aaedb6; }
 }
 .loading-social-row.status-playing {
   border-color: #2bd14b;
