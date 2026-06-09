@@ -817,7 +817,11 @@ function showShapesMode() {
 
   runShapesPregame(() => {
     if (typeof playMusic !== 'undefined') playMusic(sfxGameMusic);
+<<<<<<< Updated upstream
     shapesTimeLeft = 60;
+=======
+    shapesTimeLeft = 60; // TEMP: 10s para testear (volver a 60)
+>>>>>>> Stashed changes
     shapesRunning  = true;
 
     clearInterval(shapesTimerIntervalId);

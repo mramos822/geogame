@@ -11,7 +11,11 @@ document.addEventListener('contextmenu', e => {
   });
 });
 
+<<<<<<< Updated upstream
 const FLAGS_GAME_DURATION = 60;
+=======
+const FLAGS_GAME_DURATION = 60; // TEMP: 10s para testear (volver a 60)
+>>>>>>> Stashed changes
 
 const flagsWrapper       = document.getElementById('flags-wrapper');
 const flagsScoreDisplay  = document.getElementById('flags-score-display');
