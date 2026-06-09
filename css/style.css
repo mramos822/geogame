@@ -304,10 +304,10 @@ body {
 /* iOS: Safari renderiza el check/conteo ~2cqmin más arriba que PC (métricas de
    fuente/imagen), las filas no. Bajamos solo el check/wrong + conteo en iOS para
    nivelarlos con sus filas, sin tocar PC. */
-body.is-ios .game-bg-check3    { top: 18.4cqmin; }
-body.is-ios .game-bg-wrong3    { top: 31.5cqmin; }
-body.is-ios .grade-count-total { top: 18.4cqmin; }
-body.is-ios .wrong-count-total { top: 31.5cqmin; }
+body.is-ios .game-bg-check3    { top: 16.4cqmin; }
+body.is-ios .game-bg-wrong3    { top: 29.5cqmin; }
+body.is-ios .grade-count-total { top: 16.4cqmin; }
+body.is-ios .wrong-count-total { top: 29.5cqmin; }
 
 .game-bg-check3-mid {
   left: 31%;
@@ -881,12 +881,13 @@ body.is-ios .wrong-count-total { top: 31.5cqmin; }
   user-select: none;
 }
 
-#loading-screen::after {
+#loading-screen::before {
   content: "";
   position: absolute;
   inset: 0;
   width: 100%;
-  height: 100%;  background: linear-gradient(to top, rgba(67,210,255,0.3), rgba(67,210,255,0));
+  height: 100%;
+  background: linear-gradient(to top, rgba(67,210,255,0.3), rgba(67,210,255,0));
   z-index: 1;
   pointer-events: none;
   mix-blend-mode: screen;

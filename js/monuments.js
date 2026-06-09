@@ -2999,8 +2999,12 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
     if (window.campaign.idx < window.campaign.btns.length) {
       // silenciar el check del botón del siguiente modo (ya sonó uno arriba)
       sfxCheck.volume = 0;
-      document.getElementById(window.campaign.btns[window.campaign.idx]).click();
-      setTimeout(() => { sfxCheck.volume = isMuted ? 0 : 1; }, 150);
+      // Diferir al siguiente frame: disparar .click() síncrono dentro de un handler
+      // causa reflows + WebAudio anidados que crashean iOS.
+      setTimeout(() => {
+        document.getElementById(window.campaign.btns[window.campaign.idx]).click();
+        setTimeout(() => { sfxCheck.volume = isMuted ? 0 : 1; }, 150);
+      }, 0);
     } else {
       window.campaign.active = false;
       playMusic(null);

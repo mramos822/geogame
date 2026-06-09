@@ -249,6 +249,7 @@ function showCountryShape(country, ext1, ext2, startDelay) {
   if (tImgStart) tImgStart.style.animationPlayState = 'running';
 
   const whiteBg = document.createElement('div');
+  whiteBg.className = 'shapes-clip-overlay';
   whiteBg.style.cssText = 'position:absolute;top:52%;left:36.3%;transform:translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01);width:62cqmin;height:62cqmin;background:#FCFAF4;clip-path:url(#' + clipId + ');z-index:100;opacity:1;transition:opacity 0.5s ease;pointer-events:none;';
   (window.appStage || document.body).appendChild(whiteBg);
   setTimeout(() => { whiteBg.style.opacity = '0'; }, 60);
@@ -258,6 +259,7 @@ function showCountryShape(country, ext1, ext2, startDelay) {
   clip.style.display = '';
 
   const flash = document.createElement('div');
+  flash.className = 'shapes-clip-overlay';
   flash.style.cssText = 'position:absolute;top:52%;left:36.3%;transform:translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01);width:59.4cqmin;height:59.4cqmin;background:white;clip-path:url(#' + clipId + ');z-index:104;opacity:1;transition:opacity 0.5s ease;pointer-events:none;';
   (window.appStage || document.body).appendChild(flash);
   requestAnimationFrame(() => requestAnimationFrame(() => { flash.style.opacity = '0'; }));
@@ -748,6 +750,7 @@ function shapesHardReset() {
   if (typeof sfxCountdown !== 'undefined') { try { sfxCountdown.pause(); sfxCountdown.currentTime = 0; } catch (e) {} }
   // Quitar silueta/tag/board en curso y el countdown widget
   document.querySelectorAll('.shapes-tag').forEach(t => t.remove());
+  document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
   try { if (shapesCurrentImg)  shapesCurrentImg.remove(); } catch (e) {}
   try { if (shapesCurrentImg2) shapesCurrentImg2.parentElement?.remove(); } catch (e) {}
   try { if (shapesCurrentClip) shapesCurrentClip.remove(); } catch (e) {}
@@ -836,7 +839,9 @@ function showShapesMode() {
       if (shapesTimeLeft <= 0) {
         clearInterval(shapesTimerIntervalId);
         shapesRunning = false;
+        clearTimeout(shapesTagsTimeout); shapesTagsTimeout = null;
         document.querySelectorAll('.shapes-tag').forEach(el => { el.style.cursor = 'default'; el.style.pointerEvents = 'none'; });
+        document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
         clearTimeout(shapesCurrentAnimTimeout);
         clearTimeout(shapesCurrentClipFadeTimeout);
         // Cortar la transición sin pinear el transform como matriz px (eso
@@ -876,6 +881,7 @@ function showShapesMode() {
 function hideShapesMode() {
   // freeze & remove in-progress country display
   document.querySelectorAll('.shapes-tag').forEach(t => t.remove());
+  document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
   if (shapesCurrentImg)   shapesCurrentImg.remove();
   if (shapesCurrentImg2)  shapesCurrentImg2.parentElement?.remove(); // clip div
   if (shapesCurrentClip)  shapesCurrentClip.remove();
