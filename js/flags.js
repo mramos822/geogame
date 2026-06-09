@@ -839,21 +839,19 @@ function startFlagsRound() {
   flagsGroupIds.forEach((id, i) => {
     const group = document.getElementById(id);
     if (!group) return;
-    // pointerup = al SOLTAR sobre el maletín (confirmación), inmediato en iOS (sin el
-    // lag del click). Acá congelamos findluggage y las máquinas, y capturamos la
-    // posición del molde, así el maletín cae donde estaba al confirmar, sin deriva.
-    group.onpointerup = () => {
-      if (flagsRunning && !flagsPicked && !group.classList.contains('flags-faded')) {
-        flagsTapFindRect = flagsFindLuggage.getBoundingClientRect();
-        flagsFindLuggage.style.animationPlayState = 'paused';
-        flagsMachine2.style.animationPlayState  = 'paused';
-        flagsMachine3.style.animationPlayState  = 'paused';
-        flagsMachine3b.style.animationPlayState = 'paused';
-      }
+    // pointerup = al SOLTAR el maletín, inmediato en iOS (sin los 300ms del click).
+    // Congela findluggage Y ejecuta la acción en el mismo evento.
+    group.onpointerup = (ev) => {
+      if (!flagsRunning || flagsPicked || group.classList.contains('flags-faded')) return;
+      ev.preventDefault(); // evita que dispare click posterior en iOS
+      flagsTapFindRect = flagsFindLuggage.getBoundingClientRect();
+      flagsFindLuggage.style.animationPlayState = 'paused';
+      flagsMachine2.style.animationPlayState  = 'paused';
+      flagsMachine3.style.animationPlayState  = 'paused';
+      flagsMachine3b.style.animationPlayState = 'paused';
+      handleLuggagePick();
     };
-    group.onclick = () => {
-      // Ignorar opciones ya desvanecidas: aunque el grupo tenga pointer-events:none,
-      // un hijo con pointer-events:auto deja que el click burbujee hasta acá.
+    function handleLuggagePick() {
       if (!flagsRunning || flagsPicked || group.classList.contains('flags-faded')) return;
       flagsPicked = true;
       clearFlagsElimination();
@@ -1001,7 +999,8 @@ function startFlagsRound() {
           }, 50);
         }, 750);
       }
-    };
+    }
+    group.onclick = handleLuggagePick;
   });
 }
 

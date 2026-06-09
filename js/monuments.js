@@ -226,6 +226,7 @@ const sfxGameMusic = new Audio('sfx/gamemusic.mp3');
 sfxGameMusic.loop  = true;
 const sfxSelect    = new Audio('sfx/select.mp3');
 if (localStorage.getItem('muted') === 'true') { sfxCheck.volume = 0; sfxPostgame.volume = 0; sfxGameMusic.volume = 0; sfxSelect.volume = 0; }
+[sfxCheck, sfxSelect].forEach(sfx => { sfx.load(); });
 
 // ── MÚSICA EN LOOP: motor Web Audio SOLO en iOS ───────────────────────────────
 // En PC se usa el <audio loop> de siempre (camino intacto, sin riesgo). En iOS el
@@ -1405,6 +1406,9 @@ function loadGameSFX() {
   sfxTickdown  = new Audio('sfx/countdown.mp3');
   sfxTimesUp   = new Audio('sfx/timesup.mp3');
   if (isMuted) getAllSfx().forEach(sfx => { sfx.volume = 0; });
+  // Forzar preload en iOS: sin .load() el primer play() dispara la descarga y decodificación
+  [sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus, sfxTickdown, sfxTimesUp]
+    .forEach(sfx => { sfx.load(); });
 }
 
 // Camino PC (y fallback): <audio> HTML de siempre. NO TOCAR.
