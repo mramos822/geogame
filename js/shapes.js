@@ -935,25 +935,6 @@ document.getElementById('loading-shapes-btn').addEventListener('click', () => {
   if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.play(); }
   if (typeof loadGameSFX !== 'undefined') loadGameSFX();
   window.pendingGameMode = 'shapes';
-  document.getElementById('splash-screen').classList.add('mode-flags', 'mode-shapes');
-  document.getElementById('gameover-screen').classList.add('mode-flags', 'mode-shapes');
-  const howtoplayVideo = document.querySelector('.splash-howtoplay-video');
-  if (howtoplayVideo) { howtoplayVideo.src = 'images/howtoplay/howtoplay2.mp4'; howtoplayVideo.load(); }
-  document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men5.png');
-  document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men6.png');
-  document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl5.png');
-  document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl6.png');
-  document.querySelectorAll('.game-bg-women1').forEach(el => el.src = 'images/characters/women4.png');
-  document.querySelectorAll('.game-bg-women2').forEach(el => el.src = 'images/characters/women5.png');
-  document.querySelectorAll('.game-bg-city').forEach(el => el.src = 'images/bg/level2complete.png');
-  document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check2.png');
-  document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong2.png');
-  const label = document.querySelector('.splash-text2-label');
-  if (label) { label.textContent = t('splash.shapes.1'); label.classList.remove('step2'); }
-  const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
-  if (howtoWrap) howtoWrap.classList.remove('slide-down');
-  const howtoTitle = document.querySelector('.splash-howtoplay-title');
-  if (howtoTitle) howtoTitle.textContent = 'Map Mayhem';
   document.getElementById('loading-screen').style.display = 'none';
   const splashEl = document.getElementById('splash-screen');
   splashEl.style.display = 'flex';
@@ -962,6 +943,27 @@ document.getElementById('loading-shapes-btn').addEventListener('click', () => {
   void splashEl.offsetWidth;
   animEls.forEach(el => el.classList.add('animate-in'));
   if (typeof playMusic !== 'undefined') playMusic(sfxPostgame);
+  requestAnimationFrame(() => {
+    document.getElementById('splash-screen').classList.add('mode-flags', 'mode-shapes');
+    document.getElementById('gameover-screen').classList.add('mode-flags', 'mode-shapes');
+    const howtoplayVideo = document.querySelector('.splash-howtoplay-video');
+    if (howtoplayVideo) { howtoplayVideo.src = 'images/howtoplay/howtoplay2.mp4'; howtoplayVideo.load(); }
+    document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men5.png');
+    document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men6.png');
+    document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl5.png');
+    document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl6.png');
+    document.querySelectorAll('.game-bg-women1').forEach(el => el.src = 'images/characters/women4.png');
+    document.querySelectorAll('.game-bg-women2').forEach(el => el.src = 'images/characters/women5.png');
+    document.querySelectorAll('.game-bg-city').forEach(el => el.src = 'images/bg/level2complete.png');
+    document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check2.png');
+    document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong2.png');
+    const label = document.querySelector('.splash-text2-label');
+    if (label) { label.textContent = t('splash.shapes.1'); label.classList.remove('step2'); }
+    const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
+    if (howtoWrap) howtoWrap.classList.remove('slide-down');
+    const howtoTitle = document.querySelector('.splash-howtoplay-title');
+    if (howtoTitle) howtoTitle.textContent = 'Map Mayhem';
+  });
 });
 
 document.getElementById('loading-shapes-btn').addEventListener('mouseenter', () => {
@@ -977,27 +979,6 @@ document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.play(); }
   if (typeof loadGameSFX !== 'undefined') loadGameSFX();
   window.pendingGameMode = 'monuments';
-  document.getElementById('splash-screen').classList.remove('mode-flags', 'mode-shapes');
-  document.getElementById('splash-screen').classList.add('mode-monuments');
-  document.getElementById('gameover-screen').classList.remove('mode-flags', 'mode-shapes');
-  document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men1.png');
-  document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men2.png');
-  document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl1.png');
-  document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl2.png');
-  document.querySelectorAll('.game-bg-women1').forEach(el => el.src = 'images/characters/women1.png');
-  document.querySelectorAll('.game-bg-women2').forEach(el => el.src = 'images/characters/women1.png');
-  document.querySelectorAll('.game-bg-city-monuments').forEach(el => el.src = 'images/bg/level4complete.png');
-  document.querySelectorAll('.game-bg-city-monuments2').forEach(el => el.src = 'images/bg/level4complete2.png');
-  document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check4.png');
-  document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong4.png');
-  const label = document.querySelector('.splash-text2-label');
-  if (label) { label.textContent = t('splash.monuments.1'); label.classList.remove('step2'); }
-  const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
-  if (howtoWrap) howtoWrap.classList.remove('slide-down');
-  const howtoTitle = document.querySelector('.splash-howtoplay-title');
-  if (howtoTitle) howtoTitle.textContent = 'Landmark Loco';
-  const howtoVideo = document.querySelector('.splash-howtoplay-video');
-  if (howtoVideo) { howtoVideo.pause(); howtoVideo.src = 'images/howtoplay/howtoplay4.mp4'; howtoVideo.load(); }
   document.getElementById('loading-screen').style.display = 'none';
   const splashEl = document.getElementById('splash-screen');
   splashEl.style.display = 'flex';
@@ -1006,4 +987,27 @@ document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   void splashEl.offsetWidth;
   animEls.forEach(el => el.classList.add('animate-in'));
   if (typeof playMusic !== 'undefined') playMusic(sfxPostgame);
+  requestAnimationFrame(() => {
+    document.getElementById('splash-screen').classList.remove('mode-flags', 'mode-shapes');
+    document.getElementById('splash-screen').classList.add('mode-monuments');
+    document.getElementById('gameover-screen').classList.remove('mode-flags', 'mode-shapes');
+    document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men1.png');
+    document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men2.png');
+    document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl1.png');
+    document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl2.png');
+    document.querySelectorAll('.game-bg-women1').forEach(el => el.src = 'images/characters/women1.png');
+    document.querySelectorAll('.game-bg-women2').forEach(el => el.src = 'images/characters/women1.png');
+    document.querySelectorAll('.game-bg-city-monuments').forEach(el => el.src = 'images/bg/level4complete.png');
+    document.querySelectorAll('.game-bg-city-monuments2').forEach(el => el.src = 'images/bg/level4complete2.png');
+    document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check4.png');
+    document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong4.png');
+    const label = document.querySelector('.splash-text2-label');
+    if (label) { label.textContent = t('splash.monuments.1'); label.classList.remove('step2'); }
+    const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
+    if (howtoWrap) howtoWrap.classList.remove('slide-down');
+    const howtoTitle = document.querySelector('.splash-howtoplay-title');
+    if (howtoTitle) howtoTitle.textContent = 'Landmark Loco';
+    const howtoVideo = document.querySelector('.splash-howtoplay-video');
+    if (howtoVideo) { howtoVideo.pause(); howtoVideo.src = 'images/howtoplay/howtoplay4.mp4'; howtoVideo.load(); }
+  });
 });

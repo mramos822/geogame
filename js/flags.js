@@ -844,11 +844,15 @@ function startFlagsRound() {
     group.onpointerup = (ev) => {
       if (!flagsRunning || flagsPicked || group.classList.contains('flags-faded')) return;
       ev.preventDefault(); // evita que dispare click posterior en iOS
-      flagsTapFindRect = flagsFindLuggage.getBoundingClientRect();
+      // Pausar PRIMERO, luego forzar reflow para que el DOM sincronice la posición
+      // visual del compositor (iOS usa compositing asíncrono: getBCR sin reflow previo
+      // devuelve la posición de layout que puede diferir de lo que el usuario ve).
       flagsFindLuggage.style.animationPlayState = 'paused';
       flagsMachine2.style.animationPlayState  = 'paused';
       flagsMachine3.style.animationPlayState  = 'paused';
       flagsMachine3b.style.animationPlayState = 'paused';
+      void flagsFindLuggage.offsetWidth; // commit posición pausada al DOM
+      flagsTapFindRect = flagsFindLuggage.getBoundingClientRect(); // ahora es exacto
       handleLuggagePick();
     };
     function handleLuggagePick() {
@@ -1189,27 +1193,7 @@ function endFlagsGame() {
 document.getElementById('loading-flags-btn').addEventListener('click', () => {
   if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.play(); }
   window.pendingGameMode = 'flags';
-  document.getElementById('splash-screen').classList.add('mode-flags');
-  document.getElementById('splash-screen').classList.remove('mode-shapes', 'mode-monuments');
-  document.getElementById('gameover-screen').classList.add('mode-flags');
-  document.getElementById('gameover-screen').classList.remove('mode-shapes', 'mode-monuments');
-  const howtoplayVideo = document.querySelector('.splash-howtoplay-video');
-  if (howtoplayVideo) { howtoplayVideo.src = 'images/howtoplay/howtoplay1.mp4'; howtoplayVideo.load(); }
-  document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men3.png');
-  document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men4.png');
-  document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl3.png');
-  document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl4.png');
-  document.querySelectorAll('.game-bg-women1').forEach(el => el.src = 'images/characters/women2.png');
-  document.querySelectorAll('.game-bg-women2').forEach(el => el.src = 'images/characters/women3.png');
-  document.querySelectorAll('.game-bg-city').forEach(el => el.src = 'images/bg/level1complete.png');
-  document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check1.png');
-  document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong1.png');
-  const label = document.querySelector('.splash-text2-label');
-  if (label) { label.textContent = t('splash.flags.1'); label.classList.remove('step2'); }
-  const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
-  if (howtoWrap) howtoWrap.classList.remove('slide-down');
-  const howtoTitle = document.querySelector('.splash-howtoplay-title');
-  if (howtoTitle) howtoTitle.textContent = 'Suitcase Shuffle';
+  // Transición visual inmediata
   document.getElementById('loading-screen').style.display = 'none';
   const splashEl = document.getElementById('splash-screen');
   splashEl.style.display = 'flex';
@@ -1218,6 +1202,30 @@ document.getElementById('loading-flags-btn').addEventListener('click', () => {
   void splashEl.offsetWidth;
   animEls.forEach(el => el.classList.add('animate-in'));
   if (typeof playMusic !== 'undefined') playMusic(sfxPostgame);
+  // Setup no visual diferido
+  requestAnimationFrame(() => {
+    document.getElementById('splash-screen').classList.add('mode-flags');
+    document.getElementById('splash-screen').classList.remove('mode-shapes', 'mode-monuments');
+    document.getElementById('gameover-screen').classList.add('mode-flags');
+    document.getElementById('gameover-screen').classList.remove('mode-shapes', 'mode-monuments');
+    const howtoplayVideo = document.querySelector('.splash-howtoplay-video');
+    if (howtoplayVideo) { howtoplayVideo.src = 'images/howtoplay/howtoplay1.mp4'; howtoplayVideo.load(); }
+    document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men3.png');
+    document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men4.png');
+    document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl3.png');
+    document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl4.png');
+    document.querySelectorAll('.game-bg-women1').forEach(el => el.src = 'images/characters/women2.png');
+    document.querySelectorAll('.game-bg-women2').forEach(el => el.src = 'images/characters/women3.png');
+    document.querySelectorAll('.game-bg-city').forEach(el => el.src = 'images/bg/level1complete.png');
+    document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check1.png');
+    document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong1.png');
+    const label = document.querySelector('.splash-text2-label');
+    if (label) { label.textContent = t('splash.flags.1'); label.classList.remove('step2'); }
+    const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
+    if (howtoWrap) howtoWrap.classList.remove('slide-down');
+    const howtoTitle = document.querySelector('.splash-howtoplay-title');
+    if (howtoTitle) howtoTitle.textContent = 'Suitcase Shuffle';
+  });
 });
 
 document.getElementById('loading-flags-btn').addEventListener('mouseenter', () => {

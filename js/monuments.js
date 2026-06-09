@@ -343,23 +343,7 @@ document.getElementById('loading-play-btn').addEventListener('mouseenter', () =>
 document.getElementById('loading-play-btn').addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxCheck.play();
   window.pendingGameMode = 'game';
-  document.getElementById('splash-screen').classList.remove('mode-flags', 'mode-shapes', 'mode-monuments');
-  document.getElementById('gameover-screen').classList.remove('mode-flags', 'mode-shapes', 'mode-monuments');
-  document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men1.png');
-  document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men2.png');
-  document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl1.png');
-  document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl2.png');
-  document.querySelectorAll('.game-bg-women1').forEach(el => el.src = 'images/characters/women1.png');
-  document.querySelectorAll('.game-bg-women2').forEach(el => el.src = 'images/characters/women1.png');
-  document.querySelectorAll('.game-bg-city').forEach(el => el.src = 'images/bg/level3complete.png');
-  document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check3.png');
-  document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong3.png');
-  const howtoVideoCity = document.querySelector('.splash-howtoplay-video');
-  if (howtoVideoCity) { howtoVideoCity.pause(); howtoVideoCity.src = 'images/howtoplay/howtoplay3.mp4'; howtoVideoCity.load(); }
-  const howtoTitleCity = document.querySelector('.splash-howtoplay-title');
-  if (howtoTitleCity) howtoTitleCity.textContent = 'City Blitz';
-  const label = document.querySelector('.splash-text2-label');
-  if (label) { label.textContent = t('splash.cities.1'); label.classList.remove('step2'); }
+  // Transición visual inmediata — ocultar loading y mostrar splash en este frame
   document.getElementById('loading-screen').style.display = 'none';
   const splashElCity = document.getElementById('splash-screen');
   splashElCity.style.display = 'flex';
@@ -368,6 +352,26 @@ document.getElementById('loading-play-btn').addEventListener('click', () => {
   void splashElCity.offsetWidth;
   animElsCity.forEach(el => el.classList.add('animate-in'));
   playMusic(sfxPostgame);
+  // Setup no visual diferido al siguiente frame para no bloquear la transición
+  requestAnimationFrame(() => {
+    document.getElementById('splash-screen').classList.remove('mode-flags', 'mode-shapes', 'mode-monuments');
+    document.getElementById('gameover-screen').classList.remove('mode-flags', 'mode-shapes', 'mode-monuments');
+    document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men1.png');
+    document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men2.png');
+    document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl1.png');
+    document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl2.png');
+    document.querySelectorAll('.game-bg-women1').forEach(el => el.src = 'images/characters/women1.png');
+    document.querySelectorAll('.game-bg-women2').forEach(el => el.src = 'images/characters/women1.png');
+    document.querySelectorAll('.game-bg-city').forEach(el => el.src = 'images/bg/level3complete.png');
+    document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check3.png');
+    document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong3.png');
+    const howtoVideoCity = document.querySelector('.splash-howtoplay-video');
+    if (howtoVideoCity) { howtoVideoCity.pause(); howtoVideoCity.src = 'images/howtoplay/howtoplay3.mp4'; howtoVideoCity.load(); }
+    const howtoTitleCity = document.querySelector('.splash-howtoplay-title');
+    if (howtoTitleCity) howtoTitleCity.textContent = 'City Blitz';
+    const label = document.querySelector('.splash-text2-label');
+    if (label) { label.textContent = t('splash.cities.1'); label.classList.remove('step2'); }
+  });
 });
 
 // ── CAMPAÑA: 4 modos encadenados ─────────────────────────────────────────────
