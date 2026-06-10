@@ -1665,6 +1665,36 @@ badgeOverlay.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none
 const badgeOverlayCtx = badgeOverlay.getContext('2d');
 gameWrapper.appendChild(badgeOverlay);
 
+// Libera proactivamente la memoria de juego: suelta los bitmaps decodificados de
+// fondos/personajes/ranks (poniendo src=''), achica los canvas a 1px y libera el
+// video de howtoplay. Se llama al volver al menú (y se puede llamar entre modos)
+// para que la app NO acumule RAM a lo largo de una campaña ni entre sesiones — así
+// el baseline queda plano y no hace falta recargar la página. Las imágenes se
+// vuelven a setear solas cuando el modo siguiente arranca (los handlers asignan sus
+// src), así que limpiar acá es seguro: el menú no usa estos <img> de juego.
+window.releaseGameMemory = function () {
+  try {
+    // Fondos, personajes, check/wrong, cielos, monumento, banderas de país.
+    document.querySelectorAll(
+      '.game-bg-city, .game-bg-men1, .game-bg-men2, .game-bg-girl1, .game-bg-girl2, ' +
+      '.game-bg-women1, .game-bg-women2, .game-bg-check3, .game-bg-wrong3, ' +
+      '.game-bg-sky-monuments, #monument-img'
+    ).forEach(el => { if (el && el.tagName === 'IMG') el.removeAttribute('src'); });
+    // Imágenes de rango en results/final (hasta 35 de ~2MB decodificados c/u).
+    document.querySelectorAll('#results-screen img, #final-screen img').forEach(el => {
+      if (el && el.tagName === 'IMG') el.removeAttribute('src');
+    });
+    // Canvas: liberar el buffer de píxeles (GPU+CPU) reduciéndolo a 1px.
+    if (typeof canvas !== 'undefined' && canvas) { canvas.width = 1; canvas.height = 1; }
+    if (badgeOverlay) { badgeOverlay.width = 1; badgeOverlay.height = 1; }
+    const fbc = document.getElementById('flags-badge-canvas');
+    if (fbc) { fbc.width = 1; fbc.height = 1; }
+    // Video de howtoplay: liberar decoder/buffers.
+    const v = document.querySelector('.splash-howtoplay-video');
+    if (v) { try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) {} }
+  } catch (e) {}
+};
+
 // ── ASSETS ───────────────────────────────────────────────────────────────────
 const MONUMENTS_EASY_NAMES = [
   "Torre Eiffel", "Estatua de la Libertad", "Taj Mahal", "Pirámides de Giza",
@@ -3170,6 +3200,9 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
   }
 
   gameoverScreen.style.display = 'none';
+  // Liberar la RAM del juego recién terminado antes de volver al menú (el video se
+  // vuelve a setear más abajo con swapHowtoVideo).
+  if (typeof window.releaseGameMemory === 'function') window.releaseGameMemory();
   document.getElementById('loading-screen').style.display = '';
   document.getElementById('loading-screen').classList.remove('table-shown');
   document.getElementById('loading-table-group')?.classList.add('table-gone');

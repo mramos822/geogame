@@ -200,19 +200,15 @@ document.getElementById('final-confirm-back-wrap')?.addEventListener('click', ()
   w.classList.add('confirm-pressed');
   setTimeout(() => w.classList.remove('confirm-pressed'), 50);
   if (typeof window.stopResultsMusic === 'function') window.stopResultsMusic();
-  // En móvil: recargar la página al volver al menú tras una campaña completa.
-  // Sin reload, las imágenes/video/canvas decodificados de los 4 modos quedan en
-  // RAM (las pantallas solo se ocultan, no liberan nada) y la siguiente acción
-  // (nueva partida o entrar a social) sumaba encima del baseline alto y crasheaba
-  // iOS. El reload garantiza un estado de memoria limpio. Los highscores están en
-  // localStorage, no se pierde nada; en móvil el preload está desactivado, así que
-  // la recarga es rápida.
-  if (navigator.maxTouchPoints > 1) { location.reload(); return; }
   hideFinalScreen();
   document.getElementById('loading-screen').style.display = '';
   document.getElementById('loading-screen').classList.remove('table-shown');
   document.getElementById('loading-table-group')?.classList.add('table-gone');
   if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
+  // Liberar la RAM de la campaña recién terminada (fondos/personajes/ranks/canvas/
+  // video). Así la app no acumula memoria entre sesiones y la siguiente partida o
+  // entrar a social arranca con baseline bajo, sin necesidad de recargar la página.
+  if (typeof window.releaseGameMemory === 'function') window.releaseGameMemory();
 });
 document.getElementById('final-confirm-back-wrap')?.addEventListener('mouseenter', () => { if (typeof playSelect === 'function') playSelect(); });
 document.getElementById('final-confirm-back-wrap')?.addEventListener('mouseleave', () => { if (typeof playSelect === 'function') playSelect(); });
