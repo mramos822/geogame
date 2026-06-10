@@ -58,27 +58,25 @@
   // Lista COMPLETA de assets: usa el manifest auto-generado (todos los archivos de
   // images/ y sfx/). Si por algo falta, cae a la lista mínima embebida.
   const M = window.ASSET_MANIFEST || {};
-  const imgList   = (M.images && M.images.length) ? M.images : IMAGES;
+  // En mobile reducir concurrencia y saltear decode() para no picar memoria.
+  const isMobile = navigator.maxTouchPoints > 1;
+  // En MOBILE no precargar imágenes en absoluto. El preloader creaba un new Image()
+  // por cada una de las ~880 imágenes del manifest y las retenía en
+  // window.__preloadedImages → cientos de MB de bitmaps clavados en RAM desde el
+  // arranque, dejando iOS al borde del límite y reiniciando la pestaña en las
+  // transiciones de campaña. Las imágenes se cargan y decodifican on-demand cuando
+  // se muestran, y el navegador las libera cuando ya no se usan. En desktop sí se
+  // precargan (hay RAM de sobra y acelera el primer render).
+  const imgList   = isMobile ? [] : ((M.images && M.images.length) ? M.images : IMAGES);
   const audioList = (M.audio  && M.audio.length)  ? M.audio  : AUDIO;
   const videoList = M.video || [];
 
-  // En mobile reducir concurrencia y saltear decode() para no picar memoria.
-  const isMobile = navigator.maxTouchPoints > 1;
   const imgConcurrency   = isMobile ? 4 : 24;
   const audioConcurrency = isMobile ? 4 : 8;
 
   window.__preloadedImages = window.__preloadedImages || [];
 
   function loadImage(src) {
-    // En mobile (iOS/Android): warmear SOLO el caché HTTP con fetch. No crear
-    // objetos Image() ni retenerlos en __preloadedImages — eso decodificaba las
-    // ~880 imágenes a bitmap y las mantenía vivas para siempre (cientos de MB en
-    // RAM), dejando iOS al borde del límite y crasheando en las transiciones de
-    // campaña. Con fetch solo quedan los bytes comprimidos en disco; cada imagen
-    // se decodifica on-demand al mostrarse y se libera cuando ya no se usa.
-    if (isMobile) {
-      return fetch(src, { cache: 'force-cache' }).then(() => {}, () => {});
-    }
     return new Promise(resolve => {
       const img = new Image();
       const finish = () => { window.__preloadedImages.push(img); resolve(); };
