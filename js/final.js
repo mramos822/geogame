@@ -178,7 +178,10 @@ function buildFriendClouds(ranking, playerPos) {
     checkPass();
     if (running) requestAnimationFrame(loop);
   }
-  requestAnimationFrame(loop);
+  // Esperar el delay de la animación antes de empezar a checkear:
+  // en iOS getBoundingClientRect devuelve 0 para elementos con Web Animations
+  // antes de que arranquen, marcando todas las nubes como passed inmediatamente.
+  setTimeout(() => requestAnimationFrame(loop), 3000);
 }
 
 function hideFinalScreen() {

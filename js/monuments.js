@@ -353,6 +353,7 @@ document.getElementById('loading-play-btn').addEventListener('click', () => {
   animElsCity.forEach(el => el.classList.remove('animate-in'));
   void splashElCity.offsetWidth;
   animElsCity.forEach(el => el.classList.add('animate-in'));
+  if (typeof resyncPlaneAnims === 'function') resyncPlaneAnims(splashElCity);
   playMusic(sfxPostgame);
   // Setup no visual diferido al siguiente frame para no bloquear la transición
   requestAnimationFrame(() => {
@@ -3043,11 +3044,13 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
       };
       // Esperar a que la carga inicial llegue al 100% antes de pasar al siguiente modo.
       // En flujo normal ya está lista; el poll actúa solo en redes muy lentas.
+      // Llamar directo (sin setTimeout) para que gameover.hide + splash.show
+      // ocurran en el mismo task → el navegador los batchea sin frame en blanco.
       if (window.__loadingReady) {
-        setTimeout(_fireNext, 0);
+        _fireNext();
       } else {
         const _pollId = setInterval(() => {
-          if (window.__loadingReady) { clearInterval(_pollId); setTimeout(_fireNext, 0); }
+          if (window.__loadingReady) { clearInterval(_pollId); _fireNext(); }
         }, 100);
       }
     } else {

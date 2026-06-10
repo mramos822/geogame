@@ -86,29 +86,34 @@ function resultsFaShow(n) {
 
 function startResultsFlightAtt() {
   clearTimeout(resultsFaTimeout);
-  resultsFaShow(1);
-  document.querySelectorAll('.results-flightatt').forEach(el => el.classList.add('active'));
-  const rank = getRank(resultsScreen._total || 0);
-  const descEl = document.getElementById('results-rank-desc');
-  if (descEl) descEl.textContent = rank.desc || '';
-  document.querySelector('.results-text3-wrap')?.classList.add('active');
-  let step = 0;
-  function tick() {
-    const [f, d] = RESULTS_FA_TIMELINE[step];
-    resultsFaShow(f);
-    step++;
-    if (step >= RESULTS_FA_TIMELINE.length) {
-      step = 0;
-      resultsFaTimeout = setTimeout(() => {
-        resultsFaShow(RESULTS_FA_TIMELINE[0][0]);
-        step = 1;
-        resultsFaTimeout = setTimeout(tick, 1500);
-      }, d);
-    } else {
-      resultsFaTimeout = setTimeout(tick, d);
+  // iOS no decodifica frames con visibility:hidden hasta que se muestran → flash.
+  // Forzamos decode de todos antes de arrancar.
+  const decodes = [...resultsFaFrames].map(img => img.decode ? img.decode().catch(() => {}) : Promise.resolve());
+  Promise.all(decodes).then(() => {
+    resultsFaShow(1);
+    document.querySelectorAll('.results-flightatt').forEach(el => el.classList.add('active'));
+    const rank = getRank(resultsScreen._total || 0);
+    const descEl = document.getElementById('results-rank-desc');
+    if (descEl) descEl.textContent = rank.desc || '';
+    document.querySelector('.results-text3-wrap')?.classList.add('active');
+    let step = 0;
+    function tick() {
+      const [f, d] = RESULTS_FA_TIMELINE[step];
+      resultsFaShow(f);
+      step++;
+      if (step >= RESULTS_FA_TIMELINE.length) {
+        step = 0;
+        resultsFaTimeout = setTimeout(() => {
+          resultsFaShow(RESULTS_FA_TIMELINE[0][0]);
+          step = 1;
+          resultsFaTimeout = setTimeout(tick, 1500);
+        }, d);
+      } else {
+        resultsFaTimeout = setTimeout(tick, d);
+      }
     }
-  }
-  resultsFaTimeout = setTimeout(tick, RESULTS_FA_TIMELINE[0][1]);
+    resultsFaTimeout = setTimeout(tick, RESULTS_FA_TIMELINE[0][1]);
+  });
 }
 
 function stopResultsFlightAtt() {
