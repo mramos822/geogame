@@ -70,11 +70,19 @@
   window.__preloadedImages = window.__preloadedImages || [];
 
   function loadImage(src) {
+    // En mobile (iOS/Android): warmear SOLO el caché HTTP con fetch. No crear
+    // objetos Image() ni retenerlos en __preloadedImages — eso decodificaba las
+    // ~880 imágenes a bitmap y las mantenía vivas para siempre (cientos de MB en
+    // RAM), dejando iOS al borde del límite y crasheando en las transiciones de
+    // campaña. Con fetch solo quedan los bytes comprimidos en disco; cada imagen
+    // se decodifica on-demand al mostrarse y se libera cuando ya no se usa.
+    if (isMobile) {
+      return fetch(src, { cache: 'force-cache' }).then(() => {}, () => {});
+    }
     return new Promise(resolve => {
       const img = new Image();
       const finish = () => { window.__preloadedImages.push(img); resolve(); };
-      // En mobile saltear decode() — ahorra memoria durante la carga inicial.
-      img.onload = () => { (!isMobile && img.decode ? img.decode().then(finish, finish) : finish()); };
+      img.onload = () => { (img.decode ? img.decode().then(finish, finish) : finish()); };
       img.onerror = finish;
       img.src = src;
     });
@@ -156,9 +164,15 @@
 // frame en blanco.
 window.addEventListener('load', () => {
   // Warming: decodificar todos los <img> ya presentes en el DOM.
-  document.querySelectorAll('img').forEach(img => {
-    if (img.decode) img.decode().catch(() => {});
-  });
+  // En mobile NO hacerlo: forzaría decodificar a la vez los fondos de los 4 modos
+  // (cada uno un bitmap grande) y al estar en el DOM quedarían retenidos → suma a
+  // la presión de RAM que crashea iOS. En mobile se decodifican on-demand.
+  const _isMobileWarm = navigator.maxTouchPoints > 1;
+  if (!_isMobileWarm) {
+    document.querySelectorAll('img').forEach(img => {
+      if (img.decode) img.decode().catch(() => {});
+    });
+  }
   // Imágenes que cambian de src al pasar de modo: decodificación síncrona.
   document.querySelectorAll(
     '.game-bg-city, .game-bg-check3, .game-bg-wrong3, .game-bg-men, ' +
