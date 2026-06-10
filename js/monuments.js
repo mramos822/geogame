@@ -368,7 +368,12 @@ document.getElementById('loading-play-btn').addEventListener('click', () => {
     document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check3.png');
     document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong3.png');
     const howtoVideoCity = document.querySelector('.splash-howtoplay-video');
-    if (howtoVideoCity) { howtoVideoCity.pause(); howtoVideoCity.src = 'images/howtoplay/howtoplay3.mp4'; howtoVideoCity.load(); }
+    if (howtoVideoCity) {
+      howtoVideoCity.pause();
+      howtoVideoCity.src = 'images/howtoplay/howtoplay3.mp4';
+      // iOS: diferir .load() para no picar memoria mientras shapes libera SVGs
+      setTimeout(() => { try { howtoVideoCity.load(); } catch (e) {} }, 600);
+    }
     const howtoTitleCity = document.querySelector('.splash-howtoplay-title');
     if (howtoTitleCity) howtoTitleCity.textContent = 'City Blitz';
     const label = document.querySelector('.splash-text2-label');
@@ -3008,11 +3013,13 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
       };
       // Esperar a que la carga inicial llegue al 100% antes de pasar al siguiente modo.
       // En flujo normal ya está lista; el poll actúa solo en redes muy lentas.
+      // iOS necesita ~400ms para liberar memoria del modo anterior antes de iniciar el siguiente
+      const _iosDelay = 400;
       if (window.__loadingReady) {
-        setTimeout(_fireNext, 0);
+        setTimeout(_fireNext, _iosDelay);
       } else {
         const _pollId = setInterval(() => {
-          if (window.__loadingReady) { clearInterval(_pollId); setTimeout(_fireNext, 0); }
+          if (window.__loadingReady) { clearInterval(_pollId); setTimeout(_fireNext, _iosDelay); }
         }, 100);
       }
     } else {
