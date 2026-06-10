@@ -252,14 +252,10 @@ if (IS_IOS) document.body.classList.add('is-ios');
 
 // Delays de transición: agresivos en iOS para dar tiempo al GC antes de cargar
 // el modo siguiente. En PC todo es instantáneo (0ms).
-// IMPORTANTE: estos delays NO son cosméticos. Son la ventana que iOS necesita para
-// LIBERAR la memoria del modo anterior antes de que el siguiente cargue sus assets.
-// iOS libera memoria de forma asíncrona; si el siguiente modo carga "encima" del
-// anterior sin liberar, el pico transitorio revienta el límite de Safari y reinicia
-// la pestaña. Bajarlos (se probó 400/50) volvió el crash consistente y temprano.
-// Mantener generosos.
-const IOS_VIDEO_LOAD_DELAY      = IS_IOS ? 2500 : 0;   // antes de .load() en videos
-const IOS_CAMPAIGN_TRANS_DELAY  = IS_IOS ? 1200 : 0;   // antes de disparar el btn del modo siguiente
+// 0 delay = comportamiento original (así funcionaba antes). Los valores altos que
+// se probaron en esta sesión fueron un agregado mío que complicó las cosas.
+const IOS_VIDEO_LOAD_DELAY      = 0;   // antes de .load() en videos
+const IOS_CAMPAIGN_TRANS_DELAY  = 0;   // antes de disparar el btn del modo siguiente
 
 // Muestra/oculta el confirm del gameover (se revela tras cargar assets del siguiente modo).
 window.showGameoverConfirm = function () {
