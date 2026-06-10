@@ -11,7 +11,7 @@ document.addEventListener('contextmenu', e => {
   });
 });
 
-const FLAGS_GAME_DURATION = 60; // TEMP: 10s para testear (volver a 60)
+const FLAGS_GAME_DURATION = 10; // TEMP: 10s para testear (volver a 60)
 
 const flagsWrapper       = document.getElementById('flags-wrapper');
 const flagsScoreDisplay  = document.getElementById('flags-score-display');

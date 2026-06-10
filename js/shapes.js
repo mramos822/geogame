@@ -820,7 +820,7 @@ function showShapesMode() {
 
   runShapesPregame(() => {
     if (typeof playMusic !== 'undefined') playMusic(sfxGameMusic);
-    shapesTimeLeft = 60; // TEMP: 10s para testear (volver a 60)
+    shapesTimeLeft = 10; // TEMP: 10s para testear (volver a 60)
     shapesRunning  = true;
 
     clearInterval(shapesTimerIntervalId);

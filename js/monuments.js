@@ -1469,7 +1469,7 @@ function playMusic(track) {
 }
 
 // ── CONFIG ──────────────────────────────────────────────────────────────────
-const GAME_DURATION   = 60; // TEMP: 10s para testear (volver a 60)
+const GAME_DURATION   = 10; // TEMP: 10s para testear (volver a 60)
 const BONUS_TIME      = 5;
 const DOTS_NEEDED     = 10;
 const SPEED_BONUS_WIN = 3;
