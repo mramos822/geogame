@@ -240,8 +240,8 @@ if (IS_IOS) document.body.classList.add('is-ios');
 
 // Delays de transición: agresivos en iOS para dar tiempo al GC antes de cargar
 // el modo siguiente. En PC todo es instantáneo (0ms).
-const IOS_VIDEO_LOAD_DELAY      = IS_IOS ? 2500 : 0;  // antes de .load() en videos
-const IOS_CAMPAIGN_TRANS_DELAY  = IS_IOS ? 400  : 0;  // antes de disparar el btn del modo siguiente
+const IOS_VIDEO_LOAD_DELAY      = IS_IOS ? 2500 : 0;   // antes de .load() en videos
+const IOS_CAMPAIGN_TRANS_DELAY  = IS_IOS ? 1000 : 0;   // antes de disparar el btn del modo siguiente
 
 // Muestra/oculta el confirm del gameover (se revela tras cargar assets del siguiente modo).
 window.showGameoverConfirm = function () {
@@ -446,6 +446,14 @@ window.preloadNextModeAssets = function (nextMode) {
   // en RAM mientras el modo anterior todavía no liberó su memoria → OOM en iOS.
   const images = list.filter(url => !url.endsWith('.mp4'));
   if (!images.length) return Promise.resolve();
+  // En iOS: fetch() para calentar el HTTP cache sin decodificar el bitmap en RAM.
+  // Así no se acumula memoria decodificada mientras el modo anterior todavía no liberó la suya.
+  // En PC: new Image() para decodificar proactivamente (más rápido al renderizar).
+  if (IS_IOS) {
+    return Promise.all(
+      images.map(url => fetch(url, { cache: 'force-cache' }).catch(() => {}))
+    ).then(() => {});
+  }
   return new Promise(resolve => {
     let done = 0;
     images.forEach(url => {
