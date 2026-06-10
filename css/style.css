@@ -2599,44 +2599,6 @@ body:not(.is-ios) #loading-screen.table-shown > .loading-center-group {
 .welcome-popup-confirm:hover .welcome-popup-confirm2 { opacity: 1; }
 .welcome-popup-confirm.confirm-pressed .welcome-popup-confirm2 { opacity: 0; }
 
-/* ── ORIENT WARNING (mobile landscape al cargar) ────── */
-#orient-warning {
-  display: none;
-  position: fixed;
-  inset: 0;
-  z-index: 100003;
-  background: #0a1a2e;
-  align-items: center;
-  justify-content: center;
-}
-#orient-warning.visible {
-  display: flex;
-}
-#orient-warning-box {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  padding: 32px 40px;
-  background: rgba(255,255,255,0.07);
-  border: 2px solid rgba(255,255,255,0.15);
-  border-radius: 20px;
-  text-align: center;
-  max-width: 380px;
-}
-#orient-warning-icon { font-size: 52px; }
-#orient-warning-msg {
-  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
-  font-size: 18px;
-  color: #fff;
-  margin: 0;
-}
-#orient-warning-sub {
-  font-size: 14px;
-  color: rgba(255,255,255,0.6);
-  margin: 0;
-}
-
 /* ── SCREEN WARNING ─────────────────────────────────── */
 #screen-warning {
   display: none;
