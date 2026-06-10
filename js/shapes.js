@@ -951,7 +951,6 @@ document.getElementById('loading-shapes-btn').addEventListener('click', () => {
   animEls.forEach(el => el.classList.remove('animate-in'));
   void splashEl.offsetWidth;
   animEls.forEach(el => el.classList.add('animate-in'));
-  resyncPlaneAnims(splashEl);
   if (typeof playMusic !== 'undefined') playMusic(sfxPostgame);
   requestAnimationFrame(() => {
     document.getElementById('splash-screen').classList.add('mode-flags', 'mode-shapes');
@@ -1017,7 +1016,6 @@ document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   animEls.forEach(el => el.classList.remove('animate-in'));
   void splashEl.offsetWidth;
   animEls.forEach(el => el.classList.add('animate-in'));
-  resyncPlaneAnims(splashEl);
   if (typeof playMusic !== 'undefined') playMusic(sfxPostgame);
   requestAnimationFrame(() => {
     const howtoVideo = document.querySelector('.splash-howtoplay-video');
@@ -1025,11 +1023,3 @@ document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   });
 });
 
-// Fuerza que todos los .game-bg-plane arranquen en el mismo frame en iOS.
-// Sin esto, cada elemento puede empezar su CSS animation en un frame distinto.
-function resyncPlaneAnims(splashEl) {
-  const planes = splashEl.querySelectorAll('.game-bg-plane');
-  planes.forEach(p => { p.style.animationName = 'none'; });
-  void splashEl.offsetWidth;
-  planes.forEach(p => { p.style.animationName = ''; });
-}

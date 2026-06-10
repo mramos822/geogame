@@ -1207,7 +1207,6 @@ document.getElementById('loading-flags-btn').addEventListener('click', () => {
   animEls.forEach(el => el.classList.remove('animate-in'));
   void splashEl.offsetWidth;
   animEls.forEach(el => el.classList.add('animate-in'));
-  if (typeof resyncPlaneAnims === 'function') resyncPlaneAnims(splashEl);
   if (typeof playMusic !== 'undefined') playMusic(sfxPostgame);
   // Setup no visual diferido
   requestAnimationFrame(() => {

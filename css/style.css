@@ -584,14 +584,18 @@ body.is-ios .wrong-count-total { top: 29.5cqmin; }
 }
 
 /* z-index: plane1 adelante, plane6 atrás */
-.game-bg-plane1 { z-index: 6; animation: plane-fly-in 2.7s 0.2s ease-out forwards, plane1-blink 2.5s 0.2s steps(1, end) forwards, plane-peel 0s 2.9s forwards; }
-.game-bg-plane2 { z-index: 5; opacity: 0; animation: plane-fly-in 2.7s 0.2s ease-out forwards, plane2-blink 2.5s 0.2s steps(1, end) forwards, plane-peel 0s 3.0s forwards; }
-.game-bg-plane3 { z-index: 4; animation: plane-fly-in 2.7s 0.2s ease-out forwards, plane-peel 0s 3.1s forwards; }
-.game-bg-plane4 { z-index: 3; animation: plane-fly-in 2.7s 0.2s ease-out forwards, plane-peel 0s 3.2s forwards; }
-.game-bg-plane5 { z-index: 2; animation: plane-fly-in 2.7s 0.2s ease-out forwards, plane-peel 0s 3.3s forwards; }
-.game-bg-plane6 { z-index: 1; animation: plane-fly-in 2.7s 0.2s ease-out forwards; }
+/* linear en lugar de ease-out: evita el efecto "retroceso" en iOS cuando el
+   compositor cae a main thread y salta frames en la desaceleración final. */
+.game-bg-plane1 { z-index: 6; animation: plane-fly-in 2.7s 0.2s linear forwards, plane1-blink 2.5s 0.2s steps(1, end) forwards, plane-peel 0s 2.9s forwards; }
+.game-bg-plane2 { z-index: 5; opacity: 0; animation: plane-fly-in 2.7s 0.2s linear forwards, plane2-blink 2.5s 0.2s steps(1, end) forwards, plane-peel 0s 3.0s forwards; }
+.game-bg-plane3 { z-index: 4; animation: plane-fly-in 2.7s 0.2s linear forwards, plane-peel 0s 3.1s forwards; }
+.game-bg-plane4 { z-index: 3; animation: plane-fly-in 2.7s 0.2s linear forwards, plane-peel 0s 3.2s forwards; }
+.game-bg-plane5 { z-index: 2; animation: plane-fly-in 2.7s 0.2s linear forwards, plane-peel 0s 3.3s forwards; }
+.game-bg-plane6 { z-index: 1; animation: plane-fly-in 2.7s 0.2s linear forwards; }
 
-@keyframes plane-fly-in { from { transform: translate(calc(-40cqw - 50%), -50%); } to { transform: translate(calc(30cqw - 50%), -50%); } }
+/* cqw reemplazado por px fijos (stage siempre 1920px): iOS no puede GPU-compilar
+   keyframes con unidades cqw → la animación cae a main thread → jank. */
+@keyframes plane-fly-in { from { transform: translate(calc(-768px - 50%), -50%); } to { transform: translate(calc(576px - 50%), -50%); } }
 @keyframes plane-peel   { to { opacity: 0; } }
 @keyframes plane-peel   { to   { opacity: 0; } }
 

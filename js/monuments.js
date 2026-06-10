@@ -353,7 +353,6 @@ document.getElementById('loading-play-btn').addEventListener('click', () => {
   animElsCity.forEach(el => el.classList.remove('animate-in'));
   void splashElCity.offsetWidth;
   animElsCity.forEach(el => el.classList.add('animate-in'));
-  if (typeof resyncPlaneAnims === 'function') resyncPlaneAnims(splashElCity);
   playMusic(sfxPostgame);
   // Setup no visual diferido al siguiente frame para no bloquear la transición
   requestAnimationFrame(() => {
@@ -3035,22 +3034,20 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
     const animElsC = document.querySelectorAll('#splash-screen .flightatt-splash, .splash-text2-wrap');
     animElsC.forEach(el => el.classList.remove('animate-in'));
     if (window.campaign.idx < window.campaign.btns.length) {
-      // silenciar el check del botón del siguiente modo (ya sonó uno arriba)
+      // Mostrar splash AHORA para tapar el frame en blanco entre gameover y el
+      // click del siguiente modo, que se difiere con setTimeout para no saturar iOS.
+      document.getElementById('splash-screen').style.display = 'flex';
       sfxCheck.volume = 0;
       const _nextBtn = window.campaign.btns[window.campaign.idx];
       const _fireNext = () => {
         document.getElementById(_nextBtn).click();
         setTimeout(() => { sfxCheck.volume = isMuted ? 0 : 1; }, 150);
       };
-      // Esperar a que la carga inicial llegue al 100% antes de pasar al siguiente modo.
-      // En flujo normal ya está lista; el poll actúa solo en redes muy lentas.
-      // Llamar directo (sin setTimeout) para que gameover.hide + splash.show
-      // ocurran en el mismo task → el navegador los batchea sin frame en blanco.
       if (window.__loadingReady) {
-        _fireNext();
+        setTimeout(_fireNext, 0);
       } else {
         const _pollId = setInterval(() => {
-          if (window.__loadingReady) { clearInterval(_pollId); _fireNext(); }
+          if (window.__loadingReady) { clearInterval(_pollId); setTimeout(_fireNext, 0); }
         }, 100);
       }
     } else {
