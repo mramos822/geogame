@@ -1030,8 +1030,12 @@ document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   void splashEl.offsetWidth;
   animEls.forEach(el => el.classList.add('animate-in'));
   if (typeof playMusic !== 'undefined') playMusic(sfxPostgame);
-  setTimeout(() => {
-    window.swapHowtoVideo?.('images/howtoplay/howtoplay4.mp4');
-  }, IOS_VIDEO_LOAD_DELAY);
+  // NO cargar el video de howtoplay4 acá: monuments es el modo más pesado y cargar el
+  // decoder de video JUSTO mientras se decodifican los 2 fondos full-screen + personajes
+  // es el pico GPU/video que crashea WebKit en iOS (cities→monuments, pico ~233MB).
+  // releaseGameMemory ya dejó el <video> vacío arriba; difiero la carga del video al
+  // primer click de confirm (que es cuando recién se reproduce y se ve). Así el decoder
+  // de video no compite con el spike de decodificación de assets de entrada.
+  window.pendingHowtoVideo = 'images/howtoplay/howtoplay4.mp4';
 });
 

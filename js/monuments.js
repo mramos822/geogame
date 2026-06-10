@@ -3141,8 +3141,14 @@ document.querySelector('.splash-confirm-wrap')?.addEventListener('click', () => 
     }
     const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
     if (howtoWrap) howtoWrap.classList.add('slide-down');
+    // Carga diferida del video (monuments lo difiere a este click para no solapar el
+    // decoder de video con el pico de decodificación de assets de entrada — ver shapes.js).
+    if (window.pendingHowtoVideo) {
+      window.swapHowtoVideo(window.pendingHowtoVideo);
+      window.pendingHowtoVideo = null;
+    }
     const howtoVideo = document.querySelector('.splash-howtoplay-video');
-    if (howtoVideo) howtoVideo.play();
+    if (howtoVideo) { const p = howtoVideo.play(); if (p) p.catch(() => {}); }
     confirmStep = 1;
     window.waitForHowtoVideo();
   } else {
