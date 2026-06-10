@@ -47,6 +47,64 @@ const RANKS = [
   { min: 80000, max: Infinity, name: 'Superhumano', desc: '¡Tus habilidades en geografía están fuera de alcance! ¡Como si todo un atlas hubiera sido descargado directamente a tu cabeza!', img: 'images/ranks/35.png' },
 ];
 
+// Traducción al inglés (mismo índice que RANKS). El idioma sale de getLang() (i18n.js).
+const RANKS_EN = [
+  { name: 'Agoraphobe', desc: "It seems the world still feels like a very big place to you. Don't worry — with practice you'll lose your fear of exploring it!" },
+  { name: 'Backyard Explorer', desc: 'Your geographic adventure is just beginning. The world is big, but with every step you take you get to know it a little better.' },
+  { name: 'School kid', desc: 'You\'re learning the basics of the world. With the same dedication as in the classroom, you\'ll soon master the whole map.' },
+  { name: 'Bus Driver', desc: 'You know the routes better than anyone. Although your run is local, your curiosity about the world will take you much further.' },
+  { name: 'Hotel Receptionist', desc: 'You welcome travelers from all over the world with a smile. Your geographic knowledge helps you connect with every guest who arrives at your desk.' },
+  { name: 'Baggage Handler', desc: 'You carry the weight of the world in your hands, and you do it well. Every suitcase you move brings you one step closer to knowing it all.' },
+  { name: 'Ground Crew', desc: 'You keep everything moving from the ground. Your geographic knowledge is the foundation that supports every flight to new destinations.' },
+  { name: 'City Guide', desc: 'You know the streets and corners of cities like few others. Any tourist would be delighted to have you as a guide!' },
+  { name: 'Geography Student', desc: 'You\'re on the right track. Every country you learn brings you closer to mastering the whole map. Keep studying!' },
+  { name: 'Geography Graduate', desc: 'Your geographic level is already academic. You have the knowledge of someone who has spent years studying the world. Well deserved!' },
+  { name: 'Air Traffic Controller', desc: 'With your paddles in hand you guide each plane to its exact spot. Your sense of direction on the runway reflects what you already know about the whole world.' },
+  { name: 'Cabin Crew', desc: 'You feel more comfortable finding your way through a plane than through the world, but you have what it takes to go far.' },
+  { name: 'Travel Broker', desc: 'You know how to plan routes around the world like no one else. Your clients would be in the best hands with someone who knows the planet so well!' },
+  { name: 'Park Ranger', desc: 'Your geographic knowledge takes you beyond the local park. You\'re ready to explore much bigger territories!' },
+  { name: 'Adventurer', desc: 'The explorer\'s spirit defines you. You know enough about the world to throw yourself into any adventure without fear of getting lost.' },
+  { name: 'News Anchor', desc: 'You know the world well enough to report on it with confidence. You could talk about any country without tripping over your words!' },
+  { name: 'Traveler', desc: 'You\'ve traveled the world in your mind with enviable precision. At this level, every trip you take will be a well-planned adventure!' },
+  { name: 'Jet Setter', desc: 'Your refined knowledge of the world opens doors in any circle. You discuss geography as easily as art or fashion.' },
+  { name: 'Weatherman', desc: 'You know the world so well you could predict where the wind blows. Your global sense of direction is worthy of any news screen!' },
+  { name: 'Geography Teacher', desc: 'Your geographic mastery is so solid you could teach the world. Many would learn a lot sitting in your class!' },
+  { name: 'Explorer', desc: 'Your curiosity about the world has no limits. Like a true explorer, you always find new territories to conquer on the map.' },
+  { name: 'Sailor', desc: 'You navigate geographic knowledge like a sailor navigates the seas. You know the world\'s routes better than many who have traveled them.' },
+  { name: 'Globe Trotter', desc: 'The world is your home. You know so many corners of the planet that it would be hard to find a place that surprises you.' },
+  { name: 'Tracker', desc: 'Your geographic instinct lets you find any place on the map. You could track down any destination without getting lost!' },
+  { name: 'Apprentice Pilot', desc: 'You\'re learning to navigate the world skillfully. With a little more practice, you\'ll be ready to take off toward new horizons.' },
+  { name: 'Surveyor', desc: 'Pinpointing precise geographic spots is very important for a surveyor, and that\'s exactly what you\'ve got.' },
+  { name: 'Cartographer', desc: 'You could create a map of the world from memory alone. Not many people can do that!' },
+  { name: 'Co-Pilot', desc: 'You\'re just one step from command. Your geographic knowledge is already worthy of the skies — keep it up and you\'ll soon lead the route!' },
+  { name: 'Airline Pilot', desc: 'Airline pilots are extremely good travelers with excellent knowledge of the world around them — just like you!' },
+  { name: 'Travel Writer', desc: 'Your knowledge of the world could fill entire pages. You\'d have so much to tell, and the world would love to hear you!' },
+  { name: 'Foreign Correspondent', desc: 'You\'d be confident enough to report on global events from any country with your knowledge. Excellent work.' },
+  { name: 'Diplomat', desc: 'With your great knowledge of countries, you\'d make an excellent diplomat, able to relate to anyone in the world.' },
+  { name: 'Ambassador', desc: 'Your geography knowledge is a pride for your country. You\'d be right at home working in any embassy in the world!' },
+  { name: 'Geography Guru', desc: 'There aren\'t many people in the world with global knowledge like yours. You should be proud!' },
+  { name: 'Superhuman', desc: 'Your geography abilities are off the charts! Like an entire world atlas has been downloaded directly into your noggin!' },
+];
+
 function getRank(totalScore) {
-  return RANKS.find(r => totalScore >= r.min && totalScore <= r.max) || RANKS[0];
+  let idx = RANKS.findIndex(r => totalScore >= r.min && totalScore <= r.max);
+  if (idx < 0) idx = 0;
+  return rankAt(idx);
 }
+
+// Índice del rango por puntaje (consistente con getRank). Útil para animaciones
+// que necesitan el índice (no comparar por identidad de objeto, que rompe en EN).
+function rankIndex(totalScore) {
+  const idx = RANKS.findIndex(r => totalScore >= r.min && totalScore <= r.max);
+  return idx < 0 ? 0 : idx;
+}
+
+// Rango por índice, ya localizado al idioma actual.
+function rankAt(idx) {
+  const base = RANKS[idx] || RANKS[0];
+  const lang = (typeof getLang === 'function') ? getLang() : 'es';
+  const en = RANKS_EN[idx];
+  if (lang === 'en' && en) return Object.assign({}, base, { name: en.name, desc: en.desc });
+  return base;
+}
+window.getRank = getRank; window.rankIndex = rankIndex; window.rankAt = rankAt;

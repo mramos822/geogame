@@ -21,7 +21,7 @@ function buildResultsMessage(total) {
   if (isNewBest) localStorage.setItem(TOTAL_HS_KEY, total);
 
   if (isNewBest) {
-    return `¡Excelente trabajo ${playerName}! ¡Acabas de batir un nuevo récord personal!`;
+    return t('results.newRecordMsg', { name: playerName });
   }
 
   const all = [...getFriends(), { name: playerName, score: total }]
@@ -33,12 +33,12 @@ function buildResultsMessage(total) {
 
   let friendMsg = '';
   if (above && pos > 1) {
-    friendMsg = `, justo detrás de ${above.name}`;
+    friendMsg = t('results.friendAbove', { name: above.name });
   } else if (below) {
-    friendMsg = `, justo delante de ${below.name}`;
+    friendMsg = t('results.friendBelow', { name: below.name });
   }
 
-  return `No está mal, ${playerName}. ¡Pero no es tu mejor puntaje! ${record} es el puntaje a superar, que te deja en el puesto ${pos} entre tus amigos${friendMsg}.`;
+  return t('results.notBestMsg', { name: playerName, record, pos, friendMsg });
 }
 
 const sfxCheer = new Audio('sfx/endgamecheeryay.mp3');
@@ -74,6 +74,9 @@ const RESULTS_FA_TIMELINE = [
 ];
 const resultsFaFrames = document.querySelectorAll('.results-flightatt');
 let resultsFaTimeout = null;
+// Decodificar todos los frames del DOM ahora para que el bitmap quede listo
+// en el pipeline de render antes de que empiece la animación.
+resultsFaFrames.forEach(img => { if (img.decode) img.decode().catch(() => {}); });
 
 function resultsFaShow(n) {
   resultsFaFrames.forEach(img => {
@@ -83,29 +86,34 @@ function resultsFaShow(n) {
 
 function startResultsFlightAtt() {
   clearTimeout(resultsFaTimeout);
-  resultsFaShow(1);
-  document.querySelectorAll('.results-flightatt').forEach(el => el.classList.add('active'));
-  const rank = getRank(resultsScreen._total || 0);
-  const descEl = document.getElementById('results-rank-desc');
-  if (descEl) descEl.textContent = rank.desc || '';
-  document.querySelector('.results-text3-wrap')?.classList.add('active');
-  let step = 0;
-  function tick() {
-    const [f, d] = RESULTS_FA_TIMELINE[step];
-    resultsFaShow(f);
-    step++;
-    if (step >= RESULTS_FA_TIMELINE.length) {
-      step = 0;
-      resultsFaTimeout = setTimeout(() => {
-        resultsFaShow(RESULTS_FA_TIMELINE[0][0]);
-        step = 1;
-        resultsFaTimeout = setTimeout(tick, 1500);
-      }, d);
-    } else {
-      resultsFaTimeout = setTimeout(tick, d);
+  // iOS no decodifica frames con visibility:hidden hasta que se muestran → flash.
+  // Forzamos decode de todos antes de arrancar.
+  const decodes = [...resultsFaFrames].map(img => img.decode ? img.decode().catch(() => {}) : Promise.resolve());
+  Promise.all(decodes).then(() => {
+    resultsFaShow(1);
+    document.querySelectorAll('.results-flightatt').forEach(el => el.classList.add('active'));
+    const rank = getRank(resultsScreen._total || 0);
+    const descEl = document.getElementById('results-rank-desc');
+    if (descEl) descEl.textContent = rank.desc || '';
+    document.querySelector('.results-text3-wrap')?.classList.add('active');
+    let step = 0;
+    function tick() {
+      const [f, d] = RESULTS_FA_TIMELINE[step];
+      resultsFaShow(f);
+      step++;
+      if (step >= RESULTS_FA_TIMELINE.length) {
+        step = 0;
+        resultsFaTimeout = setTimeout(() => {
+          resultsFaShow(RESULTS_FA_TIMELINE[0][0]);
+          step = 1;
+          resultsFaTimeout = setTimeout(tick, 1500);
+        }, d);
+      } else {
+        resultsFaTimeout = setTimeout(tick, d);
+      }
     }
-  }
-  resultsFaTimeout = setTimeout(tick, RESULTS_FA_TIMELINE[0][1]);
+    resultsFaTimeout = setTimeout(tick, RESULTS_FA_TIMELINE[0][1]);
+  });
 }
 
 function stopResultsFlightAtt() {
@@ -152,14 +160,14 @@ function animateTotal(target) {
 
   // rank cycling: always starts at rank 0, goes up one per second
   clearInterval(rankInterval);
-  const finalRankIdx = RANKS.indexOf(getRank(target));
+  const finalRankIdx = (typeof rankIndex === 'function') ? rankIndex(target) : RANKS.indexOf(getRank(target));
   let currentRankIdx = 0;
   if (finalRankIdx > 0) {
     const intervalMs = (duration - 300) / finalRankIdx;
     rankInterval = setInterval(() => {
       currentRankIdx++;
       const isFinal = currentRankIdx >= finalRankIdx;
-      triggerRankUp(RANKS[currentRankIdx], isFinal);
+      triggerRankUp((typeof rankAt === 'function') ? rankAt(currentRankIdx) : RANKS[currentRankIdx], isFinal);
       if (isFinal) {
         clearInterval(rankInterval);
         setTimeout(() => {
@@ -186,7 +194,7 @@ function animateTotal(target) {
 
   function tick(now) {
     const t = Math.min((now - start) / duration, 1);
-    const ease = Math.pow(t, 1.5);
+    const ease = Math.pow(t, 2.0);
     const current = Math.round(ease * target);
     renderDigits(totalEl, current);
     if (t < 1) { countRaf = requestAnimationFrame(tick); }
@@ -229,8 +237,8 @@ resultsConfirm?.addEventListener('click', () => {
     if (content) content.style.visibility = 'hidden';
   }, 300);
   setTimeout(() => {
-    resultsRank.src = RANKS[0].img;
-    resultsRankLabel.textContent = RANKS[0].name;
+    resultsRank.src = rankAt(0).img;
+    resultsRankLabel.textContent = rankAt(0).name;
     resultsRank.style.display = 'block';
     resultsRankLabel.classList.add('visible');
     void resultsRank.offsetWidth;

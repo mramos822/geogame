@@ -6,14 +6,14 @@ function fitRankLabel(id, maxWidthVmin) {
   const el = document.getElementById(id);
   if (!el) return;
   // Todo en vmin para que escale con el viewport. maxWidthVmin en vmin → px.
-  const vminPx = Math.min(window.innerWidth, window.innerHeight) / 100;
+  const vminPx = Math.min(window.STAGE_W, window.STAGE_H) / 100;
   const maxW = maxWidthVmin * vminPx;
   el.style.fontSize = '';
   let size = 4.39; // vmin (= 40px ref)
-  el.style.fontSize = size + 'vmin';
+  el.style.fontSize = size + 'cqmin';
   while (el.scrollWidth > maxW && size > 1.54) {
     size -= 0.11;
-    el.style.fontSize = size + 'vmin';
+    el.style.fontSize = size + 'cqmin';
   }
 }
 
@@ -45,8 +45,38 @@ function showFinalScreen() {
   const scoreEl = document.getElementById('final-points-score');
   if (scoreEl) scoreEl.textContent = total.toLocaleString();
   const playerName = localStorage.getItem('playerName') || 'John';
+  const profilePhoto = localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png';
+  const avatarImg = document.querySelector('.final-avatar-img');
+  if (avatarImg) avatarImg.src = profilePhoto;
   const nameEl = document.getElementById('final-player-name');
-  if (nameEl) nameEl.textContent = playerName;
+  if (nameEl) {
+    nameEl.textContent = playerName;
+    nameEl.style.fontSize = '';
+    requestAnimationFrame(() => {
+      const avatarEl = document.querySelector('.final-avatar');
+      if (!avatarEl) return;
+      const group = document.getElementById('final-group');
+      const groupW = group ? group.offsetWidth : (window.STAGE_W || window.innerWidth);
+      // Achica el nombre hasta que quepa en el 55% derecho de la nube
+      const maxNameW = groupW * 0.52;
+      let fs = parseFloat(getComputedStyle(nameEl).fontSize);
+      while (nameEl.scrollWidth > maxNameW && fs > 8) {
+        fs -= 0.5;
+        nameEl.style.fontSize = fs + 'px';
+      }
+      // Mueve la foto según cuánto se extiende el nombre a la izquierda
+      const avatarRect = avatarEl.getBoundingClientRect();
+      const nameRect   = nameEl.getBoundingClientRect();
+      const overlap    = avatarRect.right - nameRect.left + 4; // 4px de margen
+      if (overlap > 0) {
+        const pct = overlap / groupW * 100;
+        const cur = parseFloat(avatarEl.style.left) || 40;
+        avatarEl.style.left = Math.max(10, cur - pct) + '%';
+      } else {
+        avatarEl.style.left = '40%';
+      }
+    });
+  }
 
   const friends = (typeof getFriends === 'function' ? getFriends() : []);
   const ranking = [...friends, { name: playerName, score: total }]
@@ -92,14 +122,14 @@ function buildFriendClouds(ranking, playerPos) {
 
     const group = document.createElement('div');
     group.className = 'final-group5';
-    group.style.transform = `translate(${k * STEP_X}vw, ${k * STEP_Y}vw) scale(0.9)`;
+    group.style.transform = `translate(${k * STEP_X}cqw, ${k * STEP_Y}cqw) scale(0.9)`;
 
     group.innerHTML =
       `<img class="final-cloud5" src="images/bg/cloud5.png" alt="" draggable="false" oncontextmenu="return false">` +
       `<span class="final2-position">${realPos}</span>` +
       `<span class="final2-player-name">${entry.name}</span>` +
       `<span class="final2-rank-label" id="${labelId}">${rk ? rk.name : ''}</span>` +
-      `<div class="final2-avatar"><img class="final2-avatar-img" src="images/ppdefault.png" alt="" draggable="false" oncontextmenu="return false"></div>` +
+      `<div class="final2-avatar"><img class="final2-avatar-img" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false"></div>` +
       `<div class="final2-points-wrap">` +
         `<img class="final2-points-img" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">` +
         `<span class="final2-points-score">${entry.score.toLocaleString()}</span>` +
@@ -124,15 +154,15 @@ function buildFriendClouds(ranking, playerPos) {
 
   const anim = container.animate(
     [
-      { transform: `translate(${startX}vw, ${startY}vw)` },
-      { transform: `translate(${endX}vw, ${endY}vw)` },
+      { transform: `translate(${startX}cqw, ${startY}cqw)` },
+      { transform: `translate(${endX}cqw, ${endY}cqw)` },
     ],
     { duration: 7500, delay: 3000, easing: 'ease-out', fill: 'both' }
   );
 
   // poner gris las nubes que mi avión va pasando (cruzan el centro)
   const groups = Array.from(container.querySelectorAll('.final-group5'));
-  const centerX = window.innerWidth / 2;
+  const centerX = window.STAGE_W / 2;
   let running = true;
   anim.addEventListener('finish', () => { running = false; checkPass(); });
   function checkPass() {
@@ -148,7 +178,10 @@ function buildFriendClouds(ranking, playerPos) {
     checkPass();
     if (running) requestAnimationFrame(loop);
   }
-  requestAnimationFrame(loop);
+  // Esperar el delay de la animación antes de empezar a checkear:
+  // en iOS getBoundingClientRect devuelve 0 para elementos con Web Animations
+  // antes de que arranquen, marcando todas las nubes como passed inmediatamente.
+  setTimeout(() => requestAnimationFrame(loop), 3000);
 }
 
 function hideFinalScreen() {
@@ -172,6 +205,10 @@ document.getElementById('final-confirm-back-wrap')?.addEventListener('click', ()
   document.getElementById('loading-screen').classList.remove('table-shown');
   document.getElementById('loading-table-group')?.classList.add('table-gone');
   if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
+  // Liberar la RAM de la campaña recién terminada (fondos/personajes/ranks/canvas/
+  // video). Así la app no acumula memoria entre sesiones y la siguiente partida o
+  // entrar a social arranca con baseline bajo, sin necesidad de recargar la página.
+  if (typeof window.releaseGameMemory === 'function') window.releaseGameMemory();
 });
 document.getElementById('final-confirm-back-wrap')?.addEventListener('mouseenter', () => { if (typeof playSelect === 'function') playSelect(); });
 document.getElementById('final-confirm-back-wrap')?.addEventListener('mouseleave', () => { if (typeof playSelect === 'function') playSelect(); });
@@ -186,5 +223,5 @@ document.getElementById('final-confirm-wrap')?.addEventListener('click', () => {
   wrap.classList.add('confirm-pressed');
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
   document.getElementById('loading-screen').style.display = 'none';
-  showFinalScreen();
+  if (typeof showResultsScreen === 'function') showResultsScreen();
 });
