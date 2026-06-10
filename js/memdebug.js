@@ -38,16 +38,20 @@
   })();
 
   function measure() {
+    // El navegador decodifica UNA vez por URL y comparte el bitmap entre <img>
+    // iguales, así que sumamos por URL única (no por elemento) para reflejar la RAM
+    // real. imgCount = elementos cargados; uniq = URLs distintas decodificadas.
     let imgBytes = 0, imgCount = 0, imgVis = 0;
+    const seen = new Set();
     document.querySelectorAll('img').forEach(im => {
       const w = im.naturalWidth, h = im.naturalHeight;
       if (w > 0 && h > 0 && im.currentSrc) {
-        imgBytes += w * h * 4;
         imgCount++;
-        // visible ≈ tiene caja y no está display:none
         if (im.offsetParent !== null && getComputedStyle(im).visibility !== 'hidden') imgVis++;
+        if (!seen.has(im.currentSrc)) { seen.add(im.currentSrc); imgBytes += w * h * 4; }
       }
     });
+    const imgUniq = seen.size;
     let cnvBytes = 0, cnvCount = 0;
     document.querySelectorAll('canvas').forEach(c => {
       if (c.width > 1 && c.height > 1) { cnvBytes += c.width * c.height * 4; cnvCount++; }
@@ -60,7 +64,7 @@
 
     box.textContent =
       `TOT ${MB(tot)} MB  (pico ${MB(peakTot)})\n` +
-      `IMG ${MB(imgBytes)} MB  (${imgCount} cargadas, ${imgVis} vis)\n` +
+      `IMG ${MB(imgBytes)} MB  (${imgUniq} unicas, ${imgCount} tags, ${imgVis} vis)\n` +
       `CNV ${MB(cnvBytes)} MB  (${cnvCount})\n` +
       (heap != null ? `HEAP ${MB(heap)} MB (JS)\n` : `HEAP n/d (iOS no expone)\n`) +
       `FPS ${fps}   modo: ${mode}`;
