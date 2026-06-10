@@ -290,6 +290,25 @@ window.waitForHowtoVideo = function () {
   setTimeout(reveal, 5000); // fallback de seguridad
 };
 
+// Cambia el video de howtoplay liberando ANTES el recurso del video anterior.
+// En iOS, reasignar .src sin vaciar primero deja vivo el decoder/buffers del video
+// previo; recargar <video> así en cada transición (flags→shapes→cities→monuments)
+// termina crasheando el proceso WebKit de forma intermitente (Safari reinicia la
+// pestaña). El crash aparecía en transiciones variables justamente porque depende
+// del estado del decoder, no de un modo puntual. Vaciar (removeAttribute+load)
+// libera el recurso anterior antes de cargar el nuevo.
+window.swapHowtoVideo = function (newSrc) {
+  const v = document.querySelector('.splash-howtoplay-video');
+  if (!v) return;
+  try {
+    v.pause();
+    v.removeAttribute('src');
+    v.load();            // libera el recurso/decoder del video anterior
+    v.src = newSrc;
+    v.load();            // carga el nuevo
+  } catch (e) {}
+};
+
 const _iosMusicURL = new Map([
   [sfxGameMusic, 'sfx/gamemusic.mp3'],
   [sfxPostgame,  'sfx/postgameloop.mp3'],
@@ -420,8 +439,7 @@ document.getElementById('loading-play-btn').addEventListener('click', () => {
     document.querySelectorAll('.game-bg-city').forEach(el => el.src = 'images/bg/level3complete.png');
     document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check3.png');
     document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong3.png');
-    const howtoVideoCity = document.querySelector('.splash-howtoplay-video');
-    if (howtoVideoCity) { howtoVideoCity.pause(); howtoVideoCity.src = 'images/howtoplay/howtoplay3.mp4'; setTimeout(() => { try { howtoVideoCity.load(); } catch (e) {} }, IOS_VIDEO_LOAD_DELAY); }
+    window.swapHowtoVideo('images/howtoplay/howtoplay3.mp4');
     const howtoTitleCity = document.querySelector('.splash-howtoplay-title');
     if (howtoTitleCity) howtoTitleCity.textContent = 'City Blitz';
     const label = document.querySelector('.splash-text2-label');
@@ -3177,8 +3195,7 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
   if (howtoWrap) howtoWrap.classList.remove('slide-down');
   const label = document.querySelector('.splash-text2-label');
   if (label) { label.classList.remove('step2'); label.textContent = ''; }
-  const howtoVideo = document.querySelector('.splash-howtoplay-video');
-  if (howtoVideo) { howtoVideo.pause(); howtoVideo.src = 'images/howtoplay/howtoplay3.mp4'; howtoVideo.load(); }
+  window.swapHowtoVideo('images/howtoplay/howtoplay3.mp4');
   const animEls = document.querySelectorAll('#splash-screen .flightatt-splash, .splash-text2-wrap');
   animEls.forEach(el => el.classList.remove('animate-in'));
 });

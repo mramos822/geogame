@@ -1221,12 +1221,7 @@ document.getElementById('loading-flags-btn').addEventListener('click', () => {
     document.getElementById('splash-screen').classList.remove('mode-shapes', 'mode-monuments');
     document.getElementById('gameover-screen').classList.add('mode-flags');
     document.getElementById('gameover-screen').classList.remove('mode-shapes', 'mode-monuments');
-    const howtoplayVideo = document.querySelector('.splash-howtoplay-video');
-    if (howtoplayVideo) {
-      howtoplayVideo.pause();
-      howtoplayVideo.src = 'images/howtoplay/howtoplay1.mp4';
-      setTimeout(() => { try { howtoplayVideo.load(); } catch (e) {} }, IOS_VIDEO_LOAD_DELAY);
-    }
+    window.swapHowtoVideo?.('images/howtoplay/howtoplay1.mp4');
     document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men3.png');
     document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men4.png');
     document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl3.png');
