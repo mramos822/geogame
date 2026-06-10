@@ -18,6 +18,21 @@
   box-sizing: border-box;
 }
 
+/* ── iOS: NO promover capas GPU permanentes dentro del #app-stage ──────────────
+   REGRESIÓN del crash cities→monuments en campaña: apareció al meter el
+   fixed-aspect-stage (#app-stage con transform:scale). Bajo ese ancestro
+   transformado, cada `will-change:transform` / translateZ(0) / backface-hidden
+   crea una capa de compositing (IOSurface) PERMANENTE a resolución de diseño
+   (1920px). En 1.15 (sin el stage) esos mismos hints no costaban nada. Acumuladas
+   entre los 4 modos agotan la GPU de iOS y reinician WebContent. En iOS no hay
+   hover ni se necesita la promoción: se anulan. (PC sigue igual.) */
+body.is-ios * { will-change: auto !important; }
+body.is-ios .loading-play-single,
+body.is-ios .loading-secondary-btn {
+  transform: none !important;
+  backface-visibility: visible !important;
+}
+
 html, body, #app-stage-outer { background: #ffffff; }
 /* Aislar repaints de cada pantalla para que no invaliden el resto del árbol */
 #loading-screen, #splash-screen, #gameover-screen, #results-screen, #final-screen {
