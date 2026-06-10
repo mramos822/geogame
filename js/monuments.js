@@ -290,22 +290,32 @@ window.waitForHowtoVideo = function () {
   setTimeout(reveal, 5000); // fallback de seguridad
 };
 
-// Cambia el video de howtoplay liberando ANTES el recurso del video anterior.
-// En iOS, reasignar .src sin vaciar primero deja vivo el decoder/buffers del video
-// previo; recargar <video> así en cada transición (flags→shapes→cities→monuments)
-// termina crasheando el proceso WebKit de forma intermitente (Safari reinicia la
-// pestaña). El crash aparecía en transiciones variables justamente porque depende
-// del estado del decoder, no de un modo puntual. Vaciar (removeAttribute+load)
-// libera el recurso anterior antes de cargar el nuevo.
+// Cambia el video de howtoplay RECREANDO el elemento <video> entero.
+// En iOS, reusar el mismo elemento (removeAttribute+load → src+load) NO garantiza
+// que WebKit suelte la superficie GPU/IOSurface ni el decoder del video anterior:
+// el pipeline de medios del elemento sigue vivo y el pico de compositing al cargar
+// el nuevo video crashea el proceso WebKit de forma intermitente (Safari reinicia la
+// pestaña) en CUALQUIER transición (flags→shapes confirmado, no solo monuments).
+// Destruir el nodo viejo y crear uno fresco fuerza el teardown real del decoder
+// anterior antes de instanciar el nuevo. Todas las referencias al video son por
+// querySelector('.splash-howtoplay-video'), así que recrear el nodo es transparente.
 window.swapHowtoVideo = function (newSrc) {
-  const v = document.querySelector('.splash-howtoplay-video');
-  if (!v) return;
+  const old = document.querySelector('.splash-howtoplay-video');
+  if (!old) return;
   try {
-    v.pause();
-    v.removeAttribute('src');
-    v.load();            // libera el recurso/decoder del video anterior
-    v.src = newSrc;
-    v.load();            // carga el nuevo
+    old.pause();
+    old.removeAttribute('src');
+    old.load();          // pide al decoder anterior que se libere
+    const fresh = document.createElement('video');
+    fresh.className = 'splash-howtoplay-video';
+    fresh.loop = true;
+    fresh.muted = true;
+    fresh.playsInline = true;
+    fresh.setAttribute('playsinline', '');
+    fresh.preload = 'none';
+    fresh.src = newSrc;
+    old.replaceWith(fresh);
+    fresh.load();        // carga el nuevo en un elemento limpio
   } catch (e) {}
 };
 
