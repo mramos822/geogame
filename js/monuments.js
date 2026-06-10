@@ -3184,11 +3184,18 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
         document.getElementById(_nextBtn).click();
         setTimeout(() => { sfxCheck.volume = isMuted ? 0 : 1; }, 150);
       };
+      // Solo la transición a MONUMENTS necesita un respiro: monuments es el 4º modo
+      // y el más pesado, y iOS aún no terminó de evacuar (asíncrono) el caché de
+      // imágenes decodificadas de los 3 modos previos. Mantener el gameover de cities
+      // visible ~900ms le da tiempo a iOS a liberar antes de cargar monuments, sin el
+      // pico transitorio que crashea. Las otras transiciones quedan instantáneas (0).
+      const _toMonuments = (_nextBtn === 'loading-mode4-btn');
+      const _delay = (IS_IOS && _toMonuments) ? 900 : IOS_CAMPAIGN_TRANS_DELAY;
       if (window.__loadingReady) {
-        setTimeout(_fireNext, IOS_CAMPAIGN_TRANS_DELAY);
+        setTimeout(_fireNext, _delay);
       } else {
         const _pollId = setInterval(() => {
-          if (window.__loadingReady) { clearInterval(_pollId); setTimeout(_fireNext, IOS_CAMPAIGN_TRANS_DELAY); }
+          if (window.__loadingReady) { clearInterval(_pollId); setTimeout(_fireNext, _delay); }
         }, 100);
       }
     } else {
