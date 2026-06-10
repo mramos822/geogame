@@ -91,60 +91,82 @@
     return Promise.all(runners);
   }
 
-  const total = imgList.length + audioList.length + videoList.length + 2; // +fonts +load
-  let done = 0;
-  window.__loadingReady = false;
+  function startPreload() {
+    const total = imgList.length + audioList.length + videoList.length + 2; // +fonts +load
+    let done = 0;
+    window.__loadingReady = false;
 
-  function tick() {
-    done++;
-    const pct = Math.min(100, Math.round(done / total * 100));
-    barFill.style.width = pct + '%';
-    pctEl.textContent   = pct + '%';
-    if (done >= total) {
-      window.__loadingReady = true;
-      const actions = document.getElementById('loading-actions');
-      if (actions) actions.style.display = 'flex';
-      document.getElementById('loading-play-wrap').style.display = 'flex';
-      playBtn.addEventListener('animationend', () => playBtn.classList.add('loaded'), { once: true });
-      const flagsBtn = document.getElementById('loading-flags-btn');
-      document.getElementById('loading-flags-wrap').style.display = 'flex';
-      flagsBtn.addEventListener('animationend', () => flagsBtn.classList.add('loaded'), { once: true });
-      const shapesBtn = document.getElementById('loading-shapes-btn');
-      document.getElementById('loading-shapes-wrap').style.display = 'flex';
-      shapesBtn.addEventListener('animationend', () => shapesBtn.classList.add('loaded'), { once: true });
-      const mode4Btn = document.getElementById('loading-mode4-btn');
-      document.getElementById('loading-mode4-wrap').style.display = 'flex';
-      mode4Btn.addEventListener('animationend', () => mode4Btn.classList.add('loaded'), { once: true });
+    function tick() {
+      done++;
+      const pct = Math.min(100, Math.round(done / total * 100));
+      barFill.style.width = pct + '%';
+      pctEl.textContent   = pct + '%';
+      if (done >= total) {
+        window.__loadingReady = true;
+        const actions = document.getElementById('loading-actions');
+        if (actions) actions.style.display = 'flex';
+        document.getElementById('loading-play-wrap').style.display = 'flex';
+        playBtn.addEventListener('animationend', () => playBtn.classList.add('loaded'), { once: true });
+        const flagsBtn = document.getElementById('loading-flags-btn');
+        document.getElementById('loading-flags-wrap').style.display = 'flex';
+        flagsBtn.addEventListener('animationend', () => flagsBtn.classList.add('loaded'), { once: true });
+        const shapesBtn = document.getElementById('loading-shapes-btn');
+        document.getElementById('loading-shapes-wrap').style.display = 'flex';
+        shapesBtn.addEventListener('animationend', () => shapesBtn.classList.add('loaded'), { once: true });
+        const mode4Btn = document.getElementById('loading-mode4-btn');
+        document.getElementById('loading-mode4-wrap').style.display = 'flex';
+        mode4Btn.addEventListener('animationend', () => mode4Btn.classList.add('loaded'), { once: true });
 
-      const fmt = v => v > 0 ? '🏆 ' + v.toLocaleString() : '';
-      const playHs      = parseInt(localStorage.getItem('geochallenge_highscore') || '0', 10);
-      const flagsHs     = parseInt(localStorage.getItem('flagsHighscore')         || '0', 10);
-      const shapesHs    = parseInt(localStorage.getItem('shapesHighscore')        || '0', 10);
-      const monumentsHs = parseInt(localStorage.getItem('monumentsHighscore')     || '0', 10);
-      const elPlay      = document.getElementById('loading-play-hs');
-      const elFlags     = document.getElementById('loading-flags-hs');
-      const elShapes    = document.getElementById('loading-shapes-hs');
-      const elMode4     = document.getElementById('loading-mode4-hs');
-      if (elPlay)   elPlay.textContent   = fmt(playHs);
-      if (elFlags)  elFlags.textContent  = fmt(flagsHs);
-      if (elShapes) elShapes.textContent = fmt(shapesHs);
-      if (elMode4)  elMode4.textContent  = fmt(monumentsHs);
-      if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
+        const fmt = v => v > 0 ? '🏆 ' + v.toLocaleString() : '';
+        const playHs      = parseInt(localStorage.getItem('geochallenge_highscore') || '0', 10);
+        const flagsHs     = parseInt(localStorage.getItem('flagsHighscore')         || '0', 10);
+        const shapesHs    = parseInt(localStorage.getItem('shapesHighscore')        || '0', 10);
+        const monumentsHs = parseInt(localStorage.getItem('monumentsHighscore')     || '0', 10);
+        const elPlay      = document.getElementById('loading-play-hs');
+        const elFlags     = document.getElementById('loading-flags-hs');
+        const elShapes    = document.getElementById('loading-shapes-hs');
+        const elMode4     = document.getElementById('loading-mode4-hs');
+        if (elPlay)   elPlay.textContent   = fmt(playHs);
+        if (elFlags)  elFlags.textContent  = fmt(flagsHs);
+        if (elShapes) elShapes.textContent = fmt(shapesHs);
+        if (elMode4)  elMode4.textContent  = fmt(monumentsHs);
+        if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
+      }
     }
+
+    // Imágenes: hasta 24 en paralelo, decodificadas. Audio/video: descarga completa.
+    runPool(imgList, loadImage, 24, tick);
+    runPool(audioList, src => fetch(src).then(r => r.arrayBuffer()).catch(() => {}), 8, tick);
+    runPool(videoList, src => fetch(src).then(r => r.blob()).catch(() => {}), 3, tick);
+
+    // Fuentes completamente renderizadas
+    Promise.resolve(document.fonts.ready).then(tick, tick);
+
+    // Página y todos sus sub-recursos listos
+    (document.readyState === 'complete')
+      ? tick()
+      : window.addEventListener('load', tick, { once: true });
   }
 
-  // Imágenes: hasta 24 en paralelo, decodificadas. Audio/video: descarga completa.
-  runPool(imgList, loadImage, 24, tick);
-  runPool(audioList, src => fetch(src).then(r => r.arrayBuffer()).catch(() => {}), 8, tick);
-  runPool(videoList, src => fetch(src).then(r => r.blob()).catch(() => {}), 3, tick);
-
-  // Fuentes completamente renderizadas
-  Promise.resolve(document.fonts.ready).then(tick, tick);
-
-  // Página y todos sus sub-recursos listos
-  (document.readyState === 'complete')
-    ? tick()
-    : window.addEventListener('load', tick, { once: true });
+  // En mobile landscape la carga inicial crashea iOS por presión de memoria.
+  // Esperamos a portrait antes de arrancar el preload pesado.
+  const _mq = window.matchMedia('(orientation: landscape) and (max-height: 500px)');
+  if (_mq.matches) {
+    const _orientWarn = document.getElementById('orient-warning');
+    if (_orientWarn) _orientWarn.classList.add('visible');
+    const _onPortrait = () => {
+      if (!window.matchMedia('(orientation: landscape) and (max-height: 500px)').matches) {
+        window.removeEventListener('orientationchange', _onPortrait);
+        window.removeEventListener('resize', _onPortrait);
+        if (_orientWarn) _orientWarn.classList.remove('visible');
+        startPreload();
+      }
+    };
+    window.addEventListener('orientationchange', _onPortrait);
+    window.addEventListener('resize', _onPortrait);
+  } else {
+    startPreload();
+  }
 
 })();
 
