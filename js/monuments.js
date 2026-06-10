@@ -243,6 +243,16 @@ if (IS_IOS) document.body.classList.add('is-ios');
 const IOS_VIDEO_LOAD_DELAY      = IS_IOS ? 2500 : 0;  // antes de .load() en videos
 const IOS_CAMPAIGN_TRANS_DELAY  = IS_IOS ? 400  : 0;  // antes de disparar el btn del modo siguiente
 
+// Muestra/oculta el botón confirm del gameover (se revela tras cargar los assets del siguiente modo).
+window.showGameoverConfirm = function () {
+  const w = document.querySelector('.gameover-confirm-wrap');
+  if (w) w.classList.add('confirm-ready');
+};
+window.hideGameoverConfirm = function () {
+  const w = document.querySelector('.gameover-confirm-wrap');
+  if (w) w.classList.remove('confirm-ready');
+};
+
 const _iosMusicURL = new Map([
   [sfxGameMusic, 'sfx/gamemusic.mp3'],
   [sfxPostgame,  'sfx/postgameloop.mp3'],
@@ -407,13 +417,18 @@ window.preloadNextModeAssets = function (nextMode) {
     ],
   };
   const list = assetMap[nextMode];
-  if (!list) return;
-  list.forEach(url => {
-    // Videos excluidos del preload proactivo: son demasiado pesados para tener
-    // en RAM mientras el modo anterior todavía no liberó su memoria → OOM en iOS.
-    if (url.endsWith('.mp4')) return;
-    const img = new Image();
-    img.src = url;
+  if (!list) return Promise.resolve();
+  // Videos excluidos del preload proactivo: son demasiado pesados para tener
+  // en RAM mientras el modo anterior todavía no liberó su memoria → OOM en iOS.
+  const images = list.filter(url => !url.endsWith('.mp4'));
+  if (!images.length) return Promise.resolve();
+  return new Promise(resolve => {
+    let done = 0;
+    images.forEach(url => {
+      const img = new Image();
+      img.onload = img.onerror = () => { if (++done === images.length) resolve(); };
+      img.src = url;
+    });
   });
 };
 
@@ -2786,6 +2801,7 @@ function endGame() {
       if (window.pendingGameMode === 'monuments') {
         gameoverScreen.classList.add('mode-monuments');
       }
+      window.hideGameoverConfirm();
       gameoverScreen.style.display = 'flex';
       const rpGO = document.getElementById('right-panel');
       if (rpGO) rpGO.style.display = 'none';
@@ -2796,9 +2812,12 @@ function endGame() {
       const checksEndTime = (checksTotal > 0 ? (checksTotal - 1) * 0.1 + 0.2 : 0) + 0.4;
       buildWrongsRow(checksEndTime);
       playMusic(sfxPostgame);
-      // En campaña cities→monuments: precargar assets de monuments mientras el usuario lee su score
+      // Revelar confirm solo cuando los assets del siguiente modo estén en caché.
       if (window.campaign && window.campaign.active && window.pendingGameMode === 'game' && typeof window.preloadNextModeAssets === 'function') {
-        window.preloadNextModeAssets('monuments');
+        window.preloadNextModeAssets('monuments').then(window.showGameoverConfirm);
+      } else {
+        // Modo libre o último modo (monuments): no hay preload, confirmar después de un breve delay.
+        setTimeout(window.showGameoverConfirm, 800);
       }
     }, 1000);
   }, 400 + 1200);
@@ -3034,7 +3053,10 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
     window.campaign.scores[mode] = sc;
     window.campaign.base = (window.campaign.base || 0) + sc;
     window.campaign.idx++;
-    gameoverScreen.style.display = 'none';
+    // Fade out gameover mientras el splash aparece detrás
+    gameoverScreen.style.transition = 'opacity 0.2s';
+    gameoverScreen.style.opacity = '0';
+    setTimeout(() => { gameoverScreen.style.display = 'none'; gameoverScreen.style.opacity = ''; gameoverScreen.style.transition = ''; }, 220);
     // resetear estado del splash para que el segundo diálogo no se saltee
     confirmStep = 0;
     const howtoWrapC = document.querySelector('.splash-howtoplay-wrap');
@@ -3068,7 +3090,9 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
     return;
   }
 
-  gameoverScreen.style.display = 'none';
+  gameoverScreen.style.transition = 'opacity 0.2s';
+  gameoverScreen.style.opacity = '0';
+  setTimeout(() => { gameoverScreen.style.display = 'none'; gameoverScreen.style.opacity = ''; gameoverScreen.style.transition = ''; }, 220);
   document.getElementById('loading-screen').style.display = '';
   document.getElementById('loading-screen').classList.remove('table-shown');
   document.getElementById('loading-table-group')?.classList.add('table-gone');

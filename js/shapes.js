@@ -924,6 +924,7 @@ function hideShapesMode() {
   if (typeof setModeCounts !== 'undefined') setModeCounts(shapesCorrectCount, shapesWrongAnswerCount);
   const gameoverScreen = document.getElementById('gameover-screen');
   if (gameoverScreen) {
+    window.hideGameoverConfirm?.();
     gameoverScreen.style.display = 'flex';
     const label = gameoverScreen.querySelector('.gameover-text1-label');
     if (label) label.textContent = t('gameover.shapes');
@@ -935,7 +936,9 @@ function hideShapesMode() {
   if (typeof playMusic        !== 'undefined') playMusic(sfxPostgame);
   // En campaña, precargar assets del modo siguiente (cities) mientras el usuario lee su score
   if (window.campaign && window.campaign.active && typeof window.preloadNextModeAssets === 'function') {
-    window.preloadNextModeAssets('game');
+    window.preloadNextModeAssets('game').then(() => window.showGameoverConfirm?.());
+  } else {
+    setTimeout(() => window.showGameoverConfirm?.(), 800);
   }
 }
 // ─────────────────────────────────────────────────────────────────────────────

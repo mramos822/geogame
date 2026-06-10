@@ -1066,6 +1066,7 @@ function hideFlagsMode() {
   if (typeof setModeCounts !== 'undefined') setModeCounts(flagsCorrectCount, flagsWrongCount);
   const gameoverScreen = document.getElementById('gameover-screen');
   if (gameoverScreen) {
+    window.hideGameoverConfirm?.();
     gameoverScreen.style.display = 'flex';
     const label = gameoverScreen.querySelector('.gameover-text1-label');
     if (label) label.textContent = t('gameover.flags');
@@ -1076,7 +1077,9 @@ function hideFlagsMode() {
   if (typeof buildWrongsRow !== 'undefined') buildWrongsRow(checksEndTime);
   if (typeof playMusic !== 'undefined') playMusic(sfxPostgame);
   if (window.campaign && window.campaign.active && typeof window.preloadNextModeAssets === 'function') {
-    window.preloadNextModeAssets('shapes');
+    window.preloadNextModeAssets('shapes').then(() => window.showGameoverConfirm?.());
+  } else {
+    setTimeout(() => window.showGameoverConfirm?.(), 800);
   }
 }
 

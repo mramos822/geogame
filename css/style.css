@@ -724,6 +724,13 @@ body.is-ios .wrong-count-total { top: 29.5cqmin; }
   left: 62%;
   transform: translate(-50%, -50%);
   cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+.gameover-confirm-wrap.confirm-ready {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .gameover-confirm1 {
