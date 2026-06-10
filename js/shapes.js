@@ -959,7 +959,7 @@ document.getElementById('loading-shapes-btn').addEventListener('click', () => {
     if (howtoplayVideo) {
       howtoplayVideo.pause();
       howtoplayVideo.src = 'images/howtoplay/howtoplay2.mp4';
-      setTimeout(() => { try { howtoplayVideo.load(); } catch (e) {} }, 600);
+      setTimeout(() => { try { howtoplayVideo.load(); } catch (e) {} }, IOS_VIDEO_LOAD_DELAY);
     }
     document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men5.png');
     document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men6.png');
@@ -1024,6 +1024,6 @@ document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   setTimeout(() => {
     const howtoVideo = document.querySelector('.splash-howtoplay-video');
     if (howtoVideo) { howtoVideo.pause(); howtoVideo.src = 'images/howtoplay/howtoplay4.mp4'; try { howtoVideo.load(); } catch (e) {} }
-  }, 1200);
+  }, IOS_VIDEO_LOAD_DELAY);
 });
 

@@ -1221,7 +1221,7 @@ document.getElementById('loading-flags-btn').addEventListener('click', () => {
     if (howtoplayVideo) {
       howtoplayVideo.pause();
       howtoplayVideo.src = 'images/howtoplay/howtoplay1.mp4';
-      setTimeout(() => { try { howtoplayVideo.load(); } catch (e) {} }, 600);
+      setTimeout(() => { try { howtoplayVideo.load(); } catch (e) {} }, IOS_VIDEO_LOAD_DELAY);
     }
     document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men3.png');
     document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men4.png');

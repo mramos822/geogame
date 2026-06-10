@@ -238,6 +238,11 @@ const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) ||
   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 if (IS_IOS) document.body.classList.add('is-ios');
 
+// Delays de transición: agresivos en iOS para dar tiempo al GC antes de cargar
+// el modo siguiente. En PC todo es instantáneo (0ms).
+const IOS_VIDEO_LOAD_DELAY      = IS_IOS ? 2500 : 0;  // antes de .load() en videos
+const IOS_CAMPAIGN_TRANS_DELAY  = IS_IOS ? 400  : 0;  // antes de disparar el btn del modo siguiente
+
 const _iosMusicURL = new Map([
   [sfxGameMusic, 'sfx/gamemusic.mp3'],
   [sfxPostgame,  'sfx/postgameloop.mp3'],
@@ -368,7 +373,7 @@ document.getElementById('loading-play-btn').addEventListener('click', () => {
     document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check3.png');
     document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong3.png');
     const howtoVideoCity = document.querySelector('.splash-howtoplay-video');
-    if (howtoVideoCity) { howtoVideoCity.pause(); howtoVideoCity.src = 'images/howtoplay/howtoplay3.mp4'; howtoVideoCity.load(); }
+    if (howtoVideoCity) { howtoVideoCity.pause(); howtoVideoCity.src = 'images/howtoplay/howtoplay3.mp4'; setTimeout(() => { try { howtoVideoCity.load(); } catch (e) {} }, IOS_VIDEO_LOAD_DELAY); }
     const howtoTitleCity = document.querySelector('.splash-howtoplay-title');
     if (howtoTitleCity) howtoTitleCity.textContent = 'City Blitz';
     const label = document.querySelector('.splash-text2-label');
@@ -3049,10 +3054,10 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
         setTimeout(() => { sfxCheck.volume = isMuted ? 0 : 1; }, 150);
       };
       if (window.__loadingReady) {
-        setTimeout(_fireNext, 0);
+        setTimeout(_fireNext, IOS_CAMPAIGN_TRANS_DELAY);
       } else {
         const _pollId = setInterval(() => {
-          if (window.__loadingReady) { clearInterval(_pollId); setTimeout(_fireNext, 0); }
+          if (window.__loadingReady) { clearInterval(_pollId); setTimeout(_fireNext, IOS_CAMPAIGN_TRANS_DELAY); }
         }, 100);
       }
     } else {
