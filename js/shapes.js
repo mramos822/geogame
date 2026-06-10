@@ -1021,9 +1021,9 @@ document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   void splashEl.offsetWidth;
   animEls.forEach(el => el.classList.add('animate-in'));
   if (typeof playMusic !== 'undefined') playMusic(sfxPostgame);
-  requestAnimationFrame(() => {
+  setTimeout(() => {
     const howtoVideo = document.querySelector('.splash-howtoplay-video');
-    if (howtoVideo) { howtoVideo.pause(); howtoVideo.src = 'images/howtoplay/howtoplay4.mp4'; howtoVideo.load(); }
-  });
+    if (howtoVideo) { howtoVideo.pause(); howtoVideo.src = 'images/howtoplay/howtoplay4.mp4'; try { howtoVideo.load(); } catch (e) {} }
+  }, 1200);
 });
 

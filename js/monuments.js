@@ -404,12 +404,11 @@ window.preloadNextModeAssets = function (nextMode) {
   const list = assetMap[nextMode];
   if (!list) return;
   list.forEach(url => {
-    if (url.endsWith('.mp4')) {
-      fetch(url, { cache: 'force-cache' }).catch(() => {});
-    } else {
-      const img = new Image();
-      img.src = url;
-    }
+    // Videos excluidos del preload proactivo: son demasiado pesados para tener
+    // en RAM mientras el modo anterior todavía no liberó su memoria → OOM en iOS.
+    if (url.endsWith('.mp4')) return;
+    const img = new Image();
+    img.src = url;
   });
 };
 
