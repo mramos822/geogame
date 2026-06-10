@@ -1026,6 +1026,10 @@ document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   const howtoTitle = document.querySelector('.splash-howtoplay-title');
   if (howtoTitle) howtoTitle.textContent = 'Landmark Loco';
   const splashEl = document.getElementById('splash-screen');
+  // Pausar las nubes animadas de monuments durante el pico de entrada (iOS): se
+  // reanudan tras ~1.5s, cuando iOS ya asentó el compositing. Ver CSS .monuments-entry.
+  document.body.classList.add('monuments-entry');
+  setTimeout(() => document.body.classList.remove('monuments-entry'), 1500);
   splashEl.style.display = 'flex';
   window.showSplashConfirm?.();
   const animEls = splashEl.querySelectorAll('.flightatt-splash, .splash-text2-wrap');

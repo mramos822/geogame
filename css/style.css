@@ -4320,6 +4320,13 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
 }
 
 .mode-monuments .game-bg-clouds-monuments { display: block; }
+/* Durante el pico de entrada a monuments (campaña en iOS) se pausan las 3 nubes
+   animadas en bucle: una animación infinita mantiene una superficie de compositing
+   (IOSurface) activa permanentemente, y sumadas a la GPU acumulada de los 3 modos
+   previos contribuyen al pico que reinicia WebKit. Se reanudan tras asentarse. */
+body.monuments-entry .game-bg-clouds-monuments,
+body.monuments-entry .game-bg-clouds-monuments2,
+body.monuments-entry .game-bg-clouds-monuments3 { animation-play-state: paused; }
 .mode-monuments .game-bg-cloud1,
 .mode-monuments .game-bg-cloud2 { display: none; }
 

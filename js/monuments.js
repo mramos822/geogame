@@ -3190,8 +3190,9 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
       // en el mismo bloque sincrónico (sin frame intermedio en blanco).
       sfxCheck.volume = 0;
       const _nextBtn = window.campaign.btns[window.campaign.idx];
+      const _toMon = (_nextBtn === 'loading-mode4-btn');
       const _fireNext = () => {
-        // Ocultar gameover + resetear splash + mostrar siguiente — todo de una.
+        // Ocultar gameover + resetear splash + mostrar siguiente.
         gameoverScreen.style.display = 'none';
         confirmStep = 0;
         const howtoWrapC = document.querySelector('.splash-howtoplay-wrap');
@@ -3200,8 +3201,21 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
         if (labelC) { labelC.classList.remove('step2'); labelC.textContent = ''; }
         document.querySelectorAll('#splash-screen .flightatt-splash, .splash-text2-wrap')
           .forEach(el => el.classList.remove('animate-in'));
-        document.getElementById(_nextBtn).click();
-        setTimeout(() => { sfxCheck.volume = isMuted ? 0 : 1; }, 150);
+        const _go = () => {
+          document.getElementById(_nextBtn).click();
+          setTimeout(() => { sfxCheck.volume = isMuted ? 0 : 1; }, 150);
+        };
+        // Para monuments (4º modo, GPU acumulada de los 3 previos): NO construir las
+        // capas de compositing de monuments en el mismo frame en que se oculta el
+        // gameover de cities. Dar un respiro de 2 frames + tick para que iOS evacúe
+        // las superficies (IOSurface) del gameover/cities antes de instanciar las de
+        // monuments (cielo + 3 nubes animadas en bucle + fondo). Reduce el pico de
+        // compositing simultáneo que reinicia WebKit. Las otras transiciones, directo.
+        if (IS_IOS && _toMon) {
+          requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(_go, 60)));
+        } else {
+          _go();
+        }
       };
       // Solo la transición a MONUMENTS necesita un respiro: monuments es el 4º modo
       // y el más pesado, y iOS aún no terminó de evacuar (asíncrono) el caché de
