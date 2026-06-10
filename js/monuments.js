@@ -1675,10 +1675,11 @@ gameWrapper.appendChild(badgeOverlay);
 window.releaseGameMemory = function () {
   try {
     // Fondos, personajes, check/wrong, cielos, monumento, banderas de país.
+    // OJO: no incluir .game-bg-sky-monuments — el cielo de monuments no lo re-asigna
+    // ningún handler, así que limpiarlo lo deja en blanco al entrar al modo.
     document.querySelectorAll(
       '.game-bg-city, .game-bg-men1, .game-bg-men2, .game-bg-girl1, .game-bg-girl2, ' +
-      '.game-bg-women1, .game-bg-women2, .game-bg-check3, .game-bg-wrong3, ' +
-      '.game-bg-sky-monuments, #monument-img'
+      '.game-bg-women1, .game-bg-women2, .game-bg-check3, .game-bg-wrong3, #monument-img'
     ).forEach(el => { if (el && el.tagName === 'IMG') el.removeAttribute('src'); });
     // Imágenes de rango en results/final (hasta 35 de ~2MB decodificados c/u).
     document.querySelectorAll('#results-screen img, #final-screen img').forEach(el => {
@@ -3194,6 +3195,9 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
     } else {
       window.campaign.active = false;
       playMusic(null);
+      // Ocultar el gameover de monuments antes de mostrar results; si no, queda
+      // encima y bloquea el click del confirm para ver el rank.
+      gameoverScreen.style.display = 'none';
       if (typeof showResultsScreen === 'function') showResultsScreen();
     }
     return;
