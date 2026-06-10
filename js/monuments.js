@@ -240,8 +240,8 @@ if (IS_IOS) document.body.classList.add('is-ios');
 
 // Delays de transición: agresivos en iOS para dar tiempo al GC antes de cargar
 // el modo siguiente. En PC todo es instantáneo (0ms).
-const IOS_VIDEO_LOAD_DELAY      = IS_IOS ? 1200 : 0;   // antes de .load() en videos
-const IOS_CAMPAIGN_TRANS_DELAY  = IS_IOS ? 400 : 0;    // antes de disparar el btn del modo siguiente
+const IOS_VIDEO_LOAD_DELAY      = IS_IOS ? 400 : 0;    // antes de .load() en videos
+const IOS_CAMPAIGN_TRANS_DELAY  = IS_IOS ? 50 : 0;     // antes de disparar el btn del modo siguiente
 
 // Muestra/oculta el confirm del gameover (se revela tras cargar assets del siguiente modo).
 window.showGameoverConfirm = function () {
