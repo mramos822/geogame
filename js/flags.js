@@ -1209,6 +1209,7 @@ document.getElementById('loading-flags-btn').addEventListener('click', () => {
   document.getElementById('loading-screen').style.display = 'none';
   const splashEl = document.getElementById('splash-screen');
   splashEl.style.display = 'flex';
+  window.showSplashConfirm?.();
   const animEls = splashEl.querySelectorAll('.flightatt-splash, .splash-text2-wrap');
   animEls.forEach(el => el.classList.remove('animate-in'));
   void splashEl.offsetWidth;

@@ -950,6 +950,7 @@ document.getElementById('loading-shapes-btn').addEventListener('click', () => {
   document.getElementById('loading-screen').style.display = 'none';
   const splashEl = document.getElementById('splash-screen');
   splashEl.style.display = 'flex';
+  window.showSplashConfirm?.();
   const animEls = splashEl.querySelectorAll('.flightatt-splash, .splash-text2-wrap');
   animEls.forEach(el => el.classList.remove('animate-in'));
   void splashEl.offsetWidth;
@@ -1019,6 +1020,7 @@ document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   if (howtoTitle) howtoTitle.textContent = 'Landmark Loco';
   const splashEl = document.getElementById('splash-screen');
   splashEl.style.display = 'flex';
+  window.showSplashConfirm?.();
   const animEls = splashEl.querySelectorAll('.flightatt-splash, .splash-text2-wrap');
   animEls.forEach(el => el.classList.remove('animate-in'));
   void splashEl.offsetWidth;

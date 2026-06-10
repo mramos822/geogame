@@ -243,7 +243,7 @@ if (IS_IOS) document.body.classList.add('is-ios');
 const IOS_VIDEO_LOAD_DELAY      = IS_IOS ? 2500 : 0;  // antes de .load() en videos
 const IOS_CAMPAIGN_TRANS_DELAY  = IS_IOS ? 400  : 0;  // antes de disparar el btn del modo siguiente
 
-// Muestra/oculta el botón confirm del gameover (se revela tras cargar los assets del siguiente modo).
+// Muestra/oculta el confirm del gameover (se revela tras cargar assets del siguiente modo).
 window.showGameoverConfirm = function () {
   const w = document.querySelector('.gameover-confirm-wrap');
   if (w) w.classList.add('confirm-ready');
@@ -251,6 +251,29 @@ window.showGameoverConfirm = function () {
 window.hideGameoverConfirm = function () {
   const w = document.querySelector('.gameover-confirm-wrap');
   if (w) w.classList.remove('confirm-ready');
+};
+
+// Muestra/oculta el confirm del splash pre-game.
+window.showSplashConfirm = function () {
+  const w = document.querySelector('.splash-confirm-wrap');
+  if (w) w.classList.add('confirm-ready');
+};
+window.hideSplashConfirm = function () {
+  const w = document.querySelector('.splash-confirm-wrap');
+  if (w) w.classList.remove('confirm-ready');
+};
+
+// Oculta el splash confirm y lo revela cuando el video de howtoplay puede reproducirse.
+window.waitForHowtoVideo = function () {
+  window.hideSplashConfirm();
+  const v = document.querySelector('.splash-howtoplay-video');
+  if (!v || v.readyState >= 3) { window.showSplashConfirm(); return; }
+  let done = false;
+  const reveal = () => { if (!done) { done = true; window.showSplashConfirm(); } };
+  v.addEventListener('canplaythrough', reveal, { once: true });
+  v.addEventListener('loadeddata',     reveal, { once: true });
+  v.addEventListener('error',          reveal, { once: true });
+  setTimeout(reveal, 5000); // fallback de seguridad
 };
 
 const _iosMusicURL = new Map([
@@ -364,6 +387,7 @@ document.getElementById('loading-play-btn').addEventListener('click', () => {
   document.getElementById('loading-screen').style.display = 'none';
   const splashElCity = document.getElementById('splash-screen');
   splashElCity.style.display = 'flex';
+  window.showSplashConfirm();
   const animElsCity = splashElCity.querySelectorAll('.flightatt-splash, .splash-text2-wrap');
   animElsCity.forEach(el => el.classList.remove('animate-in'));
   void splashElCity.offsetWidth;
@@ -3023,6 +3047,7 @@ document.querySelector('.splash-confirm-wrap')?.addEventListener('click', () => 
     const howtoVideo = document.querySelector('.splash-howtoplay-video');
     if (howtoVideo) howtoVideo.play();
     confirmStep = 1;
+    window.waitForHowtoVideo();
   } else {
     if (window.pendingGameMode === 'flags') {
       splashScreen.style.display = 'none';
