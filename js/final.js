@@ -136,6 +136,7 @@ function buildFriendClouds(ranking, playerPos) {
       `</div>`;
     container.appendChild(group);
     fitRankLabel(labelId, 39.5);
+    group.dataset.k = k;
     const cloudImg = group.querySelector('.final-cloud5');
     if (cloudImg) {
       const dur = 6 + Math.random() * 5;       // 6–11s
@@ -160,28 +161,37 @@ function buildFriendClouds(ranking, playerPos) {
     { duration: 7500, delay: 3000, easing: 'ease-out', fill: 'both' }
   );
 
-  // poner gris las nubes que mi avión va pasando (cruzan el centro)
+  // Poner gris las nubes que el container arrastra más allá del centro.
+  // No se usa getBoundingClientRect porque en iOS el compositor anima el
+  // container en un thread separado y getBCR devuelve la posición layout
+  // (pre-animación), causando marcado incorrecto. Se calcula la posición
+  // matemáticamente a partir del progreso de la animación.
+  //
+  // Cloud k cruza el centro cuando easeOut(f) == 1 - (playerK-k)*STEP_X/240.
+  // Solo nubes con k < playerK cruzan (las de k > playerK quedan a la derecha).
   const groups = Array.from(container.querySelectorAll('.final-group5'));
-  const centerX = window.STAGE_W / 2;
-  let running = true;
-  anim.addEventListener('finish', () => { running = false; checkPass(); });
-  function checkPass() {
+  let animRunning = true;
+  let animStartTime = null;
+  const ANIM_DUR = 7500;
+  const ANIM_DELAY = 3000;
+  function easeOutQ(t) { return 1 - (1 - t) * (1 - t); }
+  function checkPassMath(ep) {
     groups.forEach(g => {
       if (g.classList.contains('passed')) return;
-      const cloud = g.querySelector('.final-cloud5');
-      if (!cloud) return;
-      const r = cloud.getBoundingClientRect();
-      if (r.left + r.width / 2 < centerX) g.classList.add('passed');
+      const gk = parseInt(g.dataset.k);
+      if (isNaN(gk) || gk >= playerK) return;
+      const threshold = 1 - (playerK - gk) * STEP_X / 240;
+      if (ep >= threshold) g.classList.add('passed');
     });
   }
-  function loop() {
-    checkPass();
-    if (running) requestAnimationFrame(loop);
+  function loop(ts) {
+    if (!animStartTime) animStartTime = ts;
+    const f = Math.min(1, (ts - animStartTime) / ANIM_DUR);
+    checkPassMath(easeOutQ(f));
+    if (animRunning) requestAnimationFrame(loop);
   }
-  // Esperar el delay de la animación antes de empezar a checkear:
-  // en iOS getBoundingClientRect devuelve 0 para elementos con Web Animations
-  // antes de que arranquen, marcando todas las nubes como passed inmediatamente.
-  setTimeout(() => requestAnimationFrame(loop), 3000);
+  anim.addEventListener('finish', () => { animRunning = false; checkPassMath(1); });
+  setTimeout(() => requestAnimationFrame(loop), ANIM_DELAY);
 }
 
 function hideFinalScreen() {
@@ -193,9 +203,7 @@ function hideFinalScreen() {
 document.getElementById('final-confirm-back-wrap')?.addEventListener('click', () => {
   if (typeof confirmCooldown !== 'undefined' && confirmCooldown) return;
   if (typeof confirmCooldownLock === 'function') confirmCooldownLock();
-  const a = new Audio('sfx/check.mp3');
-  a.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1;
-  a.play();
+  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; sfxCheck.play(); }
   const w = document.getElementById('final-confirm-back-wrap');
   w.classList.add('confirm-pressed');
   setTimeout(() => w.classList.remove('confirm-pressed'), 50);
@@ -216,9 +224,7 @@ document.getElementById('final-confirm-back-wrap')?.addEventListener('mouseleave
 document.getElementById('final-confirm-wrap')?.addEventListener('click', () => {
   if (typeof confirmCooldown !== 'undefined' && confirmCooldown) return;
   if (typeof confirmCooldownLock === 'function') confirmCooldownLock();
-  const a = new Audio('sfx/check.mp3');
-  a.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1;
-  a.play();
+  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; sfxCheck.play(); }
   const wrap = document.getElementById('final-confirm-wrap');
   wrap.classList.add('confirm-pressed');
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);

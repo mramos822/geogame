@@ -11,7 +11,7 @@ document.addEventListener('contextmenu', e => {
   });
 });
 
-const FLAGS_GAME_DURATION = 10; // TEMP: 10s para testear (volver a 60)
+const FLAGS_GAME_DURATION = 60;
 
 const flagsWrapper       = document.getElementById('flags-wrapper');
 const flagsScoreDisplay  = document.getElementById('flags-score-display');
@@ -620,6 +620,7 @@ function startFlagsRound() {
     flagsFindLuggage.removeEventListener('animationend', onFindLuggageEnd);
     clearFlagsElimination();
     if (!flagsRunning) return;
+    flagsPicked = true; // bloquear clicks hasta la siguiente pregunta
     // Simular wrong: misma lógica que click incorrecto
     flagsGroupIds.forEach(gid => {
       const g = document.getElementById(gid);
@@ -859,7 +860,9 @@ function startFlagsRound() {
       flagsMachine3b.style.animationPlayState = 'paused';
       void flagsFindLuggage.offsetWidth; // commit freeze al DOM/layout
       flagsTapFindRect = flagsFindLuggage.getBoundingClientRect(); // exacto
-      handleLuggagePick();
+      // Diferir el trabajo pesado al siguiente frame: el browser pinta el estado
+      // congelado inmediatamente y el main thread queda libre para el compositor.
+      requestAnimationFrame(handleLuggagePick);
     };
     function handleLuggagePick() {
       if (!flagsRunning || flagsPicked || group.classList.contains('flags-faded')) return;

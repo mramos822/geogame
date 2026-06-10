@@ -1425,7 +1425,7 @@ function confirmCooldownLock() {
 document.querySelector('.splash-confirm-wrap')?.addEventListener('click', () => {
   if (confirmCooldown) return;
   confirmCooldownLock();
-  const a = new Audio('sfx/check.mp3'); a.volume = isMuted ? 0 : 1; a.play();
+  sfxCheck.currentTime = 0; sfxCheck.volume = isMuted ? 0 : 1; sfxCheck.play();
   const wrap = document.querySelector('.splash-confirm-wrap');
   wrap.classList.add('confirm-pressed');
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
@@ -1458,7 +1458,7 @@ document.querySelector('.splash-confirm-wrap')?.addEventListener('click', () => 
 document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () => {
   if (confirmCooldown) return;
   confirmCooldownLock();
-  const a = new Audio('sfx/check.mp3'); a.volume = isMuted ? 0 : 1; a.play();
+  sfxCheck.currentTime = 0; sfxCheck.volume = isMuted ? 0 : 1; sfxCheck.play();
   const wrap = document.querySelector('.gameover-confirm-wrap');
   wrap.classList.add('confirm-pressed');
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
@@ -1691,7 +1691,7 @@ document.getElementById('vol-btn')?.addEventListener('click', () => {
   const vol = isMuted ? 0 : 1;
   getAllSfx().forEach(sfx => { sfx.volume = vol; });
   document.getElementById('vol-img').src = isMuted ? 'images/vol2.png' : 'images/vol1.png';
-  const a = new Audio('sfx/check.mp3'); a.volume = 1; a.play();
+  sfxCheck.currentTime = 0; sfxCheck.volume = 1; sfxCheck.play();
 });
 
 // ── LOCK LOADING SCREEN ZOOM & POSITION ───────────────────────────────────────

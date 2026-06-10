@@ -1482,17 +1482,17 @@ window.quitToMenu = quitToMenu;
   // Click en power: abre la pestañita de confirmación (el juego sigue corriendo)
   const quitPopup = document.getElementById('ingame-quit-popup');
   powerEl.addEventListener('click', () => {
-    const a = new Audio('sfx/select.mp3'); a.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; a.play();
+    sfxSelect.currentTime = 0; sfxSelect.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; sfxSelect.play();
     if (quitPopup) quitPopup.style.display = 'flex';
     document.body.classList.add('quit-open');
   });
   document.getElementById('ingame-quit-cancel')?.addEventListener('click', () => {
-    const a = new Audio('sfx/select.mp3'); a.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; a.play();
+    sfxSelect.currentTime = 0; sfxSelect.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; sfxSelect.play();
     if (quitPopup) quitPopup.style.display = 'none';
     document.body.classList.remove('quit-open');
   });
   document.getElementById('ingame-quit-confirm')?.addEventListener('click', () => {
-    const a = new Audio('sfx/check.mp3'); a.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; a.play();
+    sfxCheck.currentTime = 0; sfxCheck.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; sfxCheck.play();
     if (quitPopup) quitPopup.style.display = 'none';
     document.body.classList.remove('quit-open');
     quitToMenu();
@@ -1553,7 +1553,7 @@ function playMusic(track) {
 }
 
 // ── CONFIG ──────────────────────────────────────────────────────────────────
-const GAME_DURATION   = 10; // TEMP: 10s para testear (volver a 60)
+const GAME_DURATION   = 60;
 const BONUS_TIME      = 5;
 const DOTS_NEEDED     = 10;
 const SPEED_BONUS_WIN = 3;

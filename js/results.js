@@ -225,7 +225,7 @@ sfxCheer.addEventListener('ended', startResultsLoop);
 resultsConfirm?.addEventListener('click', () => {
   if (confirmCooldown) return;
   confirmCooldownLock();
-  const a = new Audio('sfx/check.mp3'); a.volume = isMuted ? 0 : 1; a.play();
+  sfxCheck.currentTime = 0; sfxCheck.volume = isMuted ? 0 : 1; sfxCheck.play();
   resultsConfirm.classList.add('confirm-pressed');
   setTimeout(() => resultsConfirm.classList.remove('confirm-pressed'), 50);
   resultsConfirm.classList.add('slide-out');
@@ -254,7 +254,7 @@ resultsConfirm?.addEventListener('mouseleave', playSelect);
 resultsBackWrap?.addEventListener('click', () => {
   if (confirmCooldown) return;
   confirmCooldownLock();
-  const a = new Audio('sfx/check.mp3'); a.volume = isMuted ? 0 : 1; a.play();
+  sfxCheck.currentTime = 0; sfxCheck.volume = isMuted ? 0 : 1; sfxCheck.play();
   resultsBackWrap.classList.add('confirm-pressed');
   setTimeout(() => resultsBackWrap.classList.remove('confirm-pressed'), 50);
   if (resultsBackStep === 0) {

@@ -48,7 +48,7 @@ body {
   user-select: none;
   position: relative;
   overscroll-behavior: none;
-  touch-action: none;
+  touch-action: manipulation;
 }
 
 /* ── STAGE DE ASPECTO FIJO ────────────────────────────────────
@@ -122,7 +122,7 @@ body {
 }
 
 @keyframes slide-in-flightatt {
-  from { transform: translate(calc(-50% + 56cqmin), -50%); }
+  from { transform: translate(calc(-50% + 510px), -50%); }
   to   { transform: translate(-50%, -50%); }
 }
 
@@ -142,7 +142,7 @@ body {
 }
 
 @keyframes slide-in-text2 {
-  from { transform: translate(calc(-50% + 56cqmin), -50%); }
+  from { transform: translate(calc(-50% + 510px), -50%); }
   to   { transform: translate(-50%, -50%); }
 }
 
@@ -563,7 +563,7 @@ body.is-ios .wrong-count-total { top: 29.5cqmin; }
 
 @keyframes plane7-fly {
   from { transform: scale(1) translate(0, 0); }
-  to   { transform: scale(1.8) translate(-70cqw, -50cqh); }
+  to   { transform: scale(1.8) translate(-1344px, -456px); }
 }
 
 .game-bg-sky-monuments { display: none; bottom: 75%; z-index: -2; transform: translateX(-50%) scaleX(2) scaleY(1.5); }
@@ -599,14 +599,12 @@ body.is-ios .wrong-count-total { top: 29.5cqmin; }
 }
 
 /* z-index: plane1 adelante, plane6 atrás */
-/* linear en lugar de ease-out: evita el efecto "retroceso" en iOS cuando el
-   compositor cae a main thread y salta frames en la desaceleración final. */
-.game-bg-plane1 { z-index: 6; animation: plane-fly-in 2.7s 0.2s linear forwards, plane1-blink 2.5s 0.2s steps(1, end) forwards, plane-peel 0s 2.9s forwards; }
-.game-bg-plane2 { z-index: 5; opacity: 0; animation: plane-fly-in 2.7s 0.2s linear forwards, plane2-blink 2.5s 0.2s steps(1, end) forwards, plane-peel 0s 3.0s forwards; }
-.game-bg-plane3 { z-index: 4; animation: plane-fly-in 2.7s 0.2s linear forwards, plane-peel 0s 3.1s forwards; }
-.game-bg-plane4 { z-index: 3; animation: plane-fly-in 2.7s 0.2s linear forwards, plane-peel 0s 3.2s forwards; }
-.game-bg-plane5 { z-index: 2; animation: plane-fly-in 2.7s 0.2s linear forwards, plane-peel 0s 3.3s forwards; }
-.game-bg-plane6 { z-index: 1; animation: plane-fly-in 2.7s 0.2s linear forwards; }
+.game-bg-plane1 { z-index: 6; animation: plane-fly-in 2.7s 0.2s ease-out forwards, plane1-blink 2.5s 0.2s steps(1, end) forwards, plane-peel 0s 2.9s forwards; }
+.game-bg-plane2 { z-index: 5; opacity: 0; animation: plane-fly-in 2.7s 0.2s ease-out forwards, plane2-blink 2.5s 0.2s steps(1, end) forwards, plane-peel 0s 3.0s forwards; }
+.game-bg-plane3 { z-index: 4; animation: plane-fly-in 2.7s 0.2s ease-out forwards, plane-peel 0s 3.1s forwards; }
+.game-bg-plane4 { z-index: 3; animation: plane-fly-in 2.7s 0.2s ease-out forwards, plane-peel 0s 3.2s forwards; }
+.game-bg-plane5 { z-index: 2; animation: plane-fly-in 2.7s 0.2s ease-out forwards, plane-peel 0s 3.3s forwards; }
+.game-bg-plane6 { z-index: 1; animation: plane-fly-in 2.7s 0.2s ease-out forwards; }
 
 /* cqw reemplazado por px fijos (stage siempre 1920px): iOS no puede GPU-compilar
    keyframes con unidades cqw → la animación cae a main thread → jank. */
@@ -895,7 +893,7 @@ body.is-ios .wrong-count-total { top: 29.5cqmin; }
   width: 100%;
   height: 100%;  z-index: 200;
   background: #086aa7;
-  touch-action: none;
+  touch-action: manipulation;
   overscroll-behavior: none;
   transform-origin: 0 0;
 }
@@ -965,7 +963,7 @@ body.is-ios .wrong-count-total { top: 29.5cqmin; }
 
 @keyframes clouds-scroll {
   from { transform: translateX(0); }
-  to   { transform: translateX(-130cqmin); }
+  to   { transform: translateX(-100%); }
 }
 
 .loading-clouds-b {
@@ -992,7 +990,7 @@ body.is-ios .wrong-count-total { top: 29.5cqmin; }
 
 @keyframes clouds-scroll-b {
   from { transform: translateX(0); }
-  to   { transform: translateX(-130cqmin); }
+  to   { transform: translateX(-100%); }
 }
 
 .loading-clouds-fade {
@@ -1035,7 +1033,7 @@ body.is-ios .wrong-count-total { top: 29.5cqmin; }
 
 @keyframes clouds-scroll-c {
   from { transform: translateX(0); }
-  to   { transform: translateX(-130cqmin); }
+  to   { transform: translateX(-100%); }
 }
 
 .loading-clouds-fade3 {
@@ -4348,12 +4346,7 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
 
 .mode-monuments .game-bg-city-monuments { display: block; }
 .mode-monuments .game-bg-city-monuments2 { display: block; }
-/* El titileo (compositar 2 capas full-screen infinitamente) agota la memoria de GPU
-   de iOS y crasheaba la pestaña al ENTRAR al splash de monuments (transición
-   cities→monuments). Se mantiene SOLO en el gameover (pantalla de nivel completado,
-   donde el efecto importa); en el splash se muestra un solo fondo estático. */
-#gameover-screen.mode-monuments .game-bg-city-monuments2 { animation: monuments-flicker 0.2s steps(1, end) infinite; }
-#splash-screen.mode-monuments .game-bg-city-monuments2 { display: none; }
+.mode-monuments .game-bg-city-monuments2 { animation: monuments-flicker 0.2s steps(1, end) infinite; }
 .mode-monuments .game-bg-city:not(.game-bg-city-monuments):not(.game-bg-city-monuments2) { display: none; }
 .mode-monuments .game-bg-sky-monuments { display: block; }
 .mode-monuments .game-bg-sky:not(.game-bg-sky-monuments) { display: none; }
@@ -4986,15 +4979,15 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
 
 @keyframes cloud-drift-1 {
   from { transform: translate(-50%, -50%) scale(0.6) translate(0, 0); }
-  to   { transform: translate(-50%, -50%) scale(0.6) translate(-200cqw, 100cqh); }
+  to   { transform: translate(-50%, -50%) scale(0.6) translate(-3840px, 911px); }
 }
 @keyframes cloud-drift-2 {
   from { transform: translate(-50%, -50%) scale(1.2) translate(0, 0); }
-  to   { transform: translate(-50%, -50%) scale(1.2) translate(-90cqw, 45cqh); }
+  to   { transform: translate(-50%, -50%) scale(1.2) translate(-1728px, 410px); }
 }
 @keyframes cloud-drift-3 {
   from { transform: translate(-50%, -50%) scale(1.0) translate(0, 0); }
-  to   { transform: translate(-50%, -50%) scale(1.0) translate(-120cqw, 60cqh); }
+  to   { transform: translate(-50%, -50%) scale(1.0) translate(-2304px, 547px); }
 }
 
 .final-cloud4 {
