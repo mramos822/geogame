@@ -4332,7 +4332,13 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
 .mode-monuments .game-bg-women2 { left: 31.5%; }
 
 .mode-monuments .game-bg-city-monuments { display: block; }
-.mode-monuments .game-bg-city-monuments2 { display: block; animation: monuments-flicker 0.2s steps(1, end) infinite; }
+.mode-monuments .game-bg-city-monuments2 { display: block; }
+/* El titileo (compositar 2 capas full-screen infinitamente) agota la memoria de GPU
+   de iOS y crasheaba la pestaña al ENTRAR al splash de monuments (transición
+   cities→monuments). Se mantiene SOLO en el gameover (pantalla de nivel completado,
+   donde el efecto importa); en el splash se muestra un solo fondo estático. */
+#gameover-screen.mode-monuments .game-bg-city-monuments2 { animation: monuments-flicker 0.2s steps(1, end) infinite; }
+#splash-screen.mode-monuments .game-bg-city-monuments2 { display: none; }
 .mode-monuments .game-bg-city:not(.game-bg-city-monuments):not(.game-bg-city-monuments2) { display: none; }
 .mode-monuments .game-bg-sky-monuments { display: block; }
 .mode-monuments .game-bg-sky:not(.game-bg-sky-monuments) { display: none; }
