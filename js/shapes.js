@@ -947,6 +947,7 @@ document.getElementById('loading-shapes-btn').addEventListener('click', () => {
   if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.play(); }
   if (typeof loadGameSFX !== 'undefined') loadGameSFX();
   window.pendingGameMode = 'shapes';
+  window.resetSplashEntry?.();
   document.getElementById('loading-screen').style.display = 'none';
   const splashEl = document.getElementById('splash-screen');
   splashEl.style.display = 'flex';
@@ -991,6 +992,7 @@ document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.play(); }
   if (typeof loadGameSFX !== 'undefined') loadGameSFX();
   window.pendingGameMode = 'monuments';
+  window.resetSplashEntry?.();
   document.getElementById('loading-screen').style.display = 'none';
   // Liberar la RAM del modo anterior (cities) ANTES de cargar los assets pesados de
   // monuments (2 fondos a pantalla completa + flicker). monuments es el modo más

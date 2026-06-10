@@ -1205,6 +1205,9 @@ function endFlagsGame() {
 document.getElementById('loading-flags-btn').addEventListener('click', () => {
   if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.play(); }
   window.pendingGameMode = 'flags';
+  // Resetear estado del splash con el splash AÚN oculto (evita saltear step2 y la
+  // mesa "subiendo" si veníamos de una campaña previa). Ver window.resetSplashEntry.
+  window.resetSplashEntry?.();
   // Transición visual inmediata
   document.getElementById('loading-screen').style.display = 'none';
   const splashEl = document.getElementById('splash-screen');

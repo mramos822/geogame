@@ -319,6 +319,19 @@ window.swapHowtoVideo = function (newSrc) {
   } catch (e) {}
 };
 
+// Resetea el estado del splash al ENTRAR a un modo (antes de mostrarlo). Necesario
+// porque al terminar una campaña (results/final) confirmStep queda en 1 y la mesa del
+// howtoplay en slide-down; sin esto, la siguiente partida saltea el step2 (confirm va
+// directo a jugar) y la mesa "sube" visiblemente. Se llama con el splash aún oculto
+// (display:none), así quitar slide-down no dispara la animación de transición.
+window.resetSplashEntry = function () {
+  try { confirmStep = 0; } catch (e) {}
+  const w = document.querySelector('.splash-howtoplay-wrap');
+  if (w) w.classList.remove('slide-down');
+  const l = document.querySelector('.splash-text2-label');
+  if (l) l.classList.remove('step2');
+};
+
 const _iosMusicURL = new Map([
   [sfxGameMusic, 'sfx/gamemusic.mp3'],
   [sfxPostgame,  'sfx/postgameloop.mp3'],
@@ -426,6 +439,7 @@ document.getElementById('loading-play-btn').addEventListener('mouseenter', () =>
 document.getElementById('loading-play-btn').addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxCheck.play();
   window.pendingGameMode = 'game';
+  window.resetSplashEntry?.();
   // Transición visual inmediata — ocultar loading y mostrar splash en este frame
   document.getElementById('loading-screen').style.display = 'none';
   const splashElCity = document.getElementById('splash-screen');
