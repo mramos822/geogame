@@ -1075,6 +1075,9 @@ function hideFlagsMode() {
   const checksEndTime = (flagsCorrectCount > 0 ? (flagsCorrectCount - 1) * 0.1 + 0.2 : 0) + 0.4;
   if (typeof buildWrongsRow !== 'undefined') buildWrongsRow(checksEndTime);
   if (typeof playMusic !== 'undefined') playMusic(sfxPostgame);
+  if (window.campaign && window.campaign.active && typeof window.preloadNextModeAssets === 'function') {
+    window.preloadNextModeAssets('shapes');
+  }
 }
 
 // ── PREGAME COUNTDOWN ─────────────────────────────────────────────────────────
@@ -1215,7 +1218,11 @@ document.getElementById('loading-flags-btn').addEventListener('click', () => {
     document.getElementById('gameover-screen').classList.add('mode-flags');
     document.getElementById('gameover-screen').classList.remove('mode-shapes', 'mode-monuments');
     const howtoplayVideo = document.querySelector('.splash-howtoplay-video');
-    if (howtoplayVideo) { howtoplayVideo.src = 'images/howtoplay/howtoplay1.mp4'; howtoplayVideo.load(); }
+    if (howtoplayVideo) {
+      howtoplayVideo.pause();
+      howtoplayVideo.src = 'images/howtoplay/howtoplay1.mp4';
+      setTimeout(() => { try { howtoplayVideo.load(); } catch (e) {} }, 600);
+    }
     document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men3.png');
     document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men4.png');
     document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl3.png');

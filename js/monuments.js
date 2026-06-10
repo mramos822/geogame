@@ -381,6 +381,12 @@ document.getElementById('loading-play-btn').addEventListener('click', () => {
 // lleguen al caché HTTP antes de que el usuario haga click en Confirm.
 window.preloadNextModeAssets = function (nextMode) {
   const assetMap = {
+    shapes: [
+      'images/howtoplay/howtoplay2.mp4',
+      'images/bg/level2complete.png',
+      'images/check2.png',
+      'images/wrong2.png',
+    ],
     game: [
       'images/howtoplay/howtoplay3.mp4',
       'images/bg/level3complete.png',
