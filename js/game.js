@@ -528,7 +528,7 @@ function initLeaderboard() {
   const playerEl = document.createElement('div');
   playerEl.className = 'lb-entry lb-player';
   playerEl.id = 'lb-player';
-  playerEl.innerHTML = `<div class="lb-avatar"><img class="lb-avatar-img" src="${localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png'}"></div>`
+  playerEl.innerHTML = `<div class="lb-avatar"><img class="lb-avatar-img" src="images/ppdefault.png"></div>`
                      + `<span class="lb-score" id="lb-player-score">0</span>`;
   playerEl.style.transition = 'none';
   playerEl.style.top = '-9999px';

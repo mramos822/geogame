@@ -3,7 +3,7 @@ const sfxLevel2 = new Audio('sfx/level2.mp3');
 if (typeof isMuted !== 'undefined' && isMuted) sfxLevel2.volume = 0;
 let shapesStreak = 0;
 let shapesRoundStartTime = null;
-let shapesTimeLeft = 10; // TEMP: 10s para testear (volver a 60)
+let shapesTimeLeft = 60;
 let shapesTimerIntervalId = null;
 let shapesRunning = false;
 let shapesDots = 0;
@@ -29,11 +29,11 @@ function positionShapesCountdown() {
   // Overlay fijo en vmin, igual que #countdown-widget (monuments/flags). Escala
   // con el viewport y no se mueve/agranda con el zoom como cuando se anclaba al
   // game-wrapper escalado.
-  cwEl.style.position      = 'absolute';
-  cwEl.style.top           = '2.8cqmin';
-  cwEl.style.right         = '57.5cqmin';
-  cwEl.style.width         = '26.3cqmin';
-  cwEl.style.height        = '14.5cqmin';
+  cwEl.style.position      = 'fixed';
+  cwEl.style.top           = '2.8vmin';
+  cwEl.style.right         = '57.5vmin';
+  cwEl.style.width         = '26.3vmin';
+  cwEl.style.height        = '14.5vmin';
   cwEl.style.pointerEvents = 'none';
   cwEl.style.zIndex        = '1000';
 }
@@ -101,7 +101,7 @@ function showCountryShape(country, ext1, ext2, startDelay) {
     cw.appendChild(cwNum);
     cw.appendChild(dotsEl);
     cw.appendChild(tbEl);
-    (window.appStage || document.body).appendChild(cw);
+    document.body.appendChild(cw);
   }
 
   positionShapesCountdown();
@@ -109,7 +109,6 @@ function showCountryShape(country, ext1, ext2, startDelay) {
   const clipId = 'archedShape_' + (_shapeGroupCount++);
 
   const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svgEl.setAttribute('class', 'shapes-stage-el');
   svgEl.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;';
   const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
   const clipPathEl = document.createElementNS('http://www.w3.org/2000/svg', 'clipPath');
@@ -120,33 +119,30 @@ function showCountryShape(country, ext1, ext2, startDelay) {
   clipPathEl.appendChild(pathEl);
   defs.appendChild(clipPathEl);
   svgEl.appendChild(defs);
-  (window.appStage || document.body).appendChild(svgEl);
+  document.body.appendChild(svgEl);
   shapesCurrentSvg = svgEl;
 
   const board = document.createElement('img');
-  board.className = 'shapes-stage-el';
   board.src = 'images/countryboard.png';
-  board.style.cssText = 'position:absolute;top:50%;left:36%;transform:translate(-50%,-50%) scaleX(0.96);width:85.15cqmin;height:auto;z-index:99;';
+  board.style.cssText = 'position:fixed;top:50%;left:36%;transform:translate(-50%,-50%) scaleX(0.96);width:85.15vmin;height:auto;z-index:99;';
   board.draggable = false;
-  (window.appStage || document.body).appendChild(board);
+  document.body.appendChild(board);
   shapesCurrentBoard = board;
 
 
   const img = document.createElement('img');
-  img.className = 'shapes-stage-el';
   img.src = 'images/countries/' + country + '1.' + ext1;
-  img.style.cssText = 'position:absolute;top:52%;left:36.3%;transform:translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01);width:59.4cqmin;height:59.4cqmin;z-index:103;transition:transform 3s linear;display:none;';
+  img.style.cssText = 'position:fixed;top:52%;left:36.3%;transform:translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01);width:59.4vmin;height:59.4vmin;z-index:103;transition:transform 3s linear;display:none;';
   img.draggable = false;
-  (window.appStage || document.body).appendChild(img);
+  document.body.appendChild(img);
 
   const clip = document.createElement('div');
-  clip.className = 'shapes-stage-el';
-  clip.style.cssText = 'position:absolute;top:52%;left:36.3%;transform:translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01);width:59.4cqmin;height:59.4cqmin;clip-path:url(#' + clipId + ');z-index:102;opacity:0;transition:opacity 2s ease;display:none;';
-  (window.appStage || document.body).appendChild(clip);
+  clip.style.cssText = 'position:fixed;top:52%;left:36.3%;transform:translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01);width:59.4vmin;height:59.4vmin;clip-path:url(#' + clipId + ');z-index:102;opacity:0;transition:opacity 2s ease;display:none;';
+  document.body.appendChild(clip);
 
   const img2 = document.createElement('img');
   img2.src = 'images/countries/' + country + '2.' + ext2;
-  img2.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)' + (country === 'Rusia' ? ' scale(0.5)' : '') + ';width:118.8cqmin;height:118.8cqmin;transition:transform 3s linear;';
+  img2.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)' + (country === 'Rusia' ? ' scale(0.5)' : '') + ';width:118.8vmin;height:118.8vmin;transition:transform 3s linear;';
   img2.draggable = false;
   clip.appendChild(img2);
 
@@ -163,16 +159,16 @@ function showCountryShape(country, ext1, ext2, startDelay) {
         position: absolute;
         top: 45%; left: 69%;
         transform: translate(-50%, -50%);
-        font-size: 7.4cqmin; font-weight: 900;
+        font-size: 7.4vmin; font-weight: 900;
         font-family: 'Arial Black', Impact, sans-serif;
         color: white;
-        -webkit-text-stroke: 0.27cqmin black;
+        -webkit-text-stroke: 0.27vmin black;
         text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
-        pointer-events: none; min-width: 4.8cqmin; text-align: center; transition: color 0.3s;
+        pointer-events: none; min-width: 4.8vmin; text-align: center; transition: color 0.3s;
       }
       #shapes-progress-dots {
-        position: absolute; bottom: 1.1cqmin; left: 1cqmin; width: 100%;
-        display: flex; justify-content: center; gap: 0.44cqmin; padding: 0 0.66cqmin;
+        position: absolute; bottom: 1.1vmin; left: 1vmin; width: 100%;
+        display: flex; justify-content: center; gap: 0.44vmin; padding: 0 0.66vmin;
         pointer-events: none; z-index: 11; transition: opacity 0.5s ease; opacity: 1;
       }
       #shapes-progress-dots.dots-fade-out { opacity: 0; }
@@ -253,9 +249,8 @@ function showCountryShape(country, ext1, ext2, startDelay) {
   if (tImgStart) tImgStart.style.animationPlayState = 'running';
 
   const whiteBg = document.createElement('div');
-  whiteBg.className = 'shapes-clip-overlay';
-  whiteBg.style.cssText = 'position:absolute;top:52%;left:36.3%;transform:translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01);width:62cqmin;height:62cqmin;background:#FCFAF4;clip-path:url(#' + clipId + ');z-index:100;opacity:1;transition:opacity 0.5s ease;pointer-events:none;';
-  (window.appStage || document.body).appendChild(whiteBg);
+  whiteBg.style.cssText = 'position:fixed;top:52%;left:36.3%;transform:translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01);width:62vmin;height:62vmin;background:#FCFAF4;clip-path:url(#' + clipId + ');z-index:100;opacity:1;transition:opacity 0.5s ease;pointer-events:none;';
+  document.body.appendChild(whiteBg);
   setTimeout(() => { whiteBg.style.opacity = '0'; }, 60);
   setTimeout(() => { whiteBg.remove(); }, 660);
 
@@ -263,9 +258,8 @@ function showCountryShape(country, ext1, ext2, startDelay) {
   clip.style.display = '';
 
   const flash = document.createElement('div');
-  flash.className = 'shapes-clip-overlay';
-  flash.style.cssText = 'position:absolute;top:52%;left:36.3%;transform:translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01);width:59.4cqmin;height:59.4cqmin;background:white;clip-path:url(#' + clipId + ');z-index:104;opacity:1;transition:opacity 0.5s ease;pointer-events:none;';
-  (window.appStage || document.body).appendChild(flash);
+  flash.style.cssText = 'position:fixed;top:52%;left:36.3%;transform:translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01);width:59.4vmin;height:59.4vmin;background:white;clip-path:url(#' + clipId + ');z-index:104;opacity:1;transition:opacity 0.5s ease;pointer-events:none;';
+  document.body.appendChild(flash);
   requestAnimationFrame(() => requestAnimationFrame(() => { flash.style.opacity = '0'; }));
   setTimeout(() => { flash.remove(); }, 600);
   sfxLevel2.currentTime = 0;
@@ -275,7 +269,7 @@ function showCountryShape(country, ext1, ext2, startDelay) {
     const isCorrect = (i === correctIdx);
     const base = `scaleX(1.05) scaleY(0.95) rotate(${cfg.rot})`;
     const tag = document.createElement('div');
-    tag.style.cssText = `position:absolute;top:${cfg.top};right:${cfg.right};width:40.4cqmin;z-index:110;pointer-events:auto;transform:translateX(300%) scaleX(1.05) scaleY(0.95) rotate(${cfg.rot});transform-origin:center center;transition:transform 0.15s ease;cursor:pointer;--tag-rot:${cfg.rot};`;
+    tag.style.cssText = `position:fixed;top:${cfg.top};right:${cfg.right};width:40.4vmin;z-index:110;pointer-events:auto;transform:translateX(300%) scaleX(1.05) scaleY(0.95) rotate(${cfg.rot});transform-origin:center center;transition:transform 0.15s ease;cursor:pointer;--tag-rot:${cfg.rot};`;
     tag.classList.add('shape-tag-enter', 'shapes-tag');
     tag.style.animationDelay = `${i * 80}ms`;
     tag.style.pointerEvents = 'none';
@@ -293,8 +287,8 @@ function showCountryShape(country, ext1, ext2, startDelay) {
     tagImg.style.cssText = 'display:block;width:100%;';
 
     const tagLabel = document.createElement('span');
-    tagLabel.textContent = (typeof tCountry === 'function') ? tCountry(options[i]) : options[i];
-    tagLabel.style.cssText = 'position:absolute;top:50%;left:52%;transform:translate(-50%,-50%);font-family:"VAGRoundBold","Arial Black",sans-serif;font-size:3.7cqmin;color:#2a1a00;font-weight:bold;white-space:nowrap;pointer-events:none;';
+    tagLabel.textContent = options[i];
+    tagLabel.style.cssText = 'position:absolute;top:50%;left:52%;transform:translate(-50%,-50%);font-family:"VAGRoundBold","Arial Black",sans-serif;font-size:3.7vmin;color:#2a1a00;font-weight:bold;white-space:nowrap;pointer-events:none;';
 
     tag.addEventListener('mouseenter', () => {
       if (anyClicked || !shapesRunning) return;
@@ -399,7 +393,7 @@ function showCountryShape(country, ext1, ext2, startDelay) {
         if (badgeImg && typeof showFlagsBadge !== 'undefined') {
           const bc = document.getElementById('flags-badge-canvas');
           if (bc) bc.style.zIndex = '999';
-          showFlagsBadge(badgeImg, inRowBonus, shapesStreak, window.STAGE_W * 0.39, 0.85);
+          showFlagsBadge(badgeImg, inRowBonus, shapesStreak, window.innerWidth * 0.39, 0.85);
         }
       } else {
         shapesWrongCooldown.set(country, 5);
@@ -442,16 +436,16 @@ function showCountryShape(country, ext1, ext2, startDelay) {
 
     tag.appendChild(tagImg);
     tag.appendChild(tagLabel);
-    (window.appStage || document.body).appendChild(tag);
+    document.body.appendChild(tag);
 
     // Ajuste de nombres largos en vmin (no px) para que escale con el viewport
-    // igual que el tag (40.4cqmin) y no se encoja distinto según el zoom.
-    const tagVminPx = Math.min(window.STAGE_W, window.STAGE_H) / 100;
+    // igual que el tag (40.4vmin) y no se encoja distinto según el zoom.
+    const tagVminPx = Math.min(window.innerWidth, window.innerHeight) / 100;
     const tagMaxW = 31.8 * tagVminPx;
     let fs = 3.7;
     while (tagLabel.scrollWidth > tagMaxW && fs > 1.76) {
       fs -= 0.22;
-      tagLabel.style.fontSize = fs + 'cqmin';
+      tagLabel.style.fontSize = fs + 'vmin';
       if (fs < 2.85) tagLabel.style.letterSpacing = '-1px';
       if (fs < 2.2) tagLabel.style.letterSpacing = '-2px';
     }
@@ -730,8 +724,8 @@ function runShapesPregame(onDone) {
     if (step >= SHAPES_PREGAME_STEPS.length) { el.style.display = 'none'; onDone(); return; }
     const { src, hold, size } = SHAPES_PREGAME_STEPS[step++];
     img.style.animation = 'none';
-    img.style.width     = size + 'cqmin';
-    img.style.height    = size + 'cqmin';
+    img.style.width     = size + 'vmin';
+    img.style.height    = size + 'vmin';
     img.src = src;
     void img.offsetWidth;
     img.style.animation = '';
@@ -754,8 +748,11 @@ function shapesHardReset() {
   if (typeof sfxCountdown !== 'undefined') { try { sfxCountdown.pause(); sfxCountdown.currentTime = 0; } catch (e) {} }
   // Quitar silueta/tag/board en curso y el countdown widget
   document.querySelectorAll('.shapes-tag').forEach(t => t.remove());
-  document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
-  document.querySelectorAll('.shapes-stage-el').forEach(el => { try { el.remove(); } catch (e) {} });
+  try { if (shapesCurrentImg)  shapesCurrentImg.remove(); } catch (e) {}
+  try { if (shapesCurrentImg2) shapesCurrentImg2.parentElement?.remove(); } catch (e) {}
+  try { if (shapesCurrentClip) shapesCurrentClip.remove(); } catch (e) {}
+  try { if (shapesCurrentBoard) shapesCurrentBoard.remove(); } catch (e) {}
+  try { if (shapesCurrentSvg)  shapesCurrentSvg.remove(); } catch (e) {}
   shapesCurrentImg = shapesCurrentImg2 = shapesCurrentClip = null;
   shapesCurrentBoard = shapesCurrentSvg = null;
   document.getElementById('shapes-countdown-widget')?.remove();
@@ -820,7 +817,7 @@ function showShapesMode() {
 
   runShapesPregame(() => {
     if (typeof playMusic !== 'undefined') playMusic(sfxGameMusic);
-    shapesTimeLeft = 10; // TEMP: 10s para testear (volver a 60)
+    shapesTimeLeft = 60;
     shapesRunning  = true;
 
     clearInterval(shapesTimerIntervalId);
@@ -839,9 +836,7 @@ function showShapesMode() {
       if (shapesTimeLeft <= 0) {
         clearInterval(shapesTimerIntervalId);
         shapesRunning = false;
-        clearTimeout(shapesTagsTimeout); shapesTagsTimeout = null;
         document.querySelectorAll('.shapes-tag').forEach(el => { el.style.cursor = 'default'; el.style.pointerEvents = 'none'; });
-        document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
         clearTimeout(shapesCurrentAnimTimeout);
         clearTimeout(shapesCurrentClipFadeTimeout);
         // Cortar la transición sin pinear el transform como matriz px (eso
@@ -881,11 +876,11 @@ function showShapesMode() {
 function hideShapesMode() {
   // freeze & remove in-progress country display
   document.querySelectorAll('.shapes-tag').forEach(t => t.remove());
-  document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
-  // Limpiar todos los elementos de ronda (no solo el último): en la transición
-  // entre formas puede quedar svgEl/board/img/clip de la ronda anterior si el
-  // setTimeout(200) no disparó a tiempo.
-  document.querySelectorAll('.shapes-stage-el').forEach(el => el.remove());
+  if (shapesCurrentImg)   shapesCurrentImg.remove();
+  if (shapesCurrentImg2)  shapesCurrentImg2.parentElement?.remove(); // clip div
+  if (shapesCurrentClip)  shapesCurrentClip.remove();
+  if (shapesCurrentBoard) shapesCurrentBoard.remove();
+  if (shapesCurrentSvg)   shapesCurrentSvg.remove();
   shapesCurrentImg = shapesCurrentImg2 = shapesCurrentClip = null;
   shapesCurrentBoard = shapesCurrentSvg = null;
 
@@ -924,22 +919,15 @@ function hideShapesMode() {
   if (typeof setModeCounts !== 'undefined') setModeCounts(shapesCorrectCount, shapesWrongAnswerCount);
   const gameoverScreen = document.getElementById('gameover-screen');
   if (gameoverScreen) {
-    window.hideGameoverConfirm?.();
     gameoverScreen.style.display = 'flex';
     const label = gameoverScreen.querySelector('.gameover-text1-label');
-    if (label) label.textContent = t('gameover.shapes');
+    if (label) label.textContent = '¡Increíble! ¡Los turistas están de camino!';
   }
   if (typeof restartFlightAtt !== 'undefined') restartFlightAtt();
   if (typeof buildChecksRow   !== 'undefined') buildChecksRow();
   const checksEndTime = (shapesCorrectCount > 0 ? (shapesCorrectCount - 1) * 0.1 + 0.2 : 0) + 0.4;
   if (typeof buildWrongsRow   !== 'undefined') buildWrongsRow(checksEndTime);
   if (typeof playMusic        !== 'undefined') playMusic(sfxPostgame);
-  // En campaña, precargar assets del modo siguiente (cities) mientras el usuario lee su score
-  if (window.campaign && window.campaign.active && typeof window.preloadNextModeAssets === 'function') {
-    window.preloadNextModeAssets('game').then(() => window.showGameoverConfirm?.());
-  } else {
-    setTimeout(() => window.showGameoverConfirm?.(), 800);
-  }
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -947,36 +935,33 @@ document.getElementById('loading-shapes-btn').addEventListener('click', () => {
   if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.play(); }
   if (typeof loadGameSFX !== 'undefined') loadGameSFX();
   window.pendingGameMode = 'shapes';
-  window.resetSplashEntry?.();
+  document.getElementById('splash-screen').classList.add('mode-flags', 'mode-shapes');
+  document.getElementById('gameover-screen').classList.add('mode-flags', 'mode-shapes');
+  const howtoplayVideo = document.querySelector('.splash-howtoplay-video');
+  if (howtoplayVideo) { howtoplayVideo.src = 'images/howtoplay/howtoplay2.mp4'; howtoplayVideo.load(); }
+  document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men5.png');
+  document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men6.png');
+  document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl5.png');
+  document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl6.png');
+  document.querySelectorAll('.game-bg-women1').forEach(el => el.src = 'images/characters/women4.png');
+  document.querySelectorAll('.game-bg-women2').forEach(el => el.src = 'images/characters/women5.png');
+  document.querySelectorAll('.game-bg-city').forEach(el => el.src = 'images/bg/level2complete.png');
+  document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check2.png');
+  document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong2.png');
+  const label = document.querySelector('.splash-text2-label');
+  if (label) { label.textContent = '¿Adónde? Usando un mapa de cada país, veamos adónde vuelan nuestros turistas.'; label.classList.remove('step2'); }
+  const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
+  if (howtoWrap) howtoWrap.classList.remove('slide-down');
+  const howtoTitle = document.querySelector('.splash-howtoplay-title');
+  if (howtoTitle) howtoTitle.textContent = 'Map Mayhem';
   document.getElementById('loading-screen').style.display = 'none';
   const splashEl = document.getElementById('splash-screen');
   splashEl.style.display = 'flex';
-  window.showSplashConfirm?.();
   const animEls = splashEl.querySelectorAll('.flightatt-splash, .splash-text2-wrap');
   animEls.forEach(el => el.classList.remove('animate-in'));
   void splashEl.offsetWidth;
   animEls.forEach(el => el.classList.add('animate-in'));
   if (typeof playMusic !== 'undefined') playMusic(sfxPostgame);
-  requestAnimationFrame(() => {
-    document.getElementById('splash-screen').classList.add('mode-flags', 'mode-shapes');
-    document.getElementById('gameover-screen').classList.add('mode-flags', 'mode-shapes');
-    window.swapHowtoVideo?.('images/howtoplay/howtoplay2.mp4');
-    document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men5.png');
-    document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men6.png');
-    document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl5.png');
-    document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl6.png');
-    document.querySelectorAll('.game-bg-women1').forEach(el => el.src = 'images/characters/women4.png');
-    document.querySelectorAll('.game-bg-women2').forEach(el => el.src = 'images/characters/women5.png');
-    document.querySelectorAll('.game-bg-city').forEach(el => el.src = 'images/bg/level2complete.png');
-    document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check2.png');
-    document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong2.png');
-    const label = document.querySelector('.splash-text2-label');
-    if (label) { label.textContent = t('splash.shapes.1'); label.classList.remove('step2'); }
-    const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
-    if (howtoWrap) howtoWrap.classList.remove('slide-down');
-    const howtoTitle = document.querySelector('.splash-howtoplay-title');
-    if (howtoTitle) howtoTitle.textContent = 'Map Mayhem';
-  });
 });
 
 document.getElementById('loading-shapes-btn').addEventListener('mouseenter', () => {
@@ -992,17 +977,6 @@ document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.play(); }
   if (typeof loadGameSFX !== 'undefined') loadGameSFX();
   window.pendingGameMode = 'monuments';
-  window.resetSplashEntry?.();
-  document.getElementById('loading-screen').style.display = 'none';
-  // Liberar la RAM del modo anterior (cities) ANTES de cargar los assets pesados de
-  // monuments (2 fondos a pantalla completa + flicker). monuments es el modo más
-  // pesado y es el último de la campaña, así que el pico de memoria pega justo acá.
-  // releaseGameMemory suelta el canvas previo, flags-badge-canvas, el video y los
-  // bitmaps de personajes/fondos que monuments no reutiliza; las líneas de abajo
-  // re-asignan solo lo que monuments necesita. monuments.startGame restaura el canvas.
-  if (typeof window.releaseGameMemory === 'function') window.releaseGameMemory();
-  // Actualizar modo y backgrounds ANTES de mostrar el splash para evitar el frame
-  // en blanco que se veía al transicionar desde cities en campaña.
   document.getElementById('splash-screen').classList.remove('mode-flags', 'mode-shapes');
   document.getElementById('splash-screen').classList.add('mode-monuments');
   document.getElementById('gameover-screen').classList.remove('mode-flags', 'mode-shapes');
@@ -1012,39 +986,24 @@ document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl2.png');
   document.querySelectorAll('.game-bg-women1').forEach(el => el.src = 'images/characters/women1.png');
   document.querySelectorAll('.game-bg-women2').forEach(el => el.src = 'images/characters/women1.png');
-  // Liberar level3complete.png (class distinta: .game-bg-city) antes de decodificar los de monuments.
-  document.querySelectorAll('.game-bg-city').forEach(el => { el.src = ''; });
   document.querySelectorAll('.game-bg-city-monuments').forEach(el => el.src = 'images/bg/level4complete.png');
-  // level4complete2.png (capa de flicker) NO se setea acá: solo se usa en el gameover de
-  // monuments. Decodificarla en la entrada significaba 2 fondos full-screen a la vez = el
-  // pico GPU/decode que crashea WebKit en iOS (cities→monuments, pico ~233MB). Se difiere
-  // a cuando se muestra el gameover (monuments.js). NO está en el src del HTML por lo mismo.
+  document.querySelectorAll('.game-bg-city-monuments2').forEach(el => el.src = 'images/bg/level4complete2.png');
   document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check4.png');
   document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong4.png');
   const label = document.querySelector('.splash-text2-label');
-  if (label) { label.textContent = t('splash.monuments.1'); label.classList.remove('step2'); }
+  if (label) { label.textContent = '¡Vale, es hora de hacer un poco de turismo! ¿Qué tal es tu conocimiento de monumentos famosos?'; label.classList.remove('step2'); }
   const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
   if (howtoWrap) howtoWrap.classList.remove('slide-down');
   const howtoTitle = document.querySelector('.splash-howtoplay-title');
   if (howtoTitle) howtoTitle.textContent = 'Landmark Loco';
+  const howtoVideo = document.querySelector('.splash-howtoplay-video');
+  if (howtoVideo) { howtoVideo.pause(); howtoVideo.src = 'images/howtoplay/howtoplay4.mp4'; howtoVideo.load(); }
+  document.getElementById('loading-screen').style.display = 'none';
   const splashEl = document.getElementById('splash-screen');
-  // Pausar las nubes animadas de monuments durante el pico de entrada (iOS): se
-  // reanudan tras ~1.5s, cuando iOS ya asentó el compositing. Ver CSS .monuments-entry.
-  document.body.classList.add('monuments-entry');
-  setTimeout(() => document.body.classList.remove('monuments-entry'), 1500);
   splashEl.style.display = 'flex';
-  window.showSplashConfirm?.();
   const animEls = splashEl.querySelectorAll('.flightatt-splash, .splash-text2-wrap');
   animEls.forEach(el => el.classList.remove('animate-in'));
   void splashEl.offsetWidth;
   animEls.forEach(el => el.classList.add('animate-in'));
   if (typeof playMusic !== 'undefined') playMusic(sfxPostgame);
-  // NO cargar el video de howtoplay4 acá: monuments es el modo más pesado y cargar el
-  // decoder de video JUSTO mientras se decodifican los 2 fondos full-screen + personajes
-  // es el pico GPU/video que crashea WebKit en iOS (cities→monuments, pico ~233MB).
-  // releaseGameMemory ya dejó el <video> vacío arriba; difiero la carga del video al
-  // primer click de confirm (que es cuando recién se reproduce y se ve). Así el decoder
-  // de video no compite con el spike de decodificación de assets de entrada.
-  window.pendingHowtoVideo = 'images/howtoplay/howtoplay4.mp4';
 });
-

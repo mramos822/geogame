@@ -11,7 +11,7 @@ document.addEventListener('contextmenu', e => {
   });
 });
 
-const FLAGS_GAME_DURATION = 10; // TEMP: 10s para testear (volver a 60)
+const FLAGS_GAME_DURATION = 60;
 
 const flagsWrapper       = document.getElementById('flags-wrapper');
 const flagsScoreDisplay  = document.getElementById('flags-score-display');
@@ -31,7 +31,7 @@ flagsLuggageWrap.addEventListener('dragstart', e => e.preventDefault());
 // que escale con el viewport como el resto, se escala el wrap completo como unidad.
 // Factor = min(vw,vh)/911 → 1.0 en el viewport de referencia (9.11px por vmin).
 function flagsLuggageScale() {
-  return Math.min(window.STAGE_W, window.STAGE_H) / 911;
+  return Math.min(window.innerWidth, window.innerHeight) / 911;
 }
 function scaleFlagsLuggage() {
   flagsLuggageWrap.style.transform = `translate(-50%, -50%) scale(${flagsLuggageScale()})`;
@@ -79,8 +79,8 @@ function showFlagsMode() {
   flagsWrapper.style.display   = 'block';
 
   // Aplicar el mismo scale que redimensionarJuego calcula
-  const anchoVentana = window.STAGE_W;
-  const altoVentana  = window.STAGE_H;
+  const anchoVentana = window.innerWidth;
+  const altoVentana  = window.innerHeight;
   const margenHorizontal = anchoVentana * 0.35;
   const escalaW = (anchoVentana - margenHorizontal) / gameCanvas.width;
   const escalaH = (altoVentana - altoVentana * 0.08) / gameCanvas.height;
@@ -284,9 +284,7 @@ let flagsLastPlayerRank = -1;
 function getFlagsLbRowHeight() {
   const panel = document.getElementById('flags-right-panel');
   if (!panel) return 84;
-  // offsetWidth (no getBoundingClientRect): el rect viene escalado por el transform
-  // del #app-stage y, al usarse como px de layout, se re-escalaría (entradas apretadas).
-  return Math.round(panel.offsetWidth * 1.5) + FLAGS_LB_GAP;
+  return Math.round(panel.getBoundingClientRect().width * 1.5) + FLAGS_LB_GAP;
 }
 
 function initFlagsLeaderboard() {
@@ -312,7 +310,7 @@ function initFlagsLeaderboard() {
   const playerEl = document.createElement('div');
   playerEl.className = 'lb-entry lb-player';
   playerEl.id = 'flags-lb-player';
-  playerEl.innerHTML = `<div class="lb-avatar"><img class="lb-avatar-img" src="${localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png'}"></div>`
+  playerEl.innerHTML = `<div class="lb-avatar"><img class="lb-avatar-img" src="images/ppdefault.png"></div>`
                      + `<span class="lb-score" id="flags-lb-player-score">0</span>`;
   playerEl.style.transition = 'none';
   playerEl.style.top = '-9999px';
@@ -451,13 +449,13 @@ function getFlagsRoundPoints(streak) {
 function showFlagsBadge(badgeImg, bonus, streak, cxOverride, scaleOverride) {
   const canvas = document.getElementById('flags-badge-canvas');
   if (!canvas) return;
-  canvas.width  = window.STAGE_W;
-  canvas.height = window.STAGE_H;
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
   canvas.style.display = 'block';
   const ctx2 = canvas.getContext('2d');
   const CX = cxOverride !== undefined ? cxOverride : canvas.width / 2, CY = (scaleOverride !== undefined ? canvas.height * 0.44 : canvas.height / 2);
   // Medidas en vmin (px = valor_vmin * vmin) para que escale con el viewport.
-  const vmin = Math.min(window.STAGE_W, window.STAGE_H) / 100;
+  const vmin = Math.min(window.innerWidth, window.innerHeight) / 100;
   const W = 44.5 * vmin, H = 36.6 * vmin, CW = 52.4 * vmin, CH = 44.5 * vmin;
   const IN_END = 0.2, HOLD_END = 0.60, SHRINK_DUR = 0.22, TOTAL = HOLD_END + SHRINK_DUR;
   const BZ_IN = 0.18, BZ_HOLD = 0.42, BZ_OUT = 0.72;
@@ -539,7 +537,7 @@ function startFlagsRoundRecording() {
   flagsFindLuggage.classList.add('scrolling');
 
   flagsFlagidLabel.textContent         = 'Italy';
-  flagsFlagidLabel.style.fontSize      = '4.2cqmin';
+  flagsFlagidLabel.style.fontSize      = '4.2vmin';
   flagsFlagidLabel.style.letterSpacing = '';
 
   flagsTopGroupIds.forEach((id, i) => {
@@ -725,17 +723,17 @@ function startFlagsRound() {
     chosen = chosenPool[Math.floor(Math.random() * chosenPool.length)];
   }
   flagsLastChosen = chosen;
-  flagsFlagidLabel.textContent = (typeof tCountry === 'function') ? tCountry(chosen) : chosen;
+  flagsFlagidLabel.textContent = chosen;
   // Ajustar tamaño si el nombre es largo. Todo en vmin para escalar con el
-  // viewport igual que la imagen de flagid (49.4cqmin); maxW = 41.7cqmin en px.
-  const vminPx = Math.min(window.STAGE_W, window.STAGE_H) / 100;
+  // viewport igual que la imagen de flagid (49.4vmin); maxW = 41.7vmin en px.
+  const vminPx = Math.min(window.innerWidth, window.innerHeight) / 100;
   const maxW = 41.7 * vminPx;
   let fs = 4.2;
-  flagsFlagidLabel.style.fontSize = fs + 'cqmin';
+  flagsFlagidLabel.style.fontSize = fs + 'vmin';
   flagsFlagidLabel.style.letterSpacing = '';
   while (flagsFlagidLabel.scrollWidth > maxW && fs > 1.8) {
     fs -= 0.22;
-    flagsFlagidLabel.style.fontSize = fs + 'cqmin';
+    flagsFlagidLabel.style.fontSize = fs + 'vmin';
     if (fs < 3.3) flagsFlagidLabel.style.letterSpacing = '-1px';
     if (fs < 2.4) flagsFlagidLabel.style.letterSpacing = '-2px';
   }
@@ -839,29 +837,21 @@ function startFlagsRound() {
   flagsGroupIds.forEach((id, i) => {
     const group = document.getElementById(id);
     if (!group) return;
-    // pointerup = al SOLTAR el maletín, inmediato en iOS (sin los 300ms del click).
-    // Congela findluggage Y ejecuta la acción en el mismo evento.
-    group.onpointerup = (ev) => {
-      if (!flagsRunning || flagsPicked || group.classList.contains('flags-faded')) return;
-      ev.preventDefault(); // evita que dispare click posterior en iOS
-      // En iOS el compositor anima findluggage de forma asíncrona: pausar la animación
-      // y forzar reflow no es suficiente para sincronizar la posición visual cuando el
-      // usuario responde muy rápido (el layout devuelve la X base, no la X animada).
-      // Solución: capturar la matrix exacta del compositor con getComputedStyle ANTES
-      // de tocar nada, luego fijar el transform inline → getBCR refleja la X real.
-      const _fmat = new DOMMatrix(window.getComputedStyle(flagsFindLuggage).transform);
-      flagsFindLuggage.classList.remove('scrolling');
-      flagsFindLuggage.style.animation  = 'none';
-      flagsFindLuggage.style.transition = 'none';
-      flagsFindLuggage.style.transform  = `matrix(${_fmat.a},${_fmat.b},${_fmat.c},${_fmat.d},${_fmat.e},${_fmat.f})`;
-      flagsMachine2.style.animationPlayState  = 'paused';
-      flagsMachine3.style.animationPlayState  = 'paused';
-      flagsMachine3b.style.animationPlayState = 'paused';
-      void flagsFindLuggage.offsetWidth; // commit freeze al DOM/layout
-      flagsTapFindRect = flagsFindLuggage.getBoundingClientRect(); // exacto
-      handleLuggagePick();
+    // pointerup = al SOLTAR sobre el maletín (confirmación), inmediato en iOS (sin el
+    // lag del click). Acá congelamos findluggage y las máquinas, y capturamos la
+    // posición del molde, así el maletín cae donde estaba al confirmar, sin deriva.
+    group.onpointerup = () => {
+      if (flagsRunning && !flagsPicked && !group.classList.contains('flags-faded')) {
+        flagsTapFindRect = flagsFindLuggage.getBoundingClientRect();
+        flagsFindLuggage.style.animationPlayState = 'paused';
+        flagsMachine2.style.animationPlayState  = 'paused';
+        flagsMachine3.style.animationPlayState  = 'paused';
+        flagsMachine3b.style.animationPlayState = 'paused';
+      }
     };
-    function handleLuggagePick() {
+    group.onclick = () => {
+      // Ignorar opciones ya desvanecidas: aunque el grupo tenga pointer-events:none,
+      // un hijo con pointer-events:auto deja que el click burbujee hasta acá.
       if (!flagsRunning || flagsPicked || group.classList.contains('flags-faded')) return;
       flagsPicked = true;
       clearFlagsElimination();
@@ -1009,8 +999,7 @@ function startFlagsRound() {
           }, 50);
         }, 750);
       }
-    }
-    group.onclick = handleLuggagePick;
+    };
   });
 }
 
@@ -1066,21 +1055,15 @@ function hideFlagsMode() {
   if (typeof setModeCounts !== 'undefined') setModeCounts(flagsCorrectCount, flagsWrongCount);
   const gameoverScreen = document.getElementById('gameover-screen');
   if (gameoverScreen) {
-    window.hideGameoverConfirm?.();
     gameoverScreen.style.display = 'flex';
     const label = gameoverScreen.querySelector('.gameover-text1-label');
-    if (label) label.textContent = t('gameover.flags');
+    if (label) label.textContent = '¡Buen trabajo! ¡Llevemos a los turistas a la puerta de embarque!';
   }
   if (typeof restartFlightAtt !== 'undefined') restartFlightAtt();
   if (typeof buildChecksRow !== 'undefined') buildChecksRow();
   const checksEndTime = (flagsCorrectCount > 0 ? (flagsCorrectCount - 1) * 0.1 + 0.2 : 0) + 0.4;
   if (typeof buildWrongsRow !== 'undefined') buildWrongsRow(checksEndTime);
   if (typeof playMusic !== 'undefined') playMusic(sfxPostgame);
-  if (window.campaign && window.campaign.active && typeof window.preloadNextModeAssets === 'function') {
-    window.preloadNextModeAssets('shapes').then(() => window.showGameoverConfirm?.());
-  } else {
-    setTimeout(() => window.showGameoverConfirm?.(), 800);
-  }
 }
 
 // ── PREGAME COUNTDOWN ─────────────────────────────────────────────────────────
@@ -1102,8 +1085,8 @@ function runFlagsPregame(onDone) {
     }
     const { src, hold, size } = FLAGS_PREGAME_STEPS[step++];
     flagsPregameImg.style.animation = 'none';
-    flagsPregameImg.style.width     = size + 'cqmin';
-    flagsPregameImg.style.height    = size + 'cqmin';
+    flagsPregameImg.style.width     = size + 'vmin';
+    flagsPregameImg.style.height    = size + 'vmin';
     flagsPregameImg.src = src;
     void flagsPregameImg.offsetWidth;
     flagsPregameImg.style.animation = '';
@@ -1205,42 +1188,35 @@ function endFlagsGame() {
 document.getElementById('loading-flags-btn').addEventListener('click', () => {
   if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.play(); }
   window.pendingGameMode = 'flags';
-  // Resetear estado del splash con el splash AÚN oculto (evita saltear step2 y la
-  // mesa "subiendo" si veníamos de una campaña previa). Ver window.resetSplashEntry.
-  window.resetSplashEntry?.();
-  // Transición visual inmediata
+  document.getElementById('splash-screen').classList.add('mode-flags');
+  document.getElementById('splash-screen').classList.remove('mode-shapes', 'mode-monuments');
+  document.getElementById('gameover-screen').classList.add('mode-flags');
+  document.getElementById('gameover-screen').classList.remove('mode-shapes', 'mode-monuments');
+  const howtoplayVideo = document.querySelector('.splash-howtoplay-video');
+  if (howtoplayVideo) { howtoplayVideo.src = 'images/howtoplay/howtoplay1.mp4'; howtoplayVideo.load(); }
+  document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men3.png');
+  document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men4.png');
+  document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl3.png');
+  document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl4.png');
+  document.querySelectorAll('.game-bg-women1').forEach(el => el.src = 'images/characters/women2.png');
+  document.querySelectorAll('.game-bg-women2').forEach(el => el.src = 'images/characters/women3.png');
+  document.querySelectorAll('.game-bg-city').forEach(el => el.src = 'images/bg/level1complete.png');
+  document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check1.png');
+  document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong1.png');
+  const label = document.querySelector('.splash-text2-label');
+  if (label) { label.textContent = '¡Eh, Tú! ¿Crees que podrías echarme una mano ordenando el equipaje de los turistas?'; label.classList.remove('step2'); }
+  const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
+  if (howtoWrap) howtoWrap.classList.remove('slide-down');
+  const howtoTitle = document.querySelector('.splash-howtoplay-title');
+  if (howtoTitle) howtoTitle.textContent = 'Suitcase Shuffle';
   document.getElementById('loading-screen').style.display = 'none';
   const splashEl = document.getElementById('splash-screen');
   splashEl.style.display = 'flex';
-  window.showSplashConfirm?.();
   const animEls = splashEl.querySelectorAll('.flightatt-splash, .splash-text2-wrap');
   animEls.forEach(el => el.classList.remove('animate-in'));
   void splashEl.offsetWidth;
   animEls.forEach(el => el.classList.add('animate-in'));
   if (typeof playMusic !== 'undefined') playMusic(sfxPostgame);
-  // Setup no visual diferido
-  requestAnimationFrame(() => {
-    document.getElementById('splash-screen').classList.add('mode-flags');
-    document.getElementById('splash-screen').classList.remove('mode-shapes', 'mode-monuments');
-    document.getElementById('gameover-screen').classList.add('mode-flags');
-    document.getElementById('gameover-screen').classList.remove('mode-shapes', 'mode-monuments');
-    window.swapHowtoVideo?.('images/howtoplay/howtoplay1.mp4');
-    document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men3.png');
-    document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men4.png');
-    document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl3.png');
-    document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl4.png');
-    document.querySelectorAll('.game-bg-women1').forEach(el => el.src = 'images/characters/women2.png');
-    document.querySelectorAll('.game-bg-women2').forEach(el => el.src = 'images/characters/women3.png');
-    document.querySelectorAll('.game-bg-city').forEach(el => el.src = 'images/bg/level1complete.png');
-    document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check1.png');
-    document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong1.png');
-    const label = document.querySelector('.splash-text2-label');
-    if (label) { label.textContent = t('splash.flags.1'); label.classList.remove('step2'); }
-    const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
-    if (howtoWrap) howtoWrap.classList.remove('slide-down');
-    const howtoTitle = document.querySelector('.splash-howtoplay-title');
-    if (howtoTitle) howtoTitle.textContent = 'Suitcase Shuffle';
-  });
 });
 
 document.getElementById('loading-flags-btn').addEventListener('mouseenter', () => {

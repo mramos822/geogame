@@ -58,24 +58,16 @@
   // Lista COMPLETA de assets: usa el manifest auto-generado (todos los archivos de
   // images/ y sfx/). Si por algo falta, cae a la lista mínima embebida.
   const M = window.ASSET_MANIFEST || {};
-  // En mobile reducir concurrencia y saltear decode() para no picar memoria.
-  const isMobile = navigator.maxTouchPoints > 1;
-  // En MOBILE no precargar imágenes en absoluto. El preloader creaba un new Image()
-  // por cada una de las ~880 imágenes del manifest y las retenía en
-  // window.__preloadedImages → cientos de MB de bitmaps clavados en RAM desde el
-  // arranque, dejando iOS al borde del límite y reiniciando la pestaña en las
-  // transiciones de campaña. Las imágenes se cargan y decodifican on-demand cuando
-  // se muestran, y el navegador las libera cuando ya no se usan. En desktop sí se
-  // precargan (hay RAM de sobra y acelera el primer render).
-  const imgList   = isMobile ? [] : ((M.images && M.images.length) ? M.images : IMAGES);
+  const imgList   = (M.images && M.images.length) ? M.images : IMAGES;
   const audioList = (M.audio  && M.audio.length)  ? M.audio  : AUDIO;
   const videoList = M.video || [];
 
-  const imgConcurrency   = isMobile ? 4 : 24;
-  const audioConcurrency = isMobile ? 4 : 8;
-
+  // Mantener vivas las imágenes ya decodificadas para que el navegador no las
+  // descarte de memoria antes de usarlas en el juego (evita el "titileo").
   window.__preloadedImages = window.__preloadedImages || [];
 
+  // Carga una imagen y la decodifica por completo (decode() evita el flash al
+  // pintarla por primera vez).
   function loadImage(src) {
     return new Promise(resolve => {
       const img = new Image();
@@ -86,6 +78,7 @@
     });
   }
 
+  // Ejecuta tareas con un límite de concurrencia para no saturar la red/decoder.
   function runPool(items, worker, concurrency, onEach) {
     let i = 0;
     const next = () => {
@@ -98,12 +91,8 @@
     return Promise.all(runners);
   }
 
-  // En mobile saltear el preload de video como blob — los videos se cachean igual
-  // via fetch liviano y se decodifican on-demand sin acumular blobs en memoria.
-  const effectiveVideoList = isMobile ? [] : videoList;
-  const total = imgList.length + audioList.length + effectiveVideoList.length + 2;
+  const total = imgList.length + audioList.length + videoList.length + 2; // +fonts +load
   let done = 0;
-  window.__loadingReady = false;
 
   function tick() {
     done++;
@@ -111,7 +100,6 @@
     barFill.style.width = pct + '%';
     pctEl.textContent   = pct + '%';
     if (done >= total) {
-      window.__loadingReady = true;
       const actions = document.getElementById('loading-actions');
       if (actions) actions.style.display = 'flex';
       document.getElementById('loading-play-wrap').style.display = 'flex';
@@ -143,11 +131,15 @@
     }
   }
 
-  runPool(imgList, loadImage, imgConcurrency, tick);
-  runPool(audioList, src => fetch(src).then(r => r.arrayBuffer()).catch(() => {}), audioConcurrency, tick);
-  runPool(effectiveVideoList, src => fetch(src).then(r => r.blob()).catch(() => {}), 3, tick);
+  // Imágenes: hasta 24 en paralelo, decodificadas. Audio/video: descarga completa.
+  runPool(imgList, loadImage, 24, tick);
+  runPool(audioList, src => fetch(src).then(r => r.arrayBuffer()).catch(() => {}), 8, tick);
+  runPool(videoList, src => fetch(src).then(r => r.blob()).catch(() => {}), 3, tick);
 
+  // Fuentes completamente renderizadas
   Promise.resolve(document.fonts.ready).then(tick, tick);
+
+  // Página y todos sus sub-recursos listos
   (document.readyState === 'complete')
     ? tick()
     : window.addEventListener('load', tick, { once: true });
@@ -162,15 +154,9 @@
 // frame en blanco.
 window.addEventListener('load', () => {
   // Warming: decodificar todos los <img> ya presentes en el DOM.
-  // En mobile NO hacerlo: forzaría decodificar a la vez los fondos de los 4 modos
-  // (cada uno un bitmap grande) y al estar en el DOM quedarían retenidos → suma a
-  // la presión de RAM que crashea iOS. En mobile se decodifican on-demand.
-  const _isMobileWarm = navigator.maxTouchPoints > 1;
-  if (!_isMobileWarm) {
-    document.querySelectorAll('img').forEach(img => {
-      if (img.decode) img.decode().catch(() => {});
-    });
-  }
+  document.querySelectorAll('img').forEach(img => {
+    if (img.decode) img.decode().catch(() => {});
+  });
   // Imágenes que cambian de src al pasar de modo: decodificación síncrona.
   document.querySelectorAll(
     '.game-bg-city, .game-bg-check3, .game-bg-wrong3, .game-bg-men, ' +
@@ -189,10 +175,7 @@ window.refreshProfileStats = function () {
   const elName = document.getElementById('loading-player-name');
   if (elName) elName.textContent = localStorage.getItem('playerName') || 'John';
   const elPlays = document.getElementById('loading-play-count');
-  if (elPlays) {
-    const n = parseInt(localStorage.getItem('playCount') || '0', 10);
-    elPlays.textContent = tn('profile.playedTimes', n);
-  }
+  if (elPlays) elPlays.textContent = `¡Has jugado ${parseInt(localStorage.getItem('playCount') || '0', 10)} veces!`;
   const gamesHs = { 1: flagsHs, 2: shapesHs, 3: playHs, 4: monumentsHs };
   // Columna derecha: highscore de cada modo
   [1,2,3,4].forEach(i => {
@@ -222,10 +205,10 @@ window.refreshProfileStats = function () {
       // Trabajamos en vmin para que el rango escale igual que el resto del menú.
       const maxWidth = (document.getElementById('loading-games-rank')?.offsetWidth || 240) * 1.15;
       let size = 4; // vmin
-      rankLabel.style.fontSize = size + 'cqmin';
+      rankLabel.style.fontSize = size + 'vmin';
       while (rankLabel.scrollWidth > maxWidth && size > 1.6) {
         size -= 0.1;
-        rankLabel.style.fontSize = size + 'cqmin';
+        rankLabel.style.fontSize = size + 'vmin';
       }
     }
   }
@@ -240,7 +223,6 @@ const sfxGameMusic = new Audio('sfx/gamemusic.mp3');
 sfxGameMusic.loop  = true;
 const sfxSelect    = new Audio('sfx/select.mp3');
 if (localStorage.getItem('muted') === 'true') { sfxCheck.volume = 0; sfxPostgame.volume = 0; sfxGameMusic.volume = 0; sfxSelect.volume = 0; }
-[sfxCheck, sfxSelect].forEach(sfx => { sfx.load(); });
 
 // ── MÚSICA EN LOOP: motor Web Audio SOLO en iOS ───────────────────────────────
 // En PC se usa el <audio loop> de siempre (camino intacto, sin riesgo). En iOS el
@@ -248,89 +230,6 @@ if (localStorage.getItem('muted') === 'true') { sfxCheck.volume = 0; sfxPostgame
 // el buffer una vez y lo reproducimos con AudioBufferSourceNode.loop (gapless).
 const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) ||
   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-if (IS_IOS) document.body.classList.add('is-ios');
-
-// Delays de transición: agresivos en iOS para dar tiempo al GC antes de cargar
-// el modo siguiente. En PC todo es instantáneo (0ms).
-// 0 delay = comportamiento original (así funcionaba antes). Los valores altos que
-// se probaron en esta sesión fueron un agregado mío que complicó las cosas.
-const IOS_VIDEO_LOAD_DELAY      = 0;   // antes de .load() en videos
-const IOS_CAMPAIGN_TRANS_DELAY  = 0;   // antes de disparar el btn del modo siguiente
-
-// Muestra/oculta el confirm del gameover (se revela tras cargar assets del siguiente modo).
-window.showGameoverConfirm = function () {
-  const w = document.querySelector('.gameover-confirm-wrap');
-  if (w) w.classList.add('confirm-ready');
-};
-window.hideGameoverConfirm = function () {
-  const w = document.querySelector('.gameover-confirm-wrap');
-  if (w) w.classList.remove('confirm-ready');
-};
-
-// Muestra/oculta el confirm del splash pre-game.
-window.showSplashConfirm = function () {
-  const w = document.querySelector('.splash-confirm-wrap');
-  if (w) w.classList.add('confirm-ready');
-};
-window.hideSplashConfirm = function () {
-  const w = document.querySelector('.splash-confirm-wrap');
-  if (w) w.classList.remove('confirm-ready');
-};
-
-// Oculta el splash confirm y lo revela cuando el video de howtoplay puede reproducirse.
-window.waitForHowtoVideo = function () {
-  window.hideSplashConfirm();
-  const v = document.querySelector('.splash-howtoplay-video');
-  if (!v || v.readyState >= 3) { window.showSplashConfirm(); return; }
-  let done = false;
-  const reveal = () => { if (!done) { done = true; window.showSplashConfirm(); } };
-  v.addEventListener('canplaythrough', reveal, { once: true });
-  v.addEventListener('loadeddata',     reveal, { once: true });
-  v.addEventListener('error',          reveal, { once: true });
-  setTimeout(reveal, 5000); // fallback de seguridad
-};
-
-// Cambia el video de howtoplay RECREANDO el elemento <video> entero.
-// En iOS, reusar el mismo elemento (removeAttribute+load → src+load) NO garantiza
-// que WebKit suelte la superficie GPU/IOSurface ni el decoder del video anterior:
-// el pipeline de medios del elemento sigue vivo y el pico de compositing al cargar
-// el nuevo video crashea el proceso WebKit de forma intermitente (Safari reinicia la
-// pestaña) en CUALQUIER transición (flags→shapes confirmado, no solo monuments).
-// Destruir el nodo viejo y crear uno fresco fuerza el teardown real del decoder
-// anterior antes de instanciar el nuevo. Todas las referencias al video son por
-// querySelector('.splash-howtoplay-video'), así que recrear el nodo es transparente.
-window.swapHowtoVideo = function (newSrc) {
-  const old = document.querySelector('.splash-howtoplay-video');
-  if (!old) return;
-  try {
-    old.pause();
-    old.removeAttribute('src');
-    old.load();          // pide al decoder anterior que se libere
-    const fresh = document.createElement('video');
-    fresh.className = 'splash-howtoplay-video';
-    fresh.loop = true;
-    fresh.muted = true;
-    fresh.playsInline = true;
-    fresh.setAttribute('playsinline', '');
-    fresh.preload = 'none';
-    fresh.src = newSrc;
-    old.replaceWith(fresh);
-    fresh.load();        // carga el nuevo en un elemento limpio
-  } catch (e) {}
-};
-
-// Resetea el estado del splash al ENTRAR a un modo (antes de mostrarlo). Necesario
-// porque al terminar una campaña (results/final) confirmStep queda en 1 y la mesa del
-// howtoplay en slide-down; sin esto, la siguiente partida saltea el step2 (confirm va
-// directo a jugar) y la mesa "sube" visiblemente. Se llama con el splash aún oculto
-// (display:none), así quitar slide-down no dispara la animación de transición.
-window.resetSplashEntry = function () {
-  try { confirmStep = 0; } catch (e) {}
-  const w = document.querySelector('.splash-howtoplay-wrap');
-  if (w) w.classList.remove('slide-down');
-  const l = document.querySelector('.splash-text2-label');
-  if (l) l.classList.remove('step2');
-};
 
 const _iosMusicURL = new Map([
   [sfxGameMusic, 'sfx/gamemusic.mp3'],
@@ -439,86 +338,32 @@ document.getElementById('loading-play-btn').addEventListener('mouseenter', () =>
 document.getElementById('loading-play-btn').addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxCheck.play();
   window.pendingGameMode = 'game';
-  window.resetSplashEntry?.();
-  // Transición visual inmediata — ocultar loading y mostrar splash en este frame
+  document.getElementById('splash-screen').classList.remove('mode-flags', 'mode-shapes', 'mode-monuments');
+  document.getElementById('gameover-screen').classList.remove('mode-flags', 'mode-shapes', 'mode-monuments');
+  document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men1.png');
+  document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men2.png');
+  document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl1.png');
+  document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl2.png');
+  document.querySelectorAll('.game-bg-women1').forEach(el => el.src = 'images/characters/women1.png');
+  document.querySelectorAll('.game-bg-women2').forEach(el => el.src = 'images/characters/women1.png');
+  document.querySelectorAll('.game-bg-city').forEach(el => el.src = 'images/bg/level3complete.png');
+  document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check3.png');
+  document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong3.png');
+  const howtoVideoCity = document.querySelector('.splash-howtoplay-video');
+  if (howtoVideoCity) { howtoVideoCity.pause(); howtoVideoCity.src = 'images/howtoplay/howtoplay3.mp4'; howtoVideoCity.load(); }
+  const howtoTitleCity = document.querySelector('.splash-howtoplay-title');
+  if (howtoTitleCity) howtoTitleCity.textContent = 'City Blitz';
+  const label = document.querySelector('.splash-text2-label');
+  if (label) { label.textContent = '¡Veamos a qué ciudad va cada uno! Aquí es donde tú entras a formar parte.'; label.classList.remove('step2'); }
   document.getElementById('loading-screen').style.display = 'none';
   const splashElCity = document.getElementById('splash-screen');
   splashElCity.style.display = 'flex';
-  window.showSplashConfirm();
   const animElsCity = splashElCity.querySelectorAll('.flightatt-splash, .splash-text2-wrap');
   animElsCity.forEach(el => el.classList.remove('animate-in'));
   void splashElCity.offsetWidth;
   animElsCity.forEach(el => el.classList.add('animate-in'));
   playMusic(sfxPostgame);
-  // Setup no visual diferido al siguiente frame para no bloquear la transición
-  requestAnimationFrame(() => {
-    document.getElementById('splash-screen').classList.remove('mode-flags', 'mode-shapes', 'mode-monuments');
-    document.getElementById('gameover-screen').classList.remove('mode-flags', 'mode-shapes', 'mode-monuments');
-    document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men1.png');
-    document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men2.png');
-    document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl1.png');
-    document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl2.png');
-    document.querySelectorAll('.game-bg-women1').forEach(el => el.src = 'images/characters/women1.png');
-    document.querySelectorAll('.game-bg-women2').forEach(el => el.src = 'images/characters/women1.png');
-    document.querySelectorAll('.game-bg-city').forEach(el => el.src = 'images/bg/level3complete.png');
-    document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check3.png');
-    document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong3.png');
-    window.swapHowtoVideo('images/howtoplay/howtoplay3.mp4');
-    const howtoTitleCity = document.querySelector('.splash-howtoplay-title');
-    if (howtoTitleCity) howtoTitleCity.textContent = 'City Blitz';
-    const label = document.querySelector('.splash-text2-label');
-    if (label) { label.textContent = t('splash.cities.1'); label.classList.remove('step2'); }
-  });
 });
-
-// ── PRELOAD PROACTIVO PARA TRANSICIONES DE CAMPAÑA ───────────────────────────
-// Se llama al mostrar el gameover del modo N para que los assets del modo N+1
-// lleguen al caché HTTP antes de que el usuario haga click en Confirm.
-window.preloadNextModeAssets = function (nextMode) {
-  const assetMap = {
-    shapes: [
-      'images/howtoplay/howtoplay2.mp4',
-      'images/bg/level2complete.png',
-      'images/check2.png',
-      'images/wrong2.png',
-    ],
-    game: [
-      'images/howtoplay/howtoplay3.mp4',
-      'images/bg/level3complete.png',
-      'images/check3.png',
-      'images/wrong3.png',
-    ],
-    monuments: [
-      'images/howtoplay/howtoplay4.mp4',
-      'images/bg/level4complete.png',
-      'images/bg/level4complete2.png',
-      'images/check4.png',
-      'images/wrong4.png',
-    ],
-  };
-  const list = assetMap[nextMode];
-  if (!list) return Promise.resolve();
-  // Videos excluidos del preload proactivo: son demasiado pesados para tener
-  // en RAM mientras el modo anterior todavía no liberó su memoria → OOM en iOS.
-  const images = list.filter(url => !url.endsWith('.mp4'));
-  if (!images.length) return Promise.resolve();
-  // En iOS: fetch() para calentar el HTTP cache sin decodificar el bitmap en RAM.
-  // Así no se acumula memoria decodificada mientras el modo anterior todavía no liberó la suya.
-  // En PC: new Image() para decodificar proactivamente (más rápido al renderizar).
-  if (IS_IOS) {
-    return Promise.all(
-      images.map(url => fetch(url, { cache: 'force-cache' }).catch(() => {}))
-    ).then(() => {});
-  }
-  return new Promise(resolve => {
-    let done = 0;
-    images.forEach(url => {
-      const img = new Image();
-      img.onload = img.onerror = () => { if (++done === images.length) resolve(); };
-      img.src = url;
-    });
-  });
-};
 
 // ── CAMPAÑA: 4 modos encadenados ─────────────────────────────────────────────
 window.campaign = {
@@ -573,7 +418,6 @@ function confirmNameChange() {
     localStorage.setItem('playerName', limpio);
     const el = document.getElementById('loading-player-name');
     if (el) el.textContent = limpio;
-    maybeAutoAssignPic(limpio);
   }
   wrap.classList.remove('editing');
 }
@@ -589,145 +433,6 @@ document.getElementById('loading-name-confirm')?.addEventListener('click', () =>
 document.getElementById('loading-name-input')?.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { e.preventDefault(); confirmNameChange(); }
 });
-
-// Redimensiona un File de imagen a max 256×256 y devuelve un dataURL JPEG comprimido
-function resizeImageFile(file, callback) {
-  const img = new Image();
-  const url = URL.createObjectURL(file);
-  img.onload = () => {
-    URL.revokeObjectURL(url);
-    const MAX = 256;
-    let w = img.width, h = img.height;
-    if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
-    else        { w = Math.round(w * MAX / h); h = MAX; }
-    const canvas = document.createElement('canvas');
-    canvas.width = w; canvas.height = h;
-    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-    callback(canvas.toDataURL('image/jpeg', 0.82));
-  };
-  img.src = url;
-}
-
-// Si el nombre contiene "nuti" o cualquier derivado (case-insensitive), asigna nutix.jpg automáticamente
-function maybeAutoAssignPic(nombre) {
-  if (/nuti/i.test(nombre)) {
-    localStorage.setItem('profilePhoto', 'images/profilepic/nutix.jpg');
-    applyStoredProfilePic();
-  }
-}
-
-// Aplica la foto de perfil guardada en todos los sitios donde aparece el jugador
-function applyStoredProfilePic() {
-  const src = localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png';
-  // Panel de perfil (loading) y cualquier .loading-profile-pic excepto el de amigos
-  document.querySelectorAll('.loading-profile-pic:not(#loading-friend-pic)').forEach(el => { el.src = src; });
-  // Modal de primer ingreso
-  const modalPic = document.getElementById('name-prompt-pic');
-  if (modalPic) modalPic.src = src;
-  // Barra ingame (leaderboard)
-  const lbImg = document.querySelector('#lb-player .lb-avatar-img');
-  if (lbImg) lbImg.src = src;
-}
-applyStoredProfilePic();
-
-// Cambio de foto desde el panel de perfil
-(function () {
-  function initProfilePicChange() {
-    const wrap  = document.getElementById('loading-profile-pic-wrap');
-    const input = document.getElementById('loading-profile-pic-input');
-    if (!wrap || !input) return;
-    wrap.addEventListener('click', () => { input.value = ''; input.click(); });
-    input.addEventListener('change', () => {
-      const file = input.files[0];
-      if (!file) return;
-      resizeImageFile(file, (data) => {
-        localStorage.setItem('profilePhoto', data);
-        applyStoredProfilePic();
-      });
-    });
-  }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initProfilePicChange);
-  else initProfilePicChange();
-})();
-
-// ── PRIMER INGRESO: pedir nombre obligatorio (no se puede saltar) ──────────────
-(function () {
-  function initNamePrompt() {
-    const prompt   = document.getElementById('name-prompt');
-    const input    = document.getElementById('name-prompt-input');
-    const btn      = document.getElementById('name-prompt-btn');
-    const picWrap  = document.getElementById('name-prompt-pic-wrap');
-    const picImg   = document.getElementById('name-prompt-pic');
-    const picInput = document.getElementById('name-prompt-pic-input');
-    if (!prompt || !input || !btn) return;
-    if (localStorage.getItem('playerName')) return; // ya tiene nombre: no mostrar
-
-    // Cambio de foto desde el modal
-    if (picWrap && picInput && picImg) {
-      picWrap.addEventListener('click', () => picInput.click());
-      picInput.addEventListener('change', () => {
-        const file = picInput.files[0];
-        if (!file) return;
-        resizeImageFile(file, (data) => {
-          localStorage.setItem('profilePhoto', data);
-          applyStoredProfilePic();
-        });
-      });
-    }
-
-    prompt.classList.add('visible');
-    setTimeout(() => { try { input.focus(); } catch (e) {} }, 60);
-
-    function update() { btn.disabled = input.value.trim().length === 0; }
-    input.addEventListener('input', update);
-    update();
-
-    function submit() {
-      const limpio = input.value.trim().slice(0, 12);
-      if (!limpio) return;
-      localStorage.setItem('playerName', limpio);
-      const el = document.getElementById('loading-player-name');
-      if (el) el.textContent = limpio;
-      maybeAutoAssignPic(limpio);
-      if (typeof refreshProfileStats === 'function') refreshProfileStats();
-      try { sfxCheck.currentTime = 0; sfxCheck.play(); } catch (e) {}
-      prompt.classList.remove('visible');
-      showWelcomePopup(limpio);
-    }
-    btn.addEventListener('click', submit);
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); submit(); }
-    });
-  }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initNamePrompt);
-  else initNamePrompt();
-})();
-
-function showWelcomePopup(nombre) {
-  const popup    = document.getElementById('welcome-popup');
-  const picEl    = document.getElementById('welcome-popup-pic');
-  const nameEl   = document.getElementById('welcome-popup-name');
-  const subEl    = document.getElementById('welcome-popup-sub');
-  const confirmW = document.getElementById('welcome-popup-confirm');
-  if (!popup) return;
-  const src = localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png';
-  if (picEl)  picEl.src = src;
-  if (nameEl) nameEl.textContent = (typeof t === 'function') ? t('name.greet', { name: nombre }) : `¡Hola, ${nombre}!`;
-  if (subEl)  subEl.textContent  = (typeof t === 'function') ? t('name.greetSub') : 'Bienvenido a GeoChallenge.';
-  popup.classList.add('visible');
-  if (confirmW) {
-    const onClick = () => {
-      try { sfxCheck.currentTime = 0; sfxCheck.play(); } catch (e) {}
-      confirmW.classList.add('confirm-pressed');
-      setTimeout(() => {
-        confirmW.classList.remove('confirm-pressed');
-        popup.classList.remove('visible');
-      }, 120);
-      confirmW.removeEventListener('click', onClick);
-    };
-    confirmW.addEventListener('click', onClick);
-  }
-}
 
 document.getElementById('loading-profile-btn')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxCheck.play();
@@ -778,34 +483,11 @@ let SOCIAL_REQUESTS = [
 let socialActiveTab = 'friends';
 let socialSort = localStorage.getItem('socialSort') || 'conn';
 
-// ── Estado de relaciones (favoritos / bloqueados) ────────────────────────────
-// Mock persistido en localStorage; al haber backend, reemplazar por datos reales.
-// Estado de relaciones: MOCK en memoria (se reinicia al recargar). NO se persiste:
-// más adelante esto vendrá del backend/servidor. Ver project_social_backend_todo.
-let socialFavorites = new Set();      // nombres marcados como mejor amigo
-let socialBlocked   = [];             // [{name,score}] bloqueados
-let socialSent      = [];             // [{name,score}] solicitudes que YO envié
-function saveSocialRel() { /* no-op: mock en memoria, sin persistir (futuro: server) */ }
-function isBlockedName(name) { return socialBlocked.some(b => b.name === name); }
-function isSentName(name)    { return socialSent.some(s => s.name === name); }
-function isFriendName(name)  { return (typeof getFriends === 'function' ? getFriends() : []).some(f => f.name === name); }
-function hasRequestName(name){ return SOCIAL_REQUESTS.some(r => r.name === name); }
-function relStatus(name) {
-  if (isBlockedName(name))  return 'blocked';
-  if (isFriendName(name))   return 'friend';
-  if (hasRequestName(name)) return 'request';   // solicitud que me enviaron a mí
-  if (isSentName(name))     return 'sent';      // solicitud que yo envié (pendiente)
-  return 'none';
-}
-
-// El amigo cuyo perfil está abierto (para los botones de relación).
-let currentFriendProfile = null;
-
 function updateSocialTabCounts() {
   const friendsTab  = document.getElementById('loading-social-tab-friends');
   const requestsTab = document.getElementById('loading-social-tab-requests');
-  if (friendsTab)  friendsTab.textContent  = `${t('social.tab.friends')} (${(typeof getFriends === 'function' ? getFriends() : []).length})`;
-  if (requestsTab) requestsTab.textContent = `${t('social.tab.requests')} (${SOCIAL_REQUESTS.length})`;
+  if (friendsTab)  friendsTab.textContent  = `Mis Amigos (${(typeof getFriends === 'function' ? getFriends() : []).length})`;
+  if (requestsTab) requestsTab.textContent = `Solicitudes (${SOCIAL_REQUESTS.length})`;
 }
 
 // Pinta la pestaña activa (amigos o solicitudes).
@@ -829,19 +511,14 @@ function renderSocialRequests(filter = '') {
       `<img class="loading-social-avatar" src="${SOCIAL_AVATARS[i % SOCIAL_AVATARS.length]}" alt="" draggable="false" oncontextmenu="return false">` +
       `<div class="loading-social-info">` +
         `<span class="loading-social-name">${f.name}</span>` +
-        `<span class="loading-social-status">${t('social.sentYouRequest')}</span>` +
+        `<span class="loading-social-status">Te envió una solicitud</span>` +
       `</div>` +
       `<div class="loading-social-req-actions">` +
         `<button class="loading-social-req-btn accept" type="button" aria-label="Aceptar">✓</button>` +
         `<button class="loading-social-req-btn reject" type="button" aria-label="Rechazar">✕</button>` +
       `</div>`;
-    // Click en los botones ✓/✕: acepta/rechaza inline (sin abrir el perfil).
-    row.querySelector('.accept').addEventListener('click', (e) => { e.stopPropagation(); respondRequest(f, true); });
-    row.querySelector('.reject').addEventListener('click', (e) => { e.stopPropagation(); respondRequest(f, false); });
-    // Click en el nombre/celda: abre el perfil (ahí el botón del medio muestra
-    // friendreq → al clickearlo pregunta si querés agregarlo).
-    const avatar = SOCIAL_AVATARS[i % SOCIAL_AVATARS.length];
-    row.addEventListener('click', () => openFriendProfile(f, { cls: 'online', text: 'En línea', rank: 1, minsAgo: 0 }, avatar));
+    row.querySelector('.accept').addEventListener('click', () => respondRequest(f, true));
+    row.querySelector('.reject').addEventListener('click', () => respondRequest(f, false));
     list.appendChild(row);
   });
 }
@@ -869,27 +546,19 @@ function renderSocialFriends(filter = '') {
     'name-asc':  (a, b) => a.f.name.localeCompare(b.f.name),
     'name-desc': (a, b) => b.f.name.localeCompare(a.f.name),
   };
-  const baseSort = sortFns[socialSort] || sortFns.conn;
   const friends = all
     .map((f, i) => ({ f, i, st: SOCIAL_STATUSES[i % SOCIAL_STATUSES.length] }))
     .filter(o => o.f.name.toLowerCase().includes(filter.toLowerCase()))
-    .filter(o => !isBlockedName(o.f.name))               // los bloqueados van aparte, al fondo
-    // Favoritos (mejor amigo) SIEMPRE arriba, sin importar el sort elegido.
-    .sort((a, b) => {
-      const fa = socialFavorites.has(a.f.name) ? 0 : 1;
-      const fb = socialFavorites.has(b.f.name) ? 0 : 1;
-      return (fa - fb) || baseSort(a, b);
-    });
+    .sort(sortFns[socialSort] || sortFns.conn);
   list.innerHTML = '';
   friends.forEach(({ f, i, st }) => {
-    const fav = socialFavorites.has(f.name);
     const row = document.createElement('div');
-    row.className = 'loading-social-row status-' + st.cls + (fav ? ' is-fav' : '');
+    row.className = 'loading-social-row status-' + st.cls;
     row.innerHTML =
       `<img class="loading-social-avatar" src="${SOCIAL_AVATARS[i % SOCIAL_AVATARS.length]}" alt="" draggable="false" oncontextmenu="return false">` +
       `<div class="loading-social-info">` +
-        `<span class="loading-social-name">${fav ? '★ ' : ''}${f.name}</span>` +
-        `<span class="loading-social-status"><span class="dot ${st.cls}"></span>${socialStatusText(st)}</span>` +
+        `<span class="loading-social-name">${f.name}</span>` +
+        `<span class="loading-social-status"><span class="dot ${st.cls}"></span>${st.text}</span>` +
       `</div>` +
       `<div class="loading-social-score">` +
         `<img class="loading-social-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">` +
@@ -900,47 +569,27 @@ function renderSocialFriends(filter = '') {
     row.addEventListener('click', () => openFriendProfile(f, st, SOCIAL_AVATARS[i % SOCIAL_AVATARS.length]));
     list.appendChild(row);
   });
-
-  // Bloqueados al fondo, en gris, clickeables para abrir su perfil y desbloquear.
-  socialBlocked
-    .filter(b => b.name.toLowerCase().includes(filter.toLowerCase()))
-    .forEach((b, k) => {
-      const st = { cls: 'offline', text: 'Bloqueado', rank: 9, minsAgo: 0 };
-      const avatar = SOCIAL_AVATARS[k % SOCIAL_AVATARS.length];
-      const row = document.createElement('div');
-      row.className = 'loading-social-row status-offline is-blocked-row';
-      row.innerHTML =
-        `<img class="loading-social-avatar" src="${avatar}" alt="" draggable="false" oncontextmenu="return false">` +
-        `<div class="loading-social-info">` +
-          `<span class="loading-social-name">${b.name}</span>` +
-          `<span class="loading-social-status">${t('social.blockedStatus')}</span>` +
-        `</div>` +
-        `<div class="loading-social-score">` +
-          `<img class="loading-social-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">` +
-          `<span class="loading-social-score-val">${b.score.toLocaleString()}</span>` +
-        `</div>` +
-        `<span class="loading-social-rankname">${(typeof getRank === 'function' ? getRank(b.score).name : '')}</span>` +
-        `<img class="loading-social-emote" src="${(typeof getRank === 'function' ? getRank(b.score).img : 'images/ranks/1.png')}" alt="" draggable="false" oncontextmenu="return false">`;
-      row.addEventListener('click', () => openFriendProfile(b, st, avatar));
-      list.appendChild(row);
-    });
 }
 
 // Abre el table (copia del perfil) con los datos del amigo seleccionado.
 function openFriendProfile(friend, st, avatarSrc) {
   sfxCheck.currentTime = 0; sfxCheck.play();
-  currentFriendProfile = { name: friend.name, score: friend.score, avatar: avatarSrc, st };
   const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
 
   const pic = document.getElementById('loading-friend-pic');
   if (pic) pic.src = avatarSrc;
   setText('loading-friend-name', friend.name);
 
+  const statusEl = document.getElementById('loading-friend-status');
+  if (statusEl) {
+    statusEl.textContent = st.cls === 'offline' ? st.text.replace('Última vez', 'Última conexión') : st.text;
+    statusEl.className = 'loading-friend-status ' + st.cls;
+  }
+
   const total = friend.score;
   setText('loading-friend-total', total.toLocaleString());
   // Veces jugadas estimadas a partir del puntaje (mock; reemplazar con dato real).
-  const friendPlays = Math.max(1, Math.round(total / 1500));
-  setText('loading-friend-play-count', tn('profile.friendPlayed', friendPlays));
+  setText('loading-friend-play-count', `¡Ha jugado ${Math.max(1, Math.round(total / 1500))} veces!`);
 
   // Repartimos el total entre los 4 modos para los highscores y derivamos el
   // promedio (~62%). Cuando el backend traiga highscores por modo, usar esos.
@@ -959,168 +608,15 @@ function openFriendProfile(friend, st, avatarSrc) {
     rankLabel.textContent = rk.name;
     const maxWidth = (rankImg?.offsetWidth || 240) * 1.15;
     let size = 4;
-    rankLabel.style.fontSize = size + 'cqmin';
+    rankLabel.style.fontSize = size + 'vmin';
     while (rankLabel.scrollWidth > maxWidth && size > 1.6) {
       size -= 0.1;
-      rankLabel.style.fontSize = size + 'cqmin';
+      rankLabel.style.fontSize = size + 'vmin';
     }
   }
 
-  updateFriendButtons();
   document.getElementById('loading-friend-group')?.classList.remove('table-gone');
 }
-
-// ── Botones de relación del perfil de amigo (fav / añadir-aceptar-borrar / bloquear) ──
-function updateFriendButtons() {
-  const actions = document.getElementById('loading-friend-actions');
-  const favBtn  = document.getElementById('loading-friend-fav');
-  const relBtn  = document.getElementById('loading-friend-rel');
-  const blockBtn= document.getElementById('loading-friend-block');
-  if (!actions || !currentFriendProfile) return;
-  const name = currentFriendProfile.name;
-  const status = relStatus(name);
-
-  // El estado (en línea/desconectado) solo se muestra si es tu amigo; si no lo
-  // tenés agregado o está bloqueado, no se muestra.
-  const statusEl = document.getElementById('loading-friend-status');
-  if (statusEl) {
-    const st = currentFriendProfile.st;
-    if (status === 'friend' && st) {
-      statusEl.style.display = '';
-      statusEl.textContent = socialStatusText(st);
-      statusEl.className = 'loading-friend-status ' + st.cls;
-    } else {
-      statusEl.style.display = 'none';
-      statusEl.textContent = '';
-    }
-  }
-
-  actions.classList.toggle('is-blocked', status === 'blocked');
-
-  // Botón mejor amigo: solo si la persona es amiga (no bloqueada).
-  if (status === 'friend') {
-    favBtn.classList.remove('hidden');
-    favBtn.src = socialFavorites.has(name) ? 'images/bestfriend2.png' : 'images/bestfriend.png';
-  } else {
-    favBtn.classList.add('hidden');
-  }
-
-  // Botón del medio según relación.
-  if (status === 'friend')       relBtn.src = 'images/nofriend.png';   // borrar amigo
-  else if (status === 'request') relBtn.src = 'images/friendreq.png';  // aceptar solicitud
-  else if (status === 'sent')    relBtn.src = 'images/friendsent.png'; // solicitud enviada (pendiente)
-  else                           relBtn.src = 'images/friendadd.png';  // añadir
-  // (bloqueado: el medio queda en gris vía .is-blocked)
-
-  // Botón de bloquear: si ya está bloqueado, muestra friendunblock.png.
-  blockBtn.src = status === 'blocked' ? 'images/friendunblock.png' : 'images/friendblock.png';
-}
-
-// Popup de confirmación reutilizable (sí/no).
-function showFriendConfirm(text, onYes, showClose = false, onNo = null) {
-  const popup = document.getElementById('friend-confirm-popup');
-  const txt   = document.getElementById('friend-confirm-text');
-  const yes   = document.getElementById('friend-confirm-yes');
-  const no    = document.getElementById('friend-confirm-no');
-  const xbtn  = document.getElementById('friend-confirm-close');
-  if (!popup) return;
-  txt.textContent = text;
-  popup.style.display = 'flex';
-  if (xbtn) xbtn.style.display = showClose ? 'block' : 'none';  // X solo en aceptar solicitud
-  const close = () => { popup.style.display = 'none'; yes.onclick = null; no.onclick = null; if (xbtn) xbtn.onclick = null; };
-  yes.onclick = () => { sfxCheck.currentTime = 0; sfxCheck.play(); close(); onYes(); };
-  no.onclick  = () => { sfxCheck.currentTime = 0; sfxCheck.play(); close(); if (onNo) onNo(); };  // ✕ = acción "no" (si la hay)
-  if (xbtn) xbtn.onclick = () => { sfxCheck.currentTime = 0; sfxCheck.play(); close(); };          // X = cerrar sin hacer nada
-}
-
-function refreshSocialAfterRel() {
-  saveSocialRel();
-  updateFriendButtons();
-  updateSocialTabCounts();
-  renderSocial(document.getElementById('loading-social-search-input')?.value || '');
-  renderBlockedList(); // mantener el tablero de bloqueados al día
-  renderSentList();    // y el de solicitudes enviadas
-}
-
-// Sonido al pasar el cursor por los 3 botones de relación.
-['loading-friend-fav', 'loading-friend-rel', 'loading-friend-block'].forEach(id => {
-  document.getElementById(id)?.addEventListener('mouseenter', () => {
-    sfxSelect.currentTime = 0; sfxSelect.play();
-  });
-});
-
-// Botón mejor amigo: alterna favorito (solo si es amigo).
-document.getElementById('loading-friend-fav')?.addEventListener('click', () => {
-  if (!currentFriendProfile || relStatus(currentFriendProfile.name) !== 'friend') return;
-  sfxCheck.currentTime = 0; sfxCheck.play();
-  const name = currentFriendProfile.name;
-  if (socialFavorites.has(name)) socialFavorites.delete(name); else socialFavorites.add(name);
-  refreshSocialAfterRel();
-});
-
-// Botón del medio: añadir / aceptar solicitud / borrar amigo.
-document.getElementById('loading-friend-rel')?.addEventListener('click', () => {
-  if (!currentFriendProfile) return;
-  sfxCheck.currentTime = 0; sfxCheck.play();
-  const fp = currentFriendProfile;
-  const status = relStatus(fp.name);
-  if (status === 'blocked') return;
-  if (status === 'friend') {
-    showFriendConfirm(t('confirm.removeFriend', { name: fp.name }), () => {
-      if (typeof getFriends === 'function') {
-        const arr = getFriends();
-        const idx = arr.findIndex(f => f.name === fp.name);
-        if (idx >= 0) arr.splice(idx, 1);
-      }
-      socialFavorites.delete(fp.name);
-      refreshSocialAfterRel();
-    });
-  } else if (status === 'request') {
-    showFriendConfirm(t('confirm.acceptRequest', { name: fp.name }), () => {
-      SOCIAL_REQUESTS = SOCIAL_REQUESTS.filter(r => r.name !== fp.name);
-      if (typeof getFriends === 'function') getFriends().push({ name: fp.name, score: fp.score });
-      refreshSocialAfterRel();
-    }, true, () => {
-      // ✕ (no) = rechazar: se elimina su solicitud y vuelve friendadd para poder enviarle.
-      SOCIAL_REQUESTS = SOCIAL_REQUESTS.filter(r => r.name !== fp.name);
-      refreshSocialAfterRel();
-    });
-  } else if (status === 'sent') {
-    showFriendConfirm(t('confirm.cancelSent', { name: fp.name }), () => {
-      socialSent = socialSent.filter(s => s.name !== fp.name);
-      refreshSocialAfterRel();
-    });
-  } else { // none → enviar solicitud (queda pendiente hasta que la acepten)
-    socialSent.push({ name: fp.name, score: fp.score });
-    refreshSocialAfterRel();
-  }
-});
-
-// Botón bloquear / desbloquear.
-document.getElementById('loading-friend-block')?.addEventListener('click', () => {
-  if (!currentFriendProfile) return;
-  sfxCheck.currentTime = 0; sfxCheck.play();
-  const fp = currentFriendProfile;
-  if (isBlockedName(fp.name)) {
-    showFriendConfirm(t('confirm.unblock', { name: fp.name }), () => {
-      socialBlocked = socialBlocked.filter(b => b.name !== fp.name);
-      refreshSocialAfterRel();
-    });
-  } else {
-    showFriendConfirm(t('confirm.block', { name: fp.name }), () => {
-      socialBlocked.push({ name: fp.name, score: fp.score });
-      socialFavorites.delete(fp.name);            // pierde el favorito
-      socialSent = socialSent.filter(s => s.name !== fp.name); // cancela tu solicitud enviada
-      if (typeof getFriends === 'function') {      // se rompe la amistad
-        const arr = getFriends();
-        const idx = arr.findIndex(f => f.name === fp.name);
-        if (idx >= 0) arr.splice(idx, 1);
-      }
-      SOCIAL_REQUESTS = SOCIAL_REQUESTS.filter(r => r.name !== fp.name); // descarta solicitud entrante
-      refreshSocialAfterRel();
-    });
-  }
-});
 
 document.getElementById('loading-friend-back-wrap')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxCheck.play();
@@ -1135,24 +631,12 @@ document.getElementById('loading-social-search-input')?.addEventListener('input'
 });
 
 const SOCIAL_SORTS = [
-  { value: 'conn',       key: 'sort.conn'      },
-  { value: 'score-desc', key: 'sort.scoreDesc' },
-  { value: 'score-asc',  key: 'sort.scoreAsc'  },
-  { value: 'name-asc',   key: 'sort.nameAsc'   },
-  { value: 'name-desc',  key: 'sort.nameDesc'  },
+  { value: 'conn',       label: 'Conexión'    },
+  { value: 'score-desc', label: 'Puntaje ↓'   },
+  { value: 'score-asc',  label: 'Puntaje ↑'   },
+  { value: 'name-asc',   label: 'Nombre A-Z'  },
+  { value: 'name-desc',  label: 'Nombre Z-A'  },
 ];
-function socialSortLabel() {
-  const cur = SOCIAL_SORTS.find(s => s.value === socialSort);
-  return cur ? t(cur.key) : t('sort.conn');
-}
-// Texto de estado traducido (online/playing/última vez), tolerando mock viejo.
-function socialStatusText(st) {
-  if (!st) return '';
-  if (st.cls === 'playing') return t('social.playing');
-  if (st.cls === 'online')  return t('social.online');
-  const map = { 'Última vez hace 2h': 'social.lastSeen2h', 'Última vez ayer': 'social.lastSeenYesterday', 'Última vez hace 5h': 'social.lastSeen5h' };
-  return map[st.text] ? t(map[st.text]) : st.text;
-}
 document.getElementById('loading-social-sort')?.addEventListener('click', () => {
   // Clonamos el audio para que clicks rápidos no se corten entre sí
   const s = sfxSelect.cloneNode();
@@ -1163,14 +647,15 @@ document.getElementById('loading-social-sort')?.addEventListener('click', () => 
   socialSort = next.value;
   localStorage.setItem('socialSort', socialSort);
   const btn = document.getElementById('loading-social-sort');
-  if (btn) btn.textContent = socialSortLabel();
+  if (btn) btn.textContent = next.label;
   renderSocial(document.getElementById('loading-social-search-input')?.value || '');
 });
 
 // Restaura la etiqueta del botón con el orden guardado
 (() => {
   const btn = document.getElementById('loading-social-sort');
-  if (btn) btn.textContent = socialSortLabel();
+  const cur = SOCIAL_SORTS.find(s => s.value === socialSort);
+  if (btn && cur) btn.textContent = cur.label;
 })();
 
 document.getElementById('loading-social-tab-friends')?.addEventListener('click', () => {
@@ -1206,25 +691,20 @@ function sendFriendRequest() {
   const name = (input?.value || '').trim();
   if (!fb) return;
   if (!name) {
-    fb.textContent = t('social.typeName');
+    fb.textContent = 'Escribe un nombre';
     fb.className = 'loading-addfriend-feedback err show';
     return;
   }
   const friends = (typeof getFriends === 'function' ? getFriends() : []);
   const taken = friends.some(f => f.name.toLowerCase() === name.toLowerCase()) ||
-                SOCIAL_REQUESTS.some(r => r.name.toLowerCase() === name.toLowerCase()) ||
-                socialSent.some(s => s.name.toLowerCase() === name.toLowerCase()) ||
-                isBlockedName(name);
+                SOCIAL_REQUESTS.some(r => r.name.toLowerCase() === name.toLowerCase());
   if (taken) {
-    fb.textContent = t('social.alreadyInList');
+    fb.textContent = 'Ya está en tu lista';
     fb.className = 'loading-addfriend-feedback err show';
     return;
   }
   sfxCheck.currentTime = 0; sfxCheck.play();
-  // Queda como solicitud enviada (pendiente) → aparece en el tablero de enviadas.
-  socialSent.push({ name, score: Math.floor(Math.random() * 50000) });
-  saveSocialRel();
-  fb.textContent = t('social.requestSent', { name });
+  fb.textContent = `¡Solicitud enviada a ${name}!`;
   fb.className = 'loading-addfriend-feedback ok show';
   if (input) input.value = '';
 }
@@ -1240,166 +720,6 @@ document.getElementById('loading-addfriend-back-wrap')?.addEventListener('click'
   wrap.classList.add('confirm-pressed');
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
   document.getElementById('loading-addfriend-group')?.classList.add('table-gone');
-});
-
-// ── Tablero de bloqueados ─────────────────────────────────────────────────────
-let blockedSort = 'az'; // 'az' | 'za'
-function renderBlockedList() {
-  const list = document.getElementById('loading-blocked-list');
-  if (!list) return;
-  const filter = (document.getElementById('loading-blocked-search-input')?.value || '').toLowerCase();
-  list.innerHTML = '';
-  const entries = socialBlocked
-    .filter(b => b.name.toLowerCase().includes(filter))
-    .slice()
-    .sort((a, b) => blockedSort === 'za' ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name));
-  if (entries.length === 0) {
-    const empty = document.createElement('div');
-    empty.className = 'loading-social-empty';
-    empty.textContent = socialBlocked.length === 0 ? t('social.noBlocked') : t('social.noResults');
-    list.appendChild(empty);
-    return;
-  }
-  entries.forEach((b, k) => {
-    const avatar = SOCIAL_AVATARS[k % SOCIAL_AVATARS.length];
-    const row = document.createElement('div');
-    row.className = 'loading-social-row is-blocked-row';
-    row.innerHTML =
-      `<img class="loading-social-avatar" src="${avatar}" alt="" draggable="false" oncontextmenu="return false">` +
-      `<div class="loading-social-info">` +
-        `<span class="loading-social-name">${b.name}</span>` +
-        `<span class="loading-social-status">${t('social.blockedStatus')}</span>` +
-      `</div>` +
-      `<div class="loading-social-score">` +
-        `<img class="loading-social-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">` +
-        `<span class="loading-social-score-val">${b.score.toLocaleString()}</span>` +
-      `</div>` +
-      `<span class="loading-social-rankname">${(typeof getRank === 'function' ? getRank(b.score).name : '')}</span>` +
-      `<img class="loading-social-emote" src="${(typeof getRank === 'function' ? getRank(b.score).img : 'images/ranks/1.png')}" alt="" draggable="false" oncontextmenu="return false">`;
-    row.addEventListener('click', () => openFriendProfile(b, { cls: 'offline', text: 'Bloqueado', rank: 9, minsAgo: 0 }, avatar));
-    list.appendChild(row);
-  });
-}
-
-// Bloquea/restaura los clicks de la lista de amigos (para no clickear un amigo
-// durante la transición de entrada de un sub-tablero).
-function setSocialListClickable(on) {
-  const list = document.getElementById('loading-social-list');
-  if (list) list.style.pointerEvents = on ? '' : 'none';
-}
-
-document.getElementById('loading-social-blockbtn')?.addEventListener('click', () => {
-  sfxCheck.currentTime = 0; sfxCheck.play();
-  renderBlockedList();
-  setSocialListClickable(false);
-  document.getElementById('loading-blocked-group')?.classList.remove('table-gone');
-});
-document.getElementById('loading-social-blockbtn')?.addEventListener('mouseenter', () => {
-  sfxSelect.currentTime = 0; sfxSelect.play();
-});
-
-document.getElementById('loading-blocked-back-wrap')?.addEventListener('click', () => {
-  sfxCheck.currentTime = 0; sfxCheck.play();
-  const wrap = document.getElementById('loading-blocked-back-wrap');
-  wrap.classList.add('confirm-pressed');
-  setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
-  document.getElementById('loading-blocked-group')?.classList.add('table-gone');
-  setSocialListClickable(true);
-});
-
-document.getElementById('loading-blocked-search-input')?.addEventListener('input', () => renderBlockedList());
-
-document.getElementById('loading-blocked-sort')?.addEventListener('click', () => {
-  sfxCheck.currentTime = 0; sfxCheck.play();
-  blockedSort = blockedSort === 'az' ? 'za' : 'az';
-  const btn = document.getElementById('loading-blocked-sort');
-  if (btn) btn.textContent = blockedSort === 'az' ? 'A-Z' : 'Z-A';
-  renderBlockedList();
-});
-document.getElementById('loading-blocked-sort')?.addEventListener('mouseenter', () => {
-  sfxSelect.currentTime = 0; sfxSelect.play();
-});
-
-// ── Tablero de solicitudes enviadas (pendientes) ──────────────────────────────
-let sentSort = 'az'; // 'az' | 'za'
-function renderSentList() {
-  const list = document.getElementById('loading-sent-list');
-  if (!list) return;
-  const filter = (document.getElementById('loading-sent-search-input')?.value || '').toLowerCase();
-  list.innerHTML = '';
-  const entries = socialSent
-    .filter(s => s.name.toLowerCase().includes(filter))
-    .slice()
-    .sort((a, b) => sentSort === 'za' ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name));
-  if (entries.length === 0) {
-    const empty = document.createElement('div');
-    empty.className = 'loading-social-empty';
-    empty.textContent = socialSent.length === 0 ? t('social.noSent') : t('social.noResults');
-    list.appendChild(empty);
-    return;
-  }
-  entries.forEach((s, k) => {
-    const avatar = SOCIAL_AVATARS[k % SOCIAL_AVATARS.length];
-    const row = document.createElement('div');
-    row.className = 'loading-social-row';
-    row.innerHTML =
-      `<img class="loading-social-avatar" src="${avatar}" alt="" draggable="false" oncontextmenu="return false">` +
-      `<div class="loading-social-info">` +
-        `<span class="loading-social-name">${s.name}</span>` +
-        `<span class="loading-social-status">${t('social.pendingStatus')}</span>` +
-      `</div>` +
-      `<div class="loading-social-score">` +
-        `<img class="loading-social-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">` +
-        `<span class="loading-social-score-val">${s.score.toLocaleString()}</span>` +
-      `</div>` +
-      `<span class="loading-social-rankname">${(typeof getRank === 'function' ? getRank(s.score).name : '')}</span>` +
-      `<img class="loading-social-emote" src="${(typeof getRank === 'function' ? getRank(s.score).img : 'images/ranks/1.png')}" alt="" draggable="false" oncontextmenu="return false">`;
-    row.addEventListener('click', () => openFriendProfile(s, { cls: 'online', text: 'En línea', rank: 1, minsAgo: 0 }, avatar));
-    list.appendChild(row);
-  });
-}
-
-document.getElementById('loading-social-sentbtn')?.addEventListener('click', () => {
-  sfxCheck.currentTime = 0; sfxCheck.play();
-  renderSentList();
-  setSocialListClickable(false);
-  document.getElementById('loading-sent-group')?.classList.remove('table-gone');
-});
-document.getElementById('loading-social-sentbtn')?.addEventListener('mouseenter', () => {
-  sfxSelect.currentTime = 0; sfxSelect.play();
-});
-
-document.getElementById('loading-sent-back-wrap')?.addEventListener('click', () => {
-  sfxCheck.currentTime = 0; sfxCheck.play();
-  const wrap = document.getElementById('loading-sent-back-wrap');
-  wrap.classList.add('confirm-pressed');
-  setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
-  document.getElementById('loading-sent-group')?.classList.add('table-gone');
-  setSocialListClickable(true);
-});
-
-document.getElementById('loading-sent-search-input')?.addEventListener('input', () => renderSentList());
-
-document.getElementById('loading-sent-sort')?.addEventListener('click', () => {
-  sfxCheck.currentTime = 0; sfxCheck.play();
-  sentSort = sentSort === 'az' ? 'za' : 'az';
-  const btn = document.getElementById('loading-sent-sort');
-  if (btn) btn.textContent = sentSort === 'az' ? 'A-Z' : 'Z-A';
-  renderSentList();
-});
-document.getElementById('loading-sent-sort')?.addEventListener('mouseenter', () => {
-  sfxSelect.currentTime = 0; sfxSelect.play();
-});
-
-// Al cambiar idioma, re-renderizar el contenido dinámico del panel social/perfil.
-if (typeof onLangChange === 'function') onLangChange(() => {
-  try { const sb = document.getElementById('loading-social-sort'); if (sb) sb.textContent = socialSortLabel(); } catch (e) {}
-  try { updateSocialTabCounts(); } catch (e) {}
-  try { renderSocial(document.getElementById('loading-social-search-input')?.value || ''); } catch (e) {}
-  try { renderBlockedList(); } catch (e) {}
-  try { renderSentList(); } catch (e) {}
-  try { if (typeof refreshProfileStats === 'function') refreshProfileStats(); } catch (e) {}
-  try { updateFriendButtons(); } catch (e) {}
 });
 
 // Cada modo registra aquí cómo detener sus loops (timers/animaciones)
@@ -1479,7 +799,7 @@ function quitToMenu() {
   // 8) Mostrar el menú principal limpio
   const ls = document.getElementById('loading-screen');
   if (ls) { ls.style.display = ''; ls.classList.remove('table-shown'); }
-  ['loading-table-group','loading-social-group','loading-friend-group','loading-addfriend-group','loading-blocked-group','loading-sent-group']
+  ['loading-table-group','loading-social-group','loading-friend-group','loading-addfriend-group']
     .forEach(id => document.getElementById(id)?.classList.add('table-gone'));
   if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
   if (typeof window.refreshIngamePower === 'function') window.refreshIngamePower();
@@ -1556,9 +876,6 @@ function loadGameSFX() {
   sfxTickdown  = new Audio('sfx/countdown.mp3');
   sfxTimesUp   = new Audio('sfx/timesup.mp3');
   if (isMuted) getAllSfx().forEach(sfx => { sfx.volume = 0; });
-  // Forzar preload en iOS: sin .load() el primer play() dispara la descarga y decodificación
-  [sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus, sfxTickdown, sfxTimesUp]
-    .forEach(sfx => { sfx.load(); });
 }
 
 // Camino PC (y fallback): <audio> HTML de siempre. NO TOCAR.
@@ -1582,7 +899,7 @@ function playMusic(track) {
 }
 
 // ── CONFIG ──────────────────────────────────────────────────────────────────
-const GAME_DURATION   = 10; // TEMP: 10s para testear (volver a 60)
+const GAME_DURATION   = 60;
 const BONUS_TIME      = 5;
 const DOTS_NEEDED     = 10;
 const SPEED_BONUS_WIN = 3;
@@ -1613,8 +930,8 @@ const MAP_ASPECT = 2380 / 1759;
 const _pad = 24;
 const _scale = 0.88;
 const DISPLAY_W = Math.min(
-  Math.floor((window.STAGE_W  - _pad * 2) * _scale),
-  Math.floor((window.STAGE_H - _pad * 2) * MAP_ASPECT * _scale)
+  Math.floor((window.innerWidth  - _pad * 2) * _scale),
+  Math.floor((window.innerHeight - _pad * 2) * MAP_ASPECT * _scale)
 );
 const DISPLAY_H = Math.round(DISPLAY_W / MAP_ASPECT);
 
@@ -1688,36 +1005,6 @@ badgeOverlay.height   = DISPLAY_H;
 badgeOverlay.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;z-index:25;';
 const badgeOverlayCtx = badgeOverlay.getContext('2d');
 gameWrapper.appendChild(badgeOverlay);
-
-// Libera proactivamente la memoria de juego: suelta los bitmaps decodificados de
-// fondos/personajes/ranks (poniendo src=''), achica los canvas a 1px y libera el
-// video de howtoplay. Se llama al volver al menú (y se puede llamar entre modos)
-// para que la app NO acumule RAM a lo largo de una campaña ni entre sesiones — así
-// el baseline queda plano y no hace falta recargar la página. Las imágenes se
-// vuelven a setear solas cuando el modo siguiente arranca (los handlers asignan sus
-// src), así que limpiar acá es seguro: el menú no usa estos <img> de juego.
-window.releaseGameMemory = function () {
-  try {
-    // Fondos, personajes, check/wrong, cielos, monumento, banderas de país.
-    // OJO: no incluir .game-bg-sky-monuments — el cielo de monuments no lo re-asigna
-    // ningún handler, así que limpiarlo lo deja en blanco al entrar al modo.
-    document.querySelectorAll(
-      '.game-bg-city, .game-bg-men1, .game-bg-men2, .game-bg-girl1, .game-bg-girl2, ' +
-      '.game-bg-women1, .game-bg-women2, .game-bg-check3, .game-bg-wrong3, #monument-img'
-    ).forEach(el => { if (el && el.tagName === 'IMG') el.removeAttribute('src'); });
-    // NO limpiar #results-screen / #final-screen img: sus src están en el HTML y no
-    // se re-asignan al mostrarse, así que limpiarlos dejaba results/final en blanco
-    // (sin imágenes ni botón de confirm). Los ranks son chicos, no vale romper eso.
-    // Canvas: liberar el buffer de píxeles (GPU+CPU) reduciéndolo a 1px.
-    if (typeof canvas !== 'undefined' && canvas) { canvas.width = 1; canvas.height = 1; }
-    if (badgeOverlay) { badgeOverlay.width = 1; badgeOverlay.height = 1; }
-    const fbc = document.getElementById('flags-badge-canvas');
-    if (fbc) { fbc.width = 1; fbc.height = 1; }
-    // Video de howtoplay: liberar decoder/buffers.
-    const v = document.querySelector('.splash-howtoplay-video');
-    if (v) { try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) {} }
-  } catch (e) {}
-};
 
 // ── ASSETS ───────────────────────────────────────────────────────────────────
 const MONUMENTS_EASY_NAMES = [
@@ -1834,8 +1121,8 @@ function buildChecksRow() {
   const gap = total > 1 ? (total > 12 ? (MAX_W - total * IMG_W) / (total - 1) : BASE_GAP) : 0;
   if (total === 0) {
     const none = document.createElement('span');
-    none.textContent = t('profile.none');
-    none.style.cssText = 'color:#ffffff;-webkit-text-stroke:0.77cqmin #132886;paint-order:stroke fill;font-family:VAGRoundBold,"Arial Black",Impact,sans-serif;font-size:4.5cqmin;font-weight:bold;position:relative;left:2.2cqmin;';
+    none.textContent = 'None';
+    none.style.cssText = 'color:#ffffff;-webkit-text-stroke:0.77vmin #132886;paint-order:stroke fill;font-family:VAGRoundBold,"Arial Black",Impact,sans-serif;font-size:4.5vmin;font-weight:bold;position:relative;left:2.2vmin;';
     row.appendChild(none);
     return;
   }
@@ -1847,7 +1134,7 @@ function buildChecksRow() {
     img.alt = '';
     img.style.animationDelay = `${i * 0.1}s`;
     img.style.zIndex = 16 + i;
-    if (i < total - 1) img.style.marginRight = `${gap}cqmin`;
+    if (i < total - 1) img.style.marginRight = `${gap}vmin`;
     row.appendChild(img);
   }
 
@@ -1875,8 +1162,8 @@ function buildWrongsRow(startOffset = 0) {
 
   if (total === 0) {
     const none = document.createElement('span');
-    none.textContent = t('profile.none');
-    none.style.cssText = 'color:#ffffff;-webkit-text-stroke:0.77cqmin #132886;paint-order:stroke fill;font-family:VAGRoundBold,"Arial Black",Impact,sans-serif;font-size:4.5cqmin;font-weight:bold;position:relative;left:2.2cqmin;opacity:0;';
+    none.textContent = 'None';
+    none.style.cssText = 'color:#ffffff;-webkit-text-stroke:0.77vmin #132886;paint-order:stroke fill;font-family:VAGRoundBold,"Arial Black",Impact,sans-serif;font-size:4.5vmin;font-weight:bold;position:relative;left:2.2vmin;opacity:0;';
     row.appendChild(none);
     const w3s = gameoverScreen.querySelector('.game-bg-wrong3');
     const wce = gameoverScreen.querySelector('.wrong-count-total');
@@ -1897,7 +1184,7 @@ function buildWrongsRow(startOffset = 0) {
     img.alt = '';
     img.style.animationDelay = `${startOffset + i * 0.1}s`;
     img.style.zIndex = 16 + i;
-    if (i < total - 1) img.style.marginRight = `${gap}cqmin`;
+    if (i < total - 1) img.style.marginRight = `${gap}vmin`;
     row.appendChild(img);
   }
 
@@ -1975,9 +1262,7 @@ let lastPlayerRank = -1;
 function getLbRowHeight() {
   const panel = document.getElementById('right-panel');
   if (!panel) return 84;
-  // offsetWidth (no getBoundingClientRect): el rect viene escalado por el transform
-  // del #app-stage y, al usarse como px de layout, se re-escalaría (entradas apretadas).
-  return Math.round(panel.offsetWidth * 1.5) + LB_GAP;
+  return Math.round(panel.getBoundingClientRect().width * 1.5) + LB_GAP;
 }
 
 function initLeaderboard() {
@@ -2012,7 +1297,7 @@ function initLeaderboard() {
   const playerEl = document.createElement('div');
   playerEl.className = 'lb-entry lb-player';
   playerEl.id = 'lb-player';
-  playerEl.innerHTML = `<div class="lb-avatar"><img class="lb-avatar-img" src="${localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png'}"></div>`
+  playerEl.innerHTML = `<div class="lb-avatar"><img class="lb-avatar-img" src="images/ppdefault.png"></div>`
                      + `<span class="lb-score" id="lb-player-score">0</span>`;
   playerEl.style.transition = 'none';
   playerEl.style.top = '-9999px';
@@ -2183,12 +1468,11 @@ function slideTagIn(cityName, countryCode) {
     }
   }
 
-  const dispCity = (typeof tCity === 'function') ? tCity(cityName) : cityName;
-  setTagText(dispCity);
+  setTagText(cityName);
   if (countryCode) {
     slideTagIn._countryTimer = setTimeout(() => {
       slideTagIn._hintShown = true;
-      setTagText(`${dispCity}, ${countryCode}`);
+      setTagText(`${cityName}, ${countryCode}`);
     }, 5000);
   }
 
@@ -2292,7 +1576,7 @@ function showResultLabel(cx, cy, grade, base, bonusAmt) {
   else if (grade === 'perfect')  { sfxVeryNice.currentTime = 0; sfxVeryNice.play(); }
   else                           { sfxAcertar.currentTime  = 0; sfxAcertar.play(); }
 
-  resultLabel.textContent = (typeof t === 'function') ? t('grade.' + grade) : LABEL_MAP[grade];
+  resultLabel.textContent = LABEL_MAP[grade];
   resultLabel.className = grade;
 
   const lx = Math.max(4, Math.min(cx - 70, DISPLAY_W - 200));
@@ -2390,7 +1674,7 @@ function slideMonumentIn(monument) {
   monumentNameEl.style.opacity = '0';
   if (slideMonumentIn._nameTimer) clearTimeout(slideMonumentIn._nameTimer);
   slideMonumentIn._nameTimer = setTimeout(() => {
-    monumentNameEl.textContent = (typeof tMonument === 'function') ? tMonument(monument.name) : monument.name;
+    monumentNameEl.textContent = monument.name;
     monumentNameEl.style.opacity = '1';
   }, 3500);
 
@@ -2602,12 +1886,9 @@ function render(timestamp) {
       ctx.textBaseline = 'top';
       ctx.strokeStyle = 'rgba(0,0,0,0.75)';
       ctx.lineWidth = 3;
-      const dotLabel = (window.pendingGameMode === 'monuments')
-        ? ((typeof tMonument === 'function') ? tMonument(dot.name) : dot.name)
-        : ((typeof tCity === 'function') ? tCity(dot.name) : dot.name);
-      ctx.strokeText(dotLabel, dot.x, dot.y + 8);
+      ctx.strokeText(dot.name, dot.x, dot.y + 8);
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(dotLabel, dot.x, dot.y + 8);
+      ctx.fillText(dot.name, dot.x, dot.y + 8);
 
       ctx.globalAlpha = 1;
     }
@@ -2884,12 +2165,6 @@ function endGame() {
 
       cancelAnimationFrame(animFrameId);
       animFrameId = null;
-      // Liberar pixel buffers del canvas en iOS para reducir pico de memoria
-      // antes de que el siguiente modo empiece a decodificar sus assets.
-      if (IS_IOS) {
-        canvas.width = 1; canvas.height = 1;
-        badgeOverlay.width = 1; badgeOverlay.height = 1;
-      }
       gameWrapper.style.display = 'none';
       scoreDisplayEl.style.display = 'none';
       const cwHide = document.getElementById('countdown-widget');
@@ -2919,16 +2194,12 @@ function endGame() {
       const gameoverTextLabel = document.querySelector('.gameover-text1-label');
       if (gameoverTextLabel) {
         gameoverTextLabel.textContent = window.pendingGameMode === 'monuments'
-          ? t('gameover.monuments')
-          : t('gameover.cities');
+          ? '¡Buen trabajo! ¡Lo conseguimos!'
+          : '¡Buen intento! ¡Todos llegaron a sus ciudades de destino!';
       }
       if (window.pendingGameMode === 'monuments') {
         gameoverScreen.classList.add('mode-monuments');
-        // Carga diferida del fondo de flicker (no se decodifica hasta acá; ver shapes.js).
-        document.querySelectorAll('.game-bg-city-monuments2')
-          .forEach(el => { if (!el.src) el.src = 'images/bg/level4complete2.png'; });
       }
-      window.hideGameoverConfirm();
       gameoverScreen.style.display = 'flex';
       const rpGO = document.getElementById('right-panel');
       if (rpGO) rpGO.style.display = 'none';
@@ -2939,13 +2210,6 @@ function endGame() {
       const checksEndTime = (checksTotal > 0 ? (checksTotal - 1) * 0.1 + 0.2 : 0) + 0.4;
       buildWrongsRow(checksEndTime);
       playMusic(sfxPostgame);
-      // Revelar confirm solo cuando los assets del siguiente modo estén en caché.
-      if (window.campaign && window.campaign.active && window.pendingGameMode === 'game' && typeof window.preloadNextModeAssets === 'function') {
-        window.preloadNextModeAssets('monuments').then(window.showGameoverConfirm);
-      } else {
-        // Modo libre o último modo (monuments): no hay preload, confirmar después de un breve delay.
-        setTimeout(window.showGameoverConfirm, 800);
-      }
     }, 1000);
   }, 400 + 1200);
 }
@@ -2954,8 +2218,8 @@ function endGame() {
 function redimensionarJuego() {
   if (!gameWrapper || gameWrapper.style.display === 'none') return;
 
-  const anchoVentana = window.STAGE_W;
-  const altoVentana = window.STAGE_H;
+  const anchoVentana = window.innerWidth;
+  const altoVentana = window.innerHeight;
 
   // Márgenes proporcionales (sin px fijos ni saltos por breakpoint) para que la
   // escala sea 100% proporcional al viewport y no "zoomee" de más al hacer zoom.
@@ -2977,7 +2241,7 @@ function showScorePopup(amount) {
   el.className = 'score-popup';
   el.textContent = '+' + amount.toLocaleString();
   el.dataset.text = '+' + amount.toLocaleString();
-  (window.appStage || document.body).appendChild(el);
+  document.body.appendChild(el);
   el.addEventListener('animationend', () => el.remove());
 }
 
@@ -3012,7 +2276,7 @@ function runPregameCountdown(onDone) {
   pregameAborted = false;
   pregameCountdownEl.style.display = 'flex';
   sfxCountdown.currentTime = 0;
-  sfxCountdown.play().catch(() => {});
+  sfxCountdown.play();
   let step = 0;
 
   function showStep() {
@@ -3024,8 +2288,8 @@ function runPregameCountdown(onDone) {
     }
     const { src, hold, size } = PREGAME_STEPS[step++];
     pregameCountdownImg.style.animation = 'none';
-    pregameCountdownImg.style.width  = size + 'cqmin';
-    pregameCountdownImg.style.height = size + 'cqmin';
+    pregameCountdownImg.style.width  = size + 'vmin';
+    pregameCountdownImg.style.height = size + 'vmin';
     pregameCountdownImg.src = src;
     void pregameCountdownImg.offsetWidth;
     pregameCountdownImg.style.animation = '';
@@ -3039,20 +2303,9 @@ function runPregameCountdown(onDone) {
 function startGame() {
   loadBadges();
   loadGameSFX();
-  // Pre-autorizar sfxCountdown en iOS mientras estamos en el contexto del gesto del usuario,
-  // antes del canvas resize (que puede tardar en iOS y expirar la ventana de gesto).
-  if (IS_IOS && sfxCountdown) {
-    const _pa = sfxCountdown.play();
-    if (_pa) _pa.catch(() => {});
-    sfxCountdown.pause();
-    sfxCountdown.currentTime = 0;
-  }
   clearInterval(timerIntervalId);
   if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
   canvas.style.pointerEvents = '';
-  // Restaurar tamaño del canvas si fue liberado en iOS al final de la ronda anterior.
-  if (canvas.width < DISPLAY_W) { canvas.width = DISPLAY_W; canvas.height = DISPLAY_H; }
-  if (badgeOverlay.width < DISPLAY_W) { badgeOverlay.width = DISPLAY_W; badgeOverlay.height = DISPLAY_H; }
 
   playMusic(null);
   splashScreen.style.display    = 'none';
@@ -3148,26 +2401,19 @@ document.querySelector('.splash-confirm-wrap')?.addEventListener('click', () => 
   if (confirmStep === 0) {
     const label = document.querySelector('.splash-text2-label');
     if (window.pendingGameMode === 'flags') {
-      if (label) { label.textContent = t('splash.flags.2'); label.classList.add('step2'); }
+      if (label) { label.textContent = 'Haz clic sobre la bandera del país, estado o unión que corresponda al nombre que aparece arriba. ¿Todo listo? ¡Entonces haz clic sobre el icono VERDE para empezar!'; label.classList.add('step2'); }
     } else if (window.pendingGameMode === 'shapes') {
-      if (label) { label.textContent = t('splash.shapes.2'); label.classList.add('step2'); }
+      if (label) { label.textContent = 'Observa la forma del país y haz click en el nombre correcto, ¡pero no te olvides de que cada segundo cuenta! ¡Haz click en el icono VERDE y comenzamos!'; label.classList.add('step2'); }
     } else if (window.pendingGameMode === 'monuments') {
-      if (label) { label.textContent = t('splash.monuments.2'); label.classList.add('step2'); }
+      if (label) { label.textContent = 'Pon un pin en el mapa allí donde crees que están. ¡Haz click en el icono VERDE cuando creas que estes listo!'; label.classList.add('step2'); }
     } else {
-      if (label) { label.textContent = t('splash.cities.2'); label.classList.add('step2'); }
+      if (label) { label.textContent = 'Coloca un pin en el mapa donde creas que cada ciudad se ubica. ¡Haz click en el botón VERDE cuando estes listo!'; label.classList.add('step2'); }
     }
     const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
     if (howtoWrap) howtoWrap.classList.add('slide-down');
-    // Carga diferida del video (monuments lo difiere a este click para no solapar el
-    // decoder de video con el pico de decodificación de assets de entrada — ver shapes.js).
-    if (window.pendingHowtoVideo) {
-      window.swapHowtoVideo(window.pendingHowtoVideo);
-      window.pendingHowtoVideo = null;
-    }
     const howtoVideo = document.querySelector('.splash-howtoplay-video');
-    if (howtoVideo) { const p = howtoVideo.play(); if (p) p.catch(() => {}); }
+    if (howtoVideo) howtoVideo.play();
     confirmStep = 1;
-    window.waitForHowtoVideo();
   } else {
     if (window.pendingGameMode === 'flags') {
       splashScreen.style.display = 'none';
@@ -3198,76 +2444,35 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
     window.campaign.scores[mode] = sc;
     window.campaign.base = (window.campaign.base || 0) + sc;
     window.campaign.idx++;
+    gameoverScreen.style.display = 'none';
+    // resetear estado del splash para que el segundo diálogo no se saltee
+    confirmStep = 0;
+    const howtoWrapC = document.querySelector('.splash-howtoplay-wrap');
+    if (howtoWrapC) howtoWrapC.classList.remove('slide-down');
+    const labelC = document.querySelector('.splash-text2-label');
+    if (labelC) { labelC.classList.remove('step2'); labelC.textContent = ''; }
+    const animElsC = document.querySelectorAll('#splash-screen .flightatt-splash, .splash-text2-wrap');
+    animElsC.forEach(el => el.classList.remove('animate-in'));
     if (window.campaign.idx < window.campaign.btns.length) {
-      // Gameover se queda visible e intacto hasta que _fireNext está listo.
-      // En ese momento se oculta el gameover y se dispara el siguiente modo
-      // en el mismo bloque sincrónico (sin frame intermedio en blanco).
+      // silenciar el check del botón del siguiente modo (ya sonó uno arriba)
       sfxCheck.volume = 0;
-      const _nextBtn = window.campaign.btns[window.campaign.idx];
-      const _toMon = (_nextBtn === 'loading-mode4-btn');
-      const _fireNext = () => {
-        // Ocultar gameover + resetear splash + mostrar siguiente.
-        gameoverScreen.style.display = 'none';
-        confirmStep = 0;
-        const howtoWrapC = document.querySelector('.splash-howtoplay-wrap');
-        if (howtoWrapC) howtoWrapC.classList.remove('slide-down');
-        const labelC = document.querySelector('.splash-text2-label');
-        if (labelC) { labelC.classList.remove('step2'); labelC.textContent = ''; }
-        document.querySelectorAll('#splash-screen .flightatt-splash, .splash-text2-wrap')
-          .forEach(el => el.classList.remove('animate-in'));
-        const _go = () => {
-          document.getElementById(_nextBtn).click();
-          setTimeout(() => { sfxCheck.volume = isMuted ? 0 : 1; }, 150);
-        };
-        // Para monuments (4º modo, GPU acumulada de los 3 previos): NO construir las
-        // capas de compositing de monuments en el mismo frame en que se oculta el
-        // gameover de cities. Dar un respiro de 2 frames + tick para que iOS evacúe
-        // las superficies (IOSurface) del gameover/cities antes de instanciar las de
-        // monuments (cielo + 3 nubes animadas en bucle + fondo). Reduce el pico de
-        // compositing simultáneo que reinicia WebKit. Las otras transiciones, directo.
-        if (IS_IOS && _toMon) {
-          requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(_go, 60)));
-        } else {
-          _go();
-        }
-      };
-      // Solo la transición a MONUMENTS necesita un respiro: monuments es el 4º modo
-      // y el más pesado, y iOS aún no terminó de evacuar (asíncrono) el caché de
-      // imágenes decodificadas de los 3 modos previos. Mantener el gameover de cities
-      // visible ~900ms le da tiempo a iOS a liberar antes de cargar monuments, sin el
-      // pico transitorio que crashea. Las otras transiciones quedan instantáneas (0).
-      const _toMonuments = (_nextBtn === 'loading-mode4-btn');
-      const _delay = (IS_IOS && _toMonuments) ? 900 : IOS_CAMPAIGN_TRANS_DELAY;
-      if (window.__loadingReady) {
-        setTimeout(_fireNext, _delay);
-      } else {
-        const _pollId = setInterval(() => {
-          if (window.__loadingReady) { clearInterval(_pollId); setTimeout(_fireNext, _delay); }
-        }, 100);
-      }
+      document.getElementById(window.campaign.btns[window.campaign.idx]).click();
+      setTimeout(() => { sfxCheck.volume = isMuted ? 0 : 1; }, 150);
     } else {
       window.campaign.active = false;
       playMusic(null);
-      // Ocultar el gameover de monuments antes de mostrar results; si no, queda
-      // encima y bloquea el click del confirm para ver el rank.
-      gameoverScreen.style.display = 'none';
       if (typeof showResultsScreen === 'function') showResultsScreen();
     }
     return;
   }
 
   gameoverScreen.style.display = 'none';
-  // Liberar la RAM del juego recién terminado antes de volver al menú (el video se
-  // vuelve a setear más abajo con swapHowtoVideo).
-  if (typeof window.releaseGameMemory === 'function') window.releaseGameMemory();
   document.getElementById('loading-screen').style.display = '';
   document.getElementById('loading-screen').classList.remove('table-shown');
   document.getElementById('loading-table-group')?.classList.add('table-gone');
   document.getElementById('loading-social-group')?.classList.add('table-gone');
   document.getElementById('loading-friend-group')?.classList.add('table-gone');
   document.getElementById('loading-addfriend-group')?.classList.add('table-gone');
-  document.getElementById('loading-blocked-group')?.classList.add('table-gone');
-  document.getElementById('loading-sent-group')?.classList.add('table-gone');
 
   const fmt = v => v > 0 ? '🏆 ' + v.toLocaleString() : '';
   const elPlay   = document.getElementById('loading-play-hs');
@@ -3285,7 +2490,8 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
   if (howtoWrap) howtoWrap.classList.remove('slide-down');
   const label = document.querySelector('.splash-text2-label');
   if (label) { label.classList.remove('step2'); label.textContent = ''; }
-  window.swapHowtoVideo('images/howtoplay/howtoplay3.mp4');
+  const howtoVideo = document.querySelector('.splash-howtoplay-video');
+  if (howtoVideo) { howtoVideo.pause(); howtoVideo.src = 'images/howtoplay/howtoplay3.mp4'; howtoVideo.load(); }
   const animEls = document.querySelectorAll('#splash-screen .flightatt-splash, .splash-text2-wrap');
   animEls.forEach(el => el.classList.remove('animate-in'));
 });
@@ -3412,8 +2618,8 @@ let restartFlightAtt;
 
 // ── SPLASH TEXT2 RESPONSIVE ──────────────────────────────────────────────────
 // El tamaño del texto de los carteles (text2/text1) se controla en CSS con vw:
-// el globo mide 25cqw/21cqw (su width:% sobre #splash-screen, que es full viewport),
-// así que la fuente en vw (1.375cqw/1.155cqw = 0.055×ancho) queda SIEMPRE en la
+// el globo mide 25vw/21vw (su width:% sobre #splash-screen, que es full viewport),
+// así que la fuente en vw (1.375vw/1.155vw = 0.055×ancho) queda SIEMPRE en la
 // misma proporción que el globo, sin atascarse con el zoom como el ResizeObserver.
 
 // ── VOLUME TOGGLE ─────────────────────────────────────────────────────────────
@@ -3456,53 +2662,8 @@ document.getElementById('vol-btn')?.addEventListener('click', () => {
   const a = new Audio('sfx/check.mp3'); a.volume = 1; a.play();
 });
 
-// ── FULLSCREEN ────────────────────────────────────────────────────────────────
-(function () {
-  const btn = document.getElementById('fs-btn');
-  if (!btn) return;
-
-  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
-    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  const isStandalone = window.navigator.standalone === true;
-
-  function showIOSToast() {
-    let toast = document.getElementById('ios-fs-toast');
-    if (!toast) {
-      toast = document.createElement('div');
-      toast.id = 'ios-fs-toast';
-      toast.style.cssText = 'position:fixed;bottom:12%;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.82);color:#fff;font-family:sans-serif;font-size:14px;padding:12px 18px;border-radius:12px;z-index:99999;text-align:center;pointer-events:none;transition:opacity 0.4s;white-space:nowrap;';
-      toast.innerHTML = 'Toca <b>Compartir</b> → <b>Añadir a inicio</b> para pantalla completa';
-      document.body.appendChild(toast);
-    }
-    toast.style.opacity = '1';
-    clearTimeout(toast._t);
-    toast._t = setTimeout(() => { toast.style.opacity = '0'; }, 3500);
-  }
-
-  function updateIcon() {
-    btn.textContent = document.fullscreenElement ? '✕' : '⛶';
-  }
-  document.addEventListener('fullscreenchange', updateIcon);
-
-  btn.addEventListener('click', () => {
-    if (isIOS) {
-      if (!isStandalone) showIOSToast();
-      return;
-    }
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
-    } else {
-      document.exitFullscreen().catch(() => {});
-    }
-  });
-})();
-
 // ── LOCK LOADING SCREEN ZOOM & POSITION ───────────────────────────────────────
-// DESACTIVADO: el #app-stage de aspecto fijo ya maneja el escalado/posición. Este
-// bloque ponía width/height/transform inline al loading-screen en cada resize del
-// visualViewport (= innerWidth), descuadrando todo dentro del stage.
 (function () {
-  return;
   const el = document.getElementById('loading-screen');
   if (!el || !window.visualViewport) return;
   const vp = window.visualViewport;
@@ -3522,9 +2683,11 @@ document.getElementById('vol-btn')?.addEventListener('click', () => {
 (function () {
   const warning = document.getElementById('screen-warning');
   const msg     = document.getElementById('screen-warning-msg');
-  const MIN_W   = 480;
-  const MIN_H   = 320;
-  const MAX_RATIO = 2.8;
+  // TEMP: límites bajados para testear en pantallas chicas (iOS).
+  // REACTIVAR a 480 / 320 / 2.8 antes de push final.
+  const MIN_W   = 200;
+  const MIN_H   = 150;
+  const MAX_RATIO = 5;
 
   function check() {
     const w = window.innerWidth;
@@ -3533,11 +2696,11 @@ document.getElementById('vol-btn')?.addEventListener('click', () => {
     let text = '';
 
     if (w < MIN_W || h < MIN_H) {
-      text = t('screen.tooSmall');
+      text = 'La pantalla es demasiado pequeña para mostrar el juego.';
     } else if (ratio > MAX_RATIO) {
-      text = t('screen.tooWide');
+      text = 'La pantalla es demasiado ancha. Redimensiona la ventana verticalmente.';
     } else if (ratio < 1 / MAX_RATIO) {
-      text = t('screen.tooTall');
+      text = 'La pantalla es demasiado alta. Redimensiona la ventana horizontalmente.';
     }
 
     if (text) {
@@ -3568,6 +2731,3 @@ document.getElementById('vol-btn')?.addEventListener('click', () => {
   wrap.addEventListener('mouseenter', playSelect);
   wrap.addEventListener('mouseleave', playSelect);
 })();
-
-
-

@@ -824,7 +824,7 @@ window.ASSET_MANIFEST = {
     "images/planet2.png",
     "images/points.png",
     "images/power.png",
-    "images/profilepic/ppdefault.png",
+    "images/ppdefault.png",
     "images/ranks/1.png",
     "images/ranks/10.png",
     "images/ranks/11.png",
