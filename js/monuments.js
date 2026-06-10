@@ -2923,7 +2923,7 @@ function runPregameCountdown(onDone) {
   pregameAborted = false;
   pregameCountdownEl.style.display = 'flex';
   sfxCountdown.currentTime = 0;
-  sfxCountdown.play();
+  sfxCountdown.play().catch(() => {});
   let step = 0;
 
   function showStep() {
@@ -2950,6 +2950,14 @@ function runPregameCountdown(onDone) {
 function startGame() {
   loadBadges();
   loadGameSFX();
+  // Pre-autorizar sfxCountdown en iOS mientras estamos en el contexto del gesto del usuario,
+  // antes del canvas resize (que puede tardar en iOS y expirar la ventana de gesto).
+  if (IS_IOS && sfxCountdown) {
+    const _pa = sfxCountdown.play();
+    if (_pa) _pa.catch(() => {});
+    sfxCountdown.pause();
+    sfxCountdown.currentTime = 0;
+  }
   clearInterval(timerIntervalId);
   if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
   canvas.style.pointerEvents = '';

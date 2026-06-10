@@ -1008,6 +1008,8 @@ document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl2.png');
   document.querySelectorAll('.game-bg-women1').forEach(el => el.src = 'images/characters/women1.png');
   document.querySelectorAll('.game-bg-women2').forEach(el => el.src = 'images/characters/women1.png');
+  // Liberar level3complete.png (class distinta: .game-bg-city) antes de decodificar los de monuments.
+  document.querySelectorAll('.game-bg-city').forEach(el => { el.src = ''; });
   document.querySelectorAll('.game-bg-city-monuments').forEach(el => el.src = 'images/bg/level4complete.png');
   document.querySelectorAll('.game-bg-city-monuments2').forEach(el => el.src = 'images/bg/level4complete2.png');
   document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check4.png');
