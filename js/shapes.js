@@ -992,6 +992,13 @@ document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   if (typeof loadGameSFX !== 'undefined') loadGameSFX();
   window.pendingGameMode = 'monuments';
   document.getElementById('loading-screen').style.display = 'none';
+  // Liberar la RAM del modo anterior (cities) ANTES de cargar los assets pesados de
+  // monuments (2 fondos a pantalla completa + flicker). monuments es el modo más
+  // pesado y es el último de la campaña, así que el pico de memoria pega justo acá.
+  // releaseGameMemory suelta el canvas previo, flags-badge-canvas, el video y los
+  // bitmaps de personajes/fondos que monuments no reutiliza; las líneas de abajo
+  // re-asignan solo lo que monuments necesita. monuments.startGame restaura el canvas.
+  if (typeof window.releaseGameMemory === 'function') window.releaseGameMemory();
   // Actualizar modo y backgrounds ANTES de mostrar el splash para evitar el frame
   // en blanco que se veía al transicionar desde cities en campaña.
   document.getElementById('splash-screen').classList.remove('mode-flags', 'mode-shapes');
