@@ -11,7 +11,9 @@
 // El número absoluto no es el límite real de iOS, pero los PICOS y su evolución en
 // las transiciones son fieles y sirven para ver dónde se dispara la memoria.
 (function () {
-  if (new URLSearchParams(location.search).get('mem') !== '1') return;
+  // Visible desde el inicio durante el beta (el usuario avisa cuándo deshabilitarlo).
+  // Para apagarlo: abrir con ?mem=0 o volver a poner el guard de ?mem=1.
+  if (new URLSearchParams(location.search).get('mem') === '0') return;
 
   const box = document.createElement('div');
   box.style.cssText = [
