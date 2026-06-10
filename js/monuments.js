@@ -250,13 +250,6 @@ const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) ||
   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 if (IS_IOS) document.body.classList.add('is-ios');
 
-// Delays de transición: agresivos en iOS para dar tiempo al GC antes de cargar
-// el modo siguiente. En PC todo es instantáneo (0ms).
-// 0 delay = comportamiento original (así funcionaba antes). Los valores altos que
-// se probaron en esta sesión fueron un agregado mío que complicó las cosas.
-const IOS_VIDEO_LOAD_DELAY      = 0;   // antes de .load() en videos
-const IOS_CAMPAIGN_TRANS_DELAY  = 0;   // antes de disparar el btn del modo siguiente
-
 // Muestra/oculta el confirm del gameover (se revela tras cargar assets del siguiente modo).
 window.showGameoverConfirm = function () {
   const w = document.querySelector('.gameover-confirm-wrap');
@@ -290,33 +283,11 @@ window.waitForHowtoVideo = function () {
   setTimeout(reveal, 5000); // fallback de seguridad
 };
 
-// Cambia el video de howtoplay RECREANDO el elemento <video> entero.
-// En iOS, reusar el mismo elemento (removeAttribute+load → src+load) NO garantiza
-// que WebKit suelte la superficie GPU/IOSurface ni el decoder del video anterior:
-// el pipeline de medios del elemento sigue vivo y el pico de compositing al cargar
-// el nuevo video crashea el proceso WebKit de forma intermitente (Safari reinicia la
-// pestaña) en CUALQUIER transición (flags→shapes confirmado, no solo monuments).
-// Destruir el nodo viejo y crear uno fresco fuerza el teardown real del decoder
-// anterior antes de instanciar el nuevo. Todas las referencias al video son por
-// querySelector('.splash-howtoplay-video'), así que recrear el nodo es transparente.
+// Cambia el video de howtoplay (swap simple, como en la baseline 1.15).
 window.swapHowtoVideo = function (newSrc) {
-  const old = document.querySelector('.splash-howtoplay-video');
-  if (!old) return;
-  try {
-    old.pause();
-    old.removeAttribute('src');
-    old.load();          // pide al decoder anterior que se libere
-    const fresh = document.createElement('video');
-    fresh.className = 'splash-howtoplay-video';
-    fresh.loop = true;
-    fresh.muted = true;
-    fresh.playsInline = true;
-    fresh.setAttribute('playsinline', '');
-    fresh.preload = 'none';
-    fresh.src = newSrc;
-    old.replaceWith(fresh);
-    fresh.load();        // carga el nuevo en un elemento limpio
-  } catch (e) {}
+  const v = document.querySelector('.splash-howtoplay-video');
+  if (!v) return;
+  try { v.src = newSrc; v.load(); } catch (e) {}
 };
 
 // Resetea el estado del splash al ENTRAR a un modo (antes de mostrarlo). Necesario
@@ -2924,9 +2895,6 @@ function endGame() {
       }
       if (window.pendingGameMode === 'monuments') {
         gameoverScreen.classList.add('mode-monuments');
-        // Carga diferida del fondo de flicker (no se decodifica hasta acá; ver shapes.js).
-        document.querySelectorAll('.game-bg-city-monuments2')
-          .forEach(el => { if (!el.src) el.src = 'images/bg/level4complete2.png'; });
       }
       window.hideGameoverConfirm();
       gameoverScreen.style.display = 'flex';
@@ -3158,14 +3126,8 @@ document.querySelector('.splash-confirm-wrap')?.addEventListener('click', () => 
     }
     const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
     if (howtoWrap) howtoWrap.classList.add('slide-down');
-    // Carga diferida del video (monuments lo difiere a este click para no solapar el
-    // decoder de video con el pico de decodificación de assets de entrada — ver shapes.js).
-    if (window.pendingHowtoVideo) {
-      window.swapHowtoVideo(window.pendingHowtoVideo);
-      window.pendingHowtoVideo = null;
-    }
     const howtoVideo = document.querySelector('.splash-howtoplay-video');
-    if (howtoVideo) { const p = howtoVideo.play(); if (p) p.catch(() => {}); }
+    if (howtoVideo) howtoVideo.play();
     confirmStep = 1;
     window.waitForHowtoVideo();
   } else {
@@ -3204,9 +3166,8 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
       // en el mismo bloque sincrónico (sin frame intermedio en blanco).
       sfxCheck.volume = 0;
       const _nextBtn = window.campaign.btns[window.campaign.idx];
-      const _toMon = (_nextBtn === 'loading-mode4-btn');
       const _fireNext = () => {
-        // Ocultar gameover + resetear splash + mostrar siguiente.
+        // Ocultar gameover + resetear splash + mostrar siguiente — todo de una.
         gameoverScreen.style.display = 'none';
         confirmStep = 0;
         const howtoWrapC = document.querySelector('.splash-howtoplay-wrap');
@@ -3215,34 +3176,16 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
         if (labelC) { labelC.classList.remove('step2'); labelC.textContent = ''; }
         document.querySelectorAll('#splash-screen .flightatt-splash, .splash-text2-wrap')
           .forEach(el => el.classList.remove('animate-in'));
-        const _go = () => {
-          document.getElementById(_nextBtn).click();
-          setTimeout(() => { sfxCheck.volume = isMuted ? 0 : 1; }, 150);
-        };
-        // Para monuments (4º modo, GPU acumulada de los 3 previos): NO construir las
-        // capas de compositing de monuments en el mismo frame en que se oculta el
-        // gameover de cities. Dar un respiro de 2 frames + tick para que iOS evacúe
-        // las superficies (IOSurface) del gameover/cities antes de instanciar las de
-        // monuments (cielo + 3 nubes animadas en bucle + fondo). Reduce el pico de
-        // compositing simultáneo que reinicia WebKit. Las otras transiciones, directo.
-        if (IS_IOS && _toMon) {
-          requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(_go, 60)));
-        } else {
-          _go();
-        }
+        document.getElementById(_nextBtn).click();
+        setTimeout(() => { sfxCheck.volume = isMuted ? 0 : 1; }, 150);
       };
-      // Solo la transición a MONUMENTS necesita un respiro: monuments es el 4º modo
-      // y el más pesado, y iOS aún no terminó de evacuar (asíncrono) el caché de
-      // imágenes decodificadas de los 3 modos previos. Mantener el gameover de cities
-      // visible ~900ms le da tiempo a iOS a liberar antes de cargar monuments, sin el
-      // pico transitorio que crashea. Las otras transiciones quedan instantáneas (0).
-      const _toMonuments = (_nextBtn === 'loading-mode4-btn');
-      const _delay = (IS_IOS && _toMonuments) ? 900 : IOS_CAMPAIGN_TRANS_DELAY;
+      // Transición instantánea (el crash de iOS era el will-change bajo el #app-stage,
+      // ya resuelto; los respiros/delays que metimos persiguiendo eso se revirtieron).
       if (window.__loadingReady) {
-        setTimeout(_fireNext, _delay);
+        _fireNext();
       } else {
         const _pollId = setInterval(() => {
-          if (window.__loadingReady) { clearInterval(_pollId); setTimeout(_fireNext, _delay); }
+          if (window.__loadingReady) { clearInterval(_pollId); _fireNext(); }
         }, 100);
       }
     } else {

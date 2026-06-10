@@ -1015,10 +1015,7 @@ document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   // Liberar level3complete.png (class distinta: .game-bg-city) antes de decodificar los de monuments.
   document.querySelectorAll('.game-bg-city').forEach(el => { el.src = ''; });
   document.querySelectorAll('.game-bg-city-monuments').forEach(el => el.src = 'images/bg/level4complete.png');
-  // level4complete2.png (capa de flicker) NO se setea acá: solo se usa en el gameover de
-  // monuments. Decodificarla en la entrada significaba 2 fondos full-screen a la vez = el
-  // pico GPU/decode que crashea WebKit en iOS (cities→monuments, pico ~233MB). Se difiere
-  // a cuando se muestra el gameover (monuments.js). NO está en el src del HTML por lo mismo.
+  document.querySelectorAll('.game-bg-city-monuments2').forEach(el => el.src = 'images/bg/level4complete2.png');
   document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check4.png');
   document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong4.png');
   const label = document.querySelector('.splash-text2-label');
@@ -1028,10 +1025,6 @@ document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   const howtoTitle = document.querySelector('.splash-howtoplay-title');
   if (howtoTitle) howtoTitle.textContent = 'Landmark Loco';
   const splashEl = document.getElementById('splash-screen');
-  // Pausar las nubes animadas de monuments durante el pico de entrada (iOS): se
-  // reanudan tras ~1.5s, cuando iOS ya asentó el compositing. Ver CSS .monuments-entry.
-  document.body.classList.add('monuments-entry');
-  setTimeout(() => document.body.classList.remove('monuments-entry'), 1500);
   splashEl.style.display = 'flex';
   window.showSplashConfirm?.();
   const animEls = splashEl.querySelectorAll('.flightatt-splash, .splash-text2-wrap');
@@ -1039,12 +1032,6 @@ document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   void splashEl.offsetWidth;
   animEls.forEach(el => el.classList.add('animate-in'));
   if (typeof playMusic !== 'undefined') playMusic(sfxPostgame);
-  // NO cargar el video de howtoplay4 acá: monuments es el modo más pesado y cargar el
-  // decoder de video JUSTO mientras se decodifican los 2 fondos full-screen + personajes
-  // es el pico GPU/video que crashea WebKit en iOS (cities→monuments, pico ~233MB).
-  // releaseGameMemory ya dejó el <video> vacío arriba; difiero la carga del video al
-  // primer click de confirm (que es cuando recién se reproduce y se ve). Así el decoder
-  // de video no compite con el spike de decodificación de assets de entrada.
-  window.pendingHowtoVideo = 'images/howtoplay/howtoplay4.mp4';
+  window.swapHowtoVideo?.('images/howtoplay/howtoplay4.mp4');
 });
 
