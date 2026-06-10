@@ -3053,25 +3053,22 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
     window.campaign.scores[mode] = sc;
     window.campaign.base = (window.campaign.base || 0) + sc;
     window.campaign.idx++;
-    // Fade out gameover mientras el splash aparece detrás
-    gameoverScreen.style.transition = 'opacity 0.2s';
-    gameoverScreen.style.opacity = '0';
-    setTimeout(() => { gameoverScreen.style.display = 'none'; gameoverScreen.style.opacity = ''; gameoverScreen.style.transition = ''; }, 220);
-    // resetear estado del splash para que el segundo diálogo no se saltee
-    confirmStep = 0;
-    const howtoWrapC = document.querySelector('.splash-howtoplay-wrap');
-    if (howtoWrapC) howtoWrapC.classList.remove('slide-down');
-    const labelC = document.querySelector('.splash-text2-label');
-    if (labelC) { labelC.classList.remove('step2'); labelC.textContent = ''; }
-    const animElsC = document.querySelectorAll('#splash-screen .flightatt-splash, .splash-text2-wrap');
-    animElsC.forEach(el => el.classList.remove('animate-in'));
     if (window.campaign.idx < window.campaign.btns.length) {
-      // Mostrar splash AHORA para tapar el frame en blanco entre gameover y el
-      // click del siguiente modo, que se difiere con setTimeout para no saturar iOS.
-      document.getElementById('splash-screen').style.display = 'flex';
+      // Gameover se queda visible e intacto hasta que _fireNext está listo.
+      // En ese momento se oculta el gameover y se dispara el siguiente modo
+      // en el mismo bloque sincrónico (sin frame intermedio en blanco).
       sfxCheck.volume = 0;
       const _nextBtn = window.campaign.btns[window.campaign.idx];
       const _fireNext = () => {
+        // Ocultar gameover + resetear splash + mostrar siguiente — todo de una.
+        gameoverScreen.style.display = 'none';
+        confirmStep = 0;
+        const howtoWrapC = document.querySelector('.splash-howtoplay-wrap');
+        if (howtoWrapC) howtoWrapC.classList.remove('slide-down');
+        const labelC = document.querySelector('.splash-text2-label');
+        if (labelC) { labelC.classList.remove('step2'); labelC.textContent = ''; }
+        document.querySelectorAll('#splash-screen .flightatt-splash, .splash-text2-wrap')
+          .forEach(el => el.classList.remove('animate-in'));
         document.getElementById(_nextBtn).click();
         setTimeout(() => { sfxCheck.volume = isMuted ? 0 : 1; }, 150);
       };
@@ -3090,9 +3087,7 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
     return;
   }
 
-  gameoverScreen.style.transition = 'opacity 0.2s';
-  gameoverScreen.style.opacity = '0';
-  setTimeout(() => { gameoverScreen.style.display = 'none'; gameoverScreen.style.opacity = ''; gameoverScreen.style.transition = ''; }, 220);
+  gameoverScreen.style.display = 'none';
   document.getElementById('loading-screen').style.display = '';
   document.getElementById('loading-screen').classList.remove('table-shown');
   document.getElementById('loading-table-group')?.classList.add('table-gone');
