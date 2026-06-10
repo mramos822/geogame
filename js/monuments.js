@@ -2910,6 +2910,9 @@ function endGame() {
       }
       if (window.pendingGameMode === 'monuments') {
         gameoverScreen.classList.add('mode-monuments');
+        // Carga diferida del fondo de flicker (no se decodifica hasta acá; ver shapes.js).
+        document.querySelectorAll('.game-bg-city-monuments2')
+          .forEach(el => { if (!el.src) el.src = 'images/bg/level4complete2.png'; });
       }
       window.hideGameoverConfirm();
       gameoverScreen.style.display = 'flex';

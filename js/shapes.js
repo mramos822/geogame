@@ -1013,7 +1013,10 @@ document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   // Liberar level3complete.png (class distinta: .game-bg-city) antes de decodificar los de monuments.
   document.querySelectorAll('.game-bg-city').forEach(el => { el.src = ''; });
   document.querySelectorAll('.game-bg-city-monuments').forEach(el => el.src = 'images/bg/level4complete.png');
-  document.querySelectorAll('.game-bg-city-monuments2').forEach(el => el.src = 'images/bg/level4complete2.png');
+  // level4complete2.png (capa de flicker) NO se setea acá: solo se usa en el gameover de
+  // monuments. Decodificarla en la entrada significaba 2 fondos full-screen a la vez = el
+  // pico GPU/decode que crashea WebKit en iOS (cities→monuments, pico ~233MB). Se difiere
+  // a cuando se muestra el gameover (monuments.js). NO está en el src del HTML por lo mismo.
   document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check4.png');
   document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong4.png');
   const label = document.querySelector('.splash-text2-label');
