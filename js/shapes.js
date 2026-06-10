@@ -933,6 +933,10 @@ function hideShapesMode() {
   const checksEndTime = (shapesCorrectCount > 0 ? (shapesCorrectCount - 1) * 0.1 + 0.2 : 0) + 0.4;
   if (typeof buildWrongsRow   !== 'undefined') buildWrongsRow(checksEndTime);
   if (typeof playMusic        !== 'undefined') playMusic(sfxPostgame);
+  // En campaña, precargar assets del modo siguiente (cities) mientras el usuario lee su score
+  if (window.campaign && window.campaign.active && typeof window.preloadNextModeAssets === 'function') {
+    window.preloadNextModeAssets('game');
+  }
 }
 // ─────────────────────────────────────────────────────────────────────────────
 

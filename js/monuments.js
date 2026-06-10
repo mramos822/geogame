@@ -368,18 +368,44 @@ document.getElementById('loading-play-btn').addEventListener('click', () => {
     document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check3.png');
     document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong3.png');
     const howtoVideoCity = document.querySelector('.splash-howtoplay-video');
-    if (howtoVideoCity) {
-      howtoVideoCity.pause();
-      howtoVideoCity.src = 'images/howtoplay/howtoplay3.mp4';
-      // iOS: diferir .load() para no picar memoria mientras shapes libera SVGs
-      setTimeout(() => { try { howtoVideoCity.load(); } catch (e) {} }, 600);
-    }
+    if (howtoVideoCity) { howtoVideoCity.pause(); howtoVideoCity.src = 'images/howtoplay/howtoplay3.mp4'; howtoVideoCity.load(); }
     const howtoTitleCity = document.querySelector('.splash-howtoplay-title');
     if (howtoTitleCity) howtoTitleCity.textContent = 'City Blitz';
     const label = document.querySelector('.splash-text2-label');
     if (label) { label.textContent = t('splash.cities.1'); label.classList.remove('step2'); }
   });
 });
+
+// ── PRELOAD PROACTIVO PARA TRANSICIONES DE CAMPAÑA ───────────────────────────
+// Se llama al mostrar el gameover del modo N para que los assets del modo N+1
+// lleguen al caché HTTP antes de que el usuario haga click en Confirm.
+window.preloadNextModeAssets = function (nextMode) {
+  const assetMap = {
+    game: [
+      'images/howtoplay/howtoplay3.mp4',
+      'images/bg/level3complete.png',
+      'images/check3.png',
+      'images/wrong3.png',
+    ],
+    monuments: [
+      'images/howtoplay/howtoplay4.mp4',
+      'images/bg/level4complete.png',
+      'images/bg/level4complete2.png',
+      'images/check4.png',
+      'images/wrong4.png',
+    ],
+  };
+  const list = assetMap[nextMode];
+  if (!list) return;
+  list.forEach(url => {
+    if (url.endsWith('.mp4')) {
+      fetch(url, { cache: 'force-cache' }).catch(() => {});
+    } else {
+      const img = new Image();
+      img.src = url;
+    }
+  });
+};
 
 // ── CAMPAÑA: 4 modos encadenados ─────────────────────────────────────────────
 window.campaign = {
@@ -2760,6 +2786,10 @@ function endGame() {
       const checksEndTime = (checksTotal > 0 ? (checksTotal - 1) * 0.1 + 0.2 : 0) + 0.4;
       buildWrongsRow(checksEndTime);
       playMusic(sfxPostgame);
+      // En campaña cities→monuments: precargar assets de monuments mientras el usuario lee su score
+      if (window.campaign && window.campaign.active && window.pendingGameMode === 'game' && typeof window.preloadNextModeAssets === 'function') {
+        window.preloadNextModeAssets('monuments');
+      }
     }, 1000);
   }, 400 + 1200);
 }
@@ -3013,13 +3043,11 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
       };
       // Esperar a que la carga inicial llegue al 100% antes de pasar al siguiente modo.
       // En flujo normal ya está lista; el poll actúa solo en redes muy lentas.
-      // iOS necesita ~400ms para liberar memoria del modo anterior antes de iniciar el siguiente
-      const _iosDelay = 400;
       if (window.__loadingReady) {
-        setTimeout(_fireNext, _iosDelay);
+        setTimeout(_fireNext, 0);
       } else {
         const _pollId = setInterval(() => {
-          if (window.__loadingReady) { clearInterval(_pollId); setTimeout(_fireNext, _iosDelay); }
+          if (window.__loadingReady) { clearInterval(_pollId); setTimeout(_fireNext, 0); }
         }, 100);
       }
     } else {
