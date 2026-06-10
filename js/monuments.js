@@ -2798,6 +2798,12 @@ function endGame() {
 
       cancelAnimationFrame(animFrameId);
       animFrameId = null;
+      // Liberar pixel buffers del canvas en iOS para reducir pico de memoria
+      // antes de que el siguiente modo empiece a decodificar sus assets.
+      if (IS_IOS) {
+        canvas.width = 1; canvas.height = 1;
+        badgeOverlay.width = 1; badgeOverlay.height = 1;
+      }
       gameWrapper.style.display = 'none';
       scoreDisplayEl.style.display = 'none';
       const cwHide = document.getElementById('countdown-widget');
@@ -2947,6 +2953,9 @@ function startGame() {
   clearInterval(timerIntervalId);
   if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
   canvas.style.pointerEvents = '';
+  // Restaurar tamaño del canvas si fue liberado en iOS al final de la ronda anterior.
+  if (canvas.width < DISPLAY_W) { canvas.width = DISPLAY_W; canvas.height = DISPLAY_H; }
+  if (badgeOverlay.width < DISPLAY_W) { badgeOverlay.width = DISPLAY_W; badgeOverlay.height = DISPLAY_H; }
 
   playMusic(null);
   splashScreen.style.display    = 'none';
