@@ -26,18 +26,17 @@
 
   const MB = b => (b / 1048576).toFixed(1);
   let peakTot = 0;
-  // Forense de crash: si la sesión anterior murió (crash de iOS), leemos lo último
-  // que registramos antes del reinicio. Se distingue de una recarga normal por la
-  // marca 'memdbg_alive': si quedó en '1', la pestaña no cerró limpio → fue crash.
+  // Forense de crash: SIEMPRE mostramos la última lectura de la sesión anterior.
+  // Como la app no recarga sola, cualquier reinicio = el crash de iOS, así que el
+  // último valor guardado es el de justo antes de morir la pestaña. (No usamos
+  // bandera de "salida limpia" porque iOS dispara pagehide hasta en los crashes.)
   let crashLine = '';
   try {
     const prev = JSON.parse(localStorage.getItem('memdbg_last') || 'null');
-    const dirty = localStorage.getItem('memdbg_alive') === '1';
-    if (prev && dirty) {
-      crashLine = `⚠ ANTES DEL CRASH:\n  TOT ${MB(prev.tot)} pico ${MB(prev.peak)}\n  modo ${prev.mode} (${prev.step})\n`;
+    if (prev) {
+      crashLine = `⚠ SESION ANTERIOR (antes del reinicio):\n  TOT ${MB(prev.tot)}  pico ${MB(prev.peak)}\n  modo ${prev.mode} ${prev.step}\n`;
     }
   } catch (e) {}
-  localStorage.setItem('memdbg_alive', '1');
   let lastT = performance.now();
   let frames = 0, fps = 0;
 
@@ -78,23 +77,18 @@
     // Persistir cada tick para forense de crash (sobrevive al reinicio de la pestaña).
     try { localStorage.setItem('memdbg_last', JSON.stringify({ tot, peak: peakTot, mode, step })); } catch (e) {}
 
-    box.textContent =
-      crashLine +
+    const live =
       `TOT ${MB(tot)} MB  (pico ${MB(peakTot)})\n` +
       `IMG ${MB(imgBytes)} MB  (${imgUniq} unicas, ${imgCount} tags, ${imgVis} vis)\n` +
       `CNV ${MB(cnvBytes)} MB  (${cnvCount})\n` +
       (heap != null ? `HEAP ${MB(heap)} MB (JS)\n` : `HEAP n/d (iOS no expone)\n`) +
       `FPS ${fps}   modo: ${mode} ${step}`;
+    box.innerHTML = (crashLine ? `<span style="color:#ffd24a">${crashLine}</span>` : '') + live;
   }
 
   // Muestreo rápido (120ms) para acercarnos al pico transitorio de la transición.
   setInterval(measure, 120);
   measure();
-
-  // Marcar cierre limpio (recarga/navegación) para distinguirlo de un crash.
-  const cleanExit = () => { try { localStorage.setItem('memdbg_alive', '0'); } catch (e) {} };
-  window.addEventListener('pagehide', cleanExit);
-  window.addEventListener('beforeunload', cleanExit);
 
   // Reset del pico con doble-tap en el overlay (por si querés medir una transición).
   let lastTap = 0;
