@@ -1681,10 +1681,9 @@ window.releaseGameMemory = function () {
       '.game-bg-city, .game-bg-men1, .game-bg-men2, .game-bg-girl1, .game-bg-girl2, ' +
       '.game-bg-women1, .game-bg-women2, .game-bg-check3, .game-bg-wrong3, #monument-img'
     ).forEach(el => { if (el && el.tagName === 'IMG') el.removeAttribute('src'); });
-    // Imágenes de rango en results/final (hasta 35 de ~2MB decodificados c/u).
-    document.querySelectorAll('#results-screen img, #final-screen img').forEach(el => {
-      if (el && el.tagName === 'IMG') el.removeAttribute('src');
-    });
+    // NO limpiar #results-screen / #final-screen img: sus src están en el HTML y no
+    // se re-asignan al mostrarse, así que limpiarlos dejaba results/final en blanco
+    // (sin imágenes ni botón de confirm). Los ranks son chicos, no vale romper eso.
     // Canvas: liberar el buffer de píxeles (GPU+CPU) reduciéndolo a 1px.
     if (typeof canvas !== 'undefined' && canvas) { canvas.width = 1; canvas.height = 1; }
     if (badgeOverlay) { badgeOverlay.width = 1; badgeOverlay.height = 1; }
