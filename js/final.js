@@ -85,7 +85,10 @@ function showFinalScreen() {
   const posEl = document.getElementById('final-position');
   if (posEl) posEl.textContent = pos;
 
-  buildFriendClouds(ranking, pos);
+  // Doble rAF: iOS batea display:block + transform en el mismo frame JS y el
+  // compositor ignora el transform hasta que hay un repaint externo. Deferir
+  // la construcción de nubes garantiza que el elemento ya está pintado.
+  requestAnimationFrame(() => requestAnimationFrame(() => buildFriendClouds(ranking, pos)));
 }
 
 // Genera un cloud5 por cada puesto en diagonal 2:1, dejando un hueco en mi puesto.
