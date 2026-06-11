@@ -4836,11 +4836,11 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   transform: translate(-50%, -50%);
   z-index: 5;
   font-family: 'Dimbo', sans-serif;
-  font-size: 7.13cqmin;
+  font-size: 5.70cqmin;
   color: #fff;
-  -webkit-text-stroke: 0.88cqmin #005fee;
+  -webkit-text-stroke: 0.70cqmin #005fee;
   paint-order: stroke fill;
-  letter-spacing: 0.55cqmin;
+  letter-spacing: 0.44cqmin;
   white-space: nowrap;
   pointer-events: none;
 }
@@ -4852,11 +4852,11 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   z-index: 5;
   font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
   font-weight: bold;
-  font-size: 4.61cqmin;
+  font-size: 3.69cqmin;
   color: #000;
-  -webkit-text-stroke: 0.33cqmin #fff;
+  -webkit-text-stroke: 0.26cqmin #fff;
   paint-order: stroke fill;
-  letter-spacing: -0.11cqmin;
+  letter-spacing: -0.09cqmin;
   white-space: nowrap;
   pointer-events: none;
 }
@@ -4868,9 +4868,9 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   z-index: 4;
   font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
   font-weight: bold;
-  font-size: 4.39cqmin;
+  font-size: 3.51cqmin;
   color: #FFFF00;
-  -webkit-text-stroke: 0.66cqmin #000080;
+  -webkit-text-stroke: 0.53cqmin #000080;
   paint-order: stroke fill;
   white-space: nowrap;
   pointer-events: none;
@@ -5034,7 +5034,7 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
 .final-player-name {
   position: absolute;
   top: 37%;
-  left: 50%;
+  left: 53%;
   transform: translate(-50%, -50%) scaleY(1.1);
   z-index: 5;
   font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
@@ -5080,7 +5080,7 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
 .final-avatar {
   position: absolute;
   top: 37%;
-  left: 43%;
+  left: 46%;
   transform: translate(-50%, -50%);
   width: 11.5cqmin;
   height: 11.5cqmin;
