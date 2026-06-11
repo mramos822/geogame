@@ -118,10 +118,8 @@ function buildFriendClouds(ranking, playerPos) {
     group.innerHTML =
       `<img class="final-cloud5" src="images/bg/cloud5.png" alt="" draggable="false" oncontextmenu="return false">` +
       `<span class="final2-position">${realPos}</span>` +
-      `<div class="final2-name-group">` +
-        `<div class="final2-avatar"><img class="final2-avatar-img" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false"></div>` +
-        `<span class="final2-player-name">${entry.name}</span>` +
-      `</div>` +
+      `<div class="final2-avatar"><img class="final2-avatar-img" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false"></div>` +
+      `<span class="final2-player-name">${entry.name}</span>` +
       `<span class="final2-rank-label" id="${labelId}">${rk ? rk.name : ''}</span>` +
       `<div class="final2-points-wrap">` +
         `<img class="final2-points-img" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">` +
@@ -146,16 +144,12 @@ function buildFriendClouds(ranking, playerPos) {
   const startX = endX + 240 * CQW;
   const startY = endY - 120 * CQW;
 
-  // Flush de layout antes del transform inicial.
-  void container.offsetHeight; // eslint-disable-line no-void
-
-  // translateZ(0) fuerza al container a tener su propia capa compositor en iOS.
-  // Sin esto, el container hereda la capa del #app-stage-outer (position:fixed)
-  // cuya posición Y puede estar desincronizada hasta que el browser recibe un
-  // resize/orientationchange. Con su propia capa, el transform se aplica de forma
-  // independiente y se ve correcto desde el primer frame.
+  // translateZ(0) crea su propia capa compositor en iOS — el transform se
+  // aplica independientemente del #app-stage-outer (position:fixed) cuya Y
+  // puede estar desincronizada al primer render.
+  // SIN void offsetHeight: ese reflow síncrono rompe la animación CSS de
+  // #final-group (final-group-enter) en iOS Safari, haciéndola saltar al to.
   container.style.transform = `translate(${startX}px, ${startY}px) translateZ(0)`;
-  void container.offsetHeight;
 
   const ANIM_DUR   = 7500;
   const ANIM_DELAY = 3000;

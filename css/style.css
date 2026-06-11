@@ -4845,8 +4845,10 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   pointer-events: none;
 }
 .final2-player-name {
-  position: relative;
-  transform: scaleY(1.1);
+  position: absolute;
+  top: 36%;
+  left: 53%;
+  transform: translate(-50%, -50%) scaleY(1.1);
   z-index: 5;
   font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
   font-weight: bold;
@@ -4873,26 +4875,18 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   white-space: nowrap;
   pointer-events: none;
 }
-.final2-name-group {
+.final2-avatar {
   position: absolute;
   top: 36%;
-  left: 46%;
+  left: 40%;
   transform: translate(-50%, -50%);
-  display: flex;
-  align-items: center;
-  gap: 0.66cqmin;
-  z-index: 5;
-  pointer-events: none;
-}
-.final2-avatar {
-  position: relative;
-  flex-shrink: 0;
   width: 11.5cqmin;
   height: 11.5cqmin;
   border-radius: 1.1cqmin;
   overflow: hidden;
   border: 0.77cqmin solid #4fc3f7;
   box-sizing: border-box;
+  z-index: 5;
 }
 .final2-avatar-img {
   width: 100%;
