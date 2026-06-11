@@ -128,7 +128,7 @@ function buildFriendClouds(ranking, playerPos) {
         `<span class="final2-points-score">${entry.score.toLocaleString()}</span>` +
       `</div>`;
     container.appendChild(group);
-    fitRankLabel(labelId, 39.5);
+    fitRankLabel(labelId, 31.6); // 39.5 / 1.25
     group.dataset.k = k;
     const cloudImg = group.querySelector('.final-cloud5');
     if (cloudImg) {
@@ -146,16 +146,16 @@ function buildFriendClouds(ranking, playerPos) {
   const startX = endX + 240 * CQW;
   const startY = endY - 120 * CQW;
 
-  // Forzar layout flush ANTES de setear el transform del container.
-  // En iOS, los transforms de los .final-group5 (seteados en el loop de arriba)
-  // y el transform inicial del container pueden quedar pendientes en el main
-  // thread sin que el compositor los reciba. void offsetHeight fuerza un
-  // layout síncrono que los commitea, asegurando que TODAS las nubes
-  // (pasadas y no-pasadas) aparezcan en su posición correcta desde el primer frame.
+  // Flush de layout antes del transform inicial.
   void container.offsetHeight; // eslint-disable-line no-void
 
-  container.style.transform = `translate(${startX}px, ${startY}px)`;
-  void container.offsetHeight; // commitear también el transform inicial del container
+  // translateZ(0) fuerza al container a tener su propia capa compositor en iOS.
+  // Sin esto, el container hereda la capa del #app-stage-outer (position:fixed)
+  // cuya posición Y puede estar desincronizada hasta que el browser recibe un
+  // resize/orientationchange. Con su propia capa, el transform se aplica de forma
+  // independiente y se ve correcto desde el primer frame.
+  container.style.transform = `translate(${startX}px, ${startY}px) translateZ(0)`;
+  void container.offsetHeight;
 
   const ANIM_DUR   = 7500;
   const ANIM_DELAY = 3000;
@@ -185,9 +185,10 @@ function buildFriendClouds(ranking, playerPos) {
   requestAnimationFrame(() => {
     const tid = setTimeout(() => {
       container.style.transition = `transform ${ANIM_DUR}ms ease-out`;
-      container.style.transform  = `translate(${endX}px, ${endY}px)`;
+      container.style.transform  = `translate(${endX}px, ${endY}px) translateZ(0)`;
       container.addEventListener('transitionend', () => {
         container.style.transition = '';
+        container.style.transform  = `translate(${endX}px, ${endY}px)`; // liberar capa Z
       }, { once: true });
       loopActive = true;
       requestAnimationFrame(loop);
