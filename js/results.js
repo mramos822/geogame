@@ -74,13 +74,13 @@ const RESULTS_FA_TIMELINE = [
 ];
 const resultsFaFrames = document.querySelectorAll('.results-flightatt');
 let resultsFaTimeout = null;
-// Decodificar todos los frames del DOM ahora para que el bitmap quede listo
-// en el pipeline de render antes de que empiece la animación.
-resultsFaFrames.forEach(img => { if (img.decode) img.decode().catch(() => {}); });
+// opacity:0 en lugar de visibility:hidden — mantiene la textura GPU residente
+// para que el cambio de frame sea instantáneo sin parpadeo en el primer loop.
+resultsFaFrames.forEach(img => { img.style.opacity = '0'; });
 
 function resultsFaShow(n) {
   resultsFaFrames.forEach(img => {
-    img.style.visibility = parseInt(img.dataset.frame) === n ? 'visible' : 'hidden';
+    img.style.opacity = parseInt(img.dataset.frame) === n ? '1' : '0';
   });
 }
 
