@@ -85,7 +85,18 @@ function showFinalScreen() {
   // Doble rAF: iOS batea display:block + transform en el mismo frame JS y el
   // compositor ignora el transform hasta que hay un repaint externo. Deferir
   // la construcción de nubes garantiza que el elemento ya está pintado.
-  requestAnimationFrame(() => requestAnimationFrame(() => buildFriendClouds(ranking, pos)));
+  // letterboxRefresh: en iOS, position:fixed puede tener Y incorrecto en el
+  // primer render. Recalcular --app-fit aquí (con viewport ya estabilizado)
+  // fuerza que el elemento fixed se reposicione antes de que las nubes aparezcan.
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (typeof window.letterboxRefresh === 'function') {
+      window.letterboxRefresh();
+      // Style-flush (no layout-flush): fuerza al browser a aplicar el CSS
+      // variable antes de que buildFriendClouds lea posiciones.
+      getComputedStyle(document.documentElement).getPropertyValue('--app-fit');
+    }
+    buildFriendClouds(ranking, pos);
+  }));
 }
 
 // Genera un cloud5 por cada puesto en diagonal 2:1, dejando un hueco en mi puesto.

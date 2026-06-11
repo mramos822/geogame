@@ -69,4 +69,8 @@
   }
   window.addEventListener('resize', update);
   window.addEventListener('orientationchange', update);
+  // Expuesto para que otras pantallas puedan forzar un re-cálculo del fit.
+  // En iOS Safari, position:fixed puede tener Y incorrecto en el primer render;
+  // llamar esto después de mostrar una pantalla fuerza la corrección.
+  window.letterboxRefresh = update;
 })();
