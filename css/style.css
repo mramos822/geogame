@@ -4836,9 +4836,9 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   transform: translate(-50%, -50%);
   z-index: 5;
   font-family: 'Dimbo', sans-serif;
-  font-size: 5.70cqmin;
+  font-size: 7.13cqmin;
   color: #fff;
-  -webkit-text-stroke: 0.70cqmin #005fee;
+  -webkit-text-stroke: 0.88cqmin #005fee;
   paint-order: stroke fill;
   letter-spacing: 0.55cqmin;
   white-space: nowrap;
@@ -4847,14 +4847,14 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
 .final2-player-name {
   position: absolute;
   top: 36%;
-  left: 53%;
+  left: 50%;
   transform: translate(-50%, -50%) scaleY(1.1);
   z-index: 5;
   font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
   font-weight: bold;
-  font-size: 3.69cqmin;
+  font-size: 4.61cqmin;
   color: #000;
-  -webkit-text-stroke: 0.26cqmin #fff;
+  -webkit-text-stroke: 0.33cqmin #fff;
   paint-order: stroke fill;
   letter-spacing: -0.11cqmin;
   white-space: nowrap;
@@ -4868,9 +4868,9 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   z-index: 4;
   font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
   font-weight: bold;
-  font-size: 3.51cqmin;
+  font-size: 4.39cqmin;
   color: #FFFF00;
-  -webkit-text-stroke: 0.53cqmin #000080;
+  -webkit-text-stroke: 0.66cqmin #000080;
   paint-order: stroke fill;
   white-space: nowrap;
   pointer-events: none;
@@ -4878,7 +4878,7 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
 .final2-avatar {
   position: absolute;
   top: 36%;
-  left: 40%;
+  left: 43%;
   transform: translate(-50%, -50%);
   width: 11.5cqmin;
   height: 11.5cqmin;
@@ -5032,8 +5032,10 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
 }
 
 .final-player-name {
-  position: relative;
-  transform: scaleY(1.1);
+  position: absolute;
+  top: 37%;
+  left: 50%;
+  transform: translate(-50%, -50%) scaleY(1.1);
   z-index: 5;
   font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
   font-size: 4.61cqmin;
@@ -5075,26 +5077,18 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   width: 30.7cqmin;
   height: auto;
 }
-.final-name-group {
+.final-avatar {
   position: absolute;
   top: 37%;
-  left: 50%;
+  left: 43%;
   transform: translate(-50%, -50%);
-  display: flex;
-  align-items: center;
-  gap: 0.88cqmin;
-  z-index: 5;
-  pointer-events: none;
-}
-.final-avatar {
-  position: relative;
-  flex-shrink: 0;
   width: 11.5cqmin;
   height: 11.5cqmin;
   border-radius: 1.1cqmin;
   overflow: hidden;
   border: 0.77cqmin solid #4fc3f7;
   box-sizing: border-box;
+  z-index: 5;
 }
 .final-avatar-img {
   width: 100%;

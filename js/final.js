@@ -53,14 +53,27 @@ function showFinalScreen() {
     nameEl.textContent = playerName;
     nameEl.style.fontSize = '';
     requestAnimationFrame(() => {
-      const group  = document.getElementById('final-group');
+      const avatarEl = document.querySelector('.final-avatar');
+      if (!avatarEl) return;
+      const group = document.getElementById('final-group');
       const groupW = group ? group.offsetWidth : (window.STAGE_W || window.innerWidth);
-      // Achica el nombre si es muy largo (avatar+nombre viven en flex row centrado)
-      const maxNameW = groupW * 0.40;
+      // Achica el nombre hasta que quepa en el 55% derecho de la nube
+      const maxNameW = groupW * 0.52;
       let fs = parseFloat(getComputedStyle(nameEl).fontSize);
       while (nameEl.scrollWidth > maxNameW && fs > 8) {
         fs -= 0.5;
         nameEl.style.fontSize = fs + 'px';
+      }
+      // Mueve la foto según cuánto se extiende el nombre a la izquierda
+      const avatarRect = avatarEl.getBoundingClientRect();
+      const nameRect   = nameEl.getBoundingClientRect();
+      const overlap    = avatarRect.right - nameRect.left + 4; // 4px de margen
+      if (overlap > 0) {
+        const pct = overlap / groupW * 100;
+        const cur = parseFloat(avatarEl.style.left) || 40;
+        avatarEl.style.left = Math.max(10, cur - pct) + '%';
+      } else {
+        avatarEl.style.left = '40%';
       }
     });
   }
@@ -118,15 +131,15 @@ function buildFriendClouds(ranking, playerPos) {
     group.innerHTML =
       `<img class="final-cloud5" src="images/bg/cloud5.png" alt="" draggable="false" oncontextmenu="return false">` +
       `<span class="final2-position">${realPos}</span>` +
-      `<div class="final2-avatar"><img class="final2-avatar-img" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false"></div>` +
       `<span class="final2-player-name">${entry.name}</span>` +
       `<span class="final2-rank-label" id="${labelId}">${rk ? rk.name : ''}</span>` +
+      `<div class="final2-avatar"><img class="final2-avatar-img" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false"></div>` +
       `<div class="final2-points-wrap">` +
         `<img class="final2-points-img" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">` +
         `<span class="final2-points-score">${entry.score.toLocaleString()}</span>` +
       `</div>`;
     container.appendChild(group);
-    fitRankLabel(labelId, 31.6); // 39.5 / 1.25
+    fitRankLabel(labelId, 39.5);
     group.dataset.k = k;
     const cloudImg = group.querySelector('.final-cloud5');
     if (cloudImg) {
@@ -144,12 +157,12 @@ function buildFriendClouds(ranking, playerPos) {
   const startX = endX + 240 * CQW;
   const startY = endY - 120 * CQW;
 
-  // translateZ(0) crea su propia capa compositor en iOS — el transform se
-  // aplica independientemente del #app-stage-outer (position:fixed) cuya Y
-  // puede estar desincronizada al primer render.
-  // SIN void offsetHeight: ese reflow síncrono rompe la animación CSS de
-  // #final-group (final-group-enter) en iOS Safari, haciéndola saltar al to.
-  container.style.transform = `translate(${startX}px, ${startY}px) translateZ(0)`;
+  // CSS transition en lugar de Web Animations API — en iOS el WAAPI pone el
+  // elemento bajo el compositor antes de que el layout del display:block esté
+  // comprometido, causando posición incorrecta. CSS transition + rAF es más
+  // confiable: el rAF garantiza que el transform inicial ya fue pintado antes
+  // de que se añada la transición.
+  container.style.transform = `translate(${startX}px, ${startY}px)`;
 
   const ANIM_DUR   = 7500;
   const ANIM_DELAY = 3000;
@@ -179,10 +192,9 @@ function buildFriendClouds(ranking, playerPos) {
   requestAnimationFrame(() => {
     const tid = setTimeout(() => {
       container.style.transition = `transform ${ANIM_DUR}ms ease-out`;
-      container.style.transform  = `translate(${endX}px, ${endY}px) translateZ(0)`;
+      container.style.transform  = `translate(${endX}px, ${endY}px)`;
       container.addEventListener('transitionend', () => {
         container.style.transition = '';
-        container.style.transform  = `translate(${endX}px, ${endY}px)`; // liberar capa Z
       }, { once: true });
       loopActive = true;
       requestAnimationFrame(loop);
