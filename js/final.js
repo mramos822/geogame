@@ -157,33 +157,16 @@ function buildFriendClouds(ranking, playerPos) {
   const startX = endX + 240 * CQW;
   const startY = endY - 120 * CQW;
 
-  // Setear la posición inicial directamente en el estilo — en iOS el compositor
-  // no aplica el from-keyframe durante el delay de fill:both, dejando el
-  // container en (0,0) hasta que la animación arranca. Así queda correcto
-  // desde el primer frame aunque la animación tarde 3s en empezar.
+  // CSS transition en lugar de Web Animations API — en iOS el WAAPI pone el
+  // elemento bajo el compositor antes de que el layout del display:block esté
+  // comprometido, causando posición incorrecta. CSS transition + rAF es más
+  // confiable: el rAF garantiza que el transform inicial ya fue pintado antes
+  // de que se añada la transición.
   container.style.transform = `translate(${startX}px, ${startY}px)`;
 
-  const anim = container.animate(
-    [
-      { transform: `translate(${startX}px, ${startY}px)` },
-      { transform: `translate(${endX}px, ${endY}px)` },
-    ],
-    { duration: 7500, delay: 3000, easing: 'ease-out', fill: 'forwards' }
-  );
-
-  // Poner gris las nubes que el container arrastra más allá del centro.
-  // No se usa getBoundingClientRect porque en iOS el compositor anima el
-  // container en un thread separado y getBCR devuelve la posición layout
-  // (pre-animación), causando marcado incorrecto. Se calcula la posición
-  // matemáticamente a partir del progreso de la animación.
-  //
-  // Cloud k cruza el centro cuando easeOut(f) == 1 - (playerK-k)*STEP_X/240.
-  // Solo nubes con k < playerK cruzan (las de k > playerK quedan a la derecha).
-  const groups = Array.from(container.querySelectorAll('.final-group5'));
-  let animRunning = true;
-  let animStartTime = null;
-  const ANIM_DUR = 7500;
+  const ANIM_DUR   = 7500;
   const ANIM_DELAY = 3000;
+  const groups = Array.from(container.querySelectorAll('.final-group5'));
   function easeOutQ(t) { return 1 - (1 - t) * (1 - t); }
   function checkPassMath(ep) {
     groups.forEach(g => {
@@ -194,20 +177,39 @@ function buildFriendClouds(ranking, playerPos) {
       if (ep >= threshold) g.classList.add('passed');
     });
   }
+
+  let loopActive = false;
+  let loopStart  = null;
   function loop(ts) {
-    if (!animStartTime) animStartTime = ts;
-    const f = Math.min(1, (ts - animStartTime) / ANIM_DUR);
+    if (!loopStart) loopStart = ts;
+    const f = Math.min(1, (ts - loopStart) / ANIM_DUR);
     checkPassMath(easeOutQ(f));
-    if (animRunning) requestAnimationFrame(loop);
+    if (f < 1 && loopActive) requestAnimationFrame(loop);
+    else checkPassMath(1);
   }
-  anim.addEventListener('finish', () => { animRunning = false; checkPassMath(1); });
-  setTimeout(() => requestAnimationFrame(loop), ANIM_DELAY);
+
+  // rAF para que iOS commitee el transform inicial antes de añadir la transición
+  requestAnimationFrame(() => {
+    const tid = setTimeout(() => {
+      container.style.transition = `transform ${ANIM_DUR}ms ease-out`;
+      container.style.transform  = `translate(${endX}px, ${endY}px)`;
+      container.addEventListener('transitionend', () => {
+        container.style.transition = '';
+      }, { once: true });
+      loopActive = true;
+      requestAnimationFrame(loop);
+    }, ANIM_DELAY);
+    // exponer para cleanup si se oculta el final antes de que acabe
+    container._animTid = tid;
+  });
 }
 
 function hideFinalScreen() {
   finalScreen.style.display = 'none';
   clearTimeout(finalBackTimeout);
   document.getElementById('final-confirm-back-wrap')?.classList.remove('visible');
+  const c = document.getElementById('final-clouds5');
+  if (c && c._animTid) { clearTimeout(c._animTid); c._animTid = null; }
 }
 
 document.getElementById('final-confirm-back-wrap')?.addEventListener('click', () => {
