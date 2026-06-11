@@ -632,13 +632,10 @@ function startFlagsRound() {
     if (typeof sfxError !== 'undefined') { sfxError.currentTime = 0; sfxError.play(); }
     const overlay = document.getElementById('flags-wrong-overlay');
     if (overlay) {
-      overlay.style.display = '';
       overlay.classList.remove('animate');
-      void overlay.offsetWidth;
-      overlay.classList.add('animate');
+      requestAnimationFrame(() => overlay.classList.add('animate'));
       setTimeout(() => {
         overlay.classList.remove('animate');
-        overlay.style.display = 'none';
         if (!flagsRunning) return;
         const allGroupIds = [...flagsTopGroupIds, ...flagsBottomGroupIds];
         allGroupIds.forEach(gid => {
@@ -757,48 +754,41 @@ function startFlagsRound() {
   // Apply six-mode layout before animations so positions are correct when luggages drop
   if (flagsSixUnlocked) flagsLuggageWrap.classList.add('flags-six-mode');
 
-  // Show/animate top groups; show bottom groups if medium unlocked
-  flagsTopGroupIds.forEach(id => {
+  // Preparar grupos: quitar animación previa, dejar listos pero sin iniciar
+  const activeGroupIds = flagsSixUnlocked
+    ? [...flagsTopGroupIds, ...flagsBottomGroupIds]
+    : flagsTopGroupIds;
+  activeGroupIds.forEach(id => {
     const group = document.getElementById(id);
     if (!group) return;
     group.style.display = '';
     group.style.pointerEvents = 'auto';
     group.style.cursor = 'pointer';
-    group.classList.remove('flags-faded');
-    group.classList.remove('luggage-enter-active');
-    void group.offsetWidth;
-    group.classList.add('luggage-enter-active');
+    group.classList.remove('flags-faded', 'luggage-enter-active');
   });
 
-  if (flagsSixUnlocked) {
-    flagsBottomGroupIds.forEach(id => {
-      const group = document.getElementById(id);
-      if (!group) return;
-      group.style.display = '';
-      group.style.pointerEvents = 'auto';
-      group.style.cursor = 'pointer';
-      group.classList.remove('flags-faded');
-      group.classList.remove('luggage-enter-active');
-      void group.offsetWidth;
-      group.classList.add('luggage-enter-active');
-    });
-  }
-
-  // Assign flags to slots
+  // Assign flags to slots — src ANTES de la animación para que iOS decodifique
+  const flagDecodes = [];
   flagsGroupIds.forEach((id, i) => {
     const imgId = flagsSlotImgIds[id];
     const img = document.getElementById(imgId);
     if (!img) return;
-    let country;
-    if (i === correctSlot) {
-      country = chosen;
-    } else {
-      const distIdx = i < correctSlot ? i : i - 1;
-      country = distractorPool[distIdx] || '';
-    }
+    const country = i === correctSlot ? chosen : (distractorPool[i < correctSlot ? i : i - 1] || '');
     img.src = COUNTRY_FLAGS[country] || '';
     img.style.display = 'block';
+    if (img.decode) flagDecodes.push(img.decode().catch(() => {}));
   });
+
+  // Arrancar la animación de caída DESPUÉS de que todas las banderas estén decodificadas.
+  // Promise.all + rAF garantiza que iOS ya tiene las texturas listas y que el browser
+  // commitió la remoción de luggage-enter-active (sin void offsetWidth).
+  Promise.all(flagDecodes).then(() => requestAnimationFrame(() => {
+    if (!flagsRunning) return;
+    activeGroupIds.forEach(id => {
+      const group = document.getElementById(id);
+      if (group) group.classList.add('luggage-enter-active');
+    });
+  }));
 
   flagsRoundStartTime = performance.now() + 200; // empieza a contar tras la animación de entrada
 
@@ -959,8 +949,7 @@ function startFlagsRound() {
         if (speedBonus > 0) {
           clearTimeout(flagsSpeedBonusHideId);
           flagsSpeedBonusText.classList.remove('visible');
-          void flagsSpeedBonusText.offsetWidth;
-          flagsSpeedBonusText.classList.add('visible');
+          requestAnimationFrame(() => flagsSpeedBonusText.classList.add('visible'));
           flagsSpeedBonusHideId = setTimeout(() => flagsSpeedBonusText.classList.remove('visible'), 1600);
         }
         if (badgeImg) showFlagsBadge(badgeImg, inRowBonus, flagsStreak);
@@ -972,13 +961,10 @@ function startFlagsRound() {
       }
       const overlay = document.getElementById(correct ? 'flags-check-overlay' : 'flags-wrong-overlay');
       if (overlay) {
-        overlay.style.display = '';
         overlay.classList.remove('animate');
-        void overlay.offsetWidth;
-        overlay.classList.add('animate');
+        requestAnimationFrame(() => overlay.classList.add('animate'));
         setTimeout(() => {
           overlay.classList.remove('animate');
-          overlay.style.display = 'none';
           if (!flagsRunning) return;
           // Hide all current groups
           const allGroupIds = [...flagsTopGroupIds, ...flagsBottomGroupIds];
@@ -1142,7 +1128,7 @@ function flagsHardReset() {
   flagsSpeedBonusText.classList.remove('visible');
   ['flags-check-overlay','flags-wrong-overlay'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) { el.classList.remove('animate'); el.style.display = 'none'; el.style.opacity = ''; }
+    if (el) { el.classList.remove('animate'); el.style.display = ''; el.style.opacity = ''; }
   });
   flagsBottomGroupIds.forEach(id => { const g = document.getElementById(id); if (g) g.style.display = 'none'; });
 }
