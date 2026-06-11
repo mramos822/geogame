@@ -858,8 +858,7 @@ function startFlagsRound() {
       flagsMachine2.style.animationPlayState  = 'paused';
       flagsMachine3.style.animationPlayState  = 'paused';
       flagsMachine3b.style.animationPlayState = 'paused';
-      void flagsFindLuggage.offsetWidth; // commit freeze al DOM/layout
-      flagsTapFindRect = flagsFindLuggage.getBoundingClientRect(); // exacto
+      flagsTapFindRect = flagsFindLuggage.getBoundingClientRect(); // getBCR fuerza layout — void offsetWidth innecesario
       // Diferir el trabajo pesado al siguiente frame: el browser pinta el estado
       // congelado inmediatamente y el main thread queda libre para el compositor.
       requestAnimationFrame(handleLuggagePick);
@@ -878,34 +877,29 @@ function startFlagsRound() {
       group.style.transition = 'none';
       group.style.transform  = 'none';
       group.style.transformOrigin = '0 0';
-      void group.offsetWidth; // reflow — group fijado en su posición base
-      // findluggage es el MOLDE (contorno) donde el maletín debe encajar: centrado
-      // y del MISMO tamaño. El <div> del grupo mide 0, así que medimos la imagen.
+      // getBCR fuerza layout y commitea el reset (sin void offsetWidth).
+      // Las medidas se calculan aquí; la transición se aplica en el siguiente rAF
+      // para que el browser haya pintado transform:none antes de arrancar la animación.
       const lugImg    = group.querySelector('#flags-luggage, .flags-luggage-side');
       const lugRect   = (lugImg || group).getBoundingClientRect();
-      const grpRect   = group.getBoundingClientRect();   // punto de origen (w0) del grupo
-      // Posición de findluggage CONGELADA en el toque (pointerdown) para que el lag
-      // de iOS no la deje correr en X; si no hubo pointerdown, leer al instante.
+      const grpRect   = group.getBoundingClientRect();
       const findRect  = flagsTapFindRect || flagsFindLuggage.getBoundingClientRect();
       flagsTapFindRect = null;
       const lugScale  = flagsLuggageWrap.getBoundingClientRect().width / 220;
-      // Escala para que el maletín iguale el tamaño de findluggage (≈1 en PC, donde
-      // ya coinciden; >1 en iOS donde el maletín salía algo más chico). Esto fuerza
-      // que la proporción maletín/molde sea idéntica en cualquier pantalla.
       const fit = lugRect.width ? (findRect.width / lugRect.width) : 1;
-      // Con transform-origin 0 0, el translate se calcula compensando el scale:
-      // centro escalado del maletín = fit·lugCenter + t  →  t = findCenter − fit·lugCenter.
-      // (todo en coords locales del grupo = screen/lugScale relativo a grpRect)
       const lugCx  = (lugRect.left + lugRect.width  / 2 - grpRect.left) / lugScale;
       const lugCy  = (lugRect.top  + lugRect.height / 2 - grpRect.top)  / lugScale;
       const findCx = (findRect.left + findRect.width  / 2 - grpRect.left) / lugScale;
       const findCy = (findRect.top  + findRect.height / 2 - grpRect.top)  / lugScale;
       let dx = findCx - fit * lugCx;
       let dy = findCy - fit * lugCy;
-      group.style.willChange = 'transform';                 // capa GPU (suaviza iOS)
+      group.style.willChange = 'transform';
       group.style.transformOrigin = '0 0';
-      group.style.transition = 'transform 0.1s linear';
-      group.style.transform  = `translate3d(${dx}px, ${dy}px, 0) scale(${fit})`;
+      // Siguiente frame: transform:none ya está pintado → la transition anima limpio
+      requestAnimationFrame(() => {
+        group.style.transition = 'transform 0.1s linear';
+        group.style.transform  = `translate3d(${dx}px, ${dy}px, 0) scale(${fit})`;
+      });
       flagsMachine2.style.animationPlayState = 'paused';
       flagsMachine3.style.animationPlayState = 'paused';
       flagsMachine3b.style.animationPlayState = 'paused';

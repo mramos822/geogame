@@ -3245,12 +3245,12 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
 
   const frames = document.querySelectorAll('#loading-screen .flightatt-loading');
   frames.forEach(img => {
-    img.style.visibility = img.dataset.frame === '1' ? 'visible' : 'hidden';
+    img.style.opacity = img.dataset.frame === '1' ? '1' : '0';
   });
 
   function showFrame(n) {
     frames.forEach(img => {
-      img.style.visibility = img.dataset.frame === String(n) ? 'visible' : 'hidden';
+      img.style.opacity = img.dataset.frame === String(n) ? '1' : '0';
     });
   }
 
@@ -3276,12 +3276,12 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
 
   const frames = document.querySelectorAll('#splash-screen .flightatt-splash');
   frames.forEach(img => {
-    img.style.visibility = img.dataset.frame === '1' ? 'visible' : 'hidden';
+    img.style.opacity = img.dataset.frame === '1' ? '1' : '0';
   });
 
   function showFrame(n) {
     frames.forEach(img => {
-      img.style.visibility = img.dataset.frame === String(n) ? 'visible' : 'hidden';
+      img.style.opacity = img.dataset.frame === String(n) ? '1' : '0';
     });
   }
 
@@ -3310,7 +3310,7 @@ let restartFlightAtt;
 
   frames.forEach(img => {
     const num = parseInt(img.src.match(/(\d+)\.png$/)[1]);
-    img.style.visibility = num === 1 ? 'visible' : 'hidden';
+    img.style.opacity = num === 1 ? '1' : '0';
   });
 
   let step = 0;
@@ -3326,7 +3326,7 @@ let restartFlightAtt;
   function showFrame(n) {
     frames.forEach(img => {
       const num = parseInt(img.src.match(/(\d+)\.png$/)[1]);
-      img.style.visibility = num === n ? 'visible' : 'hidden';
+      img.style.opacity = num === n ? '1' : '0';
     });
   }
 
