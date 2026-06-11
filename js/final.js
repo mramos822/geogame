@@ -65,7 +65,7 @@ function showFinalScreen() {
       }
       const avatarRect = avatarEl.getBoundingClientRect();
       const nameRect   = nameEl.getBoundingClientRect();
-      const GAP = 20; // px de separación entre foto y nombre
+      const GAP = 36; // px de separación entre foto y nombre
       const overlap = avatarRect.right - nameRect.left + GAP;
       if (overlap > 0) {
         const pct = overlap / groupW * 100;
