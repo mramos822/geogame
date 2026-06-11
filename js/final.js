@@ -154,12 +154,18 @@ function buildFriendClouds(ranking, playerPos) {
   const startX = endX + 240 * CQW;
   const startY = endY - 120 * CQW;
 
+  // Setear la posición inicial directamente en el estilo — en iOS el compositor
+  // no aplica el from-keyframe durante el delay de fill:both, dejando el
+  // container en (0,0) hasta que la animación arranca. Así queda correcto
+  // desde el primer frame aunque la animación tarde 3s en empezar.
+  container.style.transform = `translate(${startX}px, ${startY}px)`;
+
   const anim = container.animate(
     [
       { transform: `translate(${startX}px, ${startY}px)` },
       { transform: `translate(${endX}px, ${endY}px)` },
     ],
-    { duration: 7500, delay: 3000, easing: 'ease-out', fill: 'both' }
+    { duration: 7500, delay: 3000, easing: 'ease-out', fill: 'forwards' }
   );
 
   // Poner gris las nubes que el container arrastra más allá del centro.
