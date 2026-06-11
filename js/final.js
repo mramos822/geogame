@@ -94,8 +94,9 @@ function buildFriendClouds(ranking, playerPos) {
   const container = document.getElementById('final-clouds5');
   if (!container) return;
   container.innerHTML = '';
-  const STEP_X = 22;  // vw por puesto
-  const STEP_Y = -11; // vw por puesto (2:1)
+  const CQW = window.STAGE_W / 100; // 1cqw en px (19.2 en diseño 1920)
+  const STEP_X = 22 * CQW;  // px por puesto
+  const STEP_Y = -11 * CQW; // px por puesto (2:1)
   const playerName = localStorage.getItem('playerName') || 'John';
 
   // Ventana "top 11": yo + 5 por encima + 5 por debajo. En los bordes se
@@ -122,7 +123,7 @@ function buildFriendClouds(ranking, playerPos) {
 
     const group = document.createElement('div');
     group.className = 'final-group5';
-    group.style.transform = `translate(${k * STEP_X}cqw, ${k * STEP_Y}cqw) scale(0.9)`;
+    group.style.transform = `translate(${k * STEP_X}px, ${k * STEP_Y}px) scale(0.9)`;
 
     group.innerHTML =
       `<img class="final-cloud5" src="images/bg/cloud5.png" alt="" draggable="false" oncontextmenu="return false">` +
@@ -150,13 +151,13 @@ function buildFriendClouds(ranking, playerPos) {
   const playerK = N - localPlayerPos;
   const endX = -(playerK * STEP_X);
   const endY = -(playerK * STEP_Y);
-  const startX = endX + 240;
-  const startY = endY - 120;
+  const startX = endX + 240 * CQW;
+  const startY = endY - 120 * CQW;
 
   const anim = container.animate(
     [
-      { transform: `translate(${startX}cqw, ${startY}cqw)` },
-      { transform: `translate(${endX}cqw, ${endY}cqw)` },
+      { transform: `translate(${startX}px, ${startY}px)` },
+      { transform: `translate(${endX}px, ${endY}px)` },
     ],
     { duration: 7500, delay: 3000, easing: 'ease-out', fill: 'both' }
   );
@@ -180,7 +181,7 @@ function buildFriendClouds(ranking, playerPos) {
       if (g.classList.contains('passed')) return;
       const gk = parseInt(g.dataset.k);
       if (isNaN(gk) || gk >= playerK) return;
-      const threshold = 1 - (playerK - gk) * STEP_X / 240;
+      const threshold = 1 - (playerK - gk) * STEP_X / (240 * CQW);
       if (ep >= threshold) g.classList.add('passed');
     });
   }

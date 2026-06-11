@@ -11,7 +11,7 @@ document.addEventListener('contextmenu', e => {
   });
 });
 
-const FLAGS_GAME_DURATION = 60;
+const FLAGS_GAME_DURATION = window.GAME_DURATION;
 
 const flagsWrapper       = document.getElementById('flags-wrapper');
 const flagsScoreDisplay  = document.getElementById('flags-score-display');

@@ -3,7 +3,7 @@ const sfxLevel2 = new Audio('sfx/level2.mp3');
 if (typeof isMuted !== 'undefined' && isMuted) sfxLevel2.volume = 0;
 let shapesStreak = 0;
 let shapesRoundStartTime = null;
-let shapesTimeLeft = 60;
+let shapesTimeLeft = window.GAME_DURATION;
 let shapesTimerIntervalId = null;
 let shapesRunning = false;
 let shapesDots = 0;
@@ -820,7 +820,7 @@ function showShapesMode() {
 
   runShapesPregame(() => {
     if (typeof playMusic !== 'undefined') playMusic(sfxGameMusic);
-    shapesTimeLeft = 60;
+    shapesTimeLeft = window.GAME_DURATION;
     shapesRunning  = true;
 
     clearInterval(shapesTimerIntervalId);
