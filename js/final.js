@@ -53,27 +53,13 @@ function showFinalScreen() {
     nameEl.textContent = playerName;
     nameEl.style.fontSize = '';
     requestAnimationFrame(() => {
-      const avatarEl = document.querySelector('.final-avatar');
-      if (!avatarEl) return;
-      const group = document.getElementById('final-group');
+      const group  = document.getElementById('final-group');
       const groupW = group ? group.offsetWidth : (window.STAGE_W || window.innerWidth);
-      // Achica el nombre hasta que quepa en el 55% derecho de la nube
       const maxNameW = groupW * 0.52;
       let fs = parseFloat(getComputedStyle(nameEl).fontSize);
       while (nameEl.scrollWidth > maxNameW && fs > 8) {
         fs -= 0.5;
         nameEl.style.fontSize = fs + 'px';
-      }
-      // Mueve la foto según cuánto se extiende el nombre a la izquierda
-      const avatarRect = avatarEl.getBoundingClientRect();
-      const nameRect   = nameEl.getBoundingClientRect();
-      const overlap    = avatarRect.right - nameRect.left + 4; // 4px de margen
-      if (overlap > 0) {
-        const pct = overlap / groupW * 100;
-        const cur = parseFloat(avatarEl.style.left) || 45;
-        avatarEl.style.left = Math.max(10, cur - pct) + '%';
-      } else {
-        avatarEl.style.left = '45%';
       }
     });
   }
