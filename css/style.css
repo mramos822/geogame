@@ -4845,10 +4845,8 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   pointer-events: none;
 }
 .final2-player-name {
-  position: absolute;
-  top: 36%;
-  left: 50%;
-  transform: translate(-50%, -50%) scaleY(1.1);
+  position: relative;
+  transform: scaleY(1.1);
   z-index: 5;
   font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
   font-weight: bold;
@@ -4875,18 +4873,26 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   white-space: nowrap;
   pointer-events: none;
 }
-.final2-avatar {
+.final2-name-group {
   position: absolute;
   top: 36%;
-  left: 43%;
+  left: 50%;
   transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 0.66cqmin;
+  z-index: 5;
+  pointer-events: none;
+}
+.final2-avatar {
+  position: relative;
+  flex-shrink: 0;
   width: 11.5cqmin;
   height: 11.5cqmin;
   border-radius: 1.1cqmin;
   overflow: hidden;
   border: 0.77cqmin solid #4fc3f7;
   box-sizing: border-box;
-  z-index: 5;
 }
 .final2-avatar-img {
   width: 100%;
@@ -5032,10 +5038,8 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
 }
 
 .final-player-name {
-  position: absolute;
-  top: 37%;
-  left: 50%;
-  transform: translate(-50%, -50%) scaleY(1.1);
+  position: relative;
+  transform: scaleY(1.1);
   z-index: 5;
   font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
   font-size: 4.61cqmin;
@@ -5077,18 +5081,26 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   width: 30.7cqmin;
   height: auto;
 }
-.final-avatar {
+.final-name-group {
   position: absolute;
   top: 37%;
-  left: 43%;
+  left: 50%;
   transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 0.88cqmin;
+  z-index: 5;
+  pointer-events: none;
+}
+.final-avatar {
+  position: relative;
+  flex-shrink: 0;
   width: 11.5cqmin;
   height: 11.5cqmin;
   border-radius: 1.1cqmin;
   overflow: hidden;
   border: 0.77cqmin solid #4fc3f7;
   box-sizing: border-box;
-  z-index: 5;
 }
 .final-avatar-img {
   width: 100%;
