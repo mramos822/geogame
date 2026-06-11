@@ -4840,7 +4840,7 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   color: #fff;
   -webkit-text-stroke: 0.70cqmin #005fee;
   paint-order: stroke fill;
-  letter-spacing: 0.44cqmin;
+  letter-spacing: 0.55cqmin;
   white-space: nowrap;
   pointer-events: none;
 }
@@ -4856,7 +4856,7 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   color: #000;
   -webkit-text-stroke: 0.26cqmin #fff;
   paint-order: stroke fill;
-  letter-spacing: -0.09cqmin;
+  letter-spacing: -0.11cqmin;
   white-space: nowrap;
   pointer-events: none;
 }
