@@ -70,10 +70,10 @@ function showFinalScreen() {
       const overlap    = avatarRect.right - nameRect.left + 4; // 4px de margen
       if (overlap > 0) {
         const pct = overlap / groupW * 100;
-        const cur = parseFloat(avatarEl.style.left) || 49;
+        const cur = parseFloat(avatarEl.style.left) || 45;
         avatarEl.style.left = Math.max(10, cur - pct) + '%';
       } else {
-        avatarEl.style.left = '49%';
+        avatarEl.style.left = '45%';
       }
     });
   }
