@@ -1404,6 +1404,10 @@ function _subscribeFriendshipChanges(userId) {
   _friendshipsChannel = window.sb
     .channel('friendship-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, (payload) => {
+      // En DELETE events, payload.old puede ser {} si REPLICA IDENTITY no es FULL,
+      // imposibilitando verificar user IDs. Como ya filtramos por tabla, cualquier
+      // DELETE es potencialmente relevante — recargar siempre en ese caso.
+      if (payload.eventType === 'DELETE') { _debouncedLoadSocial(); return; }
       const row = (payload.new && payload.new.user_a) ? payload.new : (payload.old || {});
       if (row.user_a === userId || row.user_b === userId) _debouncedLoadSocial();
     })
