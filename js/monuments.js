@@ -1147,6 +1147,13 @@ if (window._sessionReady && window._sbUserId) _onSessionReady(window._sbUserId);
       accountPicWrap.addEventListener('mouseenter',  () => accountPicWrap.classList.add('pic-hover'));
       accountPicWrap.addEventListener('mouseleave',  () => accountPicWrap.classList.remove('pic-hover'));
     }
+    function _setAvatarUploading(on) {
+      const pencil  = document.getElementById('account-modal-pic-pencil');
+      const spinner = document.getElementById('account-modal-pic-spinner');
+      if (pencil)  pencil.style.display  = on ? 'none'  : '';
+      if (spinner) spinner.style.display = on ? 'block' : 'none';
+      accountPicWrap?.classList.toggle('pic-uploading', on);
+    }
     input.addEventListener('change', () => {
       const file = input.files[0];
       if (!file) return;
@@ -1154,6 +1161,7 @@ if (window._sessionReady && window._sbUserId) _onSessionReady(window._sbUserId);
         localStorage.setItem('profilePhoto', dataURL);
         applyStoredProfilePic();
         if (window._accountLoggedIn && window._sbUserId) {
+          _setAvatarUploading(true);
           try {
             const res  = await fetch(dataURL);
             const blob = await res.blob();
@@ -1162,6 +1170,7 @@ if (window._sessionReady && window._sbUserId) _onSessionReady(window._sbUserId);
             localStorage.setItem('profilePhoto', url);
             applyStoredProfilePic();
           } catch (e) { console.warn('[avatar] upload error:', e.message); }
+          finally { _setAvatarUploading(false); }
         }
       });
     });

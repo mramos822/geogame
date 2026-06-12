@@ -328,7 +328,10 @@
           <span class="account-modal-title" data-i18n="account.linkedTitle">Cuenta vinculada</span>
           <div class="account-modal-pic-wrap" id="account-modal-pic-wrap">
             <img class="account-modal-pic loading-profile-pic" id="account-modal-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
-            <div class="account-modal-pic-overlay">✎</div>
+            <div class="account-modal-pic-overlay" id="account-modal-pic-overlay">
+              <span id="account-modal-pic-pencil">✎</span>
+              <div class="account-spinner" id="account-modal-pic-spinner" style="display:none;width:2.2cqmin;height:2.2cqmin"></div>
+            </div>
           </div>
           <span class="account-linked-name" id="account-linked-name"></span>
           <div class="account-action-list">
@@ -610,7 +613,7 @@
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
     </div>
-    <div id="loading-version">Ver. 2.6.18</div>
+    <div id="loading-version">Ver. 2.6.19</div>
   </div>
 
   <div id="splash-screen" class="game-bg-screen" style="display:none">
