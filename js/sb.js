@@ -247,12 +247,40 @@ sb.auth.onAuthStateChange((event, session) => {
   if (event === 'PASSWORD_RECOVERY') _showRecoveryModal();
 });
 
-// Fallback: detectar type=recovery en hash o query params directamente
+// Fallback: detectar type=recovery o error en hash/query params
 (function() {
   const hash   = window.location.hash;
   const search = window.location.search;
   const isRecoveryHash  = hash.includes('type=recovery');
   const isRecoveryQuery = search.includes('type=recovery');
+  const isExpired = hash.includes('error_code=otp_expired') || search.includes('error_code=otp_expired')
+                 || hash.includes('error=access_denied')    || search.includes('error=access_denied');
+  if (isExpired) {
+    history.replaceState(null, '', window.location.pathname);
+    function showExpired() {
+      const popup = document.getElementById('expired-popup');
+      if (!popup) return;
+      if (typeof applyI18n === 'function') applyI18n(popup);
+      popup.classList.add('open');
+      document.getElementById('expired-ok-btn')?.addEventListener('click', () => {
+        popup.classList.remove('open');
+        const accountModal = document.getElementById('account-modal');
+        const viewLogin    = document.getElementById('account-view-login');
+        if (accountModal && viewLogin) {
+          document.querySelectorAll('#account-modal .account-view').forEach(el => { el.style.display = 'none'; });
+          viewLogin.style.display = 'flex';
+          accountModal.classList.add('open');
+        }
+      }, { once: true });
+    }
+    function waitAndShowExpired() {
+      if (window.__loadingReady) { showExpired(); return; }
+      setTimeout(waitAndShowExpired, 200);
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', waitAndShowExpired);
+    else waitAndShowExpired();
+    return;
+  }
   if (isRecoveryHash || isRecoveryQuery) {
     console.log('[auth] recovery detectado via URL:', hash || search);
     _showRecoveryModal();
