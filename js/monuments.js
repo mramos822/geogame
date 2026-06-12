@@ -1299,25 +1299,19 @@ function _subscribeFriendStatuses(friendIds) {
     .subscribe();
 }
 
-// Fallback poll cada 60s por si el WebSocket se corta
+// Poll cada 20s para detectar desconexiones (last_active deja de actualizarse,
+// no hay evento Realtime para eso)
 function _startSocialListPoll() {
   clearInterval(_socialListPollInterval);
-  _socialListPollInterval = setInterval(async () => {
-    if (!window._sbUserId || !socialData.friends.length) return;
-    try {
-      const ids = socialData.friends.map(f => f.id);
-      const { data } = await window.sb.from('profiles')
-        .select('id,last_active,is_playing').in('id', ids);
-      if (!data) return;
-      data.forEach(r => {
-        const f = socialData.friends.find(x => x.id === r.id);
-        if (!f) return;
-        f.last_active = r.last_active;
-        f.is_playing  = r.is_playing;
-        _patchFriendStatusInDOM(r.id);
-      });
-    } catch(e) {}
-  }, 60000);
+  _socialListPollInterval = setInterval(() => {
+    const panelOpen = !document.getElementById('loading-social-group')?.classList.contains('table-gone');
+    if (!panelOpen) return;
+    renderSocial(document.getElementById('loading-social-search-input')?.value || '');
+    // También actualizar panel de detalle si está abierto
+    if (typeof currentFriendProfile !== 'undefined' && currentFriendProfile) {
+      if (typeof _applyFriendPanelStatus === 'function') _applyFriendPanelStatus(currentFriendProfile);
+    }
+  }, 20000);
 }
 function _stopSocialListPoll() {
   clearInterval(_socialListPollInterval);
@@ -1447,6 +1441,7 @@ async function loadSocialData(showLoader = true) {
   renderSocial(document.getElementById('loading-social-search-input')?.value || '');
   updateSocialTabCounts();
   _subscribeFriendStatuses(socialData.friends.map(f => f.id));
+  _startSocialListPoll();
 }
 
 // Pinta la pestaña activa.
