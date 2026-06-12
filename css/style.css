@@ -2742,6 +2742,35 @@ body:not(.is-ios) #loading-screen.table-shown > .profile-account-wrap {
 .account-modal-opt:hover  { transform: scale(1.04); }
 .account-modal-opt:active { transform: scale(0.96); }
 
+.account-modal-link {
+  background: none;
+  border: none;
+  color: #a0c4ff;
+  font-size: 1.8cqmin;
+  cursor: pointer;
+  padding: 0.4cqmin 0;
+  text-decoration: underline;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  transition: opacity 0.15s;
+  align-self: center;
+  margin-top: 0.4cqmin;
+}
+.account-modal-link:hover { opacity: 0.75; }
+
+.account-modal-back {
+  background: none;
+  border: none;
+  color: #aaa;
+  font-size: 1.8cqmin;
+  cursor: pointer;
+  padding: 0.4cqmin 0;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  transition: opacity 0.15s;
+  align-self: center;
+  margin-top: 0.2cqmin;
+}
+.account-modal-back:hover { opacity: 0.75; }
+
 .account-modal-login {
   background: #2bd14b;
   border-color: #1c8a32;

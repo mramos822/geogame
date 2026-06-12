@@ -617,14 +617,17 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
   const viewChangeEmail    = document.getElementById('account-view-change-email');
   const viewChangeEmailSent  = document.getElementById('account-view-change-email-sent');
   const viewLogoutConfirm    = document.getElementById('account-view-logout-confirm');
+  const viewForgot           = document.getElementById('account-view-forgot');
+  const viewForgotSent       = document.getElementById('account-view-forgot-sent');
 
   const allViews = [viewMain, viewLogin, viewRegister, viewLoading, viewVerify, viewWelcome,
-                    viewLoggedIn, viewChangePass, viewChangePassOk, viewChangeEmail, viewChangeEmailSent, viewLogoutConfirm];
+                    viewLoggedIn, viewChangePass, viewChangePassOk, viewChangeEmail, viewChangeEmailSent, viewLogoutConfirm,
+                    viewForgot, viewForgotSent];
 
   const box = modal.querySelector('.account-modal-box');
   let currentView = null;
 
-  const noCloseViews = new Set([viewLoading, viewVerify, viewWelcome, viewChangeEmailSent]);
+  const noCloseViews = new Set([viewLoading, viewWelcome, viewChangeEmailSent, viewForgotSent]);
   // backMap: X button goes to parent view; null = close modal
   const backMap = new Map([
     [viewMain,            null],
@@ -635,6 +638,7 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
     [viewChangePassOk,    viewLoggedIn],
     [viewChangeEmail,     viewLoggedIn],
     [viewLogoutConfirm,   viewLoggedIn],
+    [viewForgot,          viewLogin],
   ]);
 
   function showView(v) {
@@ -674,7 +678,48 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
 
   document.getElementById('reg-verify-ok')?.addEventListener('click', () => {
     sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
-    closeModal();
+    showView(viewLogin);
+  });
+
+  document.getElementById('login-forgot-btn')?.addEventListener('click', () => {
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    const userEl = document.getElementById('forgot-user');
+    if (userEl) userEl.value = document.getElementById('login-user')?.value || '';
+    const errEl = document.getElementById('forgot-err-user');
+    if (errEl) errEl.textContent = '';
+    showView(viewForgot);
+  });
+
+  document.getElementById('forgot-back')?.addEventListener('click', () => {
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    showView(viewLogin);
+  });
+
+  document.getElementById('forgot-submit')?.addEventListener('click', async () => {
+    const userEl = document.getElementById('forgot-user');
+    const errEl  = document.getElementById('forgot-err-user');
+    const username = userEl?.value.trim() || '';
+    if (!username) { if (errEl) errEl.textContent = t('account.errLoginUser') || 'Ingresa tu usuario.'; return; }
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    showView(viewLoading);
+    try {
+      const { data: profile, error } = await window.sb.from('profiles').select('email').eq('username', username).single();
+      if (error || !profile?.email) {
+        showView(viewForgot);
+        if (errEl) errEl.textContent = t('account.errUserNotFound') || 'Este usuario no existe.';
+        return;
+      }
+      await window.sbResetPassword(profile.email);
+      showView(viewForgotSent);
+    } catch(e) {
+      showView(viewForgot);
+      if (errEl) errEl.textContent = e.message || 'Error al enviar.';
+    }
+  });
+
+  document.getElementById('forgot-sent-ok')?.addEventListener('click', () => {
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    showView(viewLogin);
   });
 
   document.getElementById('login-welcome-ok')?.addEventListener('click', () => {
@@ -836,6 +881,9 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
     ['chpass-current','chpass-new','chpass-confirm'].forEach(id => { const el = document.getElementById(id); if (el) { el.value = ''; el.classList.remove('input-error'); } });
     const wrap = document.getElementById('chpass-strength-wrap');
     if (wrap) wrap.style.display = 'none';
+    const currentWrap = document.getElementById('chpass-current-wrap');
+    if (currentWrap) currentWrap.style.display = '';
+    window._isPasswordReset = false;
     ['chpass-err-current','chpass-err-new','chpass-err-confirm'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = ''; });
     showView(viewChangePass);
   });
@@ -901,9 +949,12 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
     const errConf = document.getElementById('chpass-err-confirm');
     let ok = true;
     const setErr = (inp, el, msg) => { el.textContent = msg; inp.classList.toggle('input-error', !!msg); if (msg) ok = false; };
+    const isReset = !!window._isPasswordReset;
 
-    if (!curInp.value) setErr(curInp, errCur, t('account.errLoginUser'));
-    else setErr(curInp, errCur, '');
+    if (!isReset) {
+      if (!curInp.value) setErr(curInp, errCur, t('account.errLoginUser'));
+      else setErr(curInp, errCur, '');
+    }
 
     if (newInp.value.length < 6) setErr(newInp, errNew, t('account.errPassShort'));
     else setErr(newInp, errNew, '');
@@ -914,18 +965,27 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
     if (ok) {
       sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
       showView(viewLoading);
-      const username = (window._sbProfile?.username) || localStorage.getItem('playerName') || '';
-      window.sbLogin(username, curInp.value)
-        .then(() => window.sbChangePassword(newInp.value))
-        .then(() => showView(viewChangePassOk))
+      const doChange = () => window.sbChangePassword(newInp.value)
+        .then(() => { window._isPasswordReset = false; showView(viewChangePassOk); })
         .catch(err => {
           showView(viewChangePass);
-          if (err.message === '__wrong_password__' || err.message === '__user_not_found__') {
-            if (errCur) { errCur.textContent = t('account.errWrongPass'); curInp.classList.add('input-error'); }
-          } else {
-            if (errNew) errNew.textContent = err.message || t('account.errPassShort');
-          }
+          if (errNew) errNew.textContent = err.message || t('account.errPassShort');
         });
+      if (isReset) {
+        doChange();
+      } else {
+        const username = (window._sbProfile?.username) || localStorage.getItem('playerName') || '';
+        window.sbLogin(username, curInp.value)
+          .then(doChange)
+          .catch(err => {
+            showView(viewChangePass);
+            if (err.message === '__wrong_password__' || err.message === '__user_not_found__') {
+              if (errCur) { errCur.textContent = t('account.errWrongPass'); curInp.classList.add('input-error'); }
+            } else {
+              if (errNew) errNew.textContent = err.message || t('account.errPassShort');
+            }
+          });
+      }
     }
   });
 

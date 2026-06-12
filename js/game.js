@@ -1228,6 +1228,7 @@ function endGame() {
   state.phase = 'idle';
   canvas.style.pointerEvents = 'none';
   countdownImg.style.animationPlayState = 'paused';
+  if (typeof window._setPlaying === 'function') window._setPlaying(false);
 
   // Mostrar overlay timeup.png
   playMusic(null);

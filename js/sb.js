@@ -25,6 +25,13 @@ window.sbLogin = async function(username, password) {
   return data;
 };
 
+window.sbResetPassword = async function(email) {
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + window.location.pathname,
+  });
+  if (error) throw error;
+};
+
 window.sbChangePassword = async function(newPassword) {
   const { error } = await sb.auth.updateUser({ password: newPassword });
   if (error) throw error;
@@ -211,6 +218,27 @@ window.sbLoadSocialData = async function(userId) {
   const hash = window.location.hash;
   const isSignupVerify     = hash.includes('type=signup')       && hash.includes('access_token');
   const isEmailChange      = hash.includes('type=email_change') && hash.includes('access_token');
+  const isRecovery         = hash.includes('type=recovery')     && hash.includes('access_token');
+  if (isRecovery) {
+    history.replaceState(null, '', window.location.pathname);
+    function showRecoveryModal() {
+      const modal = document.getElementById('account-modal');
+      const viewChangePass = document.getElementById('account-view-change-pass');
+      if (!modal || !viewChangePass) return;
+      ['chpass-current','chpass-new','chpass-confirm'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+      document.querySelectorAll('[id^="chpass-err"]').forEach(el => { el.textContent = ''; });
+      const strengthWrap = document.getElementById('chpass-strength-wrap');
+      if (strengthWrap) strengthWrap.style.display = 'none';
+      const currentWrap = document.getElementById('chpass-current-wrap');
+      if (currentWrap) currentWrap.style.display = 'none';
+      document.querySelectorAll('#account-modal .account-view').forEach(el => { el.style.display = 'none'; });
+      viewChangePass.style.display = 'flex';
+      modal.classList.add('open');
+      window._isPasswordReset = true;
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', showRecoveryModal);
+    else setTimeout(showRecoveryModal, 300);
+  }
   if (isSignupVerify || isEmailChange) {
     history.replaceState(null, '', window.location.pathname);
     function showVerifiedPopup() {

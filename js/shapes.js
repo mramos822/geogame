@@ -839,6 +839,7 @@ function showShapesMode() {
       if (shapesTimeLeft <= 0) {
         clearInterval(shapesTimerIntervalId);
         shapesRunning = false;
+        if (typeof window._setPlaying === 'function') window._setPlaying(false);
         clearTimeout(shapesTagsTimeout); shapesTagsTimeout = null;
         document.querySelectorAll('.shapes-tag').forEach(el => { el.style.cursor = 'default'; el.style.pointerEvents = 'none'; });
         document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
@@ -945,6 +946,7 @@ function hideShapesMode() {
 
 document.getElementById('loading-shapes-btn').addEventListener('click', () => {
   if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+  if (typeof window._setPlaying === 'function') window._setPlaying(true);
   if (typeof loadGameSFX !== 'undefined') loadGameSFX();
   window.pendingGameMode = 'shapes';
   window.resetSplashEntry?.();
@@ -990,6 +992,7 @@ document.getElementById('loading-mode4-btn').addEventListener('mouseenter', () =
 
 document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+  if (typeof window._setPlaying === 'function') window._setPlaying(true);
   if (typeof loadGameSFX !== 'undefined') loadGameSFX();
   window.pendingGameMode = 'monuments';
   window.resetSplashEntry?.();
