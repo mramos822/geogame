@@ -2895,11 +2895,11 @@ body.account-logged .loading-name-edit {
 /* ── ACCOUNT LOGGED-IN VIEWS ────────────────────────── */
 .account-modal-pic-wrap {
   position: relative;
-  width: 11cqmin;
-  height: 11cqmin;
+  width: 7cqmin;
+  height: 7cqmin;
   border-radius: 50%;
   overflow: hidden;
-  border: 0.6cqmin solid #fff;
+  border: 0.5cqmin solid #c8a800;
   cursor: pointer;
   flex-shrink: 0;
 }
@@ -2908,17 +2908,19 @@ body.account-logged .loading-name-edit {
   height: 100%;
   object-fit: cover;
   display: block;
-  pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;
+  position: relative;
+  z-index: 0;
 }
 .account-modal-pic-overlay {
   position: absolute;
   inset: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 4cqmin;
+  font-size: 2.8cqmin;
   color: #fff;
   background: rgba(0,0,0,0);
   opacity: 0;
@@ -2927,7 +2929,7 @@ body.account-logged .loading-name-edit {
 }
 .account-modal-pic-wrap:hover .account-modal-pic-overlay {
   opacity: 1;
-  background: rgba(0,0,0,0.45);
+  background: rgba(0,0,0,0.5);
 }
 
 .account-linked-name {
