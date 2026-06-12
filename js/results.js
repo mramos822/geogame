@@ -72,53 +72,50 @@ const RESULTS_FA_TIMELINE = [
   [11,100],[12,100],[11,100],[12,100],[11,100],[12,100],[13,100],[14,100],[15,100],
   [6,100],[5,100],[4,100],[3,100],[2,100],
 ];
-const resultsFaFrames = document.querySelectorAll('.results-flightatt');
+// Un único <img> + swap de src: sin flash al mostrarse la pantalla.
+const _resultsFaBase = 'images/characters/flightattpost/';
+const _resultsFaSrcs = Array.from({length: 15}, (_, i) => _resultsFaBase + (i + 1) + '.png');
+const resultsFaImg   = document.querySelector('.results-flightatt');
 let resultsFaTimeout = null;
-// opacity:0 en lugar de visibility:hidden — mantiene la textura GPU residente
-// para que el cambio de frame sea instantáneo sin parpadeo en el primer loop.
-resultsFaFrames.forEach(img => { img.style.opacity = '0'; });
+// Pre-decodificar frames 2-15 en background
+_resultsFaSrcs.forEach((src, i) => {
+  if (i > 0) { const m = new Image(); m.src = src; if (m.decode) m.decode().catch(() => {}); }
+});
 
 function resultsFaShow(n) {
-  resultsFaFrames.forEach(img => {
-    img.style.opacity = parseInt(img.dataset.frame) === n ? '1' : '0';
-  });
+  if (resultsFaImg) resultsFaImg.src = _resultsFaSrcs[n - 1];
 }
 
 function startResultsFlightAtt() {
   clearTimeout(resultsFaTimeout);
-  // iOS no decodifica frames con visibility:hidden hasta que se muestran → flash.
-  // Forzamos decode de todos antes de arrancar.
-  const decodes = [...resultsFaFrames].map(img => img.decode ? img.decode().catch(() => {}) : Promise.resolve());
-  Promise.all(decodes).then(() => {
-    resultsFaShow(1);
-    document.querySelectorAll('.results-flightatt').forEach(el => el.classList.add('active'));
-    const rank = getRank(resultsScreen._total || 0);
-    const descEl = document.getElementById('results-rank-desc');
-    if (descEl) descEl.textContent = rank.desc || '';
-    document.querySelector('.results-text3-wrap')?.classList.add('active');
-    let step = 0;
-    function tick() {
-      const [f, d] = RESULTS_FA_TIMELINE[step];
-      resultsFaShow(f);
-      step++;
-      if (step >= RESULTS_FA_TIMELINE.length) {
-        step = 0;
-        resultsFaTimeout = setTimeout(() => {
-          resultsFaShow(RESULTS_FA_TIMELINE[0][0]);
-          step = 1;
-          resultsFaTimeout = setTimeout(tick, 1500);
-        }, d);
-      } else {
-        resultsFaTimeout = setTimeout(tick, d);
-      }
+  resultsFaShow(1);
+  if (resultsFaImg) resultsFaImg.classList.add('active');
+  const rank = getRank(resultsScreen._total || 0);
+  const descEl = document.getElementById('results-rank-desc');
+  if (descEl) descEl.textContent = rank.desc || '';
+  document.querySelector('.results-text3-wrap')?.classList.add('active');
+  let step = 0;
+  function tick() {
+    const [f, d] = RESULTS_FA_TIMELINE[step];
+    resultsFaShow(f);
+    step++;
+    if (step >= RESULTS_FA_TIMELINE.length) {
+      step = 0;
+      resultsFaTimeout = setTimeout(() => {
+        resultsFaShow(RESULTS_FA_TIMELINE[0][0]);
+        step = 1;
+        resultsFaTimeout = setTimeout(tick, 1500);
+      }, d);
+    } else {
+      resultsFaTimeout = setTimeout(tick, d);
     }
-    resultsFaTimeout = setTimeout(tick, RESULTS_FA_TIMELINE[0][1]);
-  });
+  }
+  resultsFaTimeout = setTimeout(tick, RESULTS_FA_TIMELINE[0][1]);
 }
 
 function stopResultsFlightAtt() {
   clearTimeout(resultsFaTimeout);
-  document.querySelectorAll('.results-flightatt').forEach(el => el.classList.remove('active'));
+  if (resultsFaImg) resultsFaImg.classList.remove('active');
   document.querySelector('.results-text3-wrap')?.classList.remove('active');
   const descEl2 = document.getElementById('results-rank-desc');
   if (descEl2) descEl2.textContent = '';
