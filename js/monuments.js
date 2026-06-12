@@ -1839,7 +1839,6 @@ function _optimisticRelUpdate(action, fp) {
   updateSocialTabCounts();
   if (!document.getElementById('loading-blocked-group')?.classList.contains('table-gone')) renderBlockedList();
   if (!document.getElementById('loading-sent-group')?.classList.contains('table-gone'))    renderSentList();
-  setTimeout(() => loadSocialData(false), 800); // delay para que el servidor procese antes de re-fetch
 }
 
 // Botón del medio: añadir / aceptar / cancelar / borrar amigo.
@@ -1854,27 +1853,32 @@ document.getElementById('loading-friend-rel')?.addEventListener('click', () => {
       const favs = getSocialFavs(); favs.delete(fp.id); saveSocialFavs(favs);
       _optimisticRelUpdate('remove', fp);
       window.sbDeleteFriendship(fp.friendshipId)
-        .catch(e => console.warn('[social] removeFriend:', e));
+        .then(() => loadSocialData(false))
+        .catch(e => { console.warn('[social] removeFriend:', e); loadSocialData(false); });
     });
   } else if (status === 'request') {
     showFriendConfirm(t('confirm.acceptRequest', { name: fp.name }), () => {
       _optimisticRelUpdate('accept', fp);
       window.sbAcceptRequest(fp.friendshipId)
-        .catch(e => console.warn('[social] acceptRequest:', e));
+        .then(() => loadSocialData(false))
+        .catch(e => { console.warn('[social] acceptRequest:', e); loadSocialData(false); });
     }, true, () => {
       _optimisticRelUpdate('reject', fp);
       window.sbDeleteFriendship(fp.friendshipId)
-        .catch(e => console.warn('[social] rejectRequest:', e));
+        .then(() => loadSocialData(false))
+        .catch(e => { console.warn('[social] rejectRequest:', e); loadSocialData(false); });
     });
   } else if (status === 'sent') {
     showFriendConfirm(t('confirm.cancelSent', { name: fp.name }), () => {
       _optimisticRelUpdate('cancel', fp);
       window.sbDeleteFriendship(fp.friendshipId)
-        .catch(e => console.warn('[social] cancelSent:', e));
+        .then(() => loadSocialData(false))
+        .catch(e => { console.warn('[social] cancelSent:', e); loadSocialData(false); });
     });
   } else {
     _optimisticRelUpdate('send', fp);
     window.sbSendFriendRequest(window._sbUserId, fp.name)
+      .then(() => loadSocialData(false))
       .catch(e => { console.warn('[social] sendRequest:', e); loadSocialData(false); _showFriendPanelError(); });
   }
 });
@@ -1889,14 +1893,16 @@ document.getElementById('loading-friend-block')?.addEventListener('click', () =>
     showFriendConfirm(t('confirm.unblock', { name: fp.name }), () => {
       _optimisticRelUpdate('unblock', fp);
       window.sbDeleteFriendship(fp.friendshipId)
-        .catch(e => console.warn('[social] unblock:', e));
+        .then(() => loadSocialData(false))
+        .catch(e => { console.warn('[social] unblock:', e); loadSocialData(false); });
     });
   } else {
     showFriendConfirm(t('confirm.block', { name: fp.name }), () => {
       const favs = getSocialFavs(); favs.delete(fp.id); saveSocialFavs(favs);
       _optimisticRelUpdate('block', fp);
       window.sbBlockUser(window._sbUserId, fp.id, fp.friendshipId)
-        .catch(e => console.warn('[social] block:', e));
+        .then(() => loadSocialData(false))
+        .catch(e => { console.warn('[social] block:', e); loadSocialData(false); });
     });
   }
 });
