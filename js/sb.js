@@ -215,11 +215,14 @@ window.sbLoadSocialData = async function(userId) {
 // Mostrar modal de nueva contraseña (recovery link)
 function _showRecoveryModal() {
   history.replaceState(null, '', window.location.pathname);
+  window._isPasswordReset = true;
   function show() {
     const modal = document.getElementById('account-modal');
     const viewChangePass = document.getElementById('account-view-change-pass');
     if (!modal || !viewChangePass) return;
-    ['chpass-current','chpass-new','chpass-confirm'].forEach(id => { const el = document.getElementById(id); if (el) { el.value = ''; el.classList.remove('input-error'); } });
+    ['chpass-current','chpass-new','chpass-confirm'].forEach(id => {
+      const el = document.getElementById(id); if (el) { el.value = ''; el.classList.remove('input-error'); }
+    });
     document.querySelectorAll('[id^="chpass-err"]').forEach(el => { el.textContent = ''; });
     const strengthWrap = document.getElementById('chpass-strength-wrap');
     if (strengthWrap) strengthWrap.style.display = 'none';
@@ -228,10 +231,14 @@ function _showRecoveryModal() {
     document.querySelectorAll('#account-modal .account-view').forEach(el => { el.style.display = 'none'; });
     viewChangePass.style.display = 'flex';
     modal.classList.add('open');
-    window._isPasswordReset = true;
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', show);
-  else setTimeout(show, 300);
+  // Esperar a que el preloader termine (window.__loadingReady) antes de abrir el modal
+  function waitAndShow() {
+    if (window.__loadingReady) { show(); return; }
+    setTimeout(waitAndShow, 200);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', waitAndShow);
+  else waitAndShow();
 }
 
 // Supabase v2: PASSWORD_RECOVERY event es la forma correcta de detectar reset links
