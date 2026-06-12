@@ -269,7 +269,7 @@ function showCountryShape(country, ext1, ext2, startDelay) {
   requestAnimationFrame(() => requestAnimationFrame(() => { flash.style.opacity = '0'; }));
   setTimeout(() => { flash.remove(); }, 600);
   sfxLevel2.currentTime = 0;
-  sfxLevel2.play();
+  sfxPlay(sfxLevel2);
 
   tagConfigs.forEach((cfg, i) => {
     const isCorrect = (i === correctIdx);
@@ -300,7 +300,7 @@ function showCountryShape(country, ext1, ext2, startDelay) {
       if (anyClicked || !shapesRunning) return;
       tagImg.src = 'images/tag2yellow.png';
       tag.style.transform = base + ' scale(1.1)';
-      if (typeof sfxSelect !== 'undefined') { sfxSelect.currentTime = 0; sfxSelect.play(); }
+      if (typeof sfxSelect !== 'undefined') { sfxSelect.currentTime = 0; sfxPlay(sfxSelect); }
     });
     tag.addEventListener('mouseleave', () => {
       if (anyClicked || !shapesRunning) return;
@@ -347,7 +347,7 @@ function showCountryShape(country, ext1, ext2, startDelay) {
         shapesAnsweredSet.add(country);
         shapesCorrectCount++;
         shapesStreak++;
-        if (sfxAcertar) { sfxAcertar.currentTime = 0; sfxAcertar.play(); }
+        if (sfxAcertar) { sfxAcertar.currentTime = 0; sfxPlay(sfxAcertar); }
         const pts        = typeof getFlagsRoundPoints !== 'undefined' ? getFlagsRoundPoints(shapesCorrectCount) : 10;
         const badgeImg   = typeof getBadgeImg         !== 'undefined' ? getBadgeImg(shapesStreak)         : null;
         const inRowBonus = typeof getInRowBonus       !== 'undefined' ? getInRowBonus(shapesStreak)       : 0;
@@ -405,7 +405,7 @@ function showCountryShape(country, ext1, ext2, startDelay) {
         shapesWrongCooldown.set(country, 5);
         shapesWrongAnswerCount++;
         shapesStreak = 0;
-        if (sfxError) { sfxError.currentTime = 0; sfxError.play(); }
+        if (sfxError) { sfxError.currentTime = 0; sfxPlay(sfxError); }
       }
       tagEls.forEach(t => { t.style.pointerEvents = 'none'; t.style.cursor = 'default'; });
       setTimeout(() => {
@@ -723,7 +723,7 @@ function runShapesPregame(onDone) {
   const img = document.getElementById('pregame-countdown-img');
   if (!el || !img) { onDone(); return; }
   el.style.display = 'flex';
-  if (typeof sfxCountdown !== 'undefined') { sfxCountdown.currentTime = 0; sfxCountdown.play(); }
+  if (typeof sfxCountdown !== 'undefined') { sfxCountdown.currentTime = 0; sfxPlay(sfxCountdown); }
   let step = 0;
   function showStep() {
     if (shapesAborted) return; // se abandonó durante el 3-2-1
@@ -832,7 +832,7 @@ function showShapesMode() {
       if (shapesTimeLeft <= 10) {
         if (tEl)  tEl.style.color = '#ffffff';
         if (tImg) tImg.src = 'images/countdownred3.png';
-        if (shapesTimeLeft > 0 && typeof sfxTickdown !== 'undefined') { sfxTickdown.currentTime = 0; sfxTickdown.play(); }
+        if (shapesTimeLeft > 0 && typeof sfxTickdown !== 'undefined') { sfxTickdown.currentTime = 0; sfxPlay(sfxTickdown); }
       } else {
         if (tEl) tEl.style.color = '';
       }
@@ -851,7 +851,7 @@ function showShapesMode() {
         if (shapesCurrentImg2) { shapesCurrentImg2.style.transition = 'none'; }
         if (shapesCurrentClip) { const f = getComputedStyle(shapesCurrentClip).opacity;   shapesCurrentClip.style.transition = 'none'; shapesCurrentClip.style.opacity   = f; }
         if (tImg) tImg.style.animationPlayState = 'paused';
-        if (typeof sfxTimesUp !== 'undefined') { sfxTimesUp.currentTime = 0; sfxTimesUp.play(); }
+        if (typeof sfxTimesUp !== 'undefined') { sfxTimesUp.currentTime = 0; sfxPlay(sfxTimesUp); }
         if (typeof playMusic  !== 'undefined') playMusic(null);
         const timeupEl = document.getElementById('timeup-overlay');
         if (timeupEl) {
@@ -944,7 +944,7 @@ function hideShapesMode() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 document.getElementById('loading-shapes-btn').addEventListener('click', () => {
-  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.play(); }
+  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
   if (typeof loadGameSFX !== 'undefined') loadGameSFX();
   window.pendingGameMode = 'shapes';
   window.resetSplashEntry?.();
@@ -980,16 +980,16 @@ document.getElementById('loading-shapes-btn').addEventListener('click', () => {
 });
 
 document.getElementById('loading-shapes-btn').addEventListener('mouseenter', () => {
-  if (typeof sfxSelect !== 'undefined') { sfxSelect.currentTime = 0; sfxSelect.play(); }
+  if (typeof sfxSelect !== 'undefined') { sfxSelect.currentTime = 0; sfxPlay(sfxSelect); }
 });
 
 // ── MODO MONUMENTOS (placeholder) ────────────────────────────────────────────
 document.getElementById('loading-mode4-btn').addEventListener('mouseenter', () => {
-  if (typeof sfxSelect !== 'undefined') { sfxSelect.currentTime = 0; sfxSelect.play(); }
+  if (typeof sfxSelect !== 'undefined') { sfxSelect.currentTime = 0; sfxPlay(sfxSelect); }
 });
 
 document.getElementById('loading-mode4-btn').addEventListener('click', () => {
-  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.play(); }
+  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
   if (typeof loadGameSFX !== 'undefined') loadGameSFX();
   window.pendingGameMode = 'monuments';
   window.resetSplashEntry?.();

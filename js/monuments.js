@@ -404,11 +404,11 @@ if (IS_IOS) {
 }
 
 document.getElementById('loading-play-btn').addEventListener('mouseenter', () => {
-  sfxSelect.currentTime = 0; sfxSelect.play();
+  sfxSelect.currentTime = 0; sfxPlay(sfxSelect);
 });
 
 document.getElementById('loading-play-btn').addEventListener('click', () => {
-  sfxCheck.currentTime = 0; sfxCheck.play();
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   window.pendingGameMode = 'game';
   window.resetSplashEntry?.();
   // Transición visual inmediata — ocultar loading y mostrar splash en este frame
@@ -506,7 +506,7 @@ window.campaignBase = function () {
 };
 
 document.getElementById('loading-play-single')?.addEventListener('click', () => {
-  sfxCheck.currentTime = 0; sfxCheck.play();
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   window.campaign.active = true;
   window.campaign.idx = 0;
   window.campaign.base = 0;
@@ -516,7 +516,7 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
 });
 
 document.getElementById('loading-play-confirm-wrap')?.addEventListener('click', () => {
-  sfxCheck.currentTime = 0; sfxCheck.play();
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   const wrap = document.getElementById('loading-play-confirm-wrap');
   wrap.classList.add('confirm-pressed');
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
@@ -527,7 +527,7 @@ document.getElementById('loading-play-confirm-wrap')?.addEventListener('click', 
 });
 
 document.getElementById('loading-name-edit')?.addEventListener('click', () => {
-  sfxCheck.currentTime = 0; sfxCheck.play();
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   const wrap  = document.getElementById('loading-name-wrap');
   const input = document.getElementById('loading-name-input');
   input.value = localStorage.getItem('playerName') || 'John';
@@ -550,7 +550,7 @@ function confirmNameChange() {
 }
 
 document.getElementById('loading-name-confirm')?.addEventListener('click', () => {
-  sfxCheck.currentTime = 0; sfxCheck.play();
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   const c = document.getElementById('loading-name-confirm');
   c.classList.add('confirm-pressed');
   setTimeout(() => c.classList.remove('confirm-pressed'), 50);
@@ -661,7 +661,7 @@ applyStoredProfilePic();
       if (el) el.textContent = limpio;
       maybeAutoAssignPic(limpio);
       if (typeof refreshProfileStats === 'function') refreshProfileStats();
-      try { sfxCheck.currentTime = 0; sfxCheck.play(); } catch (e) {}
+      try { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); } catch (e) {}
       prompt.classList.remove('visible');
       showWelcomePopup(limpio);
     }
@@ -688,7 +688,7 @@ function showWelcomePopup(nombre) {
   popup.classList.add('visible');
   if (confirmW) {
     const onClick = () => {
-      try { sfxCheck.currentTime = 0; sfxCheck.play(); } catch (e) {}
+      try { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); } catch (e) {}
       confirmW.classList.add('confirm-pressed');
       setTimeout(() => {
         confirmW.classList.remove('confirm-pressed');
@@ -701,19 +701,19 @@ function showWelcomePopup(nombre) {
 }
 
 document.getElementById('loading-profile-btn')?.addEventListener('click', () => {
-  sfxCheck.currentTime = 0; sfxCheck.play();
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   document.getElementById('loading-table-group')?.classList.remove('table-gone');
   document.getElementById('loading-screen').classList.add('table-shown');
 });
 
 document.getElementById('loading-social-btn')?.addEventListener('click', () => {
-  sfxCheck.currentTime = 0; sfxCheck.play();
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   document.getElementById('loading-social-group')?.classList.remove('table-gone');
   document.getElementById('loading-screen').classList.add('table-shown');
 });
 
 document.getElementById('loading-social-back-wrap')?.addEventListener('click', () => {
-  sfxCheck.currentTime = 0; sfxCheck.play();
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   const wrap = document.getElementById('loading-social-back-wrap');
   wrap.classList.add('confirm-pressed');
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
@@ -819,7 +819,7 @@ function renderSocialRequests(filter = '') {
 
 // Acepta (suma a amigos) o rechaza una solicitud y refresca la lista.
 function respondRequest(friend, accepted) {
-  sfxCheck.currentTime = 0; sfxCheck.play();
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   SOCIAL_REQUESTS = SOCIAL_REQUESTS.filter(r => r !== friend);
   if (accepted && typeof getFriends === 'function') {
     getFriends().push({ name: friend.name, score: friend.score });
@@ -899,7 +899,7 @@ function renderSocialFriends(filter = '') {
 
 // Abre el table (copia del perfil) con los datos del amigo seleccionado.
 function openFriendProfile(friend, st, avatarSrc) {
-  sfxCheck.currentTime = 0; sfxCheck.play();
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   currentFriendProfile = { name: friend.name, score: friend.score, avatar: avatarSrc, st };
   const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
 
@@ -999,9 +999,9 @@ function showFriendConfirm(text, onYes, showClose = false, onNo = null) {
   popup.style.display = 'flex';
   if (xbtn) xbtn.style.display = showClose ? 'block' : 'none';  // X solo en aceptar solicitud
   const close = () => { popup.style.display = 'none'; yes.onclick = null; no.onclick = null; if (xbtn) xbtn.onclick = null; };
-  yes.onclick = () => { sfxCheck.currentTime = 0; sfxCheck.play(); close(); onYes(); };
-  no.onclick  = () => { sfxCheck.currentTime = 0; sfxCheck.play(); close(); if (onNo) onNo(); };  // ✕ = acción "no" (si la hay)
-  if (xbtn) xbtn.onclick = () => { sfxCheck.currentTime = 0; sfxCheck.play(); close(); };          // X = cerrar sin hacer nada
+  yes.onclick = () => { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); close(); onYes(); };
+  no.onclick  = () => { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); close(); if (onNo) onNo(); };  // ✕ = acción "no" (si la hay)
+  if (xbtn) xbtn.onclick = () => { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); close(); };          // X = cerrar sin hacer nada
 }
 
 function refreshSocialAfterRel() {
@@ -1016,14 +1016,14 @@ function refreshSocialAfterRel() {
 // Sonido al pasar el cursor por los 3 botones de relación.
 ['loading-friend-fav', 'loading-friend-rel', 'loading-friend-block'].forEach(id => {
   document.getElementById(id)?.addEventListener('mouseenter', () => {
-    sfxSelect.currentTime = 0; sfxSelect.play();
+    sfxSelect.currentTime = 0; sfxPlay(sfxSelect);
   });
 });
 
 // Botón mejor amigo: alterna favorito (solo si es amigo).
 document.getElementById('loading-friend-fav')?.addEventListener('click', () => {
   if (!currentFriendProfile || relStatus(currentFriendProfile.name) !== 'friend') return;
-  sfxCheck.currentTime = 0; sfxCheck.play();
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   const name = currentFriendProfile.name;
   if (socialFavorites.has(name)) socialFavorites.delete(name); else socialFavorites.add(name);
   refreshSocialAfterRel();
@@ -1032,7 +1032,7 @@ document.getElementById('loading-friend-fav')?.addEventListener('click', () => {
 // Botón del medio: añadir / aceptar solicitud / borrar amigo.
 document.getElementById('loading-friend-rel')?.addEventListener('click', () => {
   if (!currentFriendProfile) return;
-  sfxCheck.currentTime = 0; sfxCheck.play();
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   const fp = currentFriendProfile;
   const status = relStatus(fp.name);
   if (status === 'blocked') return;
@@ -1070,7 +1070,7 @@ document.getElementById('loading-friend-rel')?.addEventListener('click', () => {
 // Botón bloquear / desbloquear.
 document.getElementById('loading-friend-block')?.addEventListener('click', () => {
   if (!currentFriendProfile) return;
-  sfxCheck.currentTime = 0; sfxCheck.play();
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   const fp = currentFriendProfile;
   if (isBlockedName(fp.name)) {
     showFriendConfirm(t('confirm.unblock', { name: fp.name }), () => {
@@ -1094,7 +1094,7 @@ document.getElementById('loading-friend-block')?.addEventListener('click', () =>
 });
 
 document.getElementById('loading-friend-back-wrap')?.addEventListener('click', () => {
-  sfxCheck.currentTime = 0; sfxCheck.play();
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   const wrap = document.getElementById('loading-friend-back-wrap');
   wrap.classList.add('confirm-pressed');
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
@@ -1145,7 +1145,7 @@ document.getElementById('loading-social-sort')?.addEventListener('click', () => 
 })();
 
 document.getElementById('loading-social-tab-friends')?.addEventListener('click', () => {
-  sfxSelect.currentTime = 0; sfxSelect.play();
+  sfxSelect.currentTime = 0; sfxPlay(sfxSelect);
   socialActiveTab = 'friends';
   document.querySelectorAll('.loading-social-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('loading-social-tab-friends').classList.add('active');
@@ -1153,7 +1153,7 @@ document.getElementById('loading-social-tab-friends')?.addEventListener('click',
 });
 
 document.getElementById('loading-social-tab-requests')?.addEventListener('click', () => {
-  sfxSelect.currentTime = 0; sfxSelect.play();
+  sfxSelect.currentTime = 0; sfxPlay(sfxSelect);
   socialActiveTab = 'requests';
   document.querySelectorAll('.loading-social-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('loading-social-tab-requests').classList.add('active');
@@ -1162,7 +1162,7 @@ document.getElementById('loading-social-tab-requests')?.addEventListener('click'
 
 // ── Panel Añadir Amigo ────────────────────────────────────────────────────────
 document.getElementById('loading-social-invite')?.addEventListener('click', () => {
-  sfxCheck.currentTime = 0; sfxCheck.play();
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   const input = document.getElementById('loading-addfriend-input');
   const fb = document.getElementById('loading-addfriend-feedback');
   if (input) input.value = '';
@@ -1191,7 +1191,7 @@ function sendFriendRequest() {
     fb.className = 'loading-addfriend-feedback err show';
     return;
   }
-  sfxCheck.currentTime = 0; sfxCheck.play();
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   // Queda como solicitud enviada (pendiente) → aparece en el tablero de enviadas.
   socialSent.push({ name, score: Math.floor(Math.random() * 50000) });
   saveSocialRel();
@@ -1206,7 +1206,7 @@ document.getElementById('loading-addfriend-input')?.addEventListener('keydown', 
 });
 
 document.getElementById('loading-addfriend-back-wrap')?.addEventListener('click', () => {
-  sfxCheck.currentTime = 0; sfxCheck.play();
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   const wrap = document.getElementById('loading-addfriend-back-wrap');
   wrap.classList.add('confirm-pressed');
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
@@ -1260,17 +1260,17 @@ function setSocialListClickable(on) {
 }
 
 document.getElementById('loading-social-blockbtn')?.addEventListener('click', () => {
-  sfxCheck.currentTime = 0; sfxCheck.play();
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   renderBlockedList();
   setSocialListClickable(false);
   document.getElementById('loading-blocked-group')?.classList.remove('table-gone');
 });
 document.getElementById('loading-social-blockbtn')?.addEventListener('mouseenter', () => {
-  sfxSelect.currentTime = 0; sfxSelect.play();
+  sfxSelect.currentTime = 0; sfxPlay(sfxSelect);
 });
 
 document.getElementById('loading-blocked-back-wrap')?.addEventListener('click', () => {
-  sfxCheck.currentTime = 0; sfxCheck.play();
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   const wrap = document.getElementById('loading-blocked-back-wrap');
   wrap.classList.add('confirm-pressed');
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
@@ -1281,14 +1281,14 @@ document.getElementById('loading-blocked-back-wrap')?.addEventListener('click', 
 document.getElementById('loading-blocked-search-input')?.addEventListener('input', () => renderBlockedList());
 
 document.getElementById('loading-blocked-sort')?.addEventListener('click', () => {
-  sfxCheck.currentTime = 0; sfxCheck.play();
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   blockedSort = blockedSort === 'az' ? 'za' : 'az';
   const btn = document.getElementById('loading-blocked-sort');
   if (btn) btn.textContent = blockedSort === 'az' ? 'A-Z' : 'Z-A';
   renderBlockedList();
 });
 document.getElementById('loading-blocked-sort')?.addEventListener('mouseenter', () => {
-  sfxSelect.currentTime = 0; sfxSelect.play();
+  sfxSelect.currentTime = 0; sfxPlay(sfxSelect);
 });
 
 // ── Tablero de solicitudes enviadas (pendientes) ──────────────────────────────
@@ -1331,17 +1331,17 @@ function renderSentList() {
 }
 
 document.getElementById('loading-social-sentbtn')?.addEventListener('click', () => {
-  sfxCheck.currentTime = 0; sfxCheck.play();
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   renderSentList();
   setSocialListClickable(false);
   document.getElementById('loading-sent-group')?.classList.remove('table-gone');
 });
 document.getElementById('loading-social-sentbtn')?.addEventListener('mouseenter', () => {
-  sfxSelect.currentTime = 0; sfxSelect.play();
+  sfxSelect.currentTime = 0; sfxPlay(sfxSelect);
 });
 
 document.getElementById('loading-sent-back-wrap')?.addEventListener('click', () => {
-  sfxCheck.currentTime = 0; sfxCheck.play();
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   const wrap = document.getElementById('loading-sent-back-wrap');
   wrap.classList.add('confirm-pressed');
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
@@ -1352,14 +1352,14 @@ document.getElementById('loading-sent-back-wrap')?.addEventListener('click', () 
 document.getElementById('loading-sent-search-input')?.addEventListener('input', () => renderSentList());
 
 document.getElementById('loading-sent-sort')?.addEventListener('click', () => {
-  sfxCheck.currentTime = 0; sfxCheck.play();
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   sentSort = sentSort === 'az' ? 'za' : 'az';
   const btn = document.getElementById('loading-sent-sort');
   if (btn) btn.textContent = sentSort === 'az' ? 'A-Z' : 'Z-A';
   renderSentList();
 });
 document.getElementById('loading-sent-sort')?.addEventListener('mouseenter', () => {
-  sfxSelect.currentTime = 0; sfxSelect.play();
+  sfxSelect.currentTime = 0; sfxPlay(sfxSelect);
 });
 
 // Al cambiar idioma, re-renderizar el contenido dinámico del panel social/perfil.
@@ -1482,17 +1482,17 @@ window.quitToMenu = quitToMenu;
   // Click en power: abre la pestañita de confirmación (el juego sigue corriendo)
   const quitPopup = document.getElementById('ingame-quit-popup');
   powerEl.addEventListener('click', () => {
-    sfxSelect.currentTime = 0; sfxSelect.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; sfxSelect.play();
+    sfxSelect.currentTime = 0; sfxPlay(sfxSelect);
     if (quitPopup) quitPopup.style.display = 'flex';
     document.body.classList.add('quit-open');
   });
   document.getElementById('ingame-quit-cancel')?.addEventListener('click', () => {
-    sfxSelect.currentTime = 0; sfxSelect.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; sfxSelect.play();
+    sfxSelect.currentTime = 0; sfxPlay(sfxSelect);
     if (quitPopup) quitPopup.style.display = 'none';
     document.body.classList.remove('quit-open');
   });
   document.getElementById('ingame-quit-confirm')?.addEventListener('click', () => {
-    sfxCheck.currentTime = 0; sfxCheck.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; sfxCheck.play();
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
     if (quitPopup) quitPopup.style.display = 'none';
     document.body.classList.remove('quit-open');
     quitToMenu();
@@ -2167,7 +2167,7 @@ function slideTagIn(cityName, countryCode) {
   cityTagEl.style.transition = 'none';
   cityTagEl.style.top  = tpx(-163);
   cityTagEl.style.left = tpx(-525);
-  setTimeout(() => { sfxTag.currentTime = 0; sfxTag.play(); }, 200);
+  setTimeout(() => { sfxTag.currentTime = 0; sfxPlay(sfxTag); }, 200);
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       cityTagEl.style.visibility = 'visible';
@@ -2259,9 +2259,9 @@ function computeScore(grade, cityShownAt) {
 
 // ── RESULT LABEL ─────────────────────────────────────────────────────────────
 function showResultLabel(cx, cy, grade, base, bonusAmt) {
-  if (grade === 'wayoff')        { sfxError.currentTime    = 0; sfxError.play(); }
-  else if (grade === 'perfect')  { sfxVeryNice.currentTime = 0; sfxVeryNice.play(); }
-  else                           { sfxAcertar.currentTime  = 0; sfxAcertar.play(); }
+  if (grade === 'wayoff')        { sfxError.currentTime = 0; sfxPlay(sfxError); }
+  else if (grade === 'perfect')  { sfxVeryNice.currentTime = 0; sfxPlay(sfxVeryNice); }
+  else                           { sfxAcertar.currentTime = 0; sfxPlay(sfxAcertar); }
 
   resultLabel.textContent = (typeof t === 'function') ? t('grade.' + grade) : LABEL_MAP[grade];
   resultLabel.className = grade;
@@ -2355,7 +2355,7 @@ function slideMonumentIn(monument) {
   cityTagEl.style.left        = tpx(-50);
   cityTagEl.style.top         = tpx(-55);
   cityTagEl.style.visibility  = 'visible';
-  setTimeout(() => { sfxTag.currentTime = 0; sfxTag.play(); }, 200);
+  setTimeout(() => { sfxTag.currentTime = 0; sfxPlay(sfxTag); }, 200);
 
   monumentNameEl.textContent = '';
   monumentNameEl.style.opacity = '0';
@@ -2380,7 +2380,7 @@ canvas.addEventListener('click', (e) => {
   if (slideTagIn._countryTimer) { clearTimeout(slideTagIn._countryTimer); slideTagIn._countryTimer = null; }
   if (slideMonumentIn._nameTimer) { clearTimeout(slideMonumentIn._nameTimer); slideMonumentIn._nameTimer = null; }
   sfxPin.currentTime = 0;
-  sfxPin.play();
+  sfxPlay(sfxPin);
 
   const rect    = canvas.getBoundingClientRect();
 
@@ -2467,7 +2467,7 @@ canvas.addEventListener('click', (e) => {
                             showResultLabel(correct.x, correct.y, grade, base, bonusAmt);
                             if (badgeColor) {
                               state.badgeAnim = { t: 0, img: badgeColor, streak: state.streak, inRowBonus };
-                              setTimeout(() => { sfxBonus.currentTime = 0; sfxBonus.play(); }, 800);
+                              setTimeout(() => { sfxBonus.currentTime = 0; sfxPlay(sfxBonus); }, 800);
                             }
                           }, 200);
                         }
@@ -2817,7 +2817,7 @@ function startTimer() {
     if (state.timeLeft <= 10) {
       timerNumberEl.style.color = '#ffffff';
       countdownImg.src = window.pendingGameMode === 'monuments' ? 'images/countdownred4.png' : 'images/countdownred.png';
-      if (state.timeLeft > 0) { sfxTickdown.currentTime = 0; sfxTickdown.play(); }
+      if (state.timeLeft > 0) { sfxTickdown.currentTime = 0; sfxPlay(sfxTickdown); }
     } else {
       timerNumberEl.style.color = '';
       countdownImg.src = window.pendingGameMode === 'monuments' ? 'images/countdown4.png' : 'images/countdown.png';
@@ -2838,7 +2838,7 @@ function endGame() {
   countdownImg.style.animationPlayState = 'paused';
 
   playMusic(null);
-  sfxTimesUp.currentTime = 0; sfxTimesUp.play();
+  sfxTimesUp.currentTime = 0; sfxPlay(sfxTimesUp);
   timeupOverlay.style.display = 'flex';
   timeupOverlay.classList.remove('timeup-out');
   timeupOverlay.classList.add('timeup-in');
@@ -3010,7 +3010,7 @@ function startGame() {
   // Pre-autorizar sfxCountdown en iOS mientras estamos en el contexto del gesto del usuario,
   // antes del canvas resize (que puede tardar en iOS y expirar la ventana de gesto).
   if (IS_IOS && sfxCountdown) {
-    const _pa = sfxCountdown.play();
+    const _pa = sfxPlay(sfxCountdown);
     if (_pa) _pa.catch(() => {});
     sfxCountdown.pause();
     sfxCountdown.currentTime = 0;
@@ -3097,7 +3097,7 @@ function startGame() {
   });
 }
 
-btnStart.addEventListener('click', () => { sfxCheck.currentTime = 0; sfxCheck.play(); startGame(); });
+btnStart.addEventListener('click', () => { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); startGame(); });
 
 let confirmStep = 0;
 let confirmCooldown = false;
@@ -3339,11 +3339,19 @@ let restartFlightAtt;
 // ── VOLUME TOGGLE ─────────────────────────────────────────────────────────────
 let isMuted = localStorage.getItem('muted') === 'true';
 
+// En iOS, currentTime=0 puede resetear el estado muted. Siempre aplicar muted
+// justo antes de play() para garantizar que el estado persiste.
+function sfxPlay(sfx) {
+  sfx.muted = isMuted;
+  try { sfx.volume = isMuted ? 0 : 1; } catch(e) {}
+  return sfx.play();
+}
+
 function getAllSfx() {
   return [sfxCheck, sfxPostgame, sfxGameMusic, sfxSelect, sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus, sfxTickdown, sfxTimesUp,
-    typeof sfxLevel2  !== 'undefined' ? sfxLevel2  : null,
-    typeof sfxCheer   !== 'undefined' ? sfxCheer   : null,
-    typeof sfxLoop    !== 'undefined' ? sfxLoop    : null,
+    typeof sfxLevel2  !== 'undefined' ? sfxLevel2        : null,
+    window.sfxCheer  || null,
+    window.sfxLoop   || null,
   ].filter(Boolean);
 }
 
@@ -3355,7 +3363,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ── HOVER SOUNDS ──────────────────────────────────────────────────────────────
-function playSelect() { sfxSelect.currentTime = 0; sfxSelect.play(); }
+function playSelect() { sfxSelect.currentTime = 0; sfxPlay(sfxSelect); }
 
 [
   document.getElementById('loading-play-btn'),
@@ -3376,7 +3384,7 @@ document.getElementById('vol-btn')?.addEventListener('click', () => {
   getAllSfx().forEach(sfx => { sfx.volume = vol; sfx.muted = isMuted; });
   applyMusicMute(); // iOS: la música va por Web Audio (gain); en PC es no-op
   document.getElementById('vol-img').src = isMuted ? 'images/vol2.png' : 'images/vol1.png';
-  const a = new Audio('sfx/check.mp3'); a.volume = 1; a.play();
+  if (!isMuted) { const a = new Audio('sfx/check.mp3'); a.play(); }
 });
 
 // ── FULLSCREEN ────────────────────────────────────────────────────────────────
@@ -3441,21 +3449,33 @@ document.getElementById('vol-btn')?.addEventListener('click', () => {
   vp.addEventListener('scroll', fix);
 })();
 
-// ── SCREEN ORIENTATION WARNING (mobile only) ─────────────────────────────────
+// ── SCREEN WARNING ────────────────────────────────────────────────────────────
 (function () {
   const warning  = document.getElementById('screen-warning');
   const isMobile = navigator.maxTouchPoints > 1;
+  const MIN_W = 480, MIN_H = 320, MAX_RATIO = 2.8;
+
+  if (isMobile) {
+    document.body.classList.add('is-mobile');
+    const icon = document.getElementById('screen-warning-icon');
+    const msg  = document.getElementById('screen-warning-msg');
+    const sub  = document.getElementById('screen-warning-sub');
+    if (icon) icon.textContent = '📱';
+    if (msg)  msg.textContent  = 'Rotá el teléfono a horizontal para jugar.';
+    if (sub)  sub.textContent  = 'Rotate your phone to landscape to play.';
+  }
 
   function check() {
-    if (!isMobile) { warning.classList.remove('visible'); return; }
     const vp = window.visualViewport;
     const w  = vp ? vp.width  : window.innerWidth;
     const h  = vp ? vp.height : window.innerHeight;
-    if (w < h) {
-      warning.classList.add('visible');
+    let show = false;
+    if (isMobile) {
+      show = w < h;
     } else {
-      warning.classList.remove('visible');
+      show = w < MIN_W || h < MIN_H || w / h > MAX_RATIO || w / h < 1 / MAX_RATIO;
     }
+    warning.classList.toggle('visible', show);
   }
 
   window.addEventListener('resize', check);

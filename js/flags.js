@@ -7,7 +7,7 @@ document.addEventListener('contextmenu', e => {
  'flags-luggage-bl-group', 'flags-luggage-bc-group', 'flags-luggage-br-group'].forEach(id => {
   document.getElementById(id)?.addEventListener('mouseenter', () => {
     if (!flagsRunning) return;
-    if (typeof sfxSelect !== 'undefined') { sfxSelect.currentTime = 0; sfxSelect.play(); }
+    if (typeof sfxSelect !== 'undefined') { sfxSelect.currentTime = 0; sfxPlay(sfxSelect); }
   });
 });
 
@@ -480,7 +480,7 @@ function showFlagsBadge(badgeImg, bonus, streak, cxOverride, scaleOverride) {
   const bonusLabel = bonus > 0 ? `+${bonus}` : '';
   let t = 0, last = null, rafId;
 
-  setTimeout(() => { if (typeof sfxBonus !== 'undefined') { sfxBonus.currentTime = 0; sfxBonus.play(); } }, 800);
+  setTimeout(() => { if (typeof sfxBonus !== 'undefined') { sfxBonus.currentTime = 0; sfxPlay(sfxBonus); } }, 800);
 
   function frame(ts) {
     if (!last) last = ts;
@@ -644,7 +644,7 @@ function startFlagsRound() {
     flagsStreak = 0;
     flagsIsFirstRound = false;
     flagsWrongCount++;
-    if (typeof sfxError !== 'undefined') { sfxError.currentTime = 0; sfxError.play(); }
+    if (typeof sfxError !== 'undefined') { sfxError.currentTime = 0; sfxPlay(sfxError); }
     const overlay = document.getElementById('flags-wrong-overlay');
     if (overlay) {
       overlay.classList.remove('animate');
@@ -947,8 +947,8 @@ function startFlagsRound() {
         if (flagsCorrectCount >= 17) flagsHardUnlocked = true;
         if (flagsCorrectCount >= 30) flagsInsaneUnlocked = true;
         flagsAdvanceDot();
-        if (typeof sfxCheck   !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.play(); }
-        if (typeof sfxAcertar !== 'undefined') { sfxAcertar.currentTime = 0; sfxAcertar.play(); }
+        if (typeof sfxCheck   !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+        if (typeof sfxAcertar !== 'undefined') { sfxAcertar.currentTime = 0; sfxPlay(sfxAcertar); }
         const badgeImg   = typeof getBadgeImg    !== 'undefined' ? getBadgeImg(flagsStreak)   : null;
         const inRowBonus = typeof getInRowBonus  !== 'undefined' ? getInRowBonus(flagsStreak) : 0;
         const pts = getFlagsRoundPoints(flagsCorrectCount);
@@ -971,7 +971,7 @@ function startFlagsRound() {
         flagsStreak = 0;
         flagsIsFirstRound = false;
         flagsWrongCount++;
-        if (typeof sfxError !== 'undefined') { sfxError.currentTime = 0; sfxError.play(); }
+        if (typeof sfxError !== 'undefined') { sfxError.currentTime = 0; sfxPlay(sfxError); }
       }
       const overlay = document.getElementById(correct ? 'flags-check-overlay' : 'flags-wrong-overlay');
       if (overlay) {
@@ -1087,7 +1087,7 @@ let flagsAborted = false;
 function runFlagsPregame(onDone) {
   flagsAborted = false;
   flagsPregameEl.style.display = 'flex';
-  if (typeof sfxCountdown !== 'undefined') { sfxCountdown.currentTime = 0; sfxCountdown.play(); }
+  if (typeof sfxCountdown !== 'undefined') { sfxCountdown.currentTime = 0; sfxPlay(sfxCountdown); }
   let step = 0;
 
   function showStep() {
@@ -1166,7 +1166,7 @@ function startFlagsTimer() {
     if (flagsTimeLeft <= 10) {
       flagsTimerEl.style.color = '#ffffff';
       flagsTimerImg.src = 'images/countdownred2.png';
-      if (flagsTimeLeft > 0 && typeof sfxTickdown !== 'undefined') { sfxTickdown.currentTime = 0; sfxTickdown.play(); }
+      if (flagsTimeLeft > 0 && typeof sfxTickdown !== 'undefined') { sfxTickdown.currentTime = 0; sfxPlay(sfxTickdown); }
     }
     if (flagsTimeLeft <= 0) {
       clearInterval(flagsTimerIntervalId);
@@ -1174,7 +1174,7 @@ function startFlagsTimer() {
       clearFlagsElimination();
       flagsLuggageWrap.style.pointerEvents = 'none';
       flagsLuggageWrap.classList.add('flags-game-ended');
-      if (typeof sfxTimesUp !== 'undefined') { sfxTimesUp.currentTime = 0; sfxTimesUp.play(); }
+      if (typeof sfxTimesUp !== 'undefined') { sfxTimesUp.currentTime = 0; sfxPlay(sfxTimesUp); }
       endFlagsGame();
     }
   }, 1000);
@@ -1200,7 +1200,7 @@ function endFlagsGame() {
 
 // ── BOTÓN DE INICIO ───────────────────────────────────────────────────────────
 document.getElementById('loading-flags-btn').addEventListener('click', () => {
-  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.play(); }
+  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
   window.pendingGameMode = 'flags';
   // Resetear estado del splash con el splash AÚN oculto (evita saltear step2 y la
   // mesa "subiendo" si veníamos de una campaña previa). Ver window.resetSplashEntry.
@@ -1241,7 +1241,7 @@ document.getElementById('loading-flags-btn').addEventListener('click', () => {
 });
 
 document.getElementById('loading-flags-btn').addEventListener('mouseenter', () => {
-  if (typeof sfxSelect !== 'undefined') { sfxSelect.currentTime = 0; sfxSelect.play(); }
+  if (typeof sfxSelect !== 'undefined') { sfxSelect.currentTime = 0; sfxPlay(sfxSelect); }
 });
 
 

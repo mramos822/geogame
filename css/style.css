@@ -2663,6 +2663,8 @@ body:not(.is-ios) #loading-screen.table-shown > .loading-center-group {
 
 #screen-warning-icon {
   font-size: 56px;
+}
+body.is-mobile #screen-warning-icon {
   animation: rotate-hint 1.6s ease-in-out infinite;
 }
 

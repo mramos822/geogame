@@ -14,7 +14,7 @@
   // Tamaño del sistema de coordenadas del CONTENIDO (para canvas, etc.).
   window.STAGE_W = 1920;
   window.STAGE_H = 911;
-  window.GAME_DURATION = 10;
+  window.GAME_DURATION = 60;
 
   var stage = null;
   var outer = null;

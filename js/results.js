@@ -44,6 +44,8 @@ function buildResultsMessage(total) {
 const sfxCheer = new Audio('sfx/endgamecheeryay.mp3');
 const sfxLoop  = new Audio('sfx/endgameloop.mp3');
 sfxLoop.loop = true;
+window.sfxCheer = sfxCheer;
+window.sfxLoop  = sfxLoop;
 
 
 let loopStarted     = false;
@@ -200,7 +202,7 @@ function startResultsLoop() {
   loopStarted = true;
   sfxLoop.currentTime = 0;
   sfxLoop.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; sfxLoop.muted = (typeof isMuted !== 'undefined' && isMuted);
-  sfxLoop.play().catch(e => console.error('loop play failed:', e));
+  sfxPlay(sfxLoop).catch(e => console.error('loop play failed:', e));
 }
 
 // Arranca el loop un pelín antes de que termine el cheer (overlap suave)…
@@ -216,7 +218,7 @@ sfxCheer.addEventListener('ended', startResultsLoop);
 resultsConfirm?.addEventListener('click', () => {
   if (confirmCooldown) return;
   confirmCooldownLock();
-  sfxCheck.currentTime = 0; sfxCheck.volume = isMuted ? 0 : 1; sfxCheck.play();
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   resultsConfirm.classList.add('confirm-pressed');
   setTimeout(() => resultsConfirm.classList.remove('confirm-pressed'), 50);
   resultsConfirm.classList.add('slide-out');
@@ -245,7 +247,7 @@ resultsConfirm?.addEventListener('mouseleave', playSelect);
 resultsBackWrap?.addEventListener('click', () => {
   if (confirmCooldown) return;
   confirmCooldownLock();
-  sfxCheck.currentTime = 0; sfxCheck.volume = isMuted ? 0 : 1; sfxCheck.play();
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   resultsBackWrap.classList.add('confirm-pressed');
   setTimeout(() => resultsBackWrap.classList.remove('confirm-pressed'), 50);
   if (resultsBackStep === 0) {
@@ -306,10 +308,11 @@ function showResultsScreen() {
   // Primar sfxLoop DENTRO de este gesto: iOS bloquea reproducir un 2º audio fuera de
   // un gesto, así que lo "desbloqueamos" acá (play+pause) para que luego (al terminar
   // el cheer) pueda sonar sin gesto.
-  sfxLoop.play().then(() => { if (!loopStarted) { sfxLoop.pause(); sfxLoop.currentTime = 0; } }).catch(() => {});
+  sfxLoop.muted = (typeof isMuted !== 'undefined' && isMuted);
+  sfxPlay(sfxLoop).then(() => { if (!loopStarted) { sfxLoop.pause(); sfxLoop.currentTime = 0; } }).catch(() => {});
   sfxCheer.currentTime = 0;
   sfxCheer.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; sfxCheer.muted = (typeof isMuted !== 'undefined' && isMuted);
-  sfxCheer.play().catch(e => console.error('cheer play failed:', e));
+  sfxPlay(sfxCheer).catch(e => console.error('cheer play failed:', e));
   clearTimeout(confirmTimeout);
   confirmTimeout = setTimeout(() => resultsConfirm.classList.add('visible'), 300);
 }
