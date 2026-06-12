@@ -1351,6 +1351,15 @@ function _subscribeFriendStatuses(friendIds) {
         document.querySelectorAll(`.loading-social-row[data-friend-id="${updated.id}"] .loading-social-avatar`)
           .forEach(el => { el.src = updated.avatar_url; });
       }
+      // Actualizar play_count si cambió
+      if (updated.play_count != null && updated.play_count !== f.play_count) {
+        f.play_count = updated.play_count;
+        if (currentFriendProfile?.id === updated.id) {
+          currentFriendProfile.play_count = f.play_count;
+          const pcEl = document.getElementById('loading-friend-play-count');
+          if (pcEl) pcEl.textContent = tn('profile.friendPlayed', f.play_count);
+        }
+      }
       // Actualizar score si cambió (amigo terminó partida)
       const newScore = (updated.hs_flags||0)+(updated.hs_shapes||0)+(updated.hs_cities||0)+(updated.hs_monuments||0);
       if (newScore !== f.score) {
