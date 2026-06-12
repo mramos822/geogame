@@ -2625,28 +2625,27 @@ body:not(.is-ios) #loading-screen.table-shown > .profile-account-wrap {
   align-items: center;
   gap: 1.5cqmin;
   width: 36cqmin;
-  color: #6a8aaa;
-  font-size: 2.2cqmin;
+  color: rgba(255,255,255,0.6);
+  font-size: 2.4cqmin;
 }
 .name-prompt-divider::before,
 .name-prompt-divider::after {
   content: '';
   flex: 1;
-  height: 0.15cqmin;
-  background: #6a8aaa;
-  opacity: 0.5;
+  height: 0.3cqmin;
+  background: rgba(255,255,255,0.35);
 }
 .name-prompt-account-btn {
   font-family: inherit;
-  font-size: 2.2cqmin;
+  font-size: 2.6cqmin;
   font-weight: bold;
-  color: #1c5e91;
+  color: #ffffff;
   background: transparent;
-  border: 0.25cqmin solid #1c5e91;
+  border: 0.4cqmin solid rgba(255,255,255,0.6);
   border-radius: 1.4cqmin;
-  padding: 0.8cqmin 2.5cqmin;
+  padding: 0.9cqmin 2.5cqmin;
   cursor: pointer;
-  opacity: 0.85;
+  opacity: 0.8;
   transition: opacity 0.15s, transform 0.1s;
 }
 .name-prompt-account-btn:hover { opacity: 1; transform: scale(1.04); }

@@ -1262,32 +1262,36 @@ _updateProfileBtnLabel();
       if (e.key === 'Enter') { e.preventDefault(); submit(); }
     });
 
-    // Botón "¿Tenés cuenta?" — abre el modal de cuenta en la vista principal
+    // Botón "¿Tienes cuenta?" — oculta el name-prompt, abre el modal de cuenta
     const accountBtn = document.getElementById('name-prompt-account-btn');
-    if (accountBtn) {
+    const accountModal = document.getElementById('account-modal');
+    if (accountBtn && accountModal) {
       accountBtn.addEventListener('click', () => {
         try { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); } catch (e) {}
+        // Ocultar temporalmente el name-prompt para que no tape ni quede detrás
+        prompt.classList.remove('visible');
         if (typeof window.openAccountModal === 'function') window.openAccountModal();
-        else document.getElementById('account-modal')?.classList.add('open');
-      });
-    }
+        else accountModal.classList.add('open');
 
-    // Cuando se cierre el modal de cuenta con sesión iniciada, cerrar el name-prompt
-    const accountModal = document.getElementById('account-modal');
-    if (accountModal) {
-      const observer = new MutationObserver(() => {
-        if (!accountModal.classList.contains('open') && window._accountLoggedIn) {
-          observer.disconnect();
-          prompt.classList.remove('visible');
-          // Aplicar el nombre de la cuenta al loading screen
-          const loggedName = localStorage.getItem('playerName');
-          if (loggedName) {
-            const el = document.getElementById('loading-player-name');
-            if (el) el.textContent = loggedName;
+        // Observar el cierre del modal
+        const observer = new MutationObserver(() => {
+          if (!accountModal.classList.contains('open')) {
+            observer.disconnect();
+            if (window._accountLoggedIn) {
+              // Sesión iniciada: aplicar nombre y no volver a mostrar el prompt
+              const loggedName = localStorage.getItem('playerName');
+              if (loggedName) {
+                const el = document.getElementById('loading-player-name');
+                if (el) el.textContent = loggedName;
+              }
+            } else {
+              // Canceló sin iniciar sesión: volver a mostrar el name-prompt
+              prompt.classList.add('visible');
+            }
           }
-        }
+        });
+        observer.observe(accountModal, { attributes: true, attributeFilter: ['class'] });
       });
-      observer.observe(accountModal, { attributes: true, attributeFilter: ['class'] });
     }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initNamePrompt);
