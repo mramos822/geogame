@@ -1341,7 +1341,7 @@ function _subscribeFriendshipChanges(userId) {
   _friendshipsChannel = window.sb
     .channel('friendship-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, (payload) => {
-      const row = payload.new || payload.old || {};
+      const row = (payload.new && payload.new.user_a) ? payload.new : (payload.old || {});
       if (row.user_a === userId || row.user_b === userId) loadSocialData(false);
     })
     .subscribe();
