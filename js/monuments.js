@@ -1251,17 +1251,18 @@ function relStatus(f) {
 
 function getStatusObj(f) {
   if (!f || !f.last_active) return { cls: 'offline', minsAgo: 9999 };
-  const minsAgo = Math.round((Date.now() - new Date(f.last_active)) / 60000);
-  if (minsAgo > 5) return { cls: 'offline', minsAgo };
+  const secsAgo = (Date.now() - new Date(f.last_active)) / 1000;
+  if (secsAgo > 20) return { cls: 'offline', minsAgo: secsAgo / 60 };
   if (f.is_playing) return { cls: 'playing', minsAgo: 0 };
-  return { cls: 'online', minsAgo };
+  return { cls: 'online', minsAgo: 0 };
 }
 
 function socialStatusText(f) {
   if (!f || !f.last_active) return t('social.offline') || 'Sin conexión';
-  const minsAgo = Math.round((Date.now() - new Date(f.last_active)) / 60000);
-  if (minsAgo < 5 && f.is_playing) return t('social.playing') || 'Jugando';
-  if (minsAgo < 5)   return t('social.online') || 'En línea';
+  const secsAgo = (Date.now() - new Date(f.last_active)) / 1000;
+  const minsAgo = secsAgo / 60;
+  if (secsAgo <= 20 && f.is_playing) return t('social.playing') || 'Jugando';
+  if (secsAgo <= 20) return t('social.online') || 'En línea';
   if (minsAgo < 60)  { const m = Math.max(1, Math.round(minsAgo)); return `Hace ${m}min`; }
   if (minsAgo < 1440){ const h = Math.round(minsAgo / 60); return `Hace ${h}h`; }
   const d = Math.round(minsAgo / 1440); return `Hace ${d}d`;
