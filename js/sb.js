@@ -63,14 +63,16 @@ window.sbUpdateProfile = async function(userId, fields) {
 window.sbSaveScores = async function(userId, scores) {
   const profile = await window.sbGetProfile(userId);
   const updates = {};
-  let playAdded = false;
   ['flags','shapes','cities','monuments'].forEach(k => {
     if (scores[k] == null) return;
     if (scores[k] > (profile['hs_' + k] || 0)) updates['hs_' + k] = scores[k];
-    updates['avg_sum_' + k] = (profile['avg_sum_' + k] || 0) + scores[k];
-    if (!playAdded) { updates.play_count = (profile.play_count || 0) + 1; playAdded = true; }
+    updates['avg_sum_' + k]     = (profile['avg_sum_' + k]     || 0) + scores[k];
+    updates['play_count_' + k]  = (profile['play_count_' + k]  || 0) + 1;
   });
-  if (Object.keys(updates).length) await window.sbUpdateProfile(userId, updates);
+  if (Object.keys(updates).length) {
+    updates.play_count = (profile.play_count || 0) + 1;
+    await window.sbUpdateProfile(userId, updates);
+  }
 };
 
 // ── AMIGOS ────────────────────────────────────────────────────────────────────
@@ -108,6 +110,12 @@ window.sbSendFriendRequest = async function(fromId, toUsername) {
   const { data: target, error: fe } = await sb
     .from('profiles').select('id').eq('username', toUsername).single();
   if (fe || !target) throw new Error('Usuario no encontrado');
+  // Verificar que no existe relación en ninguna dirección
+  const { data: existing } = await sb.from('friendships')
+    .select('id')
+    .or(`and(user_a.eq.${fromId},user_b.eq.${target.id}),and(user_a.eq.${target.id},user_b.eq.${fromId})`)
+    .maybeSingle();
+  if (existing) throw new Error('Ya existe una relación con este usuario');
   const { error } = await sb.from('friendships').insert({
     user_a: fromId, user_b: target.id,
     status: 'pending', initiated_by: fromId
@@ -125,12 +133,75 @@ window.sbRemoveFriend = async function(friendshipId) {
   if (error) throw error;
 };
 
-window.sbBlockUser = async function(fromId, targetId) {
-  const { error } = await sb.from('friendships').upsert({
-    user_a: fromId, user_b: targetId,
-    status: 'blocked', initiated_by: fromId
-  }, { onConflict: 'user_a,user_b' });
+window.sbBlockUser = async function(fromId, targetId, friendshipId) {
+  if (friendshipId) {
+    const { error } = await sb.from('friendships')
+      .update({ status: 'blocked', initiated_by: fromId }).eq('id', friendshipId);
+    if (error) throw error;
+  } else {
+    const { error } = await sb.from('friendships')
+      .insert({ user_a: fromId, user_b: targetId, status: 'blocked', initiated_by: fromId });
+    if (error) throw error;
+  }
+};
+
+window.sbDeleteFriendship = async function(friendshipId) {
+  const { error } = await sb.from('friendships').delete().eq('id', friendshipId);
   if (error) throw error;
+};
+
+window.sbUpdateLastActive = async function(userId) {
+  await sb.from('profiles').update({ last_active: new Date().toISOString() }).eq('id', userId);
+};
+
+window.sbSetPlaying = async function(userId, playing) {
+  await sb.from('profiles')
+    .update({ is_playing: playing, last_active: new Date().toISOString() })
+    .eq('id', userId);
+};
+
+window.sbUploadAvatar = async function(userId, blob) {
+  const path = `${userId}/avatar.jpg`;
+  const { error } = await sb.storage.from('avatars').upload(path, blob, {
+    contentType: 'image/jpeg', upsert: true
+  });
+  if (error) throw error;
+  const { data } = sb.storage.from('avatars').getPublicUrl(path);
+  const url = data.publicUrl + '?t=' + Date.now();
+  await sb.from('profiles').update({ avatar_url: url }).eq('id', userId);
+  return url;
+};
+
+// Carga todos los datos sociales en una sola consulta.
+window.sbLoadSocialData = async function(userId) {
+  const { data, error } = await sb.from('friendships')
+    .select(`id, status, initiated_by, user_a, user_b,
+      pa:user_a(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,play_count,last_active,is_playing),
+      pb:user_b(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,play_count,last_active,is_playing)`)
+    .or(`user_a.eq.${userId},user_b.eq.${userId}`);
+  if (error) throw error;
+  function toEntry(row) {
+    const p = row.pa.id === userId ? row.pb : row.pa;
+    const total = (p.hs_flags||0)+(p.hs_shapes||0)+(p.hs_cities||0)+(p.hs_monuments||0);
+    return {
+      friendshipId: row.id,
+      id: p.id, name: p.username || '?',
+      score: total,
+      avatar: p.avatar_url || 'images/profilepic/ppdefault.png',
+      hs_flags: p.hs_flags||0, hs_shapes: p.hs_shapes||0,
+      hs_cities: p.hs_cities||0, hs_monuments: p.hs_monuments||0,
+      play_count: p.play_count||0,
+      last_active: p.last_active || null,
+      is_playing: p.is_playing || false,
+    };
+  }
+  const rows = data || [];
+  return {
+    friends:  rows.filter(r => r.status === 'accepted').map(toEntry),
+    requests: rows.filter(r => r.status === 'pending' && r.user_b === userId).map(toEntry),
+    sent:     rows.filter(r => r.status === 'pending' && r.user_a === userId).map(toEntry),
+    blocked:  rows.filter(r => r.status === 'blocked' && r.initiated_by === userId).map(toEntry),
+  };
 };
 
 // ── SESIÓN PERSISTENTE: restaurar al recargar ─────────────────────────────────
@@ -180,7 +251,18 @@ window.sbBlockUser = async function(fromId, targetId) {
   try {
     const profile = await window.sbGetProfile(session.user.id);
     window._sbProfile = profile;
-    if (profile.username && !localStorage.getItem('playerName'))
-      localStorage.setItem('playerName', profile.username);
+    if (profile.username) localStorage.setItem('playerName', profile.username);
+    if (profile.avatar_url) {
+      localStorage.setItem('profilePhoto', profile.avatar_url);
+      if (typeof window.applyStoredProfilePic === 'function') window.applyStoredProfilePic();
+    }
   } catch(e) {}
+  window.sbUpdateLastActive(session.user.id).catch(() => {});
+  // Notificar a monuments.js que la sesión está lista (sync de datos locales, etc.)
+  window._sessionReady = true;
+  document.dispatchEvent(new CustomEvent('sbSessionReady', { detail: { userId: session.user.id } }));
+  // Heartbeat: mantener last_active fresco mientras la página esté abierta
+  setInterval(() => {
+    if (window._sbUserId) window.sbUpdateLastActive(window._sbUserId).catch(() => {});
+  }, 2 * 60 * 1000);
 })();

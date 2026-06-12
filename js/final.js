@@ -28,7 +28,7 @@ function _onFinalResize() {
 
 function showFinalScreen() {
   finalScreen.style.display = 'block';
-  localStorage.setItem('playCount', String(parseInt(localStorage.getItem('playCount') || '0', 10) + 1));
+  if (!window._accountLoggedIn) localStorage.setItem('playCount', String(parseInt(localStorage.getItem('playCount') || '0', 10) + 1));
   const backWrap = document.getElementById('final-confirm-back-wrap');
   if (backWrap) {
     backWrap.classList.remove('visible');
@@ -41,10 +41,12 @@ function showFinalScreen() {
   const hs3  = (cs.game      != null) ? cs.game      : (parseInt(localStorage.getItem('geochallenge_highscore')) || 0);
   const hs4  = (cs.monuments != null) ? cs.monuments : (parseInt(localStorage.getItem('monumentsHighscore'))     || 0);
   // Acumular para promedios por modo (segunda columna del loading)
-  [['flags', hs1], ['shapes', hs2], ['game', hs3], ['monuments', hs4]].forEach(([k, v]) => {
-    localStorage.setItem('avgSum_' + k,   String(parseInt(localStorage.getItem('avgSum_' + k)   || '0', 10) + v));
-    localStorage.setItem('avgCount_' + k, String(parseInt(localStorage.getItem('avgCount_' + k) || '0', 10) + 1));
-  });
+  if (!window._accountLoggedIn) {
+    [['flags', hs1], ['shapes', hs2], ['game', hs3], ['monuments', hs4]].forEach(([k, v]) => {
+      localStorage.setItem('avgSum_' + k,   String(parseInt(localStorage.getItem('avgSum_' + k)   || '0', 10) + v));
+      localStorage.setItem('avgCount_' + k, String(parseInt(localStorage.getItem('avgCount_' + k) || '0', 10) + 1));
+    });
+  }
   const total = hs1 + hs2 + hs3 + hs4;
   const rank  = typeof getRank === 'function' ? getRank(total) : null;
   const label = document.getElementById('final-rank-label');

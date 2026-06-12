@@ -302,6 +302,27 @@ function showResultsScreen() {
   void resultsScreen.offsetWidth;
   resultsScreen.classList.add('results-animating');
   updateHighscores();
+
+  // Subir scores a Supabase en background (una sola vez por partida)
+  if (!window._scoresUploadedThisGame && window._accountLoggedIn && window._sbUserId) {
+    window._scoresUploadedThisGame = true;
+    const cs = window.campaign?.scores || {};
+    const payload = {};
+    if (cs.flags     != null) payload.flags     = cs.flags;
+    if (cs.shapes    != null) payload.shapes    = cs.shapes;
+    if (cs.game      != null) payload.cities    = cs.game;
+    if (cs.monuments != null) payload.monuments = cs.monuments;
+    if (Object.keys(payload).length > 0) {
+      window.sbSaveScores(window._sbUserId, payload)
+        .then(() => window.sbGetProfile(window._sbUserId))
+        .then(profile => {
+          window._sbProfile = profile;
+          if (typeof window.syncHsFromProfile === 'function') window.syncHsFromProfile(profile);
+        })
+        .catch(e => console.warn('[scores] upload:', e));
+    }
+    if (typeof window._setPlaying === 'function') window._setPlaying(false);
+  }
   loopStarted = false;
   sfxLoop.pause();
   sfxLoop.currentTime = 0;

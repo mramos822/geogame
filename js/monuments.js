@@ -182,34 +182,107 @@ window.addEventListener('load', () => {
 }, { once: true });
 
 // Actualiza el panel de perfil (nombre, veces jugadas, promedios, highscores,
+// Sincroniza los datos locales (scores/averages/plays) a la cuenta de Supabase al iniciar sesión.
+// Es idempotente: si ya estaban sincronizados (local=0 tras el último logout), no hace nada.
+async function syncLocalDataToAccount(userId) {
+  try {
+    const profile = await window.sbGetProfile(userId);
+    const localHs = {
+      flags:     parseInt(localStorage.getItem('flagsHighscore')          || '0', 10),
+      shapes:    parseInt(localStorage.getItem('shapesHighscore')         || '0', 10),
+      cities:    parseInt(localStorage.getItem('geochallenge_highscore')  || '0', 10),
+      monuments: parseInt(localStorage.getItem('monumentsHighscore')      || '0', 10),
+    };
+    const modeToLsKey = { flags: 'flags', shapes: 'shapes', cities: 'game', monuments: 'monuments' };
+    const updates = {};
+    Object.entries(localHs).forEach(([k, v]) => {
+      if (v > (profile['hs_' + k] || 0)) updates['hs_' + k] = v;
+    });
+    Object.entries(modeToLsKey).forEach(([dbKey, lsKey]) => {
+      const sum   = parseInt(localStorage.getItem('avgSum_'   + lsKey) || '0', 10);
+      const count = parseInt(localStorage.getItem('avgCount_' + lsKey) || '0', 10);
+      if (sum > 0 && count > 0) {
+        updates['avg_sum_'    + dbKey] = (profile['avg_sum_'    + dbKey] || 0) + sum;
+        updates['play_count_' + dbKey] = (profile['play_count_' + dbKey] || 0) + count;
+      }
+    });
+    const localPlays = parseInt(localStorage.getItem('playCount') || '0', 10);
+    if (localPlays > 0) updates.play_count = (profile.play_count || 0) + localPlays;
+    if (Object.keys(updates).length > 0) await window.sbUpdateProfile(userId, updates);
+  } catch(e) { console.warn('[sync] error:', e.message); }
+}
+
+// Copia los hs de Supabase a localStorage (toma el máximo) para que el display
+// en partida muestre el récord correcto sin necesidad de llegar al final.
+function syncHsFromProfile(profile) {
+  const total = (profile.hs_flags||0) + (profile.hs_shapes||0) + (profile.hs_cities||0) + (profile.hs_monuments||0);
+  const map = {
+    flagsHighscore:          profile.hs_flags     || 0,
+    shapesHighscore:         profile.hs_shapes    || 0,
+    geochallenge_highscore:  profile.hs_cities    || 0,
+    monumentsHighscore:      profile.hs_monuments || 0,
+    totalHighscore:          total,
+  };
+  Object.entries(map).forEach(([k, v]) => {
+    const cur = parseInt(localStorage.getItem(k) || '0', 10);
+    if (v > cur) localStorage.setItem(k, String(v));
+  });
+}
+
+window.syncHsFromProfile = syncHsFromProfile;
+
+// Limpia los scores locales al cerrar sesión (quedan en cero para el perfil guest).
+function clearLocalScores(full = false) {
+  const keys = ['playCount','avgSum_flags','avgSum_shapes','avgSum_game','avgSum_monuments',
+                 'avgCount_flags','avgCount_shapes','avgCount_game','avgCount_monuments'];
+  // Solo en logout completo se borran también los hs (vuelven a 0 en modo guest)
+  if (full) keys.push('geochallenge_highscore','flagsHighscore','shapesHighscore','monumentsHighscore','totalHighscore');
+  keys.forEach(k => localStorage.removeItem(k));
+}
+
 // rango). Se llama al cargar y cada vez que se vuelve al loading screen, para
-// que refleje los datos guardados de la última partida.
+// que refleje los datos de la última partida (Supabase si está logueado, local si no).
 window.refreshProfileStats = function () {
-  const playHs      = parseInt(localStorage.getItem('geochallenge_highscore') || '0', 10);
-  const flagsHs     = parseInt(localStorage.getItem('flagsHighscore')         || '0', 10);
-  const shapesHs    = parseInt(localStorage.getItem('shapesHighscore')        || '0', 10);
-  const monumentsHs = parseInt(localStorage.getItem('monumentsHighscore')     || '0', 10);
+  const p = window._sbProfile;
+  let flagsHs, shapesHs, playHs, monumentsHs, plays, avgs;
+  if (p && window._accountLoggedIn) {
+    flagsHs     = p.hs_flags     || 0;
+    shapesHs    = p.hs_shapes    || 0;
+    playHs      = p.hs_cities    || 0;
+    monumentsHs = p.hs_monuments || 0;
+    plays       = p.play_count   || 0;
+    avgs = {
+      1: p.avg_sum_flags     && (p.play_count_flags     || plays) ? Math.round(p.avg_sum_flags     / (p.play_count_flags     || plays)) : 0,
+      2: p.avg_sum_shapes    && (p.play_count_shapes    || plays) ? Math.round(p.avg_sum_shapes    / (p.play_count_shapes    || plays)) : 0,
+      3: p.avg_sum_cities    && (p.play_count_cities    || plays) ? Math.round(p.avg_sum_cities    / (p.play_count_cities    || plays)) : 0,
+      4: p.avg_sum_monuments && (p.play_count_monuments || plays) ? Math.round(p.avg_sum_monuments / (p.play_count_monuments || plays)) : 0,
+    };
+  } else {
+    flagsHs     = parseInt(localStorage.getItem('flagsHighscore')         || '0', 10);
+    shapesHs    = parseInt(localStorage.getItem('shapesHighscore')        || '0', 10);
+    playHs      = parseInt(localStorage.getItem('geochallenge_highscore') || '0', 10);
+    monumentsHs = parseInt(localStorage.getItem('monumentsHighscore')     || '0', 10);
+    plays       = parseInt(localStorage.getItem('playCount')              || '0', 10);
+    const avgKeys = { 1: 'flags', 2: 'shapes', 3: 'game', 4: 'monuments' };
+    avgs = {};
+    [1,2,3,4].forEach(i => {
+      const sum   = parseInt(localStorage.getItem('avgSum_'   + avgKeys[i]) || '0', 10);
+      const count = parseInt(localStorage.getItem('avgCount_' + avgKeys[i]) || '0', 10);
+      avgs[i] = count > 0 ? Math.round(sum / count) : 0;
+    });
+  }
   const elName = document.getElementById('loading-player-name');
   if (elName) elName.textContent = localStorage.getItem('playerName') || 'John';
   const elPlays = document.getElementById('loading-play-count');
-  if (elPlays) {
-    const n = parseInt(localStorage.getItem('playCount') || '0', 10);
-    elPlays.textContent = tn('profile.playedTimes', n);
-  }
+  if (elPlays) elPlays.textContent = tn('profile.playedTimes', plays);
   const gamesHs = { 1: flagsHs, 2: shapesHs, 3: playHs, 4: monumentsHs };
-  // Columna derecha: highscore de cada modo
   [1,2,3,4].forEach(i => {
     const el = document.getElementById('loading-games-avg' + i);
     if (el) el.textContent = gamesHs[i].toLocaleString();
   });
-  // Columna izquierda: promedio de puntaje de cada modo
-  const avgKeys = { 1: 'flags', 2: 'shapes', 3: 'game', 4: 'monuments' };
   [1,2,3,4].forEach(i => {
     const el = document.getElementById('loading-games-hs' + i);
-    if (!el) return;
-    const sum   = parseInt(localStorage.getItem('avgSum_' + avgKeys[i])   || '0', 10);
-    const count = parseInt(localStorage.getItem('avgCount_' + avgKeys[i]) || '0', 10);
-    el.textContent = (count > 0 ? Math.round(sum / count) : 0).toLocaleString();
+    if (el) el.textContent = avgs[i].toLocaleString();
   });
   const rankEl = document.getElementById('loading-games-rank');
   if (rankEl && typeof getRank === 'function') {
@@ -221,10 +294,8 @@ window.refreshProfileStats = function () {
     const rankLabel = document.getElementById('loading-games-rank-label');
     if (rankLabel && rk) {
       rankLabel.textContent = rk.name;
-      // Achicar el texto poco a poco si se sale del ancho del rank.png.
-      // Trabajamos en vmin para que el rango escale igual que el resto del menú.
       const maxWidth = (document.getElementById('loading-games-rank')?.offsetWidth || 240) * 1.15;
-      let size = 4; // vmin
+      let size = 4;
       rankLabel.style.fontSize = size + 'cqmin';
       while (rankLabel.scrollWidth > maxWidth && size > 1.6) {
         size -= 0.1;
@@ -410,8 +481,15 @@ document.getElementById('loading-play-btn').addEventListener('mouseenter', () =>
   sfxSelect.currentTime = 0; sfxPlay(sfxSelect);
 });
 
+// Helper global: actualiza is_playing en Supabase si hay sesión activa
+window._setPlaying = function(playing) {
+  if (window._sbUserId) window.sbSetPlaying(window._sbUserId, playing).catch(() => {});
+  if (playing) window._scoresUploadedThisGame = false; // reset para la nueva partida
+};
+
 document.getElementById('loading-play-btn').addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+  window._setPlaying(true);
   window.pendingGameMode = 'game';
   window.resetSplashEntry?.();
   // Transición visual inmediata — ocultar loading y mostrar splash en este frame
@@ -568,11 +646,14 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
       box.style.animation = 'none'; box.offsetWidth; box.style.animation = '';
     }
   }
+  function isLoggedIn() {
+    return !!(window._accountLoggedIn || document.body.classList.contains('account-logged'));
+  }
   function openModal() {
-    if (window._accountLoggedIn) {
+    if (isLoggedIn()) {
       const nameEl = document.getElementById('account-linked-name');
       if (nameEl) nameEl.textContent = (window._sbProfile?.username) || localStorage.getItem('playerName') || '';
-      showView(viewLoggedIn);
+      showView(viewLoggedIn || document.getElementById('account-view-loggedin'));
     } else {
       showView(viewMain);
     }
@@ -636,10 +717,18 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
           window._sbUserId = data.user.id;
           document.body.classList.add('account-logged');
           try {
+            await syncLocalDataToAccount(data.user.id);
             const profile = await window.sbGetProfile(data.user.id);
             window._sbProfile = profile;
             if (profile.username) localStorage.setItem('playerName', profile.username);
+            if (profile.avatar_url) {
+              localStorage.setItem('profilePhoto', profile.avatar_url);
+              applyStoredProfilePic();
+            }
+            syncHsFromProfile(profile);   // hs locales ← max(local, supabase)
+            clearLocalScores();           // solo avgs/playcount → 0
             if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
+            if (typeof window.sbUpdateLastActive === 'function') window.sbUpdateLastActive(data.user.id).catch(() => {});
             const displayName = profile.username || uVal;
             const nameEl   = document.getElementById('account-welcome-name');
             const prefixEl = document.getElementById('account-welcome-prefix');
@@ -761,22 +850,25 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
 
   document.getElementById('account-logout-btn')?.addEventListener('click', () => {
     sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
-    showView(viewLogoutConfirm);
+    showView(viewLogoutConfirm || document.getElementById('account-view-logout-confirm'));
   });
 
   document.getElementById('account-logout-cancel')?.addEventListener('click', () => {
     sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
-    showView(viewLoggedIn);
+    showView(viewLoggedIn || document.getElementById('account-view-loggedin'));
   });
 
   document.getElementById('account-logout-confirm')?.addEventListener('click', async () => {
     sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    if (window._sbUserId) window.sbSetPlaying(window._sbUserId, false).catch(() => {});
     closeModal();
     await window.sbLogout?.();
     window._accountLoggedIn = false;
     window._sbUserId = null;
     window._sbProfile = null;
     document.body.classList.remove('account-logged');
+    // Limpiar scores completo (vuelven a 0 como guest) — nombre y foto persisten
+    clearLocalScores(true);
     if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
   });
 
@@ -943,17 +1035,36 @@ function maybeAutoAssignPic(nombre) {
 
 // Aplica la foto de perfil guardada en todos los sitios donde aparece el jugador
 function applyStoredProfilePic() {
-  const src = localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png';
-  // Panel de perfil (loading) y cualquier .loading-profile-pic excepto el de amigos
+  const src = window._sbProfile?.avatar_url || localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png';
   document.querySelectorAll('.loading-profile-pic:not(#loading-friend-pic)').forEach(el => { el.src = src; });
-  // Modal de primer ingreso
   const modalPic = document.getElementById('name-prompt-pic');
   if (modalPic) modalPic.src = src;
-  // Barra ingame (leaderboard)
   const lbImg = document.querySelector('#lb-player .lb-avatar-img');
   if (lbImg) lbImg.src = src;
 }
+window.applyStoredProfilePic = applyStoredProfilePic;
 applyStoredProfilePic();
+
+// Cuando la sesión de Supabase se restaura al recargar: sync datos locales → cuenta
+async function _onSessionReady(userId) {
+  if (!userId) return;
+  try {
+    await syncLocalDataToAccount(userId);
+    const profile = await window.sbGetProfile(userId);
+    window._sbProfile = profile;
+    if (profile.username) localStorage.setItem('playerName', profile.username);
+    if (profile.avatar_url) {
+      localStorage.setItem('profilePhoto', profile.avatar_url);
+      applyStoredProfilePic();
+    }
+    syncHsFromProfile(profile);  // hs locales ← max(local, supabase) para display en partida
+    clearLocalScores();          // solo avgs/playcount
+    if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
+  } catch(e) {}
+}
+document.addEventListener('sbSessionReady', (e) => _onSessionReady(e.detail?.userId));
+// Si el evento ya fue disparado antes de que este listener se registrara, ejecutar ahora
+if (window._sessionReady && window._sbUserId) _onSessionReady(window._sbUserId);
 
 // Cambio de foto desde el panel de perfil
 (function () {
@@ -965,9 +1076,19 @@ applyStoredProfilePic();
     input.addEventListener('change', () => {
       const file = input.files[0];
       if (!file) return;
-      resizeImageFile(file, (data) => {
-        localStorage.setItem('profilePhoto', data);
+      resizeImageFile(file, async (dataURL) => {
+        localStorage.setItem('profilePhoto', dataURL);
         applyStoredProfilePic();
+        if (window._accountLoggedIn && window._sbUserId) {
+          try {
+            const res  = await fetch(dataURL);
+            const blob = await res.blob();
+            const url  = await window.sbUploadAvatar(window._sbUserId, blob);
+            if (window._sbProfile) window._sbProfile.avatar_url = url;
+            localStorage.setItem('profilePhoto', url);
+            applyStoredProfilePic();
+          } catch (e) { console.warn('[avatar] upload error:', e.message); }
+        }
       });
     });
   }
@@ -1068,6 +1189,7 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
   }
   document.getElementById('loading-social-group')?.classList.remove('table-gone');
   document.getElementById('loading-screen').classList.add('table-shown');
+  loadSocialData();
 });
 
 (function () {
@@ -1101,64 +1223,80 @@ document.getElementById('loading-social-back-wrap')?.addEventListener('click', (
 });
 
 // ── Lista de amigos del panel social ─────────────────────────────────────────
-const SOCIAL_AVATARS = [
-  'images/characters/men1.png', 'images/characters/girl1.png',
-  'images/characters/women1.png', 'images/characters/men2.png',
-  'images/characters/girl2.png', 'images/characters/women2.png',
-  'images/characters/men3.png', 'images/characters/girl3.png',
-];
-// rank: orden de conexión (0 = más "presente"). minsAgo: antigüedad para
-// desempatar a los desconectados (menor = visto hace menos tiempo).
-const SOCIAL_STATUSES = [
-  { cls: 'playing', text: 'Jugando',            rank: 0, minsAgo: 0 },
-  { cls: 'online',  text: 'En línea',           rank: 1, minsAgo: 0 },
-  { cls: 'offline', text: 'Última vez hace 2h', rank: 2, minsAgo: 120 },
-  { cls: 'offline', text: 'Última vez ayer',    rank: 2, minsAgo: 1440 },
-  { cls: 'online',  text: 'En línea',           rank: 1, minsAgo: 0 },
-  { cls: 'offline', text: 'Última vez hace 5h', rank: 2, minsAgo: 300 },
-];
-
-// Solicitudes de amistad pendientes (mock; reemplazar con datos del backend).
-let SOCIAL_REQUESTS = [
-  { name: 'Diego',  score: 4820 },
-  { name: 'Valentina', score: 19250 },
-  { name: 'Mateo',  score: 11340 },
-];
 
 let socialActiveTab = 'friends';
 let socialSort = localStorage.getItem('socialSort') || 'conn';
 
-// ── Estado de relaciones (favoritos / bloqueados) ────────────────────────────
-// Mock persistido en localStorage; al haber backend, reemplazar por datos reales.
-// Estado de relaciones: MOCK en memoria (se reinicia al recargar). NO se persiste:
-// más adelante esto vendrá del backend/servidor. Ver project_social_backend_todo.
-let socialFavorites = new Set();      // nombres marcados como mejor amigo
-let socialBlocked   = [];             // [{name,score}] bloqueados
-let socialSent      = [];             // [{name,score}] solicitudes que YO envié
-function saveSocialRel() { /* no-op: mock en memoria, sin persistir (futuro: server) */ }
-function isBlockedName(name) { return socialBlocked.some(b => b.name === name); }
-function isSentName(name)    { return socialSent.some(s => s.name === name); }
-function isFriendName(name)  { return (typeof getFriends === 'function' ? getFriends() : []).some(f => f.name === name); }
-function hasRequestName(name){ return SOCIAL_REQUESTS.some(r => r.name === name); }
-function relStatus(name) {
-  if (isBlockedName(name))  return 'blocked';
-  if (isFriendName(name))   return 'friend';
-  if (hasRequestName(name)) return 'request';   // solicitud que me enviaron a mí
-  if (isSentName(name))     return 'sent';      // solicitud que yo envié (pendiente)
+// Cache de datos sociales cargado desde Supabase
+let socialData = { friends: [], requests: [], sent: [], blocked: [] };
+
+// Favoritos persistidos en localStorage por user ID
+function getSocialFavs() {
+  try { return new Set(JSON.parse(localStorage.getItem('socialFavs') || '[]')); } catch { return new Set(); }
+}
+function saveSocialFavs(set) { localStorage.setItem('socialFavs', JSON.stringify([...set])); }
+
+// El amigo cuyo perfil está abierto
+let currentFriendProfile = null;
+
+function relStatus(f) {
+  if (!f) return 'none';
+  const id = f.id;
+  if (socialData.blocked.some(b => b.id === id))  return 'blocked';
+  if (socialData.friends.some(x => x.id === id))  return 'friend';
+  if (socialData.requests.some(r => r.id === id)) return 'request';
+  if (socialData.sent.some(s => s.id === id))     return 'sent';
   return 'none';
 }
 
-// El amigo cuyo perfil está abierto (para los botones de relación).
-let currentFriendProfile = null;
+function getStatusObj(f) {
+  if (!f || !f.last_active) return { cls: 'offline', minsAgo: 9999 };
+  const minsAgo = Math.round((Date.now() - new Date(f.last_active)) / 60000);
+  if (minsAgo > 5) return { cls: 'offline', minsAgo };
+  if (f.is_playing) return { cls: 'playing', minsAgo: 0 };
+  return { cls: 'online', minsAgo };
+}
+
+function socialStatusText(f) {
+  if (!f || !f.last_active) return t('social.offline') || 'Sin conexión';
+  const minsAgo = Math.round((Date.now() - new Date(f.last_active)) / 60000);
+  if (minsAgo < 5 && f.is_playing) return t('social.playing') || 'Jugando';
+  if (minsAgo < 5)   return t('social.online') || 'En línea';
+  if (minsAgo < 60)  { const m = Math.max(1, Math.round(minsAgo)); return `Hace ${m}min`; }
+  if (minsAgo < 1440){ const h = Math.round(minsAgo / 60); return `Hace ${h}h`; }
+  const d = Math.round(minsAgo / 1440); return `Hace ${d}d`;
+}
 
 function updateSocialTabCounts() {
   const friendsTab  = document.getElementById('loading-social-tab-friends');
   const requestsTab = document.getElementById('loading-social-tab-requests');
-  if (friendsTab)  friendsTab.textContent  = `${t('social.tab.friends')} (${(typeof getFriends === 'function' ? getFriends() : []).length})`;
-  if (requestsTab) requestsTab.textContent = `${t('social.tab.requests')} (${SOCIAL_REQUESTS.length})`;
+  if (friendsTab)  friendsTab.textContent = `${t('social.tab.friends')} (${socialData.friends.length})`;
+  if (requestsTab) requestsTab.textContent = `${t('social.tab.requests')} (${socialData.requests.length})`;
 }
 
-// Pinta la pestaña activa (amigos o solicitudes).
+// Carga todos los datos sociales desde Supabase y re-renderiza.
+async function loadSocialData(showLoader = true) {
+  if (!window._accountLoggedIn || !window._sbUserId) {
+    socialData = { friends: [], requests: [], sent: [], blocked: [] };
+    renderSocial(); updateSocialTabCounts(); return;
+  }
+  if (showLoader) {
+    const list = document.getElementById('loading-social-list');
+    if (list) list.innerHTML = '<div class="loading-social-empty">···</div>';
+  }
+  try {
+    socialData = await window.sbLoadSocialData(window._sbUserId);
+    if (typeof window.Friends !== 'undefined') {
+      window.Friends._setCache(socialData.friends.map(f => ({ name: f.name, score: f.score })));
+    }
+  } catch (e) {
+    console.warn('[social] error cargando:', e.message);
+  }
+  renderSocial(document.getElementById('loading-social-search-input')?.value || '');
+  updateSocialTabCounts();
+}
+
+// Pinta la pestaña activa.
 function renderSocial(filter = '') {
   if (socialActiveTab === 'requests') renderSocialRequests(filter);
   else renderSocialFriends(filter);
@@ -1168,15 +1306,13 @@ function renderSocialRequests(filter = '') {
   const list = document.getElementById('loading-social-list');
   if (!list) return;
   updateSocialTabCounts();
-  const reqs = SOCIAL_REQUESTS
-    .map((f, i) => ({ f, i }))
-    .filter(o => o.f.name.toLowerCase().includes(filter.toLowerCase()));
+  const reqs = socialData.requests.filter(f => f.name.toLowerCase().includes(filter.toLowerCase()));
   list.innerHTML = '';
-  reqs.forEach(({ f, i }) => {
+  reqs.forEach((f) => {
     const row = document.createElement('div');
     row.className = 'loading-social-row loading-social-request';
     row.innerHTML =
-      `<img class="loading-social-avatar" src="${SOCIAL_AVATARS[i % SOCIAL_AVATARS.length]}" alt="" draggable="false" oncontextmenu="return false">` +
+      `<img class="loading-social-avatar" src="${f.avatar}" alt="" draggable="false" oncontextmenu="return false">` +
       `<div class="loading-social-info">` +
         `<span class="loading-social-name">${f.name}</span>` +
         `<span class="loading-social-status">${t('social.sentYouRequest')}</span>` +
@@ -1185,61 +1321,54 @@ function renderSocialRequests(filter = '') {
         `<button class="loading-social-req-btn accept" type="button" aria-label="Aceptar">✓</button>` +
         `<button class="loading-social-req-btn reject" type="button" aria-label="Rechazar">✕</button>` +
       `</div>`;
-    // Click en los botones ✓/✕: acepta/rechaza inline (sin abrir el perfil).
     row.querySelector('.accept').addEventListener('click', (e) => { e.stopPropagation(); respondRequest(f, true); });
     row.querySelector('.reject').addEventListener('click', (e) => { e.stopPropagation(); respondRequest(f, false); });
-    // Click en el nombre/celda: abre el perfil (ahí el botón del medio muestra
-    // friendreq → al clickearlo pregunta si querés agregarlo).
-    const avatar = SOCIAL_AVATARS[i % SOCIAL_AVATARS.length];
-    row.addEventListener('click', () => openFriendProfile(f, { cls: 'online', text: 'En línea', rank: 1, minsAgo: 0 }, avatar));
+    row.addEventListener('click', () => openFriendProfile(f));
     list.appendChild(row);
   });
 }
 
-// Acepta (suma a amigos) o rechaza una solicitud y refresca la lista.
 function respondRequest(friend, accepted) {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
-  SOCIAL_REQUESTS = SOCIAL_REQUESTS.filter(r => r !== friend);
-  if (accepted && typeof getFriends === 'function') {
-    getFriends().push({ name: friend.name, score: friend.score });
-  }
-  updateSocialTabCounts();
-  renderSocial(document.getElementById('loading-social-search-input')?.value || '');
+  const op = accepted
+    ? window.sbAcceptRequest(friend.friendshipId)
+    : window.sbDeleteFriendship(friend.friendshipId);
+  op.then(() => loadSocialData(false)).catch(e => console.warn('[social] respondRequest:', e));
 }
 
 function renderSocialFriends(filter = '') {
   const list = document.getElementById('loading-social-list');
   if (!list) return;
   updateSocialTabCounts();
-  const all = (typeof getFriends === 'function' ? getFriends() : []);
+  const favs = getSocialFavs();
   const sortFns = {
-    conn:        (a, b) => (a.st.rank - b.st.rank) || (a.st.minsAgo - b.st.minsAgo),
+    conn:        (a, b) => getStatusObj(a.f).minsAgo - getStatusObj(b.f).minsAgo,
     'score-desc':(a, b) => b.f.score - a.f.score,
     'score-asc': (a, b) => a.f.score - b.f.score,
     'name-asc':  (a, b) => a.f.name.localeCompare(b.f.name),
     'name-desc': (a, b) => b.f.name.localeCompare(a.f.name),
   };
   const baseSort = sortFns[socialSort] || sortFns.conn;
-  const friends = all
-    .map((f, i) => ({ f, i, st: SOCIAL_STATUSES[i % SOCIAL_STATUSES.length] }))
-    .filter(o => o.f.name.toLowerCase().includes(filter.toLowerCase()))
-    .filter(o => !isBlockedName(o.f.name))               // los bloqueados van aparte, al fondo
-    // Favoritos (mejor amigo) SIEMPRE arriba, sin importar el sort elegido.
+  const friends = socialData.friends
+    .filter(f => f.name.toLowerCase().includes(filter.toLowerCase()))
+    .filter(f => !socialData.blocked.some(b => b.id === f.id))
+    .map(f => ({ f }))
     .sort((a, b) => {
-      const fa = socialFavorites.has(a.f.name) ? 0 : 1;
-      const fb = socialFavorites.has(b.f.name) ? 0 : 1;
+      const fa = favs.has(a.f.id) ? 0 : 1;
+      const fb = favs.has(b.f.id) ? 0 : 1;
       return (fa - fb) || baseSort(a, b);
     });
   list.innerHTML = '';
-  friends.forEach(({ f, i, st }) => {
-    const fav = socialFavorites.has(f.name);
+  friends.forEach(({ f }) => {
+    const fav = favs.has(f.id);
+    const st = getStatusObj(f);
     const row = document.createElement('div');
     row.className = 'loading-social-row status-' + st.cls + (fav ? ' is-fav' : '');
     row.innerHTML =
-      `<img class="loading-social-avatar" src="${SOCIAL_AVATARS[i % SOCIAL_AVATARS.length]}" alt="" draggable="false" oncontextmenu="return false">` +
+      `<img class="loading-social-avatar" src="${f.avatar}" alt="" draggable="false" oncontextmenu="return false">` +
       `<div class="loading-social-info">` +
         `<span class="loading-social-name">${fav ? '★ ' : ''}${f.name}</span>` +
-        `<span class="loading-social-status"><span class="dot ${st.cls}"></span>${socialStatusText(st)}</span>` +
+        `<span class="loading-social-status"><span class="dot ${st.cls}"></span>${socialStatusText(f)}</span>` +
       `</div>` +
       `<div class="loading-social-score">` +
         `<img class="loading-social-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">` +
@@ -1247,20 +1376,18 @@ function renderSocialFriends(filter = '') {
       `</div>` +
       `<span class="loading-social-rankname">${(typeof getRank === 'function' ? getRank(f.score).name : '')}</span>` +
       `<img class="loading-social-emote" src="${(typeof getRank === 'function' ? getRank(f.score).img : 'images/ranks/1.png')}" alt="" draggable="false" oncontextmenu="return false">`;
-    row.addEventListener('click', () => openFriendProfile(f, st, SOCIAL_AVATARS[i % SOCIAL_AVATARS.length]));
+    row.addEventListener('click', () => openFriendProfile(f));
     list.appendChild(row);
   });
 
-  // Bloqueados al fondo, en gris, clickeables para abrir su perfil y desbloquear.
-  socialBlocked
+  // Bloqueados al fondo
+  socialData.blocked
     .filter(b => b.name.toLowerCase().includes(filter.toLowerCase()))
-    .forEach((b, k) => {
-      const st = { cls: 'offline', text: 'Bloqueado', rank: 9, minsAgo: 0 };
-      const avatar = SOCIAL_AVATARS[k % SOCIAL_AVATARS.length];
+    .forEach((b) => {
       const row = document.createElement('div');
       row.className = 'loading-social-row status-offline is-blocked-row';
       row.innerHTML =
-        `<img class="loading-social-avatar" src="${avatar}" alt="" draggable="false" oncontextmenu="return false">` +
+        `<img class="loading-social-avatar" src="${b.avatar}" alt="" draggable="false" oncontextmenu="return false">` +
         `<div class="loading-social-info">` +
           `<span class="loading-social-name">${b.name}</span>` +
           `<span class="loading-social-status">${t('social.blockedStatus')}</span>` +
@@ -1271,37 +1398,30 @@ function renderSocialFriends(filter = '') {
         `</div>` +
         `<span class="loading-social-rankname">${(typeof getRank === 'function' ? getRank(b.score).name : '')}</span>` +
         `<img class="loading-social-emote" src="${(typeof getRank === 'function' ? getRank(b.score).img : 'images/ranks/1.png')}" alt="" draggable="false" oncontextmenu="return false">`;
-      row.addEventListener('click', () => openFriendProfile(b, st, avatar));
+      row.addEventListener('click', () => openFriendProfile(b));
       list.appendChild(row);
     });
 }
 
-// Abre el table (copia del perfil) con los datos del amigo seleccionado.
-function openFriendProfile(friend, st, avatarSrc) {
+// Abre el perfil de amigo con datos reales de Supabase.
+function openFriendProfile(friend) {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
-  currentFriendProfile = { name: friend.name, score: friend.score, avatar: avatarSrc, st };
+  currentFriendProfile = friend;
   const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
 
   const pic = document.getElementById('loading-friend-pic');
-  if (pic) pic.src = avatarSrc;
+  if (pic) pic.src = friend.avatar;
   setText('loading-friend-name', friend.name);
+  setText('loading-friend-total', friend.score.toLocaleString());
+  setText('loading-friend-play-count', tn('profile.friendPlayed', friend.play_count || 0));
 
-  const total = friend.score;
-  setText('loading-friend-total', total.toLocaleString());
-  // Veces jugadas estimadas a partir del puntaje (mock; reemplazar con dato real).
-  const friendPlays = Math.max(1, Math.round(total / 1500));
-  setText('loading-friend-play-count', tn('profile.friendPlayed', friendPlays));
-
-  // Repartimos el total entre los 4 modos para los highscores y derivamos el
-  // promedio (~62%). Cuando el backend traiga highscores por modo, usar esos.
-  const split = [0.30, 0.20, 0.28, 0.22];
-  split.forEach((p, k) => {
-    const hs = Math.round(total * p);
-    setText('loading-friend-avg' + (k + 1), hs.toLocaleString());          // columna Highscore
-    setText('loading-friend-hs'  + (k + 1), Math.round(hs * 0.62).toLocaleString()); // columna Promedio
+  const modeHs = [friend.hs_flags||0, friend.hs_shapes||0, friend.hs_cities||0, friend.hs_monuments||0];
+  modeHs.forEach((hs, k) => {
+    setText('loading-friend-avg' + (k + 1), hs.toLocaleString());
+    setText('loading-friend-hs'  + (k + 1), hs.toLocaleString());
   });
 
-  const rk = (typeof getRank === 'function') ? getRank(total) : null;
+  const rk = (typeof getRank === 'function') ? getRank(friend.score) : null;
   const rankImg = document.getElementById('loading-friend-rank');
   if (rankImg && rk) rankImg.src = rk.img;
   const rankLabel = document.getElementById('loading-friend-rank-label');
@@ -1320,24 +1440,23 @@ function openFriendProfile(friend, st, avatarSrc) {
   document.getElementById('loading-friend-group')?.classList.remove('table-gone');
 }
 
-// ── Botones de relación del perfil de amigo (fav / añadir-aceptar-borrar / bloquear) ──
+// ── Botones de relación del perfil de amigo ───────────────────────────────────
 function updateFriendButtons() {
-  const actions = document.getElementById('loading-friend-actions');
-  const favBtn  = document.getElementById('loading-friend-fav');
-  const relBtn  = document.getElementById('loading-friend-rel');
-  const blockBtn= document.getElementById('loading-friend-block');
+  const actions  = document.getElementById('loading-friend-actions');
+  const favBtn   = document.getElementById('loading-friend-fav');
+  const relBtn   = document.getElementById('loading-friend-rel');
+  const blockBtn = document.getElementById('loading-friend-block');
   if (!actions || !currentFriendProfile) return;
-  const name = currentFriendProfile.name;
-  const status = relStatus(name);
+  const f = currentFriendProfile;
+  const status = relStatus(f);
+  const favs = getSocialFavs();
 
-  // El estado (en línea/desconectado) solo se muestra si es tu amigo; si no lo
-  // tenés agregado o está bloqueado, no se muestra.
   const statusEl = document.getElementById('loading-friend-status');
   if (statusEl) {
-    const st = currentFriendProfile.st;
-    if (status === 'friend' && st) {
+    if (status === 'friend') {
+      const st = getStatusObj(f);
       statusEl.style.display = '';
-      statusEl.textContent = socialStatusText(st);
+      statusEl.textContent = socialStatusText(f);
       statusEl.className = 'loading-friend-status ' + st.cls;
     } else {
       statusEl.style.display = 'none';
@@ -1347,22 +1466,18 @@ function updateFriendButtons() {
 
   actions.classList.toggle('is-blocked', status === 'blocked');
 
-  // Botón mejor amigo: solo si la persona es amiga (no bloqueada).
   if (status === 'friend') {
     favBtn.classList.remove('hidden');
-    favBtn.src = socialFavorites.has(name) ? 'images/bestfriend2.png' : 'images/bestfriend.png';
+    favBtn.src = favs.has(f.id) ? 'images/bestfriend2.png' : 'images/bestfriend.png';
   } else {
     favBtn.classList.add('hidden');
   }
 
-  // Botón del medio según relación.
-  if (status === 'friend')       relBtn.src = 'images/nofriend.png';   // borrar amigo
-  else if (status === 'request') relBtn.src = 'images/friendreq.png';  // aceptar solicitud
-  else if (status === 'sent')    relBtn.src = 'images/friendsent.png'; // solicitud enviada (pendiente)
-  else                           relBtn.src = 'images/friendadd.png';  // añadir
-  // (bloqueado: el medio queda en gris vía .is-blocked)
+  if (status === 'friend')       relBtn.src = 'images/nofriend.png';
+  else if (status === 'request') relBtn.src = 'images/friendreq.png';
+  else if (status === 'sent')    relBtn.src = 'images/friendsent.png';
+  else                           relBtn.src = 'images/friendadd.png';
 
-  // Botón de bloquear: si ya está bloqueado, muestra friendunblock.png.
   blockBtn.src = status === 'blocked' ? 'images/friendunblock.png' : 'images/friendblock.png';
 }
 
@@ -1376,73 +1491,72 @@ function showFriendConfirm(text, onYes, showClose = false, onNo = null) {
   if (!popup) return;
   txt.textContent = text;
   popup.style.display = 'flex';
-  if (xbtn) xbtn.style.display = showClose ? 'block' : 'none';  // X solo en aceptar solicitud
+  if (xbtn) xbtn.style.display = showClose ? 'block' : 'none';
   const close = () => { popup.style.display = 'none'; yes.onclick = null; no.onclick = null; if (xbtn) xbtn.onclick = null; };
   yes.onclick = () => { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); close(); onYes(); };
-  no.onclick  = () => { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); close(); if (onNo) onNo(); };  // ✕ = acción "no" (si la hay)
-  if (xbtn) xbtn.onclick = () => { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); close(); };          // X = cerrar sin hacer nada
+  no.onclick  = () => { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); close(); if (onNo) onNo(); };
+  if (xbtn) xbtn.onclick = () => { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); close(); };
 }
 
 function refreshSocialAfterRel() {
-  saveSocialRel();
   updateFriendButtons();
   updateSocialTabCounts();
   renderSocial(document.getElementById('loading-social-search-input')?.value || '');
-  renderBlockedList(); // mantener el tablero de bloqueados al día
-  renderSentList();    // y el de solicitudes enviadas
+  renderBlockedList();
+  renderSentList();
 }
 
-// Sonido al pasar el cursor por los 3 botones de relación.
 ['loading-friend-fav', 'loading-friend-rel', 'loading-friend-block'].forEach(id => {
   document.getElementById(id)?.addEventListener('mouseenter', () => {
     sfxSelect.currentTime = 0; sfxPlay(sfxSelect);
   });
 });
 
-// Botón mejor amigo: alterna favorito (solo si es amigo).
+// Botón mejor amigo: alterna favorito.
 document.getElementById('loading-friend-fav')?.addEventListener('click', () => {
-  if (!currentFriendProfile || relStatus(currentFriendProfile.name) !== 'friend') return;
+  if (!currentFriendProfile || relStatus(currentFriendProfile) !== 'friend') return;
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
-  const name = currentFriendProfile.name;
-  if (socialFavorites.has(name)) socialFavorites.delete(name); else socialFavorites.add(name);
+  const favs = getSocialFavs();
+  if (favs.has(currentFriendProfile.id)) favs.delete(currentFriendProfile.id);
+  else favs.add(currentFriendProfile.id);
+  saveSocialFavs(favs);
   refreshSocialAfterRel();
 });
 
-// Botón del medio: añadir / aceptar solicitud / borrar amigo.
+// Botón del medio: añadir / aceptar / cancelar / borrar amigo.
 document.getElementById('loading-friend-rel')?.addEventListener('click', () => {
   if (!currentFriendProfile) return;
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   const fp = currentFriendProfile;
-  const status = relStatus(fp.name);
+  const status = relStatus(fp);
   if (status === 'blocked') return;
   if (status === 'friend') {
     showFriendConfirm(t('confirm.removeFriend', { name: fp.name }), () => {
-      if (typeof getFriends === 'function') {
-        const arr = getFriends();
-        const idx = arr.findIndex(f => f.name === fp.name);
-        if (idx >= 0) arr.splice(idx, 1);
-      }
-      socialFavorites.delete(fp.name);
-      refreshSocialAfterRel();
+      const favs = getSocialFavs(); favs.delete(fp.id); saveSocialFavs(favs);
+      window.sbDeleteFriendship(fp.friendshipId)
+        .then(() => loadSocialData(false))
+        .catch(e => console.warn('[social] removeFriend:', e));
     });
   } else if (status === 'request') {
     showFriendConfirm(t('confirm.acceptRequest', { name: fp.name }), () => {
-      SOCIAL_REQUESTS = SOCIAL_REQUESTS.filter(r => r.name !== fp.name);
-      if (typeof getFriends === 'function') getFriends().push({ name: fp.name, score: fp.score });
-      refreshSocialAfterRel();
+      window.sbAcceptRequest(fp.friendshipId)
+        .then(() => loadSocialData(false))
+        .catch(e => console.warn('[social] acceptRequest:', e));
     }, true, () => {
-      // ✕ (no) = rechazar: se elimina su solicitud y vuelve friendadd para poder enviarle.
-      SOCIAL_REQUESTS = SOCIAL_REQUESTS.filter(r => r.name !== fp.name);
-      refreshSocialAfterRel();
+      window.sbDeleteFriendship(fp.friendshipId)
+        .then(() => loadSocialData(false))
+        .catch(e => console.warn('[social] rejectRequest:', e));
     });
   } else if (status === 'sent') {
     showFriendConfirm(t('confirm.cancelSent', { name: fp.name }), () => {
-      socialSent = socialSent.filter(s => s.name !== fp.name);
-      refreshSocialAfterRel();
+      window.sbDeleteFriendship(fp.friendshipId)
+        .then(() => loadSocialData(false))
+        .catch(e => console.warn('[social] cancelSent:', e));
     });
-  } else { // none → enviar solicitud (queda pendiente hasta que la acepten)
-    socialSent.push({ name: fp.name, score: fp.score });
-    refreshSocialAfterRel();
+  } else {
+    window.sbSendFriendRequest(window._sbUserId, fp.name)
+      .then(() => loadSocialData(false))
+      .catch(e => console.warn('[social] sendRequest:', e));
   }
 });
 
@@ -1451,23 +1565,19 @@ document.getElementById('loading-friend-block')?.addEventListener('click', () =>
   if (!currentFriendProfile) return;
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   const fp = currentFriendProfile;
-  if (isBlockedName(fp.name)) {
+  const status = relStatus(fp);
+  if (status === 'blocked') {
     showFriendConfirm(t('confirm.unblock', { name: fp.name }), () => {
-      socialBlocked = socialBlocked.filter(b => b.name !== fp.name);
-      refreshSocialAfterRel();
+      window.sbDeleteFriendship(fp.friendshipId)
+        .then(() => loadSocialData(false))
+        .catch(e => console.warn('[social] unblock:', e));
     });
   } else {
     showFriendConfirm(t('confirm.block', { name: fp.name }), () => {
-      socialBlocked.push({ name: fp.name, score: fp.score });
-      socialFavorites.delete(fp.name);            // pierde el favorito
-      socialSent = socialSent.filter(s => s.name !== fp.name); // cancela tu solicitud enviada
-      if (typeof getFriends === 'function') {      // se rompe la amistad
-        const arr = getFriends();
-        const idx = arr.findIndex(f => f.name === fp.name);
-        if (idx >= 0) arr.splice(idx, 1);
-      }
-      SOCIAL_REQUESTS = SOCIAL_REQUESTS.filter(r => r.name !== fp.name); // descarta solicitud entrante
-      refreshSocialAfterRel();
+      const favs = getSocialFavs(); favs.delete(fp.id); saveSocialFavs(favs);
+      window.sbBlockUser(window._sbUserId, fp.id, fp.friendshipId)
+        .then(() => loadSocialData(false))
+        .catch(e => console.warn('[social] block:', e));
     });
   }
 });
@@ -1495,16 +1605,7 @@ function socialSortLabel() {
   const cur = SOCIAL_SORTS.find(s => s.value === socialSort);
   return cur ? t(cur.key) : t('sort.conn');
 }
-// Texto de estado traducido (online/playing/última vez), tolerando mock viejo.
-function socialStatusText(st) {
-  if (!st) return '';
-  if (st.cls === 'playing') return t('social.playing');
-  if (st.cls === 'online')  return t('social.online');
-  const map = { 'Última vez hace 2h': 'social.lastSeen2h', 'Última vez ayer': 'social.lastSeenYesterday', 'Última vez hace 5h': 'social.lastSeen5h' };
-  return map[st.text] ? t(map[st.text]) : st.text;
-}
 document.getElementById('loading-social-sort')?.addEventListener('click', () => {
-  // Clonamos el audio para que clicks rápidos no se corten entre sí
   const s = sfxSelect.cloneNode();
   s.volume = sfxSelect.volume;
   s.play();
@@ -1517,7 +1618,6 @@ document.getElementById('loading-social-sort')?.addEventListener('click', () => 
   renderSocial(document.getElementById('loading-social-search-input')?.value || '');
 });
 
-// Restaura la etiqueta del botón con el orden guardado
 (() => {
   const btn = document.getElementById('loading-social-sort');
   if (btn) btn.textContent = socialSortLabel();
@@ -1550,7 +1650,7 @@ document.getElementById('loading-social-invite')?.addEventListener('click', () =
   input?.focus();
 });
 
-function sendFriendRequest() {
+async function sendFriendRequest() {
   const input = document.getElementById('loading-addfriend-input');
   const fb = document.getElementById('loading-addfriend-feedback');
   const name = (input?.value || '').trim();
@@ -1560,23 +1660,37 @@ function sendFriendRequest() {
     fb.className = 'loading-addfriend-feedback err show';
     return;
   }
-  const friends = (typeof getFriends === 'function' ? getFriends() : []);
-  const taken = friends.some(f => f.name.toLowerCase() === name.toLowerCase()) ||
-                SOCIAL_REQUESTS.some(r => r.name.toLowerCase() === name.toLowerCase()) ||
-                socialSent.some(s => s.name.toLowerCase() === name.toLowerCase()) ||
-                isBlockedName(name);
-  if (taken) {
+  if (!window._accountLoggedIn || !window._sbUserId) {
+    fb.textContent = 'Debes iniciar sesión';
+    fb.className = 'loading-addfriend-feedback err show';
+    return;
+  }
+  const myName = window._sbProfile?.username || '';
+  if (name.toLowerCase() === myName.toLowerCase()) {
+    fb.textContent = 'No puedes agregarte a ti mismo';
+    fb.className = 'loading-addfriend-feedback err show';
+    return;
+  }
+  if (socialData.friends.some(f => f.name.toLowerCase() === name.toLowerCase()) ||
+      socialData.sent.some(s => s.name.toLowerCase() === name.toLowerCase()) ||
+      socialData.requests.some(r => r.name.toLowerCase() === name.toLowerCase())) {
     fb.textContent = t('social.alreadyInList');
     fb.className = 'loading-addfriend-feedback err show';
     return;
   }
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
-  // Queda como solicitud enviada (pendiente) → aparece en el tablero de enviadas.
-  socialSent.push({ name, score: Math.floor(Math.random() * 50000) });
-  saveSocialRel();
-  fb.textContent = t('social.requestSent', { name });
-  fb.className = 'loading-addfriend-feedback ok show';
-  if (input) input.value = '';
+  fb.textContent = '···';
+  fb.className = 'loading-addfriend-feedback show';
+  try {
+    await window.sbSendFriendRequest(window._sbUserId, name);
+    fb.textContent = t('social.requestSent', { name });
+    fb.className = 'loading-addfriend-feedback ok show';
+    if (input) input.value = '';
+    await loadSocialData(false);
+  } catch (e) {
+    fb.textContent = e.message === 'Usuario no encontrado' ? 'Usuario no encontrado' : (e.message || 'Error');
+    fb.className = 'loading-addfriend-feedback err show';
+  }
 }
 
 document.getElementById('loading-addfriend-send')?.addEventListener('click', sendFriendRequest);
@@ -1593,29 +1707,28 @@ document.getElementById('loading-addfriend-back-wrap')?.addEventListener('click'
 });
 
 // ── Tablero de bloqueados ─────────────────────────────────────────────────────
-let blockedSort = 'az'; // 'az' | 'za'
+let blockedSort = 'az';
 function renderBlockedList() {
   const list = document.getElementById('loading-blocked-list');
   if (!list) return;
   const filter = (document.getElementById('loading-blocked-search-input')?.value || '').toLowerCase();
   list.innerHTML = '';
-  const entries = socialBlocked
+  const entries = socialData.blocked
     .filter(b => b.name.toLowerCase().includes(filter))
     .slice()
     .sort((a, b) => blockedSort === 'za' ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name));
   if (entries.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'loading-social-empty';
-    empty.textContent = socialBlocked.length === 0 ? t('social.noBlocked') : t('social.noResults');
+    empty.textContent = socialData.blocked.length === 0 ? t('social.noBlocked') : t('social.noResults');
     list.appendChild(empty);
     return;
   }
-  entries.forEach((b, k) => {
-    const avatar = SOCIAL_AVATARS[k % SOCIAL_AVATARS.length];
+  entries.forEach((b) => {
     const row = document.createElement('div');
     row.className = 'loading-social-row is-blocked-row';
     row.innerHTML =
-      `<img class="loading-social-avatar" src="${avatar}" alt="" draggable="false" oncontextmenu="return false">` +
+      `<img class="loading-social-avatar" src="${b.avatar}" alt="" draggable="false" oncontextmenu="return false">` +
       `<div class="loading-social-info">` +
         `<span class="loading-social-name">${b.name}</span>` +
         `<span class="loading-social-status">${t('social.blockedStatus')}</span>` +
@@ -1626,13 +1739,12 @@ function renderBlockedList() {
       `</div>` +
       `<span class="loading-social-rankname">${(typeof getRank === 'function' ? getRank(b.score).name : '')}</span>` +
       `<img class="loading-social-emote" src="${(typeof getRank === 'function' ? getRank(b.score).img : 'images/ranks/1.png')}" alt="" draggable="false" oncontextmenu="return false">`;
-    row.addEventListener('click', () => openFriendProfile(b, { cls: 'offline', text: 'Bloqueado', rank: 9, minsAgo: 0 }, avatar));
+    row.addEventListener('click', () => openFriendProfile(b));
     list.appendChild(row);
   });
 }
 
-// Bloquea/restaura los clicks de la lista de amigos (para no clickear un amigo
-// durante la transición de entrada de un sub-tablero).
+// Bloquea/restaura los clicks de la lista de amigos.
 function setSocialListClickable(on) {
   const list = document.getElementById('loading-social-list');
   if (list) list.style.pointerEvents = on ? '' : 'none';
@@ -1671,29 +1783,28 @@ document.getElementById('loading-blocked-sort')?.addEventListener('mouseenter', 
 });
 
 // ── Tablero de solicitudes enviadas (pendientes) ──────────────────────────────
-let sentSort = 'az'; // 'az' | 'za'
+let sentSort = 'az';
 function renderSentList() {
   const list = document.getElementById('loading-sent-list');
   if (!list) return;
   const filter = (document.getElementById('loading-sent-search-input')?.value || '').toLowerCase();
   list.innerHTML = '';
-  const entries = socialSent
+  const entries = socialData.sent
     .filter(s => s.name.toLowerCase().includes(filter))
     .slice()
     .sort((a, b) => sentSort === 'za' ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name));
   if (entries.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'loading-social-empty';
-    empty.textContent = socialSent.length === 0 ? t('social.noSent') : t('social.noResults');
+    empty.textContent = socialData.sent.length === 0 ? t('social.noSent') : t('social.noResults');
     list.appendChild(empty);
     return;
   }
-  entries.forEach((s, k) => {
-    const avatar = SOCIAL_AVATARS[k % SOCIAL_AVATARS.length];
+  entries.forEach((s) => {
     const row = document.createElement('div');
     row.className = 'loading-social-row';
     row.innerHTML =
-      `<img class="loading-social-avatar" src="${avatar}" alt="" draggable="false" oncontextmenu="return false">` +
+      `<img class="loading-social-avatar" src="${s.avatar}" alt="" draggable="false" oncontextmenu="return false">` +
       `<div class="loading-social-info">` +
         `<span class="loading-social-name">${s.name}</span>` +
         `<span class="loading-social-status">${t('social.pendingStatus')}</span>` +
@@ -1704,7 +1815,7 @@ function renderSentList() {
       `</div>` +
       `<span class="loading-social-rankname">${(typeof getRank === 'function' ? getRank(s.score).name : '')}</span>` +
       `<img class="loading-social-emote" src="${(typeof getRank === 'function' ? getRank(s.score).img : 'images/ranks/1.png')}" alt="" draggable="false" oncontextmenu="return false">`;
-    row.addEventListener('click', () => openFriendProfile(s, { cls: 'online', text: 'En línea', rank: 1, minsAgo: 0 }, avatar));
+    row.addEventListener('click', () => openFriendProfile(s));
     list.appendChild(row);
   });
 }
@@ -1765,6 +1876,7 @@ window.gameStoppers.push(() => {
 
 // Termina la partida en curso (cualquier modo) y vuelve al menú principal sin recargar.
 function quitToMenu() {
+  window._setPlaying(false);
   // Invalida cualquier callback diferido (nextCity, pines, badges, etc.) en vuelo
   window.gameSession = (window.gameSession || 0) + 1;
 
@@ -2289,6 +2401,10 @@ let mockPlayers = buildFriendPlayers();
 // results.js en localStorage 'totalHighscore'. La barra es universal, así que la
 // entrada ★ best usa ese total, no el highscore de un modo individual.
 function getTotalHighscore() {
+  if (window._sbProfile && window._accountLoggedIn) {
+    const p = window._sbProfile;
+    return (p.hs_flags||0) + (p.hs_shapes||0) + (p.hs_cities||0) + (p.hs_monuments||0);
+  }
   return parseInt(localStorage.getItem('totalHighscore') || '0', 10) || 0;
 }
 const highscorePlayer = { id: 'best', score: getTotalHighscore(), color: '#6a0dad', initial: '★' };
@@ -3591,6 +3707,7 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
   }
 
   gameoverScreen.style.display = 'none';
+  window._setPlaying(false);
   // Liberar la RAM del juego recién terminado antes de volver al menú (el video se
   // vuelve a setear más abajo con swapHowtoVideo).
   if (typeof window.releaseGameMemory === 'function') window.releaseGameMemory();
