@@ -19,6 +19,9 @@
   var stage = null;
   var outer = null;
 
+  // Largest dimensions seen — used so keyboard-open events don't shrink the stage.
+  var baseW = 0, baseH = 0;
+
   function buildStage() {
     stage = document.getElementById('app-stage');
     if (stage) return;
@@ -54,7 +57,10 @@
     var vp = window.visualViewport;
     var w = vp ? vp.width  : window.innerWidth;
     var h = vp ? vp.height : window.innerHeight;
-    var fit = Math.min(w / VISIBLE_W, h / VISIBLE_H);
+    // Keep the largest dimensions seen so the stage doesn't shrink when the
+    // iOS keyboard opens and reduces visualViewport.height.
+    if (w > baseW || h > baseH) { baseW = w; baseH = h; }
+    var fit = Math.min(baseW / VISIBLE_W, baseH / VISIBLE_H);
     document.documentElement.style.setProperty('--app-fit', fit);
   }
 
@@ -78,7 +84,7 @@
     document.addEventListener('DOMContentLoaded', function () { init(); revealAfterLayout(); });
   }
   window.addEventListener('resize', update);
-  window.addEventListener('orientationchange', update);
+  window.addEventListener('orientationchange', function () { baseW = 0; baseH = 0; update(); });
   if (window.visualViewport) window.visualViewport.addEventListener('resize', update);
   // Expuesto para que otras pantallas puedan forzar un re-cálculo del fit.
   // En iOS Safari, position:fixed puede tener Y incorrecto en el primer render;

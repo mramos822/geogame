@@ -651,7 +651,8 @@ function startFlagsRound() {
     const overlay = document.getElementById('flags-wrong-overlay');
     if (overlay) {
       overlay.classList.remove('animate');
-      requestAnimationFrame(() => overlay.classList.add('animate'));
+      void overlay.offsetWidth;
+      overlay.classList.add('animate');
       setTimeout(() => {
         overlay.classList.remove('animate');
         if (!flagsRunning) return;
@@ -979,7 +980,8 @@ function startFlagsRound() {
       const overlay = document.getElementById(correct ? 'flags-check-overlay' : 'flags-wrong-overlay');
       if (overlay) {
         overlay.classList.remove('animate');
-        requestAnimationFrame(() => overlay.classList.add('animate'));
+        void overlay.offsetWidth;
+        overlay.classList.add('animate');
         setTimeout(() => {
           overlay.classList.remove('animate');
           if (!flagsRunning) return;
