@@ -1510,6 +1510,8 @@ canvas.addEventListener('mouseleave', () => {
 */
 
 // ── LOADING FLIGHT ATTENDANT (flightattpost2) ────────────────────────────────
+// Un único <img> + swap de src: un solo elemento siempre en el compositor →
+// sin flash al pasar de display:none a block (iOS no necesita repintar N capas).
 (function () {
   const TIMELINE_LOADING = [
     [1, 150], [2, 100], [3, 150], [4, 150], [5, 150],
@@ -1518,18 +1520,12 @@ canvas.addEventListener('mouseleave', () => {
     [11,150], [10,100], [7, 150], [8, 150], [3, 150],
     [2, 150], [1, 1000],
   ];
-
-  const frames = document.querySelectorAll('#loading-screen .flightatt-loading');
-  frames.forEach(img => {
-    img.style.opacity = img.dataset.frame === '1' ? '1' : '0';
-  });
-
-  function showFrame(n) {
-    frames.forEach(img => {
-      img.style.opacity = img.dataset.frame === String(n) ? '1' : '0';
-    });
-  }
-
+  const BASE = 'images/characters/flightattpost2/';
+  const srcs = Array.from({length: 11}, (_, i) => BASE + (i + 1) + '.png');
+  const img  = document.querySelector('#loading-screen .flightatt-loading');
+  if (!img) return;
+  srcs.forEach((src, i) => { if (i > 0) { const m = new Image(); m.src = src; if (m.decode) m.decode().catch(() => {}); } });
+  function showFrame(n) { img.src = srcs[n - 1]; }
   let step = 0;
   function tick() {
     const [frameNum, duration] = TIMELINE_LOADING[step];
@@ -1542,7 +1538,6 @@ canvas.addEventListener('mouseleave', () => {
 
 // ── SPLASH FLIGHT ATTENDANT (flightattpost2) ─────────────────────────────────
 (function () {
-  // [frameNum, ms until next frame]
   const TIMELINE2 = [
     [1, 150], [2, 100], [3, 150], [4, 150], [5, 150],
     [6,  50], [7, 150], [8, 200], [7, 200], [8, 200],
@@ -1550,18 +1545,12 @@ canvas.addEventListener('mouseleave', () => {
     [11,150], [10,100], [7, 150], [8, 150], [3, 150],
     [2, 150], [1, 1000],
   ];
-
-  const frames = document.querySelectorAll('#splash-screen .flightatt-splash');
-  frames.forEach(img => {
-    img.style.opacity = img.dataset.frame === '1' ? '1' : '0';
-  });
-
-  function showFrame(n) {
-    frames.forEach(img => {
-      img.style.opacity = img.dataset.frame === String(n) ? '1' : '0';
-    });
-  }
-
+  const BASE = 'images/characters/flightattpost2/';
+  const srcs = Array.from({length: 11}, (_, i) => BASE + (i + 1) + '.png');
+  const img  = document.querySelector('#splash-screen .flightatt-splash');
+  if (!img) return;
+  srcs.forEach((src, i) => { if (i > 0) { const m = new Image(); m.src = src; if (m.decode) m.decode().catch(() => {}); } });
+  function showFrame(n) { img.src = srcs[n - 1]; }
   let step = 0;
   function tick() {
     const [frameNum, duration] = TIMELINE2[step];
@@ -1575,7 +1564,6 @@ canvas.addEventListener('mouseleave', () => {
 // ── FLIGHT ATTENDANT ANIMATION ───────────────────────────────────────────────
 let restartFlightAtt;
 (function () {
-  // [frameIndex (1-based), duration in ms until next frame]
   const TIMELINE = [
     [1,  150], [2,  100], [3,  150], [4,  100], [5,  100],
     [6,  100], [7,  150], [8,   50], [9,   50], [10,  50],
@@ -1583,32 +1571,20 @@ let restartFlightAtt;
     [12, 100], [13, 100], [14, 100], [15, 100], [6,  100],
     [5,  100], [4,  100], [3,  100], [2,  100],
   ];
-
-  const frames = document.querySelectorAll('.flightatt');
-
-  // Hide all except frame 1 on init
-  frames.forEach(img => {
-    const num = parseInt(img.src.match(/(\d+)\.png$/)[1]);
-    img.style.opacity = num === 1 ? '1' : '0';
-  });
-
+  const BASE = 'images/characters/flightattpost/';
+  const srcs = Array.from({length: 15}, (_, i) => BASE + (i + 1) + '.png');
+  const img  = document.querySelector('.flightatt');
+  if (!img) return;
+  srcs.forEach((src, i) => { if (i > 0) { const m = new Image(); m.src = src; if (m.decode) m.decode().catch(() => {}); } });
+  function showFrame(n) { img.src = srcs[n - 1]; }
   let step = 0;
   let pendingTimeout = null;
-
   restartFlightAtt = function () {
     if (pendingTimeout) clearTimeout(pendingTimeout);
     step = 0;
     showFrame(1);
     pendingTimeout = setTimeout(tick, TIMELINE[0][1]);
   };
-
-  function showFrame(n) {
-    frames.forEach(img => {
-      const num = parseInt(img.src.match(/(\d+)\.png$/)[1]);
-      img.style.opacity = num === n ? '1' : '0';
-    });
-  }
-
   function tick() {
     const [frameNum, duration] = TIMELINE[step];
     showFrame(frameNum);
@@ -1621,7 +1597,6 @@ let restartFlightAtt;
       pendingTimeout = setTimeout(tick, duration);
     }
   }
-
   pendingTimeout = setTimeout(tick, TIMELINE[0][1]);
 })();
 
