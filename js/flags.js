@@ -65,7 +65,22 @@ const FLAGS_PREGAME_STEPS = [
 ];
 
 // ── SHOW / HIDE ───────────────────────────────────────────────────────────────
+// Pre-decodifica todas las banderas en background al entrar al modo.
+// 4 streams paralelos; no bloquea el main thread.
+function prewarmFlagTextures() {
+  const urls = Object.values(COUNTRY_FLAGS);
+  let i = 0;
+  function next() {
+    if (i >= urls.length) return;
+    const img = new Image();
+    img.src = urls[i++];
+    (img.decode ? img.decode().catch(() => {}) : Promise.resolve()).then(next);
+  }
+  for (let k = 0; k < 4; k++) next();
+}
+
 function showFlagsMode() {
+  prewarmFlagTextures();
   if (typeof loadGameSFX !== 'undefined') loadGameSFX();
   if (typeof playMusic !== 'undefined') playMusic(null);
   const gameCanvas = document.getElementById('game-canvas');
@@ -754,10 +769,25 @@ function startFlagsRound() {
   // Apply six-mode layout before animations so positions are correct when luggages drop
   if (flagsSixUnlocked) flagsLuggageWrap.classList.add('flags-six-mode');
 
-  // Preparar grupos: quitar animación previa, dejar listos pero sin iniciar
+  // Preparar grupos y asignar banderas
   const activeGroupIds = flagsSixUnlocked
     ? [...flagsTopGroupIds, ...flagsBottomGroupIds]
     : flagsTopGroupIds;
+
+  // Assign flags to slots primero — src antes de la animación para que el decode
+  // ocurra concurrente con la caída (200ms de animación es suficiente margen).
+  flagsGroupIds.forEach((id, i) => {
+    const imgId = flagsSlotImgIds[id];
+    const img = document.getElementById(imgId);
+    if (!img) return;
+    const country = i === correctSlot ? chosen : (distractorPool[i < correctSlot ? i : i - 1] || '');
+    img.src = COUNTRY_FLAGS[country] || '';
+    img.style.display = 'block';
+    if (img.decode) img.decode().catch(() => {}); // fire-and-forget: precalienta textura GPU
+  });
+
+  // Iniciar animación en el siguiente frame: el browser commitió la remoción de
+  // luggage-enter-active en el frame anterior (no se necesita void offsetWidth).
   activeGroupIds.forEach(id => {
     const group = document.getElementById(id);
     if (!group) return;
@@ -766,29 +796,13 @@ function startFlagsRound() {
     group.style.cursor = 'pointer';
     group.classList.remove('flags-faded', 'luggage-enter-active');
   });
-
-  // Assign flags to slots — src ANTES de la animación para que iOS decodifique
-  const flagDecodes = [];
-  flagsGroupIds.forEach((id, i) => {
-    const imgId = flagsSlotImgIds[id];
-    const img = document.getElementById(imgId);
-    if (!img) return;
-    const country = i === correctSlot ? chosen : (distractorPool[i < correctSlot ? i : i - 1] || '');
-    img.src = COUNTRY_FLAGS[country] || '';
-    img.style.display = 'block';
-    if (img.decode) flagDecodes.push(img.decode().catch(() => {}));
-  });
-
-  // Arrancar la animación de caída DESPUÉS de que todas las banderas estén decodificadas.
-  // Promise.all + rAF garantiza que iOS ya tiene las texturas listas y que el browser
-  // commitió la remoción de luggage-enter-active (sin void offsetWidth).
-  Promise.all(flagDecodes).then(() => requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
     if (!flagsRunning) return;
     activeGroupIds.forEach(id => {
       const group = document.getElementById(id);
       if (group) group.classList.add('luggage-enter-active');
     });
-  }));
+  });
 
   flagsRoundStartTime = performance.now() + 200; // empieza a contar tras la animación de entrada
 
