@@ -1284,7 +1284,17 @@ function _subscribeFriendStatuses(friendIds) {
       if (!f) return;
       f.last_active = updated.last_active;
       f.is_playing  = updated.is_playing;
-      _patchFriendStatusInDOM(updated.id);
+      // Si el panel social está visible, re-renderizar la lista
+      const panelOpen = !document.getElementById('loading-social-group')?.classList.contains('table-gone');
+      if (panelOpen) {
+        renderSocial(document.getElementById('loading-social-search-input')?.value || '');
+      }
+      // Si el panel de detalle de ese amigo está abierto, actualizarlo también
+      if (typeof currentFriendProfile !== 'undefined' && currentFriendProfile?.id === updated.id) {
+        currentFriendProfile.last_active = updated.last_active;
+        currentFriendProfile.is_playing  = updated.is_playing;
+        if (typeof _applyFriendPanelStatus === 'function') _applyFriendPanelStatus(currentFriendProfile);
+      }
     })
     .subscribe();
 }
