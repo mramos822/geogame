@@ -18,6 +18,14 @@ function fitRankLabel(id, maxWidthVmin) {
 }
 
 let finalBackTimeout = null;
+let _finalRanking = null;
+let _finalPos = 0;
+
+function _onFinalResize() {
+  if (!finalScreen || finalScreen.style.display === 'none') return;
+  if (typeof window.letterboxRefresh === 'function') window.letterboxRefresh();
+  buildFriendClouds(_finalRanking, _finalPos);
+}
 
 function showFinalScreen() {
   finalScreen.style.display = 'block';
@@ -82,17 +90,18 @@ function showFinalScreen() {
   const posEl = document.getElementById('final-position');
   if (posEl) posEl.textContent = pos;
 
-  // Doble rAF: iOS batea display:block + transform en el mismo frame JS y el
-  // compositor ignora el transform hasta que hay un repaint externo. Deferir
-  // la construcción de nubes garantiza que el elemento ya está pintado.
-  // letterboxRefresh: en iOS, position:fixed puede tener Y incorrecto en el
-  // primer render. Recalcular --app-fit aquí (con viewport ya estabilizado)
-  // fuerza que el elemento fixed se reposicione antes de que las nubes aparezcan.
+  _finalRanking = ranking;
+  _finalPos     = pos;
+  window.removeEventListener('resize', _onFinalResize);
+  window.addEventListener('resize', _onFinalResize);
+  if (window.visualViewport) {
+    window.visualViewport.removeEventListener('resize', _onFinalResize);
+    window.visualViewport.addEventListener('resize', _onFinalResize);
+  }
+
   requestAnimationFrame(() => requestAnimationFrame(() => {
     if (typeof window.letterboxRefresh === 'function') {
       window.letterboxRefresh();
-      // Style-flush (no layout-flush): fuerza al browser a aplicar el CSS
-      // variable antes de que buildFriendClouds lea posiciones.
       getComputedStyle(document.documentElement).getPropertyValue('--app-fit');
     }
     buildFriendClouds(ranking, pos);
@@ -181,7 +190,7 @@ function buildFriendClouds(ranking, playerPos) {
       if (g.classList.contains('passed')) return;
       const gk = parseInt(g.dataset.k);
       if (isNaN(gk) || gk >= playerK) return;
-      const threshold = 1 - (playerK - gk) * STEP_X / (240 * CQW);
+      const threshold = 1 - (playerK - gk - 0.75) * STEP_X / (240 * CQW);
       if (ep >= threshold) g.classList.add('passed');
     });
   }
@@ -214,6 +223,8 @@ function buildFriendClouds(ranking, playerPos) {
 
 function hideFinalScreen() {
   finalScreen.style.display = 'none';
+  window.removeEventListener('resize', _onFinalResize);
+  if (window.visualViewport) window.visualViewport.removeEventListener('resize', _onFinalResize);
   clearTimeout(finalBackTimeout);
   document.getElementById('final-confirm-back-wrap')?.classList.remove('visible');
   const c = document.getElementById('final-clouds5');

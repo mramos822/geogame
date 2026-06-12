@@ -51,8 +51,9 @@
 
   function update() {
     if (!stage) buildStage();
-    var w = window.innerWidth;
-    var h = window.innerHeight;
+    var vp = window.visualViewport;
+    var w = vp ? vp.width  : window.innerWidth;
+    var h = vp ? vp.height : window.innerHeight;
     var fit = Math.min(w / VISIBLE_W, h / VISIBLE_H);
     document.documentElement.style.setProperty('--app-fit', fit);
   }
@@ -69,6 +70,7 @@
   }
   window.addEventListener('resize', update);
   window.addEventListener('orientationchange', update);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', update);
   // Expuesto para que otras pantallas puedan forzar un re-cálculo del fit.
   // En iOS Safari, position:fixed puede tener Y incorrecto en el primer render;
   // llamar esto después de mostrar una pantalla fuerza la corrección.

@@ -46,6 +46,8 @@ body {
   font-family: 'Georgia', serif;
   overflow: hidden;
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
   position: relative;
   overscroll-behavior: none;
   touch-action: manipulation;
