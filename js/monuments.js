@@ -1414,6 +1414,36 @@ function renderSocialFriends(filter = '') {
     });
 }
 
+let _friendStatusInterval = null;
+
+function _applyFriendPanelStatus(f) {
+  const fg = document.getElementById('loading-friend-group');
+  if (!fg || fg.classList.contains('table-gone')) return;
+  const isOffline = getStatusObj(f).cls === 'offline';
+  fg.classList.toggle('is-offline', isOffline);
+  const statusEl = document.getElementById('loading-friend-status');
+  if (statusEl && relStatus(f) === 'friend') {
+    statusEl.textContent = socialStatusText(f);
+    statusEl.className = 'loading-friend-status ' + getStatusObj(f).cls;
+  }
+}
+
+function _startFriendStatusPoll(friendId) {
+  clearInterval(_friendStatusInterval);
+  _friendStatusInterval = setInterval(async () => {
+    const fg = document.getElementById('loading-friend-group');
+    if (!fg || fg.classList.contains('table-gone')) { clearInterval(_friendStatusInterval); return; }
+    try {
+      const { data } = await window.sb.from('profiles')
+        .select('last_active,is_playing').eq('id', friendId).single();
+      if (!data || !currentFriendProfile) return;
+      currentFriendProfile.last_active = data.last_active;
+      currentFriendProfile.is_playing  = data.is_playing;
+      _applyFriendPanelStatus(currentFriendProfile);
+    } catch(e) {}
+  }, 10000);
+}
+
 // Abre el perfil de amigo con datos reales de Supabase.
 function openFriendProfile(friend) {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
@@ -1451,9 +1481,9 @@ function openFriendProfile(friend) {
   const friendGroup = document.getElementById('loading-friend-group');
   if (friendGroup) {
     friendGroup.classList.remove('table-gone');
-    const isOffline = getStatusObj(friend).cls === 'offline';
-    friendGroup.classList.toggle('is-offline', isOffline);
+    _applyFriendPanelStatus(friend);
   }
+  if (friend.id) _startFriendStatusPoll(friend.id);
 }
 
 // ── Botones de relación del perfil de amigo ───────────────────────────────────
@@ -1603,6 +1633,7 @@ document.getElementById('loading-friend-back-wrap')?.addEventListener('click', (
   const wrap = document.getElementById('loading-friend-back-wrap');
   wrap.classList.add('confirm-pressed');
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
+  clearInterval(_friendStatusInterval);
   document.getElementById('loading-friend-group')?.classList.add('table-gone');
 });
 
