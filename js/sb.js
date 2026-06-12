@@ -350,8 +350,23 @@ sb.auth.onAuthStateChange((event, session) => {
   // Notificar a monuments.js que la sesión está lista (sync de datos locales, etc.)
   window._sessionReady = true;
   document.dispatchEvent(new CustomEvent('sbSessionReady', { detail: { userId: session.user.id } }));
-  // Heartbeat: mantener last_active fresco mientras la página esté abierta
+  // Heartbeat periódico
   setInterval(() => {
     if (window._sbUserId) window.sbUpdateLastActive(window._sbUserId).catch(() => {});
   }, 25 * 1000);
+
+  // Heartbeat en actividad: volver de background o interacción en el menú
+  let _lastActivityPing = 0;
+  function _activityPing() {
+    if (!window._sbUserId) return;
+    const now = Date.now();
+    if (now - _lastActivityPing < 15000) return; // throttle 15s
+    _lastActivityPing = now;
+    window.sbUpdateLastActive(window._sbUserId).catch(() => {});
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') _activityPing();
+  });
+  document.addEventListener('click', _activityPing, { passive: true });
+  document.addEventListener('touchstart', _activityPing, { passive: true });
 })();

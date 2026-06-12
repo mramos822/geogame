@@ -1567,7 +1567,7 @@ function relStatus(f) {
 function getStatusObj(f) {
   if (!f || !f.last_active) return { cls: 'offline', minsAgo: 9999 };
   const secsAgo = (Date.now() - new Date(f.last_active)) / 1000;
-  if (secsAgo > 55) return { cls: 'offline', minsAgo: secsAgo / 60 };
+  if (secsAgo > 120) return { cls: 'offline', minsAgo: secsAgo / 60 };
   if (f.is_playing) return { cls: 'playing', minsAgo: 0 };
   return { cls: 'online', minsAgo: 0 };
 }
