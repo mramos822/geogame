@@ -1119,6 +1119,23 @@ body.is-ios .wrong-count-total { top: 29.5cqmin; }
 }
 .loading-secondary-btn:hover { transform: translateZ(0) scale(1.08); }
 .loading-secondary-btn { position: relative; }
+.profile-btn-label {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 1cqmin;
+  white-space: nowrap;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 3.4cqmin;
+  color: #fde20e;
+  -webkit-text-stroke: 0.5cqmin #8b6a00;
+  paint-order: stroke fill;
+  pointer-events: none;
+  max-width: 20cqmin;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .social-notif-badge {
   position: absolute;
   top: -0.5cqmin;

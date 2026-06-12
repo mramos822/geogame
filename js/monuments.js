@@ -773,6 +773,7 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
             syncHsFromProfile(profile);   // hs locales ← max(local, supabase)
             clearLocalScores();           // solo avgs/playcount → 0
             if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
+            if (typeof _updateProfileBtnLabel === 'function') _updateProfileBtnLabel();
             if (typeof loadFriends === 'function') loadFriends();
             if (typeof window.sbUpdateLastActive === 'function') window.sbUpdateLastActive(data.user.id).catch(() => {});
             const displayName = profile.username || uVal;
@@ -924,6 +925,7 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
     // Limpiar scores completo (vuelven a 0 como guest) — nombre y foto persisten
     clearLocalScores(true);
     if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
+    _updateProfileBtnLabel();
   });
 
   // ── Cambiar contraseña ─────────────────────────────────────────────────────
@@ -1059,6 +1061,7 @@ function confirmNameChange() {
     const el = document.getElementById('loading-player-name');
     if (el) el.textContent = limpio;
     maybeAutoAssignPic(limpio);
+    _updateProfileBtnLabel();
   }
   wrap.classList.remove('editing');
 }
@@ -1131,12 +1134,15 @@ async function _onSessionReady(userId) {
     clearLocalScores();          // solo avgs/playcount
     if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
     if (typeof loadFriends === 'function') loadFriends();  // poblar barra ingame con amigos reales
+    _updateProfileBtnLabel();
   } catch(e) {}
   _subscribeFriendshipChanges(userId);  // suscribir una sola vez al login
 }
 document.addEventListener('sbSessionReady', (e) => _onSessionReady(e.detail?.userId));
 // Si el evento ya fue disparado antes de que este listener se registrara, ejecutar ahora
 if (window._sessionReady && window._sbUserId) _onSessionReady(window._sbUserId);
+// Mostrar "Cuenta/Account" si no hay sesión activa al cargar
+_updateProfileBtnLabel();
 
 // Cambio de foto desde el panel de perfil
 (function () {
@@ -1278,6 +1284,16 @@ function showWelcomePopup(nombre) {
   }
 }
 
+function _updateProfileBtnLabel() {
+  const el = document.getElementById('profile-btn-label');
+  if (!el) return;
+  if (window._accountLoggedIn) {
+    el.textContent = (window._sbProfile?.username) || localStorage.getItem('playerName') || '';
+  } else {
+    el.textContent = t('nav.account');
+  }
+}
+
 document.getElementById('loading-profile-btn')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   document.getElementById('loading-table-group')?.classList.remove('table-gone');
@@ -1386,8 +1402,16 @@ function _subscribeFriendStatuses(friendIds) {
           if (rankLabel && rk) rankLabel.textContent = rk.name;
         }
       }
-      // Parchear solo el status del row sin reconstruir el DOM (evita reiniciar animaciones)
-      _patchFriendStatusInDOM(updated.id);
+      // Si el sort es por conexión, re-renderizar la lista para re-ordenar en tiempo real
+      if (socialSort === 'conn') {
+        const panelOpen = !document.getElementById('loading-social-group')?.classList.contains('table-gone');
+        const friendDetailOpen = !document.getElementById('loading-friend-group')?.classList.contains('table-gone');
+        if (panelOpen && !friendDetailOpen && socialActiveTab === 'friends') {
+          renderSocial(document.getElementById('loading-social-search-input')?.value || '');
+        }
+      } else {
+        _patchFriendStatusInDOM(updated.id);
+      }
       // Si el panel de detalle está abierto para este amigo, actualizar status
       if (currentFriendProfile?.id === updated.id) {
         currentFriendProfile.last_active = updated.last_active;
@@ -1404,10 +1428,10 @@ function _subscribeFriendshipChanges(userId) {
   _friendshipsChannel = window.sb
     .channel('friendship-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, (payload) => {
-      // En DELETE events, payload.old puede ser {} si REPLICA IDENTITY no es FULL,
-      // imposibilitando verificar user IDs. Como ya filtramos por tabla, cualquier
-      // DELETE es potencialmente relevante — recargar siempre en ese caso.
-      if (payload.eventType === 'DELETE') { _debouncedLoadSocial(); return; }
+      // En DELETE events, payload.old puede ser {} si REPLICA IDENTITY no es FULL.
+      // Disparar reload en cualquier DELETE ya que estamos suscritos a la tabla completa.
+      const evType = payload.eventType || payload.event || '';
+      if (evType === 'DELETE') { _debouncedLoadSocial(); return; }
       const row = (payload.new && payload.new.user_a) ? payload.new : (payload.old || {});
       if (row.user_a === userId || row.user_b === userId) _debouncedLoadSocial();
     })
@@ -1422,16 +1446,10 @@ function _startSocialListPoll() {
     const panelOpen = !document.getElementById('loading-social-group')?.classList.contains('table-gone');
     if (!panelOpen) return;
     const friendDetailOpen = !document.getElementById('loading-friend-group')?.classList.contains('table-gone');
-    if (friendDetailOpen) {
-      if (typeof currentFriendProfile !== 'undefined' && currentFriendProfile &&
-          typeof _applyFriendPanelStatus === 'function') {
-        _applyFriendPanelStatus(currentFriendProfile);
-      }
-    } else {
-      // Solo parchear textos de estado sin reconstruir DOM (evita reiniciar animaciones)
-      socialData.friends.forEach(f => _patchFriendStatusInDOM(f.id));
-    }
-  }, 10000);
+    // Resync completo cada 5s: captura cambios de friendships que Realtime perdió
+    // y re-ordena la lista si el sort es por conexión.
+    loadSocialData(false);
+  }, 5000);
 }
 function _stopSocialListPoll() {
   clearInterval(_socialListPollInterval);
@@ -2253,6 +2271,7 @@ if (typeof onLangChange === 'function') onLangChange(() => {
   try { renderSentList(); } catch (e) {}
   try { if (typeof refreshProfileStats === 'function') refreshProfileStats(); } catch (e) {}
   try { updateFriendButtons(); } catch (e) {}
+  try { _updateProfileBtnLabel(); } catch (e) {}
 });
 
 // Cada modo registra aquí cómo detener sus loops (timers/animaciones)

@@ -76,6 +76,7 @@ const I18N = {
     'results.notBestMsg': 'No está mal, {name}. ¡Pero no es tu mejor puntaje! {record} es el puntaje a superar, que te deja en el puesto {pos} entre tus amigos{friendMsg}.',
     'results.friendAbove': ', justo detrás de {name}', 'results.friendBelow': ', justo delante de {name}',
     // Cuenta
+    'nav.account': 'Cuenta',
     'account.title': 'Mi Cuenta', 'account.desc': 'Conecta tu cuenta para guardar tu progreso y competir con amigos online.',
     'account.login': 'Iniciar sesión', 'account.register': 'Crear cuenta',
     'account.loginTitle': 'Iniciar sesión', 'account.userOrEmail': 'Usuario o correo', 'account.password': 'Contraseña', 'account.enter': 'Entrar',
@@ -168,6 +169,7 @@ const I18N = {
     'results.notBestMsg': "Not bad, {name}. But it's not your best score! {record} is the score to beat, which puts you in position {pos} among your friends{friendMsg}.",
     'results.friendAbove': ', just behind {name}', 'results.friendBelow': ', just ahead of {name}',
     // Account
+    'nav.account': 'Account',
     'account.title': 'My Account', 'account.desc': 'Connect your account to save your progress and compete with friends online.',
     'account.login': 'Log in', 'account.register': 'Create account',
     'account.loginTitle': 'Log in', 'account.userOrEmail': 'Username or email', 'account.password': 'Password', 'account.enter': 'Sign in',
