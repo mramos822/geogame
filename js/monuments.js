@@ -1795,7 +1795,7 @@ function _optimisticRelUpdate(action, fp) {
   updateSocialTabCounts();
   if (!document.getElementById('loading-blocked-group')?.classList.contains('table-gone')) renderBlockedList();
   if (!document.getElementById('loading-sent-group')?.classList.contains('table-gone'))    renderSentList();
-  loadSocialData(false); // sync en background
+  setTimeout(() => loadSocialData(false), 800); // delay para que el servidor procese antes de re-fetch
 }
 
 // Botón del medio: añadir / aceptar / cancelar / borrar amigo.
