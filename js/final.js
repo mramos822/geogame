@@ -82,7 +82,7 @@ function showFinalScreen() {
     });
   }
 
-  const friends = (typeof getFriends === 'function' ? getFriends() : []);
+  const friends = (window._accountLoggedIn && typeof getFriends === 'function') ? getFriends() : [];
   const ranking = [...friends, { name: playerName, score: total }]
     .sort((a, b) => b.score - a.score);
   const pos = ranking.findIndex(p => p.name === playerName && p.score === total) + 1;
@@ -196,7 +196,7 @@ function buildFriendClouds(ranking, playerPos) {
       if (g.classList.contains('passed')) return;
       const gk = parseInt(g.dataset.k);
       if (isNaN(gk) || gk >= playerK) return;
-      const threshold = 1 - (playerK - gk - 0.75) * STEP_X / (240 * CQW);
+      const threshold = 1 - (playerK - gk - 0.5) * STEP_X / (240 * CQW);
       if (ep >= threshold) g.classList.add('passed');
     });
   }

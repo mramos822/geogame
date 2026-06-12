@@ -126,6 +126,9 @@
       document.getElementById('loading-mode4-wrap').style.display = 'flex';
       mode4Btn.addEventListener('animationend', () => mode4Btn.classList.add('loaded'), { once: true });
 
+      const accountWrap = document.getElementById('profile-account-btn');
+      if (accountWrap) accountWrap.style.display = 'block';
+
       const fmt = v => v > 0 ? '🏆 ' + v.toLocaleString() : '';
       const playHs      = parseInt(localStorage.getItem('geochallenge_highscore') || '0', 10);
       const flagsHs     = parseInt(localStorage.getItem('flagsHighscore')         || '0', 10);
@@ -515,6 +518,198 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
   document.getElementById('loading-flags-btn').click();
 });
 
+// ── MODAL CUENTA ─────────────────────────────────────────────────────────────
+(function () {
+  const btn   = document.getElementById('profile-account-btn');
+  const modal = document.getElementById('account-modal');
+  const close = document.getElementById('account-modal-close');
+  const login = document.getElementById('account-modal-login');
+  const reg   = document.getElementById('account-modal-register');
+  if (!btn || !modal) return;
+
+  const viewMain     = document.getElementById('account-view-main');
+  const viewLogin    = document.getElementById('account-view-login');
+  const viewRegister = document.getElementById('account-view-register');
+  const viewLoading  = document.getElementById('account-view-loading');
+  const viewVerify   = document.getElementById('account-view-verify');
+  const viewWelcome  = document.getElementById('account-view-welcome');
+
+  const box = modal.querySelector('.account-modal-box');
+  let currentView = null;
+
+  const noCloseViews = new Set([viewLoading, viewVerify, viewWelcome]);
+  function showView(v) {
+    [viewMain, viewLogin, viewRegister, viewLoading, viewVerify, viewWelcome].forEach(el => { if (el) el.style.display = 'none'; });
+    if (v) v.style.display = 'flex';
+    currentView = v;
+    if (box) {
+      box.classList.toggle('hide-close', noCloseViews.has(v));
+      box.style.animation = 'none'; box.offsetWidth; box.style.animation = '';
+    }
+  }
+  function openModal()  { showView(viewMain); modal.classList.add('open'); }
+  function closeModal() { modal.classList.remove('open'); }
+
+  btn.addEventListener('click', () => { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); openModal(); });
+  close.addEventListener('click', () => {
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    if (currentView === viewMain) closeModal();
+    else showView(viewMain);
+  });
+
+  login.addEventListener('click', () => { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); showView(viewLogin); });
+  reg.addEventListener('click',   () => { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); showView(viewRegister); });
+
+  document.getElementById('reg-verify-ok')?.addEventListener('click', () => {
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    closeModal();
+  });
+
+  document.getElementById('login-welcome-ok')?.addEventListener('click', () => {
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    closeModal();
+  });
+
+  document.getElementById('login-submit')?.addEventListener('click', () => {
+    const userEl  = document.getElementById('login-user');
+    const passEl  = document.getElementById('login-pass');
+    const errU    = document.getElementById('login-err-user');
+    const errP    = document.getElementById('login-err-pass');
+
+    let ok = true;
+    const setErr = (input, el, msg) => {
+      el.textContent = msg;
+      input.classList.toggle('input-error', !!msg);
+      if (msg) ok = false;
+    };
+
+    const uVal = userEl.value.trim();
+    if (!uVal) {
+      setErr(userEl, errU, t('account.errLoginUser'));
+    } else if (!/^[a-zA-Z0-9]{4,12}$/.test(uVal)) {
+      setErr(userEl, errU, t('account.errLoginUserInvalid'));
+    } else {
+      setErr(userEl, errU, '');
+    }
+
+    const pVal = passEl.value;
+    if (pVal.length < 6) setErr(passEl, errP, t('account.errPassShort'));
+    else setErr(passEl, errP, '');
+
+    if (ok) {
+      sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+      showView(viewLoading);
+      window.sbLogin(uVal, pVal)
+        .then(async data => {
+          window._accountLoggedIn = true;
+          window._sbUserId = data.user.id;
+          document.body.classList.add('account-logged');
+          try {
+            const profile = await window.sbGetProfile(data.user.id);
+            window._sbProfile = profile;
+            if (profile.username) localStorage.setItem('playerName', profile.username);
+            if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
+            const displayName = profile.username || uVal;
+            const nameEl   = document.getElementById('account-welcome-name');
+            const prefixEl = document.getElementById('account-welcome-prefix');
+            const descEl   = document.getElementById('account-welcome-desc');
+            if (prefixEl) prefixEl.textContent = t('account.welcomePrefix');
+            if (nameEl)   nameEl.textContent   = displayName;
+            if (descEl)   descEl.innerHTML     = t('account.welcomeDesc');
+          } catch(e) {}
+          showView(viewWelcome);
+        })
+        .catch(err => {
+          showView(viewLogin);
+          const errU = document.getElementById('login-err-user');
+          const errP = document.getElementById('login-err-pass');
+          const userEl = document.getElementById('login-user');
+          const passEl = document.getElementById('login-pass');
+          if (err.message === '__user_not_found__') {
+            if (errU) errU.textContent = t('account.errUserNotFound');
+            if (userEl) userEl.classList.add('input-error');
+          } else {
+            if (errP) errP.textContent = t('account.errWrongPass');
+            if (passEl) passEl.classList.add('input-error');
+          }
+        });
+    }
+  });
+
+  document.getElementById('reg-pass')?.addEventListener('input', function () {
+    const wrap  = document.getElementById('pass-strength-wrap');
+    const fill  = document.getElementById('pass-strength-fill');
+    const label = document.getElementById('pass-strength-label');
+    const v = this.value;
+    if (!v) { wrap.style.display = 'none'; return; }
+    wrap.style.display = 'flex';
+    let score = 0;
+    if (v.length >= 6)  score++;
+    if (v.length >= 10) score++;
+    if (/[A-Z]/.test(v) && /[a-z]/.test(v)) score++;
+    if (/[0-9]/.test(v)) score++;
+    if (/[^a-zA-Z0-9]/.test(v)) score++;
+    if (score <= 1)      { fill.style.width = '33%';  fill.style.background = '#e74c3c'; label.style.color = '#e74c3c'; label.textContent = t('account.passWeak'); }
+    else if (score <= 3) { fill.style.width = '66%';  fill.style.background = '#f39c12'; label.style.color = '#c87800'; label.textContent = t('account.passMedium'); }
+    else                 { fill.style.width = '100%'; fill.style.background = '#2bd14b'; label.style.color = '#1a7a30'; label.textContent = t('account.passStrong'); }
+  });
+
+  document.getElementById('reg-submit')?.addEventListener('click', () => {
+    const username = document.getElementById('reg-username');
+    const email    = document.getElementById('reg-email');
+    const pass     = document.getElementById('reg-pass');
+    const pass2    = document.getElementById('reg-pass2');
+    const errU  = document.getElementById('reg-err-username');
+    const errE  = document.getElementById('reg-err-email');
+    const errP  = document.getElementById('reg-err-pass');
+    const errP2 = document.getElementById('reg-err-pass2');
+
+    let ok = true;
+    const setErr = (input, el, msg) => {
+      el.textContent = msg;
+      input.classList.toggle('input-error', !!msg);
+      if (msg) ok = false;
+    };
+
+    const uVal = username.value.trim();
+    if (uVal.length < 4 || uVal.length > 12)
+      setErr(username, errU, t('account.errUserChars'));
+    else if (!/^[a-zA-Z0-9]+$/.test(uVal))
+      setErr(username, errU, t('account.errUserInvalid'));
+    else setErr(username, errU, '');
+
+    const eVal = email.value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.(com|net|edu|org|io|co|es|mx|ar|uk|de|fr|br|ca|jp|au)(\.[a-z]{2})?$/i.test(eVal))
+      setErr(email, errE, t('account.errEmailInvalid'));
+    else setErr(email, errE, '');
+
+    const pVal = pass.value;
+    if (pVal.length < 6)
+      setErr(pass, errP, t('account.errPassShort'));
+    else setErr(pass, errP, '');
+
+    const p2Val = pass2.value;
+    if (p2Val !== pVal)
+      setErr(pass2, errP2, t('account.errPassMismatch'));
+    else setErr(pass2, errP2, '');
+
+    if (ok) {
+      sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+      showView(viewLoading);
+      window.sbRegister(
+        document.getElementById('reg-username').value.trim(),
+        document.getElementById('reg-email').value.trim(),
+        document.getElementById('reg-pass').value
+      ).then(() => showView(viewVerify))
+       .catch(err => {
+         showView(viewRegister);
+         const errU = document.getElementById('reg-err-username');
+         if (errU) errU.textContent = err.message;
+       });
+    }
+  });
+})();
+
 document.getElementById('loading-play-confirm-wrap')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   const wrap = document.getElementById('loading-play-confirm-wrap');
@@ -708,9 +903,34 @@ document.getElementById('loading-profile-btn')?.addEventListener('click', () => 
 
 document.getElementById('loading-social-btn')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+  if (!window._accountLoggedIn) {
+    document.getElementById('social-lock-popup')?.classList.add('open');
+    return;
+  }
   document.getElementById('loading-social-group')?.classList.remove('table-gone');
   document.getElementById('loading-screen').classList.add('table-shown');
 });
+
+(function () {
+  const popup = document.getElementById('social-lock-popup');
+  document.getElementById('social-lock-close')?.addEventListener('click', () => {
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    popup?.classList.remove('open');
+  });
+  document.getElementById('social-lock-login')?.addEventListener('click', () => {
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    popup?.classList.remove('open');
+    // Abre el modal de cuenta directo en la vista de login
+    const accountModal = document.getElementById('account-modal');
+    const viewLogin    = document.getElementById('account-view-login');
+    if (accountModal && viewLogin) {
+      ['account-view-main','account-view-login','account-view-register','account-view-loading','account-view-verify','account-view-welcome']
+        .forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+      viewLogin.style.display = 'flex';
+      accountModal.classList.add('open');
+    }
+  });
+})();
 
 document.getElementById('loading-social-back-wrap')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);

@@ -63,10 +63,19 @@
     update();
   }
 
+  function revealAfterLayout() {
+    var cover = document.getElementById('init-cover');
+    if (!cover) return;
+    setTimeout(function () {
+      cover.remove();
+    }, 100);
+  }
+
   if (document.body && document.readyState !== 'loading') {
     init();
+    revealAfterLayout();
   } else {
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', function () { init(); revealAfterLayout(); });
   }
   window.addEventListener('resize', update);
   window.addEventListener('orientationchange', update);

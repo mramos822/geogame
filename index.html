@@ -72,16 +72,6 @@
         <button class="loading-lang-option" type="button" data-lang="es">Español</button>
       </div>
     </div>
-    <div style="display:flex;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);gap:20px;z-index:9999;">
-      <div class="test-confirm-wrap" style="position:relative;transform:none;top:auto;left:auto;">
-        <img class="test-confirm1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
-        <img class="test-confirm2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
-      </div>
-      <div class="final-confirm-wrap" id="final-confirm-wrap" style="position:relative;">
-        <img class="final-confirm1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
-        <img class="final-confirm2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
-      </div>
-    </div>
     <div class="loading-center-group">
       <img class="loading-plane" src="images/plane.png" alt="" draggable="false" oncontextmenu="return false">
       <div class="loading-bar-track">
@@ -122,6 +112,7 @@
       <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
       <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
     </div>
+
     <span class="loading-play-count" id="loading-play-count"></span>
     <div class="loading-games-col">
       <span class="loading-games-title" data-i18n="common.average">Promedio</span>
@@ -195,6 +186,112 @@
     <img class="loading-games-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">
     <span class="loading-games-total" id="loading-games-total">0</span>
     </div>
+
+    <div class="profile-account-wrap" id="profile-account-btn">
+      <img class="profile-account1" src="images/account1.png" alt="" draggable="false" oncontextmenu="return false">
+      <img class="profile-account2" src="images/account2.png" alt="" draggable="false" oncontextmenu="return false">
+    </div>
+
+    <!-- Popup: correo verificado -->
+    <div class="account-modal" id="verified-popup">
+      <div class="account-modal-box">
+        <div class="account-view" style="display:flex">
+          <span class="account-modal-title" data-i18n="account.verifiedTitle">¡Correo verificado!</span>
+          <div class="account-verify-icon">✅</div>
+          <p class="account-modal-desc" data-i18n="account.verifiedDesc">Tu cuenta ha sido confirmada. Ya puedes iniciar sesión.</p>
+          <button class="account-modal-opt account-modal-login" id="verified-login-btn" type="button" data-i18n="account.verifiedBtn">Iniciar sesión</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Popup: requiere sesión -->
+    <div class="account-modal" id="social-lock-popup">
+      <div class="account-modal-box">
+        <button class="account-modal-close" id="social-lock-close" type="button">✕</button>
+        <div class="account-view" style="display:flex">
+          <span class="account-modal-title" data-i18n="account.socialLockTitle">Función bloqueada</span>
+          <div class="account-verify-icon">🔒</div>
+          <p class="account-modal-desc" data-i18n="account.socialLockDesc">Inicia sesión para ver y competir contra tus amigos, comparar rankings y añadir nuevos contactos.</p>
+          <button class="account-modal-opt account-modal-login" id="social-lock-login" type="button" data-i18n="account.login">Iniciar sesión</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal cuenta -->
+    <div class="account-modal" id="account-modal">
+      <div class="account-modal-box">
+        <button class="account-modal-close" id="account-modal-close" type="button">✕</button>
+
+        <!-- Vista principal -->
+        <div class="account-view" id="account-view-main">
+          <span class="account-modal-title" data-i18n="account.title">Mi Cuenta</span>
+          <p class="account-modal-desc" data-i18n="account.desc">Conecta tu cuenta para guardar tu progreso y competir con amigos online.</p>
+          <button class="account-modal-opt account-modal-login" id="account-modal-login" type="button" data-i18n="account.login">Iniciar sesión</button>
+          <button class="account-modal-opt account-modal-register" id="account-modal-register" type="button" data-i18n="account.register">Crear cuenta</button>
+        </div>
+
+        <!-- Vista iniciar sesión -->
+        <div class="account-view" id="account-view-login" style="display:none">
+          <span class="account-modal-title" data-i18n="account.loginTitle">Iniciar sesión</span>
+          <div class="account-form">
+            <label class="account-label" data-i18n="account.username">Nombre de usuario</label>
+            <input class="account-input" id="login-user" type="text" placeholder="johndoe321" maxlength="12" autocomplete="off" spellcheck="false">
+            <span class="account-error" id="login-err-user"></span>
+            <label class="account-label" data-i18n="account.password">Contraseña</label>
+            <input class="account-input" id="login-pass" type="password" placeholder="••••••••" maxlength="64">
+            <span class="account-error" id="login-err-pass"></span>
+            <button class="account-modal-opt account-modal-login" id="login-submit" type="button" data-i18n="account.enter">Entrar</button>
+          </div>
+        </div>
+
+        <!-- Vista bienvenida -->
+        <div class="account-view" id="account-view-welcome" style="display:none">
+          <span class="account-modal-title"><span id="account-welcome-prefix"></span><span class="account-welcome-name" id="account-welcome-name"></span>!</span>
+          <div class="account-verify-icon">🌍</div>
+          <p class="account-modal-desc" id="account-welcome-desc"></p>
+          <button class="account-modal-opt account-modal-login" id="login-welcome-ok" type="button" data-i18n="account.play">¡Jugar!</button>
+        </div>
+
+        <!-- Vista crear cuenta -->
+        <div class="account-view" id="account-view-register" style="display:none">
+          <span class="account-modal-title" data-i18n="account.registerTitle">Crear cuenta</span>
+          <div class="account-form">
+            <label class="account-label" data-i18n="account.username">Nombre de usuario</label>
+            <input class="account-input" id="reg-username" type="text" placeholder="johndoe321" maxlength="12" autocomplete="off" spellcheck="false">
+            <span class="account-error" id="reg-err-username"></span>
+            <label class="account-label" data-i18n="account.email">Correo electrónico</label>
+            <input class="account-input" id="reg-email" type="email" data-i18n-ph="account.emailPh" placeholder="ej. correo@email.com" maxlength="60" autocomplete="off">
+            <span class="account-error" id="reg-err-email"></span>
+            <label class="account-label" data-i18n="account.password">Contraseña</label>
+            <input class="account-input" id="reg-pass" type="password" placeholder="••••••••" maxlength="64">
+            <div class="pass-strength-wrap" id="pass-strength-wrap" style="display:none">
+              <div class="pass-strength-bar">
+                <div class="pass-strength-fill" id="pass-strength-fill"></div>
+              </div>
+              <span class="pass-strength-label" id="pass-strength-label"></span>
+            </div>
+            <span class="account-error" id="reg-err-pass"></span>
+            <label class="account-label" data-i18n="account.confirmPass">Confirmar contraseña</label>
+            <input class="account-input" id="reg-pass2" type="password" placeholder="••••••••" maxlength="64">
+            <span class="account-error" id="reg-err-pass2"></span>
+            <button class="account-modal-opt account-modal-register" id="reg-submit" type="button" data-i18n="account.registerBtn">Registrarme</button>
+          </div>
+        </div>
+        <!-- Vista cargando -->
+        <div class="account-view" id="account-view-loading" style="display:none">
+          <div class="account-spinner"></div>
+        </div>
+
+        <!-- Vista verificación -->
+        <div class="account-view" id="account-view-verify" style="display:none">
+          <span class="account-modal-title" data-i18n="account.verifyTitle">¡Casi listo!</span>
+          <div class="account-verify-icon">✉️</div>
+          <p class="account-modal-desc" data-i18n="account.verifyDesc">Tu cuenta necesita verificarse.<br>Revisa tu correo y haz click en el enlace de confirmación.</p>
+          <button class="account-modal-opt account-modal-login" id="reg-verify-ok" type="button" data-i18n="account.understood">Entendido</button>
+        </div>
+      </div>
+    </div>
+
     <div id="loading-social-group" class="table-gone">
       <img class="loading-howtotable" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
       <img class="loading-social-logo" src="images/logo.png" alt="City Blitz" draggable="false" oncontextmenu="return false">
@@ -395,7 +492,7 @@
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
     </div>
-    <div id="loading-version">Ver. 2.4.2 (beta test)</div>
+    <div id="loading-version">Ver. 2.5.0 (beta test)</div>
   </div>
 
   <div id="splash-screen" class="game-bg-screen" style="display:none">
@@ -801,6 +898,8 @@
     </div>
   </div>
 
+  <div id="init-cover"></div>
+
   <div id="screen-warning">
     <div id="screen-warning-box">
       <div id="screen-warning-icon">⚠️</div>
@@ -809,6 +908,8 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="js/sb.js"></script>
   <script src="js/letterbox.js"></script>
   <script src="js/i18n.js"></script>
   <script src="js/i18n-data.js"></script>
