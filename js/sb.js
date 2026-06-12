@@ -241,10 +241,23 @@ function _showRecoveryModal() {
   else waitAndShow();
 }
 
-// Supabase v2: PASSWORD_RECOVERY event es la forma correcta de detectar reset links
-sb.auth.onAuthStateChange((event) => {
+// Supabase v2: PASSWORD_RECOVERY event
+sb.auth.onAuthStateChange((event, session) => {
+  console.log('[auth] event:', event, session?.user?.id);
   if (event === 'PASSWORD_RECOVERY') _showRecoveryModal();
 });
+
+// Fallback: detectar type=recovery en hash o query params directamente
+(function() {
+  const hash   = window.location.hash;
+  const search = window.location.search;
+  const isRecoveryHash  = hash.includes('type=recovery');
+  const isRecoveryQuery = search.includes('type=recovery');
+  if (isRecoveryHash || isRecoveryQuery) {
+    console.log('[auth] recovery detectado via URL:', hash || search);
+    _showRecoveryModal();
+  }
+})();
 
 (async function() {
   const session = await window.sbGetSession();
