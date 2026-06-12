@@ -3341,7 +3341,10 @@ let isMuted = localStorage.getItem('muted') === 'true';
 
 function getAllSfx() {
   return [sfxCheck, sfxPostgame, sfxGameMusic, sfxSelect, sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus, sfxTickdown, sfxTimesUp,
-    typeof sfxLevel2 !== 'undefined' ? sfxLevel2 : null].filter(Boolean);
+    typeof sfxLevel2  !== 'undefined' ? sfxLevel2  : null,
+    typeof sfxCheer   !== 'undefined' ? sfxCheer   : null,
+    typeof sfxLoop    !== 'undefined' ? sfxLoop    : null,
+  ].filter(Boolean);
 }
 
 document.addEventListener('DOMContentLoaded', () => {

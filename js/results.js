@@ -45,12 +45,6 @@ const sfxCheer = new Audio('sfx/endgamecheeryay.mp3');
 const sfxLoop  = new Audio('sfx/endgameloop.mp3');
 sfxLoop.loop = true;
 
-// respetar el botón de silencio en vivo
-document.getElementById('vol-btn')?.addEventListener('click', () => {
-  const vol = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1;
-  sfxCheer.volume = vol;
-  sfxLoop.volume  = vol;
-});
 
 let loopStarted     = false;
 let confirmTimeout  = null;
