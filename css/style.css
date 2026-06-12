@@ -2109,6 +2109,7 @@ body:not(.is-ios) #loading-screen.table-shown > .profile-account-wrap {
   left: calc(50% + 18cqmin);
   transform: translateY(-50%);
   width: 30cqmin;
+  filter: none;
   height: auto;
   z-index: 212;
   pointer-events: none;
