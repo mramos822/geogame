@@ -286,6 +286,7 @@ function buildFlagsFriendPlayers() {
     id: `friend${i}`,
     name: f.name,
     score: f.score,
+    avatar: f.avatar || '',
     color: FLAGS_LB_COLORS[i % FLAGS_LB_COLORS.length],
     initial: (f.name && f.name[0]) ? f.name[0].toUpperCase() : '?',
   }));
@@ -316,8 +317,10 @@ function initFlagsLeaderboard() {
     const el = document.createElement('div');
     el.className = 'lb-entry';
     el.id = `flags-lb-${p.id}`;
-    el.innerHTML = `<div class="lb-avatar" style="background:${p.color}">${p.initial}</div>`
-                 + `<span class="lb-score">${p.score.toLocaleString()}</span>`;
+    el.innerHTML = (p.avatar
+      ? `<div class="lb-avatar lb-avatar-img-wrap"><img class="lb-avatar-img" src="${p.avatar}" onerror="this.parentNode.innerHTML='${p.initial}';this.parentNode.style.background='${p.color}'"></div>`
+      : `<div class="lb-avatar" style="background:${p.color}">${p.initial}</div>`)
+      + `<span class="lb-score">${p.score.toLocaleString()}</span>`;
     el.style.transition = 'none';
     el.style.top = '-9999px';
     flagsLbElements[el.id] = el;

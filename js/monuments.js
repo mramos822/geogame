@@ -1901,8 +1901,10 @@ document.getElementById('loading-friend-rel')?.addEventListener('click', () => {
     showFriendConfirm(t('confirm.removeFriend', { name: fp.name }), () => {
       const favs = getSocialFavs(); favs.delete(fp.id); saveSocialFavs(favs);
       _optimisticRelUpdate('remove', fp);
+      // No llamar loadSocialData en .then(): el delete y el re-fetch inmediato
+      // tienen race condition (Supabase aún no propagó el write a la capa de lectura).
+      // El optimistic update ya removió el amigo. El Realtime event confirma después.
       window.sbDeleteFriendship(fp.friendshipId, window._sbUserId, fp.id)
-        .then(() => loadSocialData(false))
         .catch(e => { console.warn('[social] removeFriend:', e); loadSocialData(false); });
     });
   } else if (status === 'request') {
@@ -2845,16 +2847,6 @@ function initLeaderboard() {
     lb.appendChild(el);
   });
 
-  const bestEl = document.createElement('div');
-  bestEl.className = 'lb-entry lb-best';
-  bestEl.id = 'lb-best';
-  bestEl.innerHTML = `<div class="lb-avatar lb-avatar-best">★</div>`
-                   + `<span class="lb-score" id="lb-best-score">${highscorePlayer.score > 0 ? highscorePlayer.score.toLocaleString() : '—'}</span>`;
-  bestEl.style.transition = 'none';
-  bestEl.style.top = '-9999px';
-  lbElements['lb-best'] = bestEl;
-  lb.appendChild(bestEl);
-
   const playerEl = document.createElement('div');
   playerEl.className = 'lb-entry lb-player';
   playerEl.id = 'lb-player';
@@ -2884,7 +2876,7 @@ function positionLeaderboard(playerScore, animate) {
 
   lb.style.height = (LB_WINDOW * rowH - LB_GAP) + 'px';
 
-  const all = [...mockPlayers, { id: 'best', score: highscorePlayer.score }, { id: 'player', score: playerScore }];
+  const all = [...mockPlayers, { id: 'player', score: playerScore }];
   all.sort((a, b) => b.score - a.score);
 
   const playerRank = all.findIndex(p => p.id === 'player');

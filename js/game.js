@@ -448,12 +448,18 @@ function buildWrongsRow(startOffset = 0) {
 // ── LEADERBOARD ──────────────────────────────────────────────────────────────────────────────
 const LB_COLORS = ['#e74c3c','#e67e22','#f1c40f','#2ecc71','#1abc9c',
                     '#3498db','#9b59b6','#e91e63','#00bcd4','#8bc34a'];
-const mockPlayers = Array.from({ length: 10 }, (_, i) => ({
-  id: `mock${i}`,
-  score: Math.floor(Math.random() * 9500) + 400,
-  color: LB_COLORS[i],
-  initial: 'ABCDEFGHIJ'[i],
-}));
+function buildGameFriendPlayers() {
+  const src = (typeof getFriends === 'function') ? getFriends() : [];
+  return src.map((f, i) => ({
+    id: `friend${i}`,
+    name: f.name,
+    score: f.score,
+    avatar: f.avatar || '',
+    color: LB_COLORS[i % LB_COLORS.length],
+    initial: (f.name && f.name[0]) ? f.name[0].toUpperCase() : '?',
+  }));
+}
+let mockPlayers = buildGameFriendPlayers();
 
 // Perfil del highscore propio (entrada 11)
 const highscorePlayer = { id: 'best', score: highscore, color: '#6a0dad', initial: '★' };
@@ -501,13 +507,16 @@ function initLeaderboard() {
   const lb = document.getElementById('leaderboard');
   lb.innerHTML = '';
   lbElements = {};
+  mockPlayers = buildGameFriendPlayers();
 
   mockPlayers.forEach(p => {
     const el = document.createElement('div');
     el.className = 'lb-entry';
     el.id = `lb-${p.id}`;
-    el.innerHTML = `<div class="lb-avatar" style="background:${p.color}">${p.initial}</div>`
-                 + `<span class="lb-score">${p.score.toLocaleString()}</span>`;
+    el.innerHTML = (p.avatar
+      ? `<div class="lb-avatar lb-avatar-img-wrap"><img class="lb-avatar-img" src="${p.avatar}" onerror="this.parentNode.innerHTML='${p.initial}';this.parentNode.style.background='${p.color}'"></div>`
+      : `<div class="lb-avatar" style="background:${p.color}">${p.initial}</div>`)
+      + `<span class="lb-score">${p.score.toLocaleString()}</span>`;
     el.style.transition = 'none';
     el.style.top = '-9999px';
     lbElements[el.id] = el;
@@ -515,16 +524,6 @@ function initLeaderboard() {
   });
 
   // Entrada del highscore propio
-  const bestEl = document.createElement('div');
-  bestEl.className = 'lb-entry lb-best';
-  bestEl.id = 'lb-best';
-  bestEl.innerHTML = `<div class="lb-avatar lb-avatar-best">★</div>`
-                   + `<span class="lb-score" id="lb-best-score">${highscorePlayer.score > 0 ? highscorePlayer.score.toLocaleString() : '—'}</span>`;
-  bestEl.style.transition = 'none';
-  bestEl.style.top = '-9999px';
-  lbElements['lb-best'] = bestEl;
-  lb.appendChild(bestEl);
-
   const playerEl = document.createElement('div');
   playerEl.className = 'lb-entry lb-player';
   playerEl.id = 'lb-player';
@@ -553,7 +552,7 @@ function positionLeaderboard(playerScore, animate) {
 
   lb.style.height = (LB_WINDOW * rowH - LB_GAP) + 'px';
 
-  const all = [...mockPlayers, { id: 'best', score: highscorePlayer.score }, { id: 'player', score: playerScore }];
+  const all = [...mockPlayers, { id: 'player', score: playerScore }];
   all.sort((a, b) => b.score - a.score);
 
   const playerRank = all.findIndex(p => p.id === 'player');
