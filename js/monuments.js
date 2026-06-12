@@ -918,6 +918,9 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
     window._sbUserId = null;
     window._sbProfile = null;
     document.body.classList.remove('account-logged');
+    localStorage.removeItem('profilePhoto');
+    localStorage.removeItem('playerName');
+    applyStoredProfilePic();
     // Limpiar scores completo (vuelven a 0 como guest) — nombre y foto persisten
     clearLocalScores(true);
     if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
@@ -1299,6 +1302,8 @@ function _patchFriendStatusInDOM(friendId) {
     row.className = row.className.replace(/status-\w+/, 'status-' + st.cls);
     const statusEl = row.querySelector('.loading-social-status');
     if (statusEl) statusEl.innerHTML = `<span class="dot ${st.cls}"></span>${socialStatusText(f)}`;
+    const avatarEl = row.querySelector('.loading-social-avatar');
+    if (avatarEl && f.avatar) avatarEl.src = f.avatar;
   }
   // Si el panel de detalle de ese amigo está abierto, actualizarlo también
   if (currentFriendProfile?.id === friendId) {
@@ -1326,6 +1331,18 @@ function _subscribeFriendStatuses(friendIds) {
       if (!f) return;
       f.last_active  = updated.last_active;
       f.is_playing   = updated.is_playing;
+      // Actualizar avatar si cambió
+      if (updated.avatar_url && updated.avatar_url !== f.avatar) {
+        f.avatar = updated.avatar_url;
+        if (currentFriendProfile?.id === updated.id) {
+          currentFriendProfile.avatar = updated.avatar_url;
+          const pic = document.getElementById('loading-friend-pic');
+          if (pic) pic.src = updated.avatar_url;
+        }
+        // Parchear avatar en paneles de solicitudes/enviadas/bloqueados
+        document.querySelectorAll(`.loading-social-row[data-friend-id="${updated.id}"] .loading-social-avatar`)
+          .forEach(el => { el.src = updated.avatar_url; });
+      }
       // Actualizar score si cambió (amigo terminó partida)
       const newScore = (updated.hs_flags||0)+(updated.hs_shapes||0)+(updated.hs_cities||0)+(updated.hs_monuments||0);
       if (newScore !== f.score) {
