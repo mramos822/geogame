@@ -25,7 +25,7 @@ async function loadFriends() {
   }
   try {
     const data = await window.sbLoadSocialData(window._sbUserId);
-    _friendsCache = data.friends.map(f => ({ name: f.name, score: f.score }));
+    _friendsCache = data.friends.map(f => ({ name: f.name, score: f.score, avatar: f.avatar || '' }));
   } catch (e) {
     console.warn('[friends] error cargando:', e.message);
     _friendsCache = [];

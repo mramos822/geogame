@@ -1470,7 +1470,7 @@ async function loadSocialData(showLoader = true) {
   try {
     socialData = await window.sbLoadSocialData(window._sbUserId);
     if (typeof window.Friends !== 'undefined') {
-      window.Friends._setCache(socialData.friends.map(f => ({ name: f.name, score: f.score })));
+      window.Friends._setCache(socialData.friends.map(f => ({ name: f.name, score: f.score, avatar: f.avatar || '' })));
     }
   } catch (e) {
     console.warn('[social] error cargando:', e.message);
@@ -2613,6 +2613,7 @@ function buildFriendPlayers() {
     id: `friend${i}`,
     name: f.name,
     score: f.score,
+    avatar: f.avatar || '',
     color: LB_COLORS[i % LB_COLORS.length],
     initial: (f.name && f.name[0]) ? f.name[0].toUpperCase() : '?',
   }));
@@ -2679,8 +2680,10 @@ function initLeaderboard() {
     const el = document.createElement('div');
     el.className = 'lb-entry';
     el.id = `lb-${p.id}`;
-    el.innerHTML = `<div class="lb-avatar" style="background:${p.color}">${p.initial}</div>`
-                 + `<span class="lb-score">${p.score.toLocaleString()}</span>`;
+    const avatarHTML = p.avatar
+      ? `<div class="lb-avatar lb-avatar-img-wrap"><img class="lb-avatar-img" src="${p.avatar}" onerror="this.parentNode.innerHTML='${p.initial}';this.parentNode.style.background='${p.color}'"></div>`
+      : `<div class="lb-avatar" style="background:${p.color}">${p.initial}</div>`;
+    el.innerHTML = avatarHTML + `<span class="lb-score">${p.score.toLocaleString()}</span>`;
     el.style.transition = 'none';
     el.style.top = '-9999px';
     lbElements[el.id] = el;

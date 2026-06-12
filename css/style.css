@@ -3710,6 +3710,7 @@ body.is-mobile #screen-warning-icon {
   color: #f0c040;
 }
 
+.lb-avatar-img-wrap { padding: 0; }
 .lb-avatar {
   width: 100%;
   aspect-ratio: 1 / 1;
