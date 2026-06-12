@@ -728,6 +728,7 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
             syncHsFromProfile(profile);   // hs locales ← max(local, supabase)
             clearLocalScores();           // solo avgs/playcount → 0
             if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
+            if (typeof loadFriends === 'function') loadFriends();
             if (typeof window.sbUpdateLastActive === 'function') window.sbUpdateLastActive(data.user.id).catch(() => {});
             const displayName = profile.username || uVal;
             const nameEl   = document.getElementById('account-welcome-name');
@@ -1060,6 +1061,7 @@ async function _onSessionReady(userId) {
     syncHsFromProfile(profile);  // hs locales ← max(local, supabase) para display en partida
     clearLocalScores();          // solo avgs/playcount
     if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
+    if (typeof loadFriends === 'function') loadFriends();  // poblar barra ingame con amigos reales
   } catch(e) {}
 }
 document.addEventListener('sbSessionReady', (e) => _onSessionReady(e.detail?.userId));
