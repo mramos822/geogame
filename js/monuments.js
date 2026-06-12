@@ -1526,7 +1526,7 @@ function loadGameSFX() {
   sfxBonus     = new Audio('sfx/bonus.mp3');
   sfxTickdown  = new Audio('sfx/countdown.mp3');
   sfxTimesUp   = new Audio('sfx/timesup.mp3');
-  if (isMuted) getAllSfx().forEach(sfx => { sfx.volume = 0; });
+  if (isMuted) getAllSfx().forEach(sfx => { sfx.volume = 0; sfx.muted = true; });
   // Forzar preload en iOS: sin .load() el primer play() dispara la descarga y decodificación
   [sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus, sfxTickdown, sfxTimesUp]
     .forEach(sfx => { sfx.load(); });
@@ -3109,7 +3109,7 @@ function confirmCooldownLock() {
 document.querySelector('.splash-confirm-wrap')?.addEventListener('click', () => {
   if (confirmCooldown) return;
   confirmCooldownLock();
-  const a = new Audio('sfx/check.mp3'); a.volume = isMuted ? 0 : 1; a.play();
+  const a = new Audio('sfx/check.mp3'); a.volume = isMuted ? 0 : 1; a.muted = isMuted; a.play();
   const wrap = document.querySelector('.splash-confirm-wrap');
   wrap.classList.add('confirm-pressed');
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
@@ -3148,7 +3148,7 @@ document.querySelector('.splash-confirm-wrap')?.addEventListener('click', () => 
 document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () => {
   if (confirmCooldown) return;
   confirmCooldownLock();
-  const a = new Audio('sfx/check.mp3'); a.volume = isMuted ? 0 : 1; a.play();
+  const a = new Audio('sfx/check.mp3'); a.volume = isMuted ? 0 : 1; a.muted = isMuted; a.play();
   const wrap = document.querySelector('.gameover-confirm-wrap');
   wrap.classList.add('confirm-pressed');
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
@@ -3373,7 +3373,7 @@ document.getElementById('vol-btn')?.addEventListener('click', () => {
   isMuted = !isMuted;
   localStorage.setItem('muted', isMuted);
   const vol = isMuted ? 0 : 1;
-  getAllSfx().forEach(sfx => { sfx.volume = vol; });
+  getAllSfx().forEach(sfx => { sfx.volume = vol; sfx.muted = isMuted; });
   applyMusicMute(); // iOS: la música va por Web Audio (gain); en PC es no-op
   document.getElementById('vol-img').src = isMuted ? 'images/vol2.png' : 'images/vol1.png';
   const a = new Audio('sfx/check.mp3'); a.volume = 1; a.play();
@@ -3471,7 +3471,7 @@ document.getElementById('vol-btn')?.addEventListener('click', () => {
   wrap.addEventListener('click', () => {
     if (confirmCooldown) return;
     confirmCooldownLock();
-    const a = new Audio('sfx/check.mp3'); a.volume = isMuted ? 0 : 1; a.play();
+    const a = new Audio('sfx/check.mp3'); a.volume = isMuted ? 0 : 1; a.muted = isMuted; a.play();
     wrap.classList.add('confirm-pressed');
     setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
     document.getElementById('loading-screen').style.display = 'none';

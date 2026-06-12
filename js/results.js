@@ -199,7 +199,7 @@ function startResultsLoop() {
   if (loopStarted) return;
   loopStarted = true;
   sfxLoop.currentTime = 0;
-  sfxLoop.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1;
+  sfxLoop.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; sfxLoop.muted = (typeof isMuted !== 'undefined' && isMuted);
   sfxLoop.play().catch(e => console.error('loop play failed:', e));
 }
 
@@ -308,7 +308,7 @@ function showResultsScreen() {
   // el cheer) pueda sonar sin gesto.
   sfxLoop.play().then(() => { if (!loopStarted) { sfxLoop.pause(); sfxLoop.currentTime = 0; } }).catch(() => {});
   sfxCheer.currentTime = 0;
-  sfxCheer.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1;
+  sfxCheer.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; sfxCheer.muted = (typeof isMuted !== 'undefined' && isMuted);
   sfxCheer.play().catch(e => console.error('cheer play failed:', e));
   clearTimeout(confirmTimeout);
   confirmTimeout = setTimeout(() => resultsConfirm.classList.add('visible'), 300);
