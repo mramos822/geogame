@@ -3438,30 +3438,17 @@ document.getElementById('vol-btn')?.addEventListener('click', () => {
   vp.addEventListener('scroll', fix);
 })();
 
-// ── SCREEN SIZE WARNING ───────────────────────────────────────────────────────
+// ── SCREEN ORIENTATION WARNING (mobile only) ─────────────────────────────────
 (function () {
-  const warning = document.getElementById('screen-warning');
-  const msg     = document.getElementById('screen-warning-msg');
-  const MIN_W   = 480;
-  const MIN_H   = 320;
-  const MAX_RATIO = 2.8;
+  const warning  = document.getElementById('screen-warning');
+  const isMobile = navigator.maxTouchPoints > 1;
 
   function check() {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    const ratio = w / h;
-    let text = '';
-
-    if (w < MIN_W || h < MIN_H) {
-      text = t('screen.tooSmall');
-    } else if (ratio > MAX_RATIO) {
-      text = t('screen.tooWide');
-    } else if (ratio < 1 / MAX_RATIO) {
-      text = t('screen.tooTall');
-    }
-
-    if (text) {
-      msg.textContent = text;
+    if (!isMobile) { warning.classList.remove('visible'); return; }
+    const vp = window.visualViewport;
+    const w  = vp ? vp.width  : window.innerWidth;
+    const h  = vp ? vp.height : window.innerHeight;
+    if (w < h) {
       warning.classList.add('visible');
     } else {
       warning.classList.remove('visible');
@@ -3469,6 +3456,8 @@ document.getElementById('vol-btn')?.addEventListener('click', () => {
   }
 
   window.addEventListener('resize', check);
+  window.addEventListener('orientationchange', () => setTimeout(check, 150));
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', check);
   check();
 })();
 

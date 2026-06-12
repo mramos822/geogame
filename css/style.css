@@ -2662,7 +2662,14 @@ body:not(.is-ios) #loading-screen.table-shown > .loading-center-group {
 }
 
 #screen-warning-icon {
-  font-size: 48px;
+  font-size: 56px;
+  animation: rotate-hint 1.6s ease-in-out infinite;
+}
+
+@keyframes rotate-hint {
+  0%,100% { transform: rotate(0deg); }
+  40%      { transform: rotate(90deg); }
+  60%      { transform: rotate(90deg); }
 }
 
 #screen-warning-msg {
