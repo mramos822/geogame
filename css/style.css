@@ -2002,6 +2002,14 @@ body:not(.is-ios) #loading-screen.table-shown > .profile-account-wrap {
 .loading-friend-act:hover  { transform: scale(1.08); }
 .loading-friend-act:active { transform: scale(0.94); }
 .loading-friend-act.hidden { visibility: hidden; pointer-events: none; }
+/* Amigo desconectado: panel de detalle en gris */
+#loading-friend-group.is-offline .loading-profile-pic,
+#loading-friend-group.is-offline #loading-friend-rank,
+#loading-friend-group.is-offline .loading-friend-emote {
+  filter: grayscale(1) opacity(0.6);
+}
+#loading-friend-group.is-offline .loading-friend-status { color: #6f6c64; }
+
 /* Persona bloqueada: fav y relación quedan en gris e inútiles */
 .loading-friend-actions.is-blocked .loading-friend-fav,
 .loading-friend-actions.is-blocked .loading-friend-rel {

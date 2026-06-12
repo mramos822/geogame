@@ -1259,13 +1259,21 @@ function getStatusObj(f) {
 
 function socialStatusText(f) {
   if (!f || !f.last_active) return t('social.offline') || 'Sin conexión';
-  const secsAgo = (Date.now() - new Date(f.last_active)) / 1000;
-  const minsAgo = secsAgo / 60;
+  const secsAgo  = (Date.now() - new Date(f.last_active)) / 1000;
+  const minsAgo  = secsAgo / 60;
+  const hoursAgo = minsAgo / 60;
+  const daysAgo  = hoursAgo / 24;
+  const monthsAgo = daysAgo / 30.5;
+  const yearsAgo  = daysAgo / 365;
   if (secsAgo <= 20 && f.is_playing) return t('social.playing') || 'Jugando';
   if (secsAgo <= 20) return t('social.online') || 'En línea';
-  if (minsAgo < 60)  { const m = Math.max(1, Math.round(minsAgo)); return `Hace ${m}min`; }
-  if (minsAgo < 1440){ const h = Math.round(minsAgo / 60); return `Hace ${h}h`; }
-  const d = Math.round(minsAgo / 1440); return `Hace ${d}d`;
+  let n, unit;
+  if (yearsAgo >= 1)       { n = Math.round(yearsAgo);  unit = t(n === 1 ? 'social.unitYear'  : 'social.unitYears');  }
+  else if (monthsAgo >= 1) { n = Math.round(monthsAgo); unit = t(n === 1 ? 'social.unitMonth' : 'social.unitMonths'); }
+  else if (daysAgo >= 1)   { n = Math.round(daysAgo);   unit = t(n === 1 ? 'social.unitDay'   : 'social.unitDays');   }
+  else if (hoursAgo >= 1)  { n = Math.round(hoursAgo);  unit = t(n === 1 ? 'social.unitHour'  : 'social.unitHours');  }
+  else                     { n = Math.max(1, Math.round(minsAgo)); unit = t(n === 1 ? 'social.unitMin' : 'social.unitMins'); }
+  return t('social.ago', { n, unit });
 }
 
 function updateSocialTabCounts() {
@@ -1438,7 +1446,12 @@ function openFriendProfile(friend) {
   }
 
   updateFriendButtons();
-  document.getElementById('loading-friend-group')?.classList.remove('table-gone');
+  const friendGroup = document.getElementById('loading-friend-group');
+  if (friendGroup) {
+    friendGroup.classList.remove('table-gone');
+    const isOffline = getStatusObj(friend).cls === 'offline';
+    friendGroup.classList.toggle('is-offline', isOffline);
+  }
 }
 
 // ── Botones de relación del perfil de amigo ───────────────────────────────────
