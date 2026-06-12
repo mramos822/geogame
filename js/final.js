@@ -104,6 +104,13 @@ function showFinalScreen() {
       getComputedStyle(document.documentElement).getPropertyValue('--app-fit');
     }
     buildFriendClouds(ranking, pos);
+    // iOS: visualViewport puede estar desactualizado en el primer render.
+    // Segundo refresh a 300ms garantiza que el viewport está estabilizado.
+    setTimeout(() => {
+      if (finalScreen.style.display === 'none') return;
+      if (typeof window.letterboxRefresh === 'function') window.letterboxRefresh();
+      buildFriendClouds(ranking, pos);
+    }, 300);
   }));
 }
 

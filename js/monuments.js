@@ -2349,7 +2349,19 @@ function slideMonumentIn(monument) {
   tagImg.style.height = 'auto';
   cityTagText.style.display = 'none';
   monumentImgEl.src = `images/places/${monument.img}`;
+  if (monumentImgEl.decode) monumentImgEl.decode().catch(() => {});
   monumentImgEl.style.display = 'block';
+
+  // Precargar la imagen del próximo monumento en background
+  if (state && state.monumentPool) {
+    const nextIdx = state.poolIndex < state.monumentPool.length ? state.poolIndex : 0;
+    const nextM   = state.monumentPool[nextIdx];
+    if (nextM && nextM.img) {
+      const pre = new Image();
+      pre.src = `images/places/${nextM.img}`;
+      if (pre.decode) pre.decode().catch(() => {});
+    }
+  }
 
   cityTagEl.style.transition  = 'none';
   cityTagEl.style.left        = tpx(-50);

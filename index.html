@@ -72,12 +72,12 @@
         <button class="loading-lang-option" type="button" data-lang="es">Español</button>
       </div>
     </div>
-    <div style="display:none;">
-      <div class="test-confirm-wrap">
+    <div style="display:flex;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);gap:20px;z-index:9999;">
+      <div class="test-confirm-wrap" style="position:relative;transform:none;top:auto;left:auto;">
         <img class="test-confirm1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
         <img class="test-confirm2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
-      <div class="final-confirm-wrap" id="final-confirm-wrap">
+      <div class="final-confirm-wrap" id="final-confirm-wrap" style="position:relative;">
         <img class="final-confirm1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
         <img class="final-confirm2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
@@ -395,7 +395,7 @@
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
     </div>
-    <div id="loading-version">Ver. 2.4.1 (beta test)</div>
+    <div id="loading-version">Ver. 2.4.2 (beta test)</div>
   </div>
 
   <div id="splash-screen" class="game-bg-screen" style="display:none">
