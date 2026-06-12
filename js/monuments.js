@@ -1140,6 +1140,8 @@ if (window._sessionReady && window._sbUserId) _onSessionReady(window._sbUserId);
     const input = document.getElementById('loading-profile-pic-input');
     if (!wrap || !input) return;
     wrap.addEventListener('click', () => { input.value = ''; input.click(); });
+    // También desde el modal de cuenta
+    document.getElementById('account-modal-pic-wrap')?.addEventListener('click', () => { input.value = ''; input.click(); });
     input.addEventListener('change', () => {
       const file = input.files[0];
       if (!file) return;
