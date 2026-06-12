@@ -1492,6 +1492,8 @@ async function loadSocialData(showLoader = true) {
   }
   renderSocial(document.getElementById('loading-social-search-input')?.value || '');
   updateSocialTabCounts();
+  if (!document.getElementById('loading-blocked-group')?.classList.contains('table-gone')) renderBlockedList();
+  if (!document.getElementById('loading-sent-group')?.classList.contains('table-gone'))    renderSentList();
   _subscribeFriendStatuses(socialData.friends.map(f => f.id));
   _startSocialListPoll();
   // Si el panel de detalle de amigo está abierto, sincronizar friendshipId y botones
@@ -1791,6 +1793,8 @@ function _optimisticRelUpdate(action, fp) {
   updateFriendButtons();
   renderSocial(document.getElementById('loading-social-search-input')?.value || '');
   updateSocialTabCounts();
+  if (!document.getElementById('loading-blocked-group')?.classList.contains('table-gone')) renderBlockedList();
+  if (!document.getElementById('loading-sent-group')?.classList.contains('table-gone'))    renderSentList();
   loadSocialData(false); // sync en background
 }
 
