@@ -1118,6 +1118,30 @@ body.is-ios .wrong-count-total { top: 29.5cqmin; }
   backface-visibility: hidden;
 }
 .loading-secondary-btn:hover { transform: translateZ(0) scale(1.08); }
+.loading-secondary-btn { position: relative; }
+.social-notif-badge {
+  position: absolute;
+  top: -0.5cqmin;
+  right: -0.5cqmin;
+  width: 6.5cqmin;
+  height: 6.5cqmin;
+  background: #e03030;
+  border: 0.6cqmin solid #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 4cqmin;
+  font-weight: 900;
+  color: #fff;
+  pointer-events: none;
+  animation: notif-pop 0.35s cubic-bezier(0.34,1.56,0.64,1) both;
+  z-index: 5;
+}
+@keyframes notif-pop {
+  from { transform: scale(0); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
 .loading-secondary-btn img {
   width: clamp(22cqmin, 32cqmin, 37cqmin);
   height: auto;

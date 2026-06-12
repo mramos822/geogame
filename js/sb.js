@@ -154,10 +154,10 @@ window.sbBlockUser = async function(fromId, targetId, friendshipId) {
 
 window.sbDeleteFriendship = async function(friendshipId, userA, userB) {
   if (friendshipId) {
-    const { error } = await sb.from('friendships').delete().eq('id', friendshipId);
-    if (!error) return;
+    const { data, error } = await sb.from('friendships').delete().eq('id', friendshipId).select();
+    if (!error && data && data.length > 0) return; // borrado confirmado
   }
-  // Fallback: borrar por usuarios si el ID falla o es nulo
+  // Fallback: el ID era nulo, inválido o la fila ya no existía con ese ID
   if (userA && userB) {
     await sb.from('friendships').delete()
       .or(`and(user_a.eq.${userA},user_b.eq.${userB}),and(user_a.eq.${userB},user_b.eq.${userA})`);

@@ -1433,6 +1433,9 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
   }
   document.getElementById('loading-social-group')?.classList.remove('table-gone');
   document.getElementById('loading-screen').classList.add('table-shown');
+  // Ocultar badge al entrar al panel
+  const badge = document.getElementById('social-notif-badge');
+  if (badge) badge.style.display = 'none';
   loadSocialData();
 });
 
@@ -1464,6 +1467,7 @@ document.getElementById('loading-social-back-wrap')?.addEventListener('click', (
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
   document.getElementById('loading-social-group')?.classList.add('table-gone');
   document.getElementById('loading-screen').classList.remove('table-shown');
+  _updateSocialBadge();
 });
 
 // ── Lista de amigos del panel social ─────────────────────────────────────────
@@ -1525,6 +1529,25 @@ function updateSocialTabCounts() {
   const requestsTab = document.getElementById('loading-social-tab-requests');
   if (friendsTab)  friendsTab.textContent = `${t('social.tab.friends')} (${socialData.friends.length})`;
   if (requestsTab) requestsTab.textContent = `${t('social.tab.requests')} (${socialData.requests.length})`;
+  _updateSocialBadge();
+}
+
+function _updateSocialBadge() {
+  const badge = document.getElementById('social-notif-badge');
+  if (!badge) return;
+  const panelOpen = !document.getElementById('loading-social-group')?.classList.contains('table-gone');
+  const hasRequests = socialData.requests.length > 0;
+  if (hasRequests && !panelOpen) {
+    if (badge.style.display === 'none') {
+      badge.style.display = 'flex';
+      // re-trigger animation on each new appearance
+      badge.style.animation = 'none';
+      void badge.offsetWidth;
+      badge.style.animation = '';
+    }
+  } else {
+    badge.style.display = 'none';
+  }
 }
 
 // Carga todos los datos sociales desde Supabase y re-renderiza.
