@@ -1246,9 +1246,41 @@ document.getElementById('loading-profile-btn')?.addEventListener('click', () => 
 });
 
 let _socialListPollInterval = null;
+
+async function _patchSocialStatuses() {
+  if (!window._sbUserId || !socialData.friends.length) return;
+  try {
+    const ids = socialData.friends.map(f => f.id);
+    const { data } = await window.sb.from('profiles')
+      .select('id,last_active,is_playing').in('id', ids);
+    if (!data) return;
+    const map = {};
+    data.forEach(r => { map[r.id] = r; });
+    socialData.friends.forEach(f => {
+      if (map[f.id]) {
+        f.last_active = map[f.id].last_active;
+        f.is_playing  = map[f.id].is_playing;
+      }
+    });
+    // Parchear solo los span de status en los rows existentes (sin re-renderizar)
+    const list = document.getElementById('loading-social-list');
+    if (!list) return;
+    const friendMap = {};
+    socialData.friends.forEach(f => { friendMap[f.id] = f; });
+    list.querySelectorAll('.loading-social-row[data-friend-id]').forEach(row => {
+      const f = friendMap[row.dataset.friendId];
+      if (!f) return;
+      const st = getStatusObj(f);
+      row.className = row.className.replace(/status-\w+/, 'status-' + st.cls);
+      const statusEl = row.querySelector('.loading-social-status');
+      if (statusEl) statusEl.innerHTML = `<span class="dot ${st.cls}"></span>${socialStatusText(f)}`;
+    });
+  } catch(e) {}
+}
+
 function _startSocialListPoll() {
   clearInterval(_socialListPollInterval);
-  _socialListPollInterval = setInterval(() => loadSocialData(false), 15000);
+  _socialListPollInterval = setInterval(_patchSocialStatuses, 15000);
 }
 function _stopSocialListPoll() {
   clearInterval(_socialListPollInterval);
@@ -1449,6 +1481,7 @@ function renderSocialFriends(filter = '') {
     const st = getStatusObj(f);
     const row = document.createElement('div');
     row.className = 'loading-social-row status-' + st.cls + (fav ? ' is-fav' : '');
+    row.dataset.friendId = f.id;
     row.innerHTML =
       `<img class="loading-social-avatar" src="${f.avatar}" alt="" draggable="false" oncontextmenu="return false">` +
       `<div class="loading-social-info">` +
