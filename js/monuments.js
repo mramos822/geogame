@@ -1299,19 +1299,23 @@ function _subscribeFriendStatuses(friendIds) {
     .subscribe();
 }
 
-// Poll cada 20s para detectar desconexiones (last_active deja de actualizarse,
-// no hay evento Realtime para eso)
+// Poll cada 10s para detectar desconexiones y actualizar textos de tiempo
+// (last_active deja de actualizarse al desconectarse — no hay evento Realtime)
 function _startSocialListPoll() {
   clearInterval(_socialListPollInterval);
   _socialListPollInterval = setInterval(() => {
     const panelOpen = !document.getElementById('loading-social-group')?.classList.contains('table-gone');
     if (!panelOpen) return;
-    renderSocial(document.getElementById('loading-social-search-input')?.value || '');
-    // También actualizar panel de detalle si está abierto
-    if (typeof currentFriendProfile !== 'undefined' && currentFriendProfile) {
-      if (typeof _applyFriendPanelStatus === 'function') _applyFriendPanelStatus(currentFriendProfile);
+    const friendDetailOpen = !document.getElementById('loading-friend-group')?.classList.contains('table-gone');
+    if (friendDetailOpen) {
+      if (typeof currentFriendProfile !== 'undefined' && currentFriendProfile &&
+          typeof _applyFriendPanelStatus === 'function') {
+        _applyFriendPanelStatus(currentFriendProfile);
+      }
+    } else {
+      renderSocial(document.getElementById('loading-social-search-input')?.value || '');
     }
-  }, 20000);
+  }, 10000);
 }
 function _stopSocialListPoll() {
   clearInterval(_socialListPollInterval);
