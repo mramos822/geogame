@@ -212,33 +212,39 @@ window.sbLoadSocialData = async function(userId) {
 };
 
 // ── SESIÓN PERSISTENTE: restaurar al recargar ─────────────────────────────────
+// Mostrar modal de nueva contraseña (recovery link)
+function _showRecoveryModal() {
+  history.replaceState(null, '', window.location.pathname);
+  function show() {
+    const modal = document.getElementById('account-modal');
+    const viewChangePass = document.getElementById('account-view-change-pass');
+    if (!modal || !viewChangePass) return;
+    ['chpass-current','chpass-new','chpass-confirm'].forEach(id => { const el = document.getElementById(id); if (el) { el.value = ''; el.classList.remove('input-error'); } });
+    document.querySelectorAll('[id^="chpass-err"]').forEach(el => { el.textContent = ''; });
+    const strengthWrap = document.getElementById('chpass-strength-wrap');
+    if (strengthWrap) strengthWrap.style.display = 'none';
+    const currentWrap = document.getElementById('chpass-current-wrap');
+    if (currentWrap) currentWrap.style.display = 'none';
+    document.querySelectorAll('#account-modal .account-view').forEach(el => { el.style.display = 'none'; });
+    viewChangePass.style.display = 'flex';
+    modal.classList.add('open');
+    window._isPasswordReset = true;
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', show);
+  else setTimeout(show, 300);
+}
+
+// Supabase v2: PASSWORD_RECOVERY event es la forma correcta de detectar reset links
+sb.auth.onAuthStateChange((event) => {
+  if (event === 'PASSWORD_RECOVERY') _showRecoveryModal();
+});
+
 (async function() {
   const session = await window.sbGetSession();
   // Detectar redirección de verificación de email (signup o email_change)
   const hash = window.location.hash;
-  const isSignupVerify     = hash.includes('type=signup')       && hash.includes('access_token');
-  const isEmailChange      = hash.includes('type=email_change') && hash.includes('access_token');
-  const isRecovery         = hash.includes('type=recovery')     && hash.includes('access_token');
-  if (isRecovery) {
-    history.replaceState(null, '', window.location.pathname);
-    function showRecoveryModal() {
-      const modal = document.getElementById('account-modal');
-      const viewChangePass = document.getElementById('account-view-change-pass');
-      if (!modal || !viewChangePass) return;
-      ['chpass-current','chpass-new','chpass-confirm'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-      document.querySelectorAll('[id^="chpass-err"]').forEach(el => { el.textContent = ''; });
-      const strengthWrap = document.getElementById('chpass-strength-wrap');
-      if (strengthWrap) strengthWrap.style.display = 'none';
-      const currentWrap = document.getElementById('chpass-current-wrap');
-      if (currentWrap) currentWrap.style.display = 'none';
-      document.querySelectorAll('#account-modal .account-view').forEach(el => { el.style.display = 'none'; });
-      viewChangePass.style.display = 'flex';
-      modal.classList.add('open');
-      window._isPasswordReset = true;
-    }
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', showRecoveryModal);
-    else setTimeout(showRecoveryModal, 300);
-  }
+  const isSignupVerify = hash.includes('type=signup')       && hash.includes('access_token');
+  const isEmailChange  = hash.includes('type=email_change') && hash.includes('access_token');
   if (isSignupVerify || isEmailChange) {
     history.replaceState(null, '', window.location.pathname);
     function showVerifiedPopup() {
