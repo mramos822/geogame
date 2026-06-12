@@ -20,6 +20,7 @@ const I18N = {
     // Primer ingreso (nombre)
     'name.welcome': '¡Bienvenido!', 'name.askName': '¿Cómo te llamas?',
     'name.ph': 'Tu nombre...', 'name.confirm': 'Confirmar',
+    'name.orDivider': 'o', 'name.hasAccount': '¿Tienes cuenta? Inicia sesión o regístrate',
     'name.greet': '¡Hola, {name}!', 'name.greetSub': '¡Demuestra quién sabe más países, banderas y ciudades del mundo. Consigue tu ranking y supera a tus amigos!',
     // Social
     'social.title': 'Panel de Amigos', 'social.sort.conn': 'Conexión',
@@ -121,6 +122,7 @@ const I18N = {
     'common.speedBonus': 'Speed bonus!', 'common.continue': 'Continue',
     'name.welcome': 'Welcome!', 'name.askName': "What's your name?",
     'name.ph': 'Your name...', 'name.confirm': 'Confirm',
+    'name.orDivider': 'or', 'name.hasAccount': 'Have an account? Sign in / Register',
     'name.greet': 'Hello, {name}!', 'name.greetSub': 'Prove once and for all who knows the most countries, flags and cities in the world. Get your ranking and beat your friends!',
     'social.title': 'Friends Panel', 'social.sort.conn': 'Connection',
     'social.tab.friends': 'My Friends', 'social.tab.requests': 'Requests',

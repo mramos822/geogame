@@ -603,7 +603,7 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
   const close = document.getElementById('account-modal-close');
   const login = document.getElementById('account-modal-login');
   const reg   = document.getElementById('account-modal-register');
-  if (!btn || !modal) return;
+  if (!modal) return;
 
   const viewMain           = document.getElementById('account-view-main');
   const viewLogin          = document.getElementById('account-view-login');
@@ -665,6 +665,14 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
   }
   function closeModal() { modal.classList.remove('open'); }
 
+  // Expuesto para que el name-prompt abra el modal directamente en login o register
+  window.openAccountModal = function (startView) {
+    if (startView === 'login')    { showView(viewLogin);    modal.classList.add('open'); return; }
+    if (startView === 'register') { showView(viewRegister); modal.classList.add('open'); return; }
+    openModal();
+  };
+
+  if (!btn) return;
   btn.addEventListener('click', () => { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); openModal(); });
   close.addEventListener('click', () => {
     sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
@@ -1253,6 +1261,34 @@ _updateProfileBtnLabel();
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); submit(); }
     });
+
+    // Botón "¿Tenés cuenta?" — abre el modal de cuenta en la vista principal
+    const accountBtn = document.getElementById('name-prompt-account-btn');
+    if (accountBtn) {
+      accountBtn.addEventListener('click', () => {
+        try { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); } catch (e) {}
+        if (typeof window.openAccountModal === 'function') window.openAccountModal();
+        else document.getElementById('account-modal')?.classList.add('open');
+      });
+    }
+
+    // Cuando se cierre el modal de cuenta con sesión iniciada, cerrar el name-prompt
+    const accountModal = document.getElementById('account-modal');
+    if (accountModal) {
+      const observer = new MutationObserver(() => {
+        if (!accountModal.classList.contains('open') && window._accountLoggedIn) {
+          observer.disconnect();
+          prompt.classList.remove('visible');
+          // Aplicar el nombre de la cuenta al loading screen
+          const loggedName = localStorage.getItem('playerName');
+          if (loggedName) {
+            const el = document.getElementById('loading-player-name');
+            if (el) el.textContent = loggedName;
+          }
+        }
+      });
+      observer.observe(accountModal, { attributes: true, attributeFilter: ['class'] });
+    }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initNamePrompt);
   else initNamePrompt();
