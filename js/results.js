@@ -322,7 +322,6 @@ function showResultsScreen() {
         .catch(e => console.warn('[scores] upload:', e));
     }
   }
-  if (typeof window._setPlaying === 'function') window._setPlaying(false);
   loopStarted = false;
   sfxLoop.pause();
   sfxLoop.currentTime = 0;

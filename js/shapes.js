@@ -839,7 +839,6 @@ function showShapesMode() {
       if (shapesTimeLeft <= 0) {
         clearInterval(shapesTimerIntervalId);
         shapesRunning = false;
-        if (typeof window._setPlaying === 'function') window._setPlaying(false);
         clearTimeout(shapesTagsTimeout); shapesTagsTimeout = null;
         document.querySelectorAll('.shapes-tag').forEach(el => { el.style.cursor = 'default'; el.style.pointerEvents = 'none'; });
         document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());

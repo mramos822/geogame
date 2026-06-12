@@ -28,6 +28,7 @@ function _onFinalResize() {
 
 function showFinalScreen() {
   finalScreen.style.display = 'block';
+  if (typeof window._setPlaying === 'function') window._setPlaying(false);
   if (!window._accountLoggedIn) localStorage.setItem('playCount', String(parseInt(localStorage.getItem('playCount') || '0', 10) + 1));
   const backWrap = document.getElementById('final-confirm-back-wrap');
   if (backWrap) {

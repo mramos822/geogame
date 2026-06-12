@@ -1041,7 +1041,6 @@ function hideFlagsMode() {
   clearInterval(flagsTimerIntervalId);
   flagsRunning = false;
   clearFlagsElimination();
-  if (typeof window._setPlaying === 'function') window._setPlaying(false);
 
   const finalScore = Math.round(flagsScore);
   window.lastModeScore = finalScore;

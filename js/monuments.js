@@ -1283,6 +1283,11 @@ document.getElementById('loading-profile-btn')?.addEventListener('click', () => 
 
 let _friendRealtimeChannel = null;
 let _friendshipsChannel    = null;
+let _socialReloadTimer     = null;
+function _debouncedLoadSocial() {
+  clearTimeout(_socialReloadTimer);
+  _socialReloadTimer = setTimeout(() => loadSocialData(false), 400);
+}
 let _socialListPollInterval = null;
 
 function _patchFriendStatusInDOM(friendId) {
@@ -1303,11 +1308,12 @@ function _patchFriendStatusInDOM(friendId) {
   }
 }
 
+let _lastSubscribedFriendIds = '';
 function _subscribeFriendStatuses(friendIds) {
-  if (_friendRealtimeChannel) {
-    window.sb.removeChannel(_friendRealtimeChannel);
-    _friendRealtimeChannel = null;
-  }
+  const key = [...friendIds].sort().join(',');
+  if (_friendRealtimeChannel && key === _lastSubscribedFriendIds) return; // sin cambios
+  if (_friendRealtimeChannel) { window.sb.removeChannel(_friendRealtimeChannel); _friendRealtimeChannel = null; }
+  _lastSubscribedFriendIds = key;
   if (!friendIds.length) return;
   _friendRealtimeChannel = window.sb
     .channel('friend-statuses')
@@ -1318,15 +1324,38 @@ function _subscribeFriendStatuses(friendIds) {
       const updated = payload.new;
       const f = socialData.friends.find(x => x.id === updated.id);
       if (!f) return;
-      f.last_active = updated.last_active;
-      f.is_playing  = updated.is_playing;
-      // Si el panel social está visible, re-renderizar la lista
-      const panelOpen = !document.getElementById('loading-social-group')?.classList.contains('table-gone');
-      if (panelOpen) {
-        renderSocial(document.getElementById('loading-social-search-input')?.value || '');
+      f.last_active  = updated.last_active;
+      f.is_playing   = updated.is_playing;
+      // Actualizar score si cambió (amigo terminó partida)
+      const newScore = (updated.hs_flags||0)+(updated.hs_shapes||0)+(updated.hs_cities||0)+(updated.hs_monuments||0);
+      if (newScore !== f.score) {
+        f.score       = newScore;
+        f.hs_flags    = updated.hs_flags    || 0;
+        f.hs_shapes   = updated.hs_shapes   || 0;
+        f.hs_cities   = updated.hs_cities   || 0;
+        f.hs_monuments= updated.hs_monuments|| 0;
+        // Si el panel de detalle está abierto para este amigo, actualizar stats
+        if (currentFriendProfile?.id === updated.id) {
+          currentFriendProfile.score        = f.score;
+          currentFriendProfile.hs_flags     = f.hs_flags;
+          currentFriendProfile.hs_shapes    = f.hs_shapes;
+          currentFriendProfile.hs_cities    = f.hs_cities;
+          currentFriendProfile.hs_monuments = f.hs_monuments;
+          const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+          const modeHs = [f.hs_flags, f.hs_shapes, f.hs_cities, f.hs_monuments];
+          modeHs.forEach((hs, k) => { setText('loading-friend-avg'+(k+1), hs.toLocaleString()); setText('loading-friend-hs'+(k+1), hs.toLocaleString()); });
+          setText('loading-friend-total', f.score.toLocaleString());
+          const rk = (typeof getRank === 'function') ? getRank(f.score) : null;
+          const rankImg = document.getElementById('loading-friend-rank');
+          if (rankImg && rk) rankImg.src = rk.img;
+          const rankLabel = document.getElementById('loading-friend-rank-label');
+          if (rankLabel && rk) rankLabel.textContent = rk.name;
+        }
       }
-      // Si el panel de detalle de ese amigo está abierto, actualizarlo también
-      if (typeof currentFriendProfile !== 'undefined' && currentFriendProfile?.id === updated.id) {
+      // Parchear solo el status del row sin reconstruir el DOM (evita reiniciar animaciones)
+      _patchFriendStatusInDOM(updated.id);
+      // Si el panel de detalle está abierto para este amigo, actualizar status
+      if (currentFriendProfile?.id === updated.id) {
         currentFriendProfile.last_active = updated.last_active;
         currentFriendProfile.is_playing  = updated.is_playing;
         if (typeof _applyFriendPanelStatus === 'function') _applyFriendPanelStatus(currentFriendProfile);
@@ -1342,7 +1371,7 @@ function _subscribeFriendshipChanges(userId) {
     .channel('friendship-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, (payload) => {
       const row = (payload.new && payload.new.user_a) ? payload.new : (payload.old || {});
-      if (row.user_a === userId || row.user_b === userId) loadSocialData(false);
+      if (row.user_a === userId || row.user_b === userId) _debouncedLoadSocial();
     })
     .subscribe();
 }
@@ -1361,7 +1390,8 @@ function _startSocialListPoll() {
         _applyFriendPanelStatus(currentFriendProfile);
       }
     } else {
-      renderSocial(document.getElementById('loading-social-search-input')?.value || '');
+      // Solo parchear textos de estado sin reconstruir DOM (evita reiniciar animaciones)
+      socialData.friends.forEach(f => _patchFriendStatusInDOM(f.id));
     }
   }, 10000);
 }
