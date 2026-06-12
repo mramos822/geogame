@@ -1297,14 +1297,22 @@ function _patchFriendStatusInDOM(friendId) {
   const f = socialData.friends.find(x => x.id === friendId);
   if (!f) return;
   const st = getStatusObj(f);
-  const row = document.querySelector(`.loading-social-row[data-friend-id="${friendId}"]`);
-  if (row) {
-    row.className = row.className.replace(/status-\w+/, 'status-' + st.cls);
-    const statusEl = row.querySelector('.loading-social-status');
-    if (statusEl) statusEl.innerHTML = `<span class="dot ${st.cls}"></span>${socialStatusText(f)}`;
+  const rk = (typeof getRank === 'function') ? getRank(f.score) : null;
+  document.querySelectorAll(`.loading-social-row[data-friend-id="${friendId}"]`).forEach(row => {
+    if (row.querySelector('.loading-social-status')) {
+      row.className = row.className.replace(/status-\w+/, 'status-' + st.cls);
+      const statusEl = row.querySelector('.loading-social-status');
+      if (statusEl) statusEl.innerHTML = `<span class="dot ${st.cls}"></span>${socialStatusText(f)}`;
+    }
     const avatarEl = row.querySelector('.loading-social-avatar');
     if (avatarEl && f.avatar) avatarEl.src = f.avatar;
-  }
+    const scoreVal = row.querySelector('.loading-social-score-val');
+    if (scoreVal) scoreVal.textContent = f.score.toLocaleString();
+    const rankName = row.querySelector('.loading-social-rankname');
+    if (rankName && rk) rankName.textContent = rk.name;
+    const rankImg = row.querySelector('.loading-social-emote');
+    if (rankImg && rk) rankImg.src = rk.img;
+  });
   // Si el panel de detalle de ese amigo está abierto, actualizarlo también
   if (currentFriendProfile?.id === friendId) {
     currentFriendProfile.last_active = f.last_active;
@@ -1567,6 +1575,7 @@ function renderSocialRequests(filter = '') {
   reqs.forEach((f) => {
     const row = document.createElement('div');
     row.className = 'loading-social-row loading-social-request';
+    row.dataset.friendId = f.id;
     row.innerHTML =
       `<img class="loading-social-avatar" src="${f.avatar}" alt="" draggable="false" oncontextmenu="return false">` +
       `<div class="loading-social-info">` +
@@ -1869,7 +1878,7 @@ document.getElementById('loading-friend-rel')?.addEventListener('click', () => {
     showFriendConfirm(t('confirm.removeFriend', { name: fp.name }), () => {
       const favs = getSocialFavs(); favs.delete(fp.id); saveSocialFavs(favs);
       _optimisticRelUpdate('remove', fp);
-      window.sbDeleteFriendship(fp.friendshipId)
+      window.sbDeleteFriendship(fp.friendshipId, window._sbUserId, fp.id)
         .then(() => loadSocialData(false))
         .catch(e => { console.warn('[social] removeFriend:', e); loadSocialData(false); });
     });
@@ -1881,14 +1890,14 @@ document.getElementById('loading-friend-rel')?.addEventListener('click', () => {
         .catch(e => { console.warn('[social] acceptRequest:', e); loadSocialData(false); });
     }, true, () => {
       _optimisticRelUpdate('reject', fp);
-      window.sbDeleteFriendship(fp.friendshipId)
+      window.sbDeleteFriendship(fp.friendshipId, window._sbUserId, fp.id)
         .then(() => loadSocialData(false))
         .catch(e => { console.warn('[social] rejectRequest:', e); loadSocialData(false); });
     });
   } else if (status === 'sent') {
     showFriendConfirm(t('confirm.cancelSent', { name: fp.name }), () => {
       _optimisticRelUpdate('cancel', fp);
-      window.sbDeleteFriendship(fp.friendshipId)
+      window.sbDeleteFriendship(fp.friendshipId, window._sbUserId, fp.id)
         .then(() => loadSocialData(false))
         .catch(e => { console.warn('[social] cancelSent:', e); loadSocialData(false); });
     });
@@ -1909,7 +1918,7 @@ document.getElementById('loading-friend-block')?.addEventListener('click', () =>
   if (status === 'blocked') {
     showFriendConfirm(t('confirm.unblock', { name: fp.name }), () => {
       _optimisticRelUpdate('unblock', fp);
-      window.sbDeleteFriendship(fp.friendshipId)
+      window.sbDeleteFriendship(fp.friendshipId, window._sbUserId, fp.id)
         .then(() => loadSocialData(false))
         .catch(e => { console.warn('[social] unblock:', e); loadSocialData(false); });
     });
@@ -2070,6 +2079,7 @@ function renderBlockedList() {
   entries.forEach((b) => {
     const row = document.createElement('div');
     row.className = 'loading-social-row is-blocked-row';
+    row.dataset.friendId = b.id;
     row.innerHTML =
       `<img class="loading-social-avatar" src="${b.avatar}" alt="" draggable="false" oncontextmenu="return false">` +
       `<div class="loading-social-info">` +
@@ -2146,6 +2156,7 @@ function renderSentList() {
   entries.forEach((s) => {
     const row = document.createElement('div');
     row.className = 'loading-social-row';
+    row.dataset.friendId = s.id;
     row.innerHTML =
       `<img class="loading-social-avatar" src="${s.avatar}" alt="" draggable="false" oncontextmenu="return false">` +
       `<div class="loading-social-info">` +

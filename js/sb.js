@@ -152,9 +152,16 @@ window.sbBlockUser = async function(fromId, targetId, friendshipId) {
   }
 };
 
-window.sbDeleteFriendship = async function(friendshipId) {
-  const { error } = await sb.from('friendships').delete().eq('id', friendshipId);
-  if (error) throw error;
+window.sbDeleteFriendship = async function(friendshipId, userA, userB) {
+  if (friendshipId) {
+    const { error } = await sb.from('friendships').delete().eq('id', friendshipId);
+    if (!error) return;
+  }
+  // Fallback: borrar por usuarios si el ID falla o es nulo
+  if (userA && userB) {
+    await sb.from('friendships').delete()
+      .or(`and(user_a.eq.${userA},user_b.eq.${userB}),and(user_a.eq.${userB},user_b.eq.${userA})`);
+  }
 };
 
 window.sbUpdateLastActive = async function(userId) {
