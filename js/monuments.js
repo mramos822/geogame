@@ -1129,6 +1129,7 @@ async function _onSessionReady(userId) {
     if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
     if (typeof loadFriends === 'function') loadFriends();  // poblar barra ingame con amigos reales
   } catch(e) {}
+  _subscribeFriendshipChanges(userId);  // suscribir una sola vez al login
 }
 document.addEventListener('sbSessionReady', (e) => _onSessionReady(e.detail?.userId));
 // Si el evento ya fue disparado antes de que este listener se registrara, ejecutar ahora
@@ -1335,7 +1336,7 @@ function _subscribeFriendStatuses(friendIds) {
 }
 
 function _subscribeFriendshipChanges(userId) {
-  if (_friendshipsChannel) { window.sb.removeChannel(_friendshipsChannel); _friendshipsChannel = null; }
+  if (_friendshipsChannel) return; // ya suscrito — no recrear
   if (!userId) return;
   _friendshipsChannel = window.sb
     .channel('friendship-changes')
@@ -1492,7 +1493,6 @@ async function loadSocialData(showLoader = true) {
   renderSocial(document.getElementById('loading-social-search-input')?.value || '');
   updateSocialTabCounts();
   _subscribeFriendStatuses(socialData.friends.map(f => f.id));
-  _subscribeFriendshipChanges(window._sbUserId);
   _startSocialListPoll();
   // Si el panel de detalle de amigo está abierto, sincronizar friendshipId y botones
   if (currentFriendProfile) {
