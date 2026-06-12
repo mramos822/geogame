@@ -2925,14 +2925,22 @@ body.account-logged .loading-name-edit {
   transition: opacity 0.18s, background 0.18s;
   pointer-events: none;
 }
-#account-modal-pic-spinner {
-  margin: 0;
-  border-width: 0.4cqmin;
-  border-color: rgba(255,255,255,0.4);
+.pic-upload-spinner {
+  width: 1.8cqmin;
+  height: 1.8cqmin;
+  border: 0.35cqmin solid rgba(255,255,255,0.35);
   border-top-color: #fff;
+  border-radius: 50%;
+  animation: acct-spin 0.7s linear infinite;
+}
+.loading-profile-pic-wrap .pic-upload-spinner {
+  width: 4cqmin;
+  height: 4cqmin;
+  border-width: 0.5cqmin;
 }
 .account-modal-pic-wrap.pic-hover .account-modal-pic-overlay,
-.account-modal-pic-wrap.pic-uploading .account-modal-pic-overlay {
+.account-modal-pic-wrap.pic-uploading .account-modal-pic-overlay,
+.loading-profile-pic-wrap.pic-uploading .loading-profile-pic-overlay {
   opacity: 1;
   background: rgba(0,0,0,0.5);
 }

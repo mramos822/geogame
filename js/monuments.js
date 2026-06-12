@@ -1148,20 +1148,27 @@ if (window._sessionReady && window._sbUserId) _onSessionReady(window._sbUserId);
       accountPicWrap.addEventListener('mouseleave',  () => accountPicWrap.classList.remove('pic-hover'));
     }
     function _setAvatarUploading(on) {
-      const pencil  = document.getElementById('account-modal-pic-pencil');
-      const spinner = document.getElementById('account-modal-pic-spinner');
-      if (pencil)  pencil.style.display  = on ? 'none'  : '';
-      if (spinner) spinner.style.display = on ? 'block' : 'none';
+      // Account modal pic
+      const acctPencil  = document.getElementById('account-modal-pic-pencil');
+      const acctSpinner = document.getElementById('account-modal-pic-spinner');
+      if (acctPencil)  acctPencil.style.display  = on ? 'none'  : '';
+      if (acctSpinner) acctSpinner.style.display  = on ? 'block' : 'none';
       accountPicWrap?.classList.toggle('pic-uploading', on);
+      // Panel de perfil
+      const profPencil  = document.getElementById('loading-profile-pic-pencil');
+      const profSpinner = document.getElementById('loading-profile-pic-spinner');
+      if (profPencil)  profPencil.style.display  = on ? 'none'  : '';
+      if (profSpinner) profSpinner.style.display  = on ? 'block' : 'none';
+      wrap?.classList.toggle('pic-uploading', on);
     }
     input.addEventListener('change', () => {
       const file = input.files[0];
       if (!file) return;
+      if (window._accountLoggedIn && window._sbUserId) _setAvatarUploading(true);
       resizeImageFile(file, async (dataURL) => {
         localStorage.setItem('profilePhoto', dataURL);
         applyStoredProfilePic();
         if (window._accountLoggedIn && window._sbUserId) {
-          _setAvatarUploading(true);
           try {
             const res  = await fetch(dataURL);
             const blob = await res.blob();
