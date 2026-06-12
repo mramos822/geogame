@@ -1109,6 +1109,8 @@ applyStoredProfilePic();
 // Cuando la sesión de Supabase se restaura al recargar: sync datos locales → cuenta
 async function _onSessionReady(userId) {
   if (!userId) return;
+  // Resetear is_playing por si quedó stale (ej: browser cerrado durante partida)
+  if (typeof window.sbSetPlaying === 'function') window.sbSetPlaying(userId, false).catch(() => {});
   try {
     await syncLocalDataToAccount(userId);
     const profile = await window.sbGetProfile(userId);
@@ -1243,6 +1245,16 @@ document.getElementById('loading-profile-btn')?.addEventListener('click', () => 
   document.getElementById('loading-screen').classList.add('table-shown');
 });
 
+let _socialListPollInterval = null;
+function _startSocialListPoll() {
+  clearInterval(_socialListPollInterval);
+  _socialListPollInterval = setInterval(() => loadSocialData(false), 15000);
+}
+function _stopSocialListPoll() {
+  clearInterval(_socialListPollInterval);
+  _socialListPollInterval = null;
+}
+
 document.getElementById('loading-social-btn')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   if (!window._accountLoggedIn) {
@@ -1252,6 +1264,7 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
   document.getElementById('loading-social-group')?.classList.remove('table-gone');
   document.getElementById('loading-screen').classList.add('table-shown');
   loadSocialData();
+  _startSocialListPoll();
 });
 
 (function () {
@@ -1282,6 +1295,7 @@ document.getElementById('loading-social-back-wrap')?.addEventListener('click', (
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
   document.getElementById('loading-social-group')?.classList.add('table-gone');
   document.getElementById('loading-screen').classList.remove('table-shown');
+  _stopSocialListPoll();
 });
 
 // ── Lista de amigos del panel social ─────────────────────────────────────────
