@@ -25,6 +25,16 @@ window.sbLogin = async function(username, password) {
   return data;
 };
 
+window.sbChangePassword = async function(newPassword) {
+  const { error } = await sb.auth.updateUser({ password: newPassword });
+  if (error) throw error;
+};
+
+window.sbChangeEmail = async function(newEmail) {
+  const { error } = await sb.auth.updateUser({ email: newEmail });
+  if (error) throw error;
+};
+
 window.sbLogout = async function() {
   await sb.auth.signOut();
   window._accountLoggedIn = false;
@@ -126,39 +136,44 @@ window.sbBlockUser = async function(fromId, targetId) {
 // ── SESIÓN PERSISTENTE: restaurar al recargar ─────────────────────────────────
 (async function() {
   const session = await window.sbGetSession();
-  if (!session) {
-    // Detectar redirección de verificación de email
-    const hash = window.location.hash;
-    if (hash.includes('type=signup') && hash.includes('access_token')) {
-      // Limpiar el hash de la URL sin recargar
-      history.replaceState(null, '', window.location.pathname);
-      // Esperar a que el DOM esté listo para mostrar el popup
-      function showVerifiedPopup() {
-        const popup = document.getElementById('verified-popup');
-        const loginBtn = document.getElementById('verified-login-btn');
-        if (!popup) return;
-        if (typeof applyI18n === 'function') applyI18n(popup);
-        popup.classList.add('open');
-        loginBtn?.addEventListener('click', () => {
-          popup.classList.remove('open');
-          const accountModal = document.getElementById('account-modal');
-          const viewLogin    = document.getElementById('account-view-login');
-          if (accountModal && viewLogin) {
-            ['account-view-main','account-view-login','account-view-register','account-view-loading','account-view-verify','account-view-welcome']
-              .forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
-            viewLogin.style.display = 'flex';
-            accountModal.classList.add('open');
-          }
-        }, { once: true });
-      }
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', showVerifiedPopup);
+  // Detectar redirección de verificación de email (signup o email_change)
+  const hash = window.location.hash;
+  const isSignupVerify     = hash.includes('type=signup')       && hash.includes('access_token');
+  const isEmailChange      = hash.includes('type=email_change') && hash.includes('access_token');
+  if (isSignupVerify || isEmailChange) {
+    history.replaceState(null, '', window.location.pathname);
+    function showVerifiedPopup() {
+      const popup    = document.getElementById('verified-popup');
+      const titleEl  = popup?.querySelector('[data-i18n="account.verifiedTitle"]');
+      const descEl   = popup?.querySelector('[data-i18n="account.verifiedDesc"]');
+      const btnEl    = document.getElementById('verified-login-btn');
+      if (!popup) return;
+      if (isEmailChange) {
+        if (titleEl) { titleEl.removeAttribute('data-i18n'); titleEl.textContent = (typeof t === 'function') ? t('account.emailChangedTitle') : '¡Correo actualizado!'; }
+        if (descEl)  { descEl.removeAttribute('data-i18n');  descEl.textContent  = (typeof t === 'function') ? t('account.emailChangedDesc')  : 'Tu correo fue confirmado. Ya puedes iniciar sesión.'; }
+        if (btnEl)   { btnEl.removeAttribute('data-i18n');   btnEl.textContent   = (typeof t === 'function') ? t('account.emailChangedBtn')   : 'Iniciar sesión'; }
       } else {
-        setTimeout(showVerifiedPopup, 300);
+        if (typeof applyI18n === 'function') applyI18n(popup);
       }
+      popup.classList.add('open');
+      btnEl?.addEventListener('click', () => {
+        popup.classList.remove('open');
+        const accountModal = document.getElementById('account-modal');
+        const viewLogin    = document.getElementById('account-view-login');
+        if (accountModal && viewLogin) {
+          document.querySelectorAll('#account-modal .account-view').forEach(el => { el.style.display = 'none'; });
+          viewLogin.style.display = 'flex';
+          accountModal.classList.add('open');
+        }
+      }, { once: true });
     }
-    return;
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', showVerifiedPopup);
+    } else {
+      setTimeout(showVerifiedPopup, 300);
+    }
   }
+  if (!session) return;
   window._accountLoggedIn = true;
   window._sbUserId = session.user.id;
   document.body.classList.add('account-logged');

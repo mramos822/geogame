@@ -527,19 +527,38 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
   const reg   = document.getElementById('account-modal-register');
   if (!btn || !modal) return;
 
-  const viewMain     = document.getElementById('account-view-main');
-  const viewLogin    = document.getElementById('account-view-login');
-  const viewRegister = document.getElementById('account-view-register');
-  const viewLoading  = document.getElementById('account-view-loading');
-  const viewVerify   = document.getElementById('account-view-verify');
-  const viewWelcome  = document.getElementById('account-view-welcome');
+  const viewMain           = document.getElementById('account-view-main');
+  const viewLogin          = document.getElementById('account-view-login');
+  const viewRegister       = document.getElementById('account-view-register');
+  const viewLoading        = document.getElementById('account-view-loading');
+  const viewVerify         = document.getElementById('account-view-verify');
+  const viewWelcome        = document.getElementById('account-view-welcome');
+  const viewLoggedIn       = document.getElementById('account-view-loggedin');
+  const viewChangePass     = document.getElementById('account-view-change-pass');
+  const viewChangePassOk   = document.getElementById('account-view-change-pass-ok');
+  const viewChangeEmail    = document.getElementById('account-view-change-email');
+  const viewChangeEmailSent= document.getElementById('account-view-change-email-sent');
+
+  const allViews = [viewMain, viewLogin, viewRegister, viewLoading, viewVerify, viewWelcome,
+                    viewLoggedIn, viewChangePass, viewChangePassOk, viewChangeEmail, viewChangeEmailSent];
 
   const box = modal.querySelector('.account-modal-box');
   let currentView = null;
 
-  const noCloseViews = new Set([viewLoading, viewVerify, viewWelcome]);
+  const noCloseViews = new Set([viewLoading, viewVerify, viewWelcome, viewChangeEmailSent]);
+  // backMap: X button goes to parent view; null = close modal
+  const backMap = new Map([
+    [viewMain,            null],
+    [viewLoggedIn,        null],
+    [viewLogin,           viewMain],
+    [viewRegister,        viewMain],
+    [viewChangePass,      viewLoggedIn],
+    [viewChangePassOk,    viewLoggedIn],
+    [viewChangeEmail,     viewLoggedIn],
+  ]);
+
   function showView(v) {
-    [viewMain, viewLogin, viewRegister, viewLoading, viewVerify, viewWelcome].forEach(el => { if (el) el.style.display = 'none'; });
+    allViews.forEach(el => { if (el) el.style.display = 'none'; });
     if (v) v.style.display = 'flex';
     currentView = v;
     if (box) {
@@ -547,18 +566,28 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
       box.style.animation = 'none'; box.offsetWidth; box.style.animation = '';
     }
   }
-  function openModal()  { showView(viewMain); modal.classList.add('open'); }
+  function openModal() {
+    if (window._accountLoggedIn) {
+      const nameEl = document.getElementById('account-linked-name');
+      if (nameEl) nameEl.textContent = (window._sbProfile?.username) || localStorage.getItem('playerName') || '';
+      showView(viewLoggedIn);
+    } else {
+      showView(viewMain);
+    }
+    modal.classList.add('open');
+  }
   function closeModal() { modal.classList.remove('open'); }
 
   btn.addEventListener('click', () => { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); openModal(); });
   close.addEventListener('click', () => {
     sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
-    if (currentView === viewMain) closeModal();
-    else showView(viewMain);
+    const back = backMap.get(currentView);
+    if (back === undefined || back === null) closeModal();
+    else showView(back);
   });
 
-  login.addEventListener('click', () => { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); showView(viewLogin); });
-  reg.addEventListener('click',   () => { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); showView(viewRegister); });
+  login?.addEventListener('click', () => { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); showView(viewLogin); });
+  reg?.addEventListener('click',   () => { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); showView(viewRegister); });
 
   document.getElementById('reg-verify-ok')?.addEventListener('click', () => {
     sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
@@ -707,6 +736,116 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
          if (errU) errU.textContent = err.message;
        });
     }
+  });
+
+  // ── Vista logueado: botones de acción ──────────────────────────────────────
+  document.getElementById('account-go-change-pass')?.addEventListener('click', () => {
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    const inp = document.getElementById('chpass-new');
+    const inp2 = document.getElementById('chpass-confirm');
+    if (inp) inp.value = '';
+    if (inp2) inp2.value = '';
+    const wrap = document.getElementById('chpass-strength-wrap');
+    if (wrap) wrap.style.display = 'none';
+    ['chpass-err-new','chpass-err-confirm'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = ''; });
+    showView(viewChangePass);
+  });
+
+  document.getElementById('account-go-change-email')?.addEventListener('click', () => {
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    const inp = document.getElementById('chemail-new');
+    if (inp) inp.value = '';
+    const err = document.getElementById('chemail-err');
+    if (err) err.textContent = '';
+    showView(viewChangeEmail);
+  });
+
+  document.getElementById('account-logout-btn')?.addEventListener('click', async () => {
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    closeModal();
+    await window.sbLogout?.();
+    window._accountLoggedIn = false;
+    window._sbUserId = null;
+    window._sbProfile = null;
+    document.body.classList.remove('account-logged');
+    if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
+  });
+
+  // ── Cambiar contraseña ─────────────────────────────────────────────────────
+  document.getElementById('chpass-new')?.addEventListener('input', function () {
+    const wrap  = document.getElementById('chpass-strength-wrap');
+    const fill  = document.getElementById('chpass-strength-fill');
+    const label = document.getElementById('chpass-strength-label');
+    const v = this.value;
+    if (!v) { wrap.style.display = 'none'; return; }
+    wrap.style.display = 'flex';
+    let score = 0;
+    if (v.length >= 6)  score++;
+    if (v.length >= 10) score++;
+    if (/[A-Z]/.test(v) && /[a-z]/.test(v)) score++;
+    if (/[0-9]/.test(v)) score++;
+    if (/[^a-zA-Z0-9]/.test(v)) score++;
+    if (score <= 1)      { fill.style.width = '33%';  fill.style.background = '#e74c3c'; label.style.color = '#e74c3c'; label.textContent = t('account.passWeak'); }
+    else if (score <= 3) { fill.style.width = '66%';  fill.style.background = '#f39c12'; label.style.color = '#c87800'; label.textContent = t('account.passMedium'); }
+    else                 { fill.style.width = '100%'; fill.style.background = '#2bd14b'; label.style.color = '#1a7a30'; label.textContent = t('account.passStrong'); }
+  });
+
+  document.getElementById('chpass-submit')?.addEventListener('click', () => {
+    const newInp  = document.getElementById('chpass-new');
+    const conf    = document.getElementById('chpass-confirm');
+    const errNew  = document.getElementById('chpass-err-new');
+    const errConf = document.getElementById('chpass-err-confirm');
+    let ok = true;
+    const setErr = (inp, el, msg) => { el.textContent = msg; inp.classList.toggle('input-error', !!msg); if (msg) ok = false; };
+
+    if (newInp.value.length < 6) setErr(newInp, errNew, t('account.errPassShort'));
+    else setErr(newInp, errNew, '');
+
+    if (conf.value !== newInp.value) setErr(conf, errConf, t('account.errPassMismatch'));
+    else setErr(conf, errConf, '');
+
+    if (ok) {
+      sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+      showView(viewLoading);
+      window.sbChangePassword(newInp.value)
+        .then(() => showView(viewChangePassOk))
+        .catch(() => {
+          showView(viewChangePass);
+          if (errNew) errNew.textContent = t('account.errPassShort');
+        });
+    }
+  });
+
+  document.getElementById('chpass-ok-close')?.addEventListener('click', () => {
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    showView(viewLoggedIn);
+  });
+
+  // ── Cambiar correo ─────────────────────────────────────────────────────────
+  document.getElementById('chemail-submit')?.addEventListener('click', () => {
+    const inp = document.getElementById('chemail-new');
+    const err = document.getElementById('chemail-err');
+    const eVal = inp.value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.(com|net|edu|org|io|co|es|mx|ar|uk|de|fr|br|ca|jp|au)(\.[a-z]{2})?$/i.test(eVal)) {
+      err.textContent = t('account.errEmailInvalid');
+      inp.classList.add('input-error');
+      return;
+    }
+    err.textContent = '';
+    inp.classList.remove('input-error');
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    showView(viewLoading);
+    window.sbChangeEmail(eVal)
+      .then(() => showView(viewChangeEmailSent))
+      .catch(e => {
+        showView(viewChangeEmail);
+        if (err) err.textContent = e.message || t('account.errEmailInvalid');
+      });
+  });
+
+  document.getElementById('chemail-sent-ok')?.addEventListener('click', () => {
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    closeModal();
   });
 })();
 

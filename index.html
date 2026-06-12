@@ -289,6 +289,74 @@
           <p class="account-modal-desc" data-i18n="account.verifyDesc">Tu cuenta necesita verificarse.<br>Revisa tu correo y haz click en el enlace de confirmación.</p>
           <button class="account-modal-opt account-modal-login" id="reg-verify-ok" type="button" data-i18n="account.understood">Entendido</button>
         </div>
+
+        <!-- Vista cuenta vinculada (logueado) -->
+        <div class="account-view" id="account-view-loggedin" style="display:none">
+          <span class="account-modal-title" data-i18n="account.linkedTitle">Cuenta vinculada</span>
+          <div class="account-verify-icon">🌍</div>
+          <span class="account-linked-name" id="account-linked-name"></span>
+          <div class="account-action-list">
+            <button class="account-action-btn" id="account-go-change-pass" type="button">
+              <span class="account-action-icon">🔑</span>
+              <span data-i18n="account.changePass">Cambiar contraseña</span>
+              <span class="account-action-arrow">›</span>
+            </button>
+            <button class="account-action-btn" id="account-go-change-email" type="button">
+              <span class="account-action-icon">📧</span>
+              <span data-i18n="account.changeEmail">Cambiar correo</span>
+              <span class="account-action-arrow">›</span>
+            </button>
+            <button class="account-action-btn danger" id="account-logout-btn" type="button">
+              <span class="account-action-icon">🚪</span>
+              <span data-i18n="account.logout">Cerrar sesión</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Vista cambiar contraseña -->
+        <div class="account-view" id="account-view-change-pass" style="display:none">
+          <span class="account-modal-title" data-i18n="account.changePassTitle">Cambiar contraseña</span>
+          <div class="account-form">
+            <label class="account-label" data-i18n="account.newPass">Nueva contraseña</label>
+            <input class="account-input" id="chpass-new" type="password" placeholder="••••••••" maxlength="64">
+            <div class="pass-strength-wrap" id="chpass-strength-wrap" style="display:none">
+              <div class="pass-strength-bar"><div class="pass-strength-fill" id="chpass-strength-fill"></div></div>
+              <span class="pass-strength-label" id="chpass-strength-label"></span>
+            </div>
+            <span class="account-error" id="chpass-err-new"></span>
+            <label class="account-label" data-i18n="account.confirmNewPass">Confirmar nueva contraseña</label>
+            <input class="account-input" id="chpass-confirm" type="password" placeholder="••••••••" maxlength="64">
+            <span class="account-error" id="chpass-err-confirm"></span>
+            <button class="account-modal-opt account-modal-login" id="chpass-submit" type="button" data-i18n="account.saveChanges">Guardar</button>
+          </div>
+        </div>
+
+        <!-- Vista contraseña cambiada OK -->
+        <div class="account-view" id="account-view-change-pass-ok" style="display:none">
+          <span class="account-modal-title" data-i18n="account.passChangedTitle">¡Contraseña actualizada!</span>
+          <div class="account-ok-icon">✅</div>
+          <p class="account-modal-desc" data-i18n="account.passChangedDesc">Tu contraseña fue cambiada exitosamente.</p>
+          <button class="account-modal-opt account-modal-login" id="chpass-ok-close" type="button" data-i18n="account.understood">Entendido</button>
+        </div>
+
+        <!-- Vista cambiar correo -->
+        <div class="account-view" id="account-view-change-email" style="display:none">
+          <span class="account-modal-title" data-i18n="account.changeEmailTitle">Cambiar correo</span>
+          <div class="account-form">
+            <label class="account-label" data-i18n="account.newEmail">Nuevo correo electrónico</label>
+            <input class="account-input" id="chemail-new" type="email" placeholder="nuevo@correo.com" maxlength="60" autocomplete="off">
+            <span class="account-error" id="chemail-err"></span>
+            <button class="account-modal-opt account-modal-login" id="chemail-submit" type="button" data-i18n="account.changeEmailBtn">Enviar verificación</button>
+          </div>
+        </div>
+
+        <!-- Vista correo - revisa tu correo nuevo -->
+        <div class="account-view" id="account-view-change-email-sent" style="display:none">
+          <span class="account-modal-title" data-i18n="account.changeEmailSentTitle">Revisa tu correo</span>
+          <div class="account-verify-icon">✉️</div>
+          <p class="account-modal-desc" data-i18n="account.changeEmailSentDesc">Te enviamos un enlace al nuevo correo. Confirma el cambio desde ahí.</p>
+          <button class="account-modal-opt account-modal-login" id="chemail-sent-ok" type="button" data-i18n="account.understood">Entendido</button>
+        </div>
       </div>
     </div>
 
@@ -492,7 +560,7 @@
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
     </div>
-    <div id="loading-version">Ver. 2.5.2</div>
+    <div id="loading-version">Ver. 2.5.3</div>
   </div>
 
   <div id="splash-screen" class="game-bg-screen" style="display:none">

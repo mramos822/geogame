@@ -2862,6 +2862,46 @@ body.account-logged .loading-name-edit {
   margin-top: -0.6cqmin;
 }
 
+/* ── ACCOUNT LOGGED-IN VIEWS ────────────────────────── */
+.account-linked-name {
+  font-size: 3.2cqmin;
+  color: #fde20e;
+  -webkit-text-stroke: 0.3cqmin #8b6a00;
+  paint-order: stroke fill;
+  text-align: center;
+}
+.account-action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2cqmin;
+  width: 100%;
+  margin-top: 0.5cqmin;
+}
+.account-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 2cqmin;
+  width: 100%;
+  background: rgba(139,106,0,0.08);
+  border: 0.25cqmin solid #d4aa30;
+  border-radius: 2cqmin;
+  padding: 1.8cqmin 2cqmin;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2cqmin;
+  color: #5a4400;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  box-sizing: border-box;
+}
+.account-action-btn:hover  { background: rgba(139,106,0,0.15); transform: scale(1.02); }
+.account-action-btn:active { transform: scale(0.97); }
+.account-action-icon  { font-size: 2.5cqmin; flex-shrink: 0; }
+.account-action-arrow { margin-left: auto; color: #8b6a00; font-size: 2.5cqmin; }
+.account-action-btn.danger { color: #c0392b; border-color: #e74c3c; background: rgba(192,57,43,0.07); }
+.account-action-btn.danger:hover { background: rgba(192,57,43,0.14); }
+.account-ok-icon { font-size: 5.5cqmin; line-height: 1; }
+
 /* ── SCREEN WARNING ─────────────────────────────────── */
 #screen-warning {
   display: none;
