@@ -353,5 +353,5 @@ sb.auth.onAuthStateChange((event, session) => {
   // Heartbeat: mantener last_active fresco mientras la página esté abierta
   setInterval(() => {
     if (window._sbUserId) window.sbUpdateLastActive(window._sbUserId).catch(() => {});
-  }, 10 * 1000);
+  }, 25 * 1000);
 })();
