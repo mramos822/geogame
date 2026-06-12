@@ -1148,18 +1148,26 @@ if (window._sessionReady && window._sbUserId) _onSessionReady(window._sbUserId);
       accountPicWrap.addEventListener('mouseleave',  () => accountPicWrap.classList.remove('pic-hover'));
     }
     function _setAvatarUploading(on) {
-      // Account modal pic
+      // Account modal pic — inline styles (CSS class-opacity breaks inside animated stacking context)
+      const acctOverlay = document.getElementById('account-modal-pic-overlay');
       const acctPencil  = document.getElementById('account-modal-pic-pencil');
       const acctSpinner = document.getElementById('account-modal-pic-spinner');
+      if (acctOverlay) {
+        acctOverlay.style.opacity    = on ? '1' : '';
+        acctOverlay.style.background = on ? 'rgba(0,0,0,0.5)' : '';
+      }
       if (acctPencil)  acctPencil.style.display  = on ? 'none'  : '';
       if (acctSpinner) acctSpinner.style.display  = on ? 'block' : 'none';
-      accountPicWrap?.classList.toggle('pic-uploading', on);
-      // Panel de perfil
+      // Panel de perfil — inline styles
+      const profOverlay = document.getElementById('loading-profile-pic-overlay');
       const profPencil  = document.getElementById('loading-profile-pic-pencil');
       const profSpinner = document.getElementById('loading-profile-pic-spinner');
+      if (profOverlay) {
+        profOverlay.style.opacity    = on ? '1' : '';
+        profOverlay.style.background = on ? 'rgba(0,0,0,0.5)' : '';
+      }
       if (profPencil)  profPencil.style.display  = on ? 'none'  : '';
       if (profSpinner) profSpinner.style.display  = on ? 'block' : 'none';
-      wrap?.classList.toggle('pic-uploading', on);
     }
     input.addEventListener('change', () => {
       const file = input.files[0];
