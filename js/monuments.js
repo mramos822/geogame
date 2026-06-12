@@ -1141,7 +1141,12 @@ if (window._sessionReady && window._sbUserId) _onSessionReady(window._sbUserId);
     if (!wrap || !input) return;
     wrap.addEventListener('click', () => { input.value = ''; input.click(); });
     // También desde el modal de cuenta
-    document.getElementById('account-modal-pic-wrap')?.addEventListener('click', () => { input.value = ''; input.click(); });
+    const accountPicWrap = document.getElementById('account-modal-pic-wrap');
+    if (accountPicWrap) {
+      accountPicWrap.addEventListener('click',       () => { input.value = ''; input.click(); });
+      accountPicWrap.addEventListener('mouseenter',  () => accountPicWrap.classList.add('pic-hover'));
+      accountPicWrap.addEventListener('mouseleave',  () => accountPicWrap.classList.remove('pic-hover'));
+    }
     input.addEventListener('change', () => {
       const file = input.files[0];
       if (!file) return;
