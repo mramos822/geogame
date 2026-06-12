@@ -1609,6 +1609,29 @@ body:not(.is-ios) #loading-screen.table-shown > .profile-account-wrap {
 .loading-social-blockbtn img { width: 100%; height: auto; display: block; }
 
 /* ── Panel de perfil de un amigo (se desliza desde arriba sobre el social) ────── */
+.friend-error-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2cqmin;
+  background: rgba(0,0,0,0.72);
+  color: #fff;
+  font-size: 1.7cqmin;
+  font-weight: 600;
+  z-index: 10;
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s;
+}
+.friend-error-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 #loading-friend-group {
   position: absolute;
   inset: 0;

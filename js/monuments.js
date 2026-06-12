@@ -1685,6 +1685,20 @@ function openFriendProfile(friend) {
   if (friend.id) _startFriendStatusPoll(friend.id);
 }
 
+function _showFriendPanelError() {
+  const panel = document.getElementById('loading-friend-group');
+  if (!panel) return;
+  let overlay = panel.querySelector('.friend-error-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.className = 'friend-error-overlay';
+    panel.appendChild(overlay);
+  }
+  overlay.textContent = 'Ha ocurrido un error, por favor inténtelo más tarde';
+  overlay.classList.add('visible');
+  setTimeout(() => overlay.classList.remove('visible'), 3000);
+}
+
 // ── Botones de relación del perfil de amigo ───────────────────────────────────
 function updateFriendButtons() {
   const actions  = document.getElementById('loading-friend-actions');
@@ -1831,7 +1845,7 @@ document.getElementById('loading-friend-rel')?.addEventListener('click', () => {
   } else {
     _optimisticRelUpdate('send', fp);
     window.sbSendFriendRequest(window._sbUserId, fp.name)
-      .catch(e => { console.warn('[social] sendRequest:', e); loadSocialData(false); });
+      .catch(e => { console.warn('[social] sendRequest:', e); loadSocialData(false); _showFriendPanelError(); });
   }
 });
 
@@ -1964,7 +1978,7 @@ async function sendFriendRequest() {
     if (input) input.value = '';
     await loadSocialData(false);
   } catch (e) {
-    fb.textContent = e.message === 'Usuario no encontrado' ? 'Usuario no encontrado' : (e.message || 'Error');
+    fb.textContent = e.message === 'Usuario no encontrado' ? 'Usuario no encontrado' : 'Ha ocurrido un error, por favor inténtelo más tarde';
     fb.className = 'loading-addfriend-feedback err show';
   }
 }
