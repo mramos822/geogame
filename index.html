@@ -317,6 +317,9 @@
         <div class="account-view" id="account-view-change-pass" style="display:none">
           <span class="account-modal-title" data-i18n="account.changePassTitle">Cambiar contraseña</span>
           <div class="account-form">
+            <label class="account-label" data-i18n="account.currentPass">Contraseña actual</label>
+            <input class="account-input" id="chpass-current" type="password" placeholder="••••••••" maxlength="64">
+            <span class="account-error" id="chpass-err-current"></span>
             <label class="account-label" data-i18n="account.newPass">Nueva contraseña</label>
             <input class="account-input" id="chpass-new" type="password" placeholder="••••••••" maxlength="64">
             <div class="pass-strength-wrap" id="chpass-strength-wrap" style="display:none">
@@ -348,6 +351,15 @@
             <span class="account-error" id="chemail-err"></span>
             <button class="account-modal-opt account-modal-login" id="chemail-submit" type="button" data-i18n="account.changeEmailBtn">Enviar verificación</button>
           </div>
+        </div>
+
+        <!-- Vista confirmar cierre de sesión -->
+        <div class="account-view" id="account-view-logout-confirm" style="display:none">
+          <span class="account-modal-title" data-i18n="account.logoutConfirmTitle">¿Cerrar sesión?</span>
+          <div class="account-verify-icon">🚪</div>
+          <p class="account-modal-desc" data-i18n="account.logoutConfirmDesc">Se cerrará tu sesión en este dispositivo.</p>
+          <button class="account-modal-opt account-modal-register" id="account-logout-confirm" type="button" data-i18n="account.logoutYes">Cerrar sesión</button>
+          <button class="account-modal-opt account-modal-login" id="account-logout-cancel" type="button" data-i18n="account.logoutNo">Cancelar</button>
         </div>
 
         <!-- Vista correo - revisa tu correo nuevo -->
@@ -560,7 +572,7 @@
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
     </div>
-    <div id="loading-version">Ver. 2.5.3</div>
+    <div id="loading-version">Ver. 2.5.4</div>
   </div>
 
   <div id="splash-screen" class="game-bg-screen" style="display:none">

@@ -537,10 +537,11 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
   const viewChangePass     = document.getElementById('account-view-change-pass');
   const viewChangePassOk   = document.getElementById('account-view-change-pass-ok');
   const viewChangeEmail    = document.getElementById('account-view-change-email');
-  const viewChangeEmailSent= document.getElementById('account-view-change-email-sent');
+  const viewChangeEmailSent  = document.getElementById('account-view-change-email-sent');
+  const viewLogoutConfirm    = document.getElementById('account-view-logout-confirm');
 
   const allViews = [viewMain, viewLogin, viewRegister, viewLoading, viewVerify, viewWelcome,
-                    viewLoggedIn, viewChangePass, viewChangePassOk, viewChangeEmail, viewChangeEmailSent];
+                    viewLoggedIn, viewChangePass, viewChangePassOk, viewChangeEmail, viewChangeEmailSent, viewLogoutConfirm];
 
   const box = modal.querySelector('.account-modal-box');
   let currentView = null;
@@ -555,6 +556,7 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
     [viewChangePass,      viewLoggedIn],
     [viewChangePassOk,    viewLoggedIn],
     [viewChangeEmail,     viewLoggedIn],
+    [viewLogoutConfirm,   viewLoggedIn],
   ]);
 
   function showView(v) {
@@ -741,13 +743,10 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
   // ── Vista logueado: botones de acción ──────────────────────────────────────
   document.getElementById('account-go-change-pass')?.addEventListener('click', () => {
     sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
-    const inp = document.getElementById('chpass-new');
-    const inp2 = document.getElementById('chpass-confirm');
-    if (inp) inp.value = '';
-    if (inp2) inp2.value = '';
+    ['chpass-current','chpass-new','chpass-confirm'].forEach(id => { const el = document.getElementById(id); if (el) { el.value = ''; el.classList.remove('input-error'); } });
     const wrap = document.getElementById('chpass-strength-wrap');
     if (wrap) wrap.style.display = 'none';
-    ['chpass-err-new','chpass-err-confirm'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = ''; });
+    ['chpass-err-current','chpass-err-new','chpass-err-confirm'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = ''; });
     showView(viewChangePass);
   });
 
@@ -760,7 +759,17 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
     showView(viewChangeEmail);
   });
 
-  document.getElementById('account-logout-btn')?.addEventListener('click', async () => {
+  document.getElementById('account-logout-btn')?.addEventListener('click', () => {
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    showView(viewLogoutConfirm);
+  });
+
+  document.getElementById('account-logout-cancel')?.addEventListener('click', () => {
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    showView(viewLoggedIn);
+  });
+
+  document.getElementById('account-logout-confirm')?.addEventListener('click', async () => {
     sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
     closeModal();
     await window.sbLogout?.();
@@ -791,12 +800,17 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
   });
 
   document.getElementById('chpass-submit')?.addEventListener('click', () => {
+    const curInp  = document.getElementById('chpass-current');
     const newInp  = document.getElementById('chpass-new');
     const conf    = document.getElementById('chpass-confirm');
+    const errCur  = document.getElementById('chpass-err-current');
     const errNew  = document.getElementById('chpass-err-new');
     const errConf = document.getElementById('chpass-err-confirm');
     let ok = true;
     const setErr = (inp, el, msg) => { el.textContent = msg; inp.classList.toggle('input-error', !!msg); if (msg) ok = false; };
+
+    if (!curInp.value) setErr(curInp, errCur, t('account.errLoginUser'));
+    else setErr(curInp, errCur, '');
 
     if (newInp.value.length < 6) setErr(newInp, errNew, t('account.errPassShort'));
     else setErr(newInp, errNew, '');
@@ -807,11 +821,17 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
     if (ok) {
       sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
       showView(viewLoading);
-      window.sbChangePassword(newInp.value)
+      const username = (window._sbProfile?.username) || localStorage.getItem('playerName') || '';
+      window.sbLogin(username, curInp.value)
+        .then(() => window.sbChangePassword(newInp.value))
         .then(() => showView(viewChangePassOk))
-        .catch(() => {
+        .catch(err => {
           showView(viewChangePass);
-          if (errNew) errNew.textContent = t('account.errPassShort');
+          if (err.message === '__wrong_password__' || err.message === '__user_not_found__') {
+            if (errCur) { errCur.textContent = t('account.errWrongPass'); curInp.classList.add('input-error'); }
+          } else {
+            if (errNew) errNew.textContent = err.message || t('account.errPassShort');
+          }
         });
     }
   });
