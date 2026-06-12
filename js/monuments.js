@@ -1766,6 +1766,34 @@ document.getElementById('loading-friend-fav')?.addEventListener('click', () => {
   refreshSocialAfterRel();
 });
 
+// Aplica un cambio optimista a socialData y refresca el panel al instante,
+// luego sincroniza con el servidor en background.
+function _optimisticRelUpdate(action, fp) {
+  const id = fp.id;
+  const removeFromAll = () => {
+    socialData.friends  = socialData.friends.filter(x => x.id !== id);
+    socialData.requests = socialData.requests.filter(x => x.id !== id);
+    socialData.sent     = socialData.sent.filter(x => x.id !== id);
+    socialData.blocked  = socialData.blocked.filter(x => x.id !== id);
+  };
+  if (action === 'remove' || action === 'reject' || action === 'cancel' || action === 'unblock') {
+    removeFromAll();
+  } else if (action === 'block') {
+    removeFromAll();
+    socialData.blocked.push({ ...fp, friendshipId: fp.friendshipId });
+  } else if (action === 'accept') {
+    socialData.requests = socialData.requests.filter(x => x.id !== id);
+    socialData.sent     = socialData.sent.filter(x => x.id !== id);
+    socialData.friends.push({ ...fp });
+  } else if (action === 'send') {
+    socialData.sent.push({ ...fp, friendshipId: null });
+  }
+  updateFriendButtons();
+  renderSocial(document.getElementById('loading-social-search-input')?.value || '');
+  updateSocialTabCounts();
+  loadSocialData(false); // sync en background
+}
+
 // Botón del medio: añadir / aceptar / cancelar / borrar amigo.
 document.getElementById('loading-friend-rel')?.addEventListener('click', () => {
   if (!currentFriendProfile) return;
@@ -1776,30 +1804,30 @@ document.getElementById('loading-friend-rel')?.addEventListener('click', () => {
   if (status === 'friend') {
     showFriendConfirm(t('confirm.removeFriend', { name: fp.name }), () => {
       const favs = getSocialFavs(); favs.delete(fp.id); saveSocialFavs(favs);
+      _optimisticRelUpdate('remove', fp);
       window.sbDeleteFriendship(fp.friendshipId)
-        .then(() => loadSocialData(false))
         .catch(e => console.warn('[social] removeFriend:', e));
     });
   } else if (status === 'request') {
     showFriendConfirm(t('confirm.acceptRequest', { name: fp.name }), () => {
+      _optimisticRelUpdate('accept', fp);
       window.sbAcceptRequest(fp.friendshipId)
-        .then(() => loadSocialData(false))
         .catch(e => console.warn('[social] acceptRequest:', e));
     }, true, () => {
+      _optimisticRelUpdate('reject', fp);
       window.sbDeleteFriendship(fp.friendshipId)
-        .then(() => loadSocialData(false))
         .catch(e => console.warn('[social] rejectRequest:', e));
     });
   } else if (status === 'sent') {
     showFriendConfirm(t('confirm.cancelSent', { name: fp.name }), () => {
+      _optimisticRelUpdate('cancel', fp);
       window.sbDeleteFriendship(fp.friendshipId)
-        .then(() => loadSocialData(false))
         .catch(e => console.warn('[social] cancelSent:', e));
     });
   } else {
+    _optimisticRelUpdate('send', fp);
     window.sbSendFriendRequest(window._sbUserId, fp.name)
-      .then(() => loadSocialData(false))
-      .catch(e => console.warn('[social] sendRequest:', e));
+      .catch(e => { console.warn('[social] sendRequest:', e); loadSocialData(false); });
   }
 });
 
@@ -1811,15 +1839,15 @@ document.getElementById('loading-friend-block')?.addEventListener('click', () =>
   const status = relStatus(fp);
   if (status === 'blocked') {
     showFriendConfirm(t('confirm.unblock', { name: fp.name }), () => {
+      _optimisticRelUpdate('unblock', fp);
       window.sbDeleteFriendship(fp.friendshipId)
-        .then(() => loadSocialData(false))
         .catch(e => console.warn('[social] unblock:', e));
     });
   } else {
     showFriendConfirm(t('confirm.block', { name: fp.name }), () => {
       const favs = getSocialFavs(); favs.delete(fp.id); saveSocialFavs(favs);
+      _optimisticRelUpdate('block', fp);
       window.sbBlockUser(window._sbUserId, fp.id, fp.friendshipId)
-        .then(() => loadSocialData(false))
         .catch(e => console.warn('[social] block:', e));
     });
   }
