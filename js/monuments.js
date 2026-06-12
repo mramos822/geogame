@@ -3384,7 +3384,7 @@ document.getElementById('vol-btn')?.addEventListener('click', () => {
   getAllSfx().forEach(sfx => { sfx.volume = vol; sfx.muted = isMuted; });
   applyMusicMute(); // iOS: la música va por Web Audio (gain); en PC es no-op
   document.getElementById('vol-img').src = isMuted ? 'images/vol2.png' : 'images/vol1.png';
-  if (!isMuted) { const a = new Audio('sfx/check.mp3'); a.play(); }
+  const _a = new Audio('sfx/check.mp3'); _a.play();
 });
 
 // ── FULLSCREEN ────────────────────────────────────────────────────────────────
