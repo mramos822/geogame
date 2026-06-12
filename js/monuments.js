@@ -992,6 +992,8 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
 
   document.getElementById('chpass-ok-close')?.addEventListener('click', () => {
     sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    const nameEl = document.getElementById('account-linked-name');
+    if (nameEl) nameEl.textContent = (window._sbProfile?.username) || localStorage.getItem('playerName') || '';
     showView(viewLoggedIn);
   });
 
