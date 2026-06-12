@@ -99,7 +99,6 @@ body {
   pointer-events: none;
   z-index: 18;
   will-change: transform;
-  opacity: 0;
 }
 
 #splash-screen .flightatt-splash.animate-in {
@@ -116,7 +115,6 @@ body {
   pointer-events: none;
   z-index: 18;
   will-change: transform;
-  opacity: 0;
 }
 
 #splash-screen .flightatt.animate-in {
@@ -804,7 +802,6 @@ body.is-ios .wrong-count-total { top: 29.5cqmin; }
   user-select: none;
   -webkit-user-drag: none;
   contain: layout style;
-  opacity: 0;
   will-change: contents;
 }
 
@@ -4670,7 +4667,6 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   z-index: 16;
   pointer-events: none;
   transition: right 0.4s ease-out;
-  opacity: 0;
 }
 .results-flightatt.active { right: 5%; }
 
