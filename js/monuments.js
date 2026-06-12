@@ -1494,6 +1494,13 @@ async function loadSocialData(showLoader = true) {
   _subscribeFriendStatuses(socialData.friends.map(f => f.id));
   _subscribeFriendshipChanges(window._sbUserId);
   _startSocialListPoll();
+  // Si el panel de detalle de amigo está abierto, sincronizar friendshipId y botones
+  if (currentFriendProfile) {
+    const all = [...socialData.friends, ...socialData.requests, ...socialData.sent, ...socialData.blocked];
+    const fresh = all.find(x => x.id === currentFriendProfile.id);
+    if (fresh) currentFriendProfile.friendshipId = fresh.friendshipId;
+    if (typeof updateFriendButtons === 'function') updateFriendButtons();
+  }
 }
 
 // Pinta la pestaña activa.
