@@ -911,6 +911,7 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
     sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
     if (window._sbUserId) window.sbSetPlaying(window._sbUserId, false).catch(() => {});
     closeModal();
+    if (_friendRealtimeChannel) { window.sb.removeChannel(_friendRealtimeChannel); _friendRealtimeChannel = null; }
     await window.sbLogout?.();
     window._accountLoggedIn = false;
     window._sbUserId = null;
@@ -1245,42 +1246,68 @@ document.getElementById('loading-profile-btn')?.addEventListener('click', () => 
   document.getElementById('loading-screen').classList.add('table-shown');
 });
 
+let _friendRealtimeChannel = null;
 let _socialListPollInterval = null;
 
-async function _patchSocialStatuses() {
-  if (!window._sbUserId || !socialData.friends.length) return;
-  try {
-    const ids = socialData.friends.map(f => f.id);
-    const { data } = await window.sb.from('profiles')
-      .select('id,last_active,is_playing').in('id', ids);
-    if (!data) return;
-    const map = {};
-    data.forEach(r => { map[r.id] = r; });
-    socialData.friends.forEach(f => {
-      if (map[f.id]) {
-        f.last_active = map[f.id].last_active;
-        f.is_playing  = map[f.id].is_playing;
-      }
-    });
-    // Parchear solo los span de status en los rows existentes (sin re-renderizar)
-    const list = document.getElementById('loading-social-list');
-    if (!list) return;
-    const friendMap = {};
-    socialData.friends.forEach(f => { friendMap[f.id] = f; });
-    list.querySelectorAll('.loading-social-row[data-friend-id]').forEach(row => {
-      const f = friendMap[row.dataset.friendId];
-      if (!f) return;
-      const st = getStatusObj(f);
-      row.className = row.className.replace(/status-\w+/, 'status-' + st.cls);
-      const statusEl = row.querySelector('.loading-social-status');
-      if (statusEl) statusEl.innerHTML = `<span class="dot ${st.cls}"></span>${socialStatusText(f)}`;
-    });
-  } catch(e) {}
+function _patchFriendStatusInDOM(friendId) {
+  const f = socialData.friends.find(x => x.id === friendId);
+  if (!f) return;
+  const st = getStatusObj(f);
+  const row = document.querySelector(`.loading-social-row[data-friend-id="${friendId}"]`);
+  if (row) {
+    row.className = row.className.replace(/status-\w+/, 'status-' + st.cls);
+    const statusEl = row.querySelector('.loading-social-status');
+    if (statusEl) statusEl.innerHTML = `<span class="dot ${st.cls}"></span>${socialStatusText(f)}`;
+  }
+  // Si el panel de detalle de ese amigo está abierto, actualizarlo también
+  if (currentFriendProfile?.id === friendId) {
+    currentFriendProfile.last_active = f.last_active;
+    currentFriendProfile.is_playing  = f.is_playing;
+    _applyFriendPanelStatus(currentFriendProfile);
+  }
 }
 
+function _subscribeFriendStatuses(friendIds) {
+  if (_friendRealtimeChannel) {
+    window.sb.removeChannel(_friendRealtimeChannel);
+    _friendRealtimeChannel = null;
+  }
+  if (!friendIds.length) return;
+  _friendRealtimeChannel = window.sb
+    .channel('friend-statuses')
+    .on('postgres_changes', {
+      event: 'UPDATE', schema: 'public', table: 'profiles',
+      filter: `id=in.(${friendIds.join(',')})`,
+    }, (payload) => {
+      const updated = payload.new;
+      const f = socialData.friends.find(x => x.id === updated.id);
+      if (!f) return;
+      f.last_active = updated.last_active;
+      f.is_playing  = updated.is_playing;
+      _patchFriendStatusInDOM(updated.id);
+    })
+    .subscribe();
+}
+
+// Fallback poll cada 60s por si el WebSocket se corta
 function _startSocialListPoll() {
   clearInterval(_socialListPollInterval);
-  _socialListPollInterval = setInterval(_patchSocialStatuses, 15000);
+  _socialListPollInterval = setInterval(async () => {
+    if (!window._sbUserId || !socialData.friends.length) return;
+    try {
+      const ids = socialData.friends.map(f => f.id);
+      const { data } = await window.sb.from('profiles')
+        .select('id,last_active,is_playing').in('id', ids);
+      if (!data) return;
+      data.forEach(r => {
+        const f = socialData.friends.find(x => x.id === r.id);
+        if (!f) return;
+        f.last_active = r.last_active;
+        f.is_playing  = r.is_playing;
+        _patchFriendStatusInDOM(r.id);
+      });
+    } catch(e) {}
+  }, 60000);
 }
 function _stopSocialListPoll() {
   clearInterval(_socialListPollInterval);
@@ -1296,7 +1323,6 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
   document.getElementById('loading-social-group')?.classList.remove('table-gone');
   document.getElementById('loading-screen').classList.add('table-shown');
   loadSocialData();
-  _startSocialListPoll();
 });
 
 (function () {
@@ -1327,7 +1353,6 @@ document.getElementById('loading-social-back-wrap')?.addEventListener('click', (
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
   document.getElementById('loading-social-group')?.classList.add('table-gone');
   document.getElementById('loading-screen').classList.remove('table-shown');
-  _stopSocialListPoll();
 });
 
 // ── Lista de amigos del panel social ─────────────────────────────────────────
@@ -1411,6 +1436,7 @@ async function loadSocialData(showLoader = true) {
   }
   renderSocial(document.getElementById('loading-social-search-input')?.value || '');
   updateSocialTabCounts();
+  _subscribeFriendStatuses(socialData.friends.map(f => f.id));
 }
 
 // Pinta la pestaña activa.
