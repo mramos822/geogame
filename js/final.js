@@ -24,7 +24,6 @@ let _finalPos = 0;
 function _onFinalResize() {
   if (!finalScreen || finalScreen.style.display === 'none') return;
   if (typeof window.letterboxRefresh === 'function') window.letterboxRefresh();
-  buildFriendClouds(_finalRanking, _finalPos);
 }
 
 function showFinalScreen() {
