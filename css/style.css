@@ -2641,14 +2641,13 @@ body:not(.is-ios) #loading-screen.table-shown > .profile-account-wrap {
   font-weight: bold;
   color: #ffffff;
   background: transparent;
-  border: 0.4cqmin solid rgba(255,255,255,0.6);
+  border: 0.4cqmin solid rgba(255,255,255,0.85);
   border-radius: 1.4cqmin;
   padding: 0.9cqmin 2.5cqmin;
   cursor: pointer;
-  opacity: 0.8;
-  transition: opacity 0.15s, transform 0.1s;
+  transition: transform 0.1s, background 0.15s;
 }
-.name-prompt-account-btn:hover { opacity: 1; transform: scale(1.04); }
+.name-prompt-account-btn:hover { background: rgba(255,255,255,0.12); transform: scale(1.04); }
 
 /* ── POPUP DE BIENVENIDA ─────────────────────────────── */
 #welcome-popup {

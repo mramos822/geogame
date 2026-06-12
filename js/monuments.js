@@ -1268,25 +1268,21 @@ _updateProfileBtnLabel();
     if (accountBtn && accountModal) {
       accountBtn.addEventListener('click', () => {
         try { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); } catch (e) {}
-        // Ocultar temporalmente el name-prompt para que no tape ni quede detrás
-        prompt.classList.remove('visible');
+        prompt.style.display = 'none';
         if (typeof window.openAccountModal === 'function') window.openAccountModal();
         else accountModal.classList.add('open');
 
-        // Observar el cierre del modal
         const observer = new MutationObserver(() => {
           if (!accountModal.classList.contains('open')) {
             observer.disconnect();
             if (window._accountLoggedIn) {
-              // Sesión iniciada: aplicar nombre y no volver a mostrar el prompt
               const loggedName = localStorage.getItem('playerName');
               if (loggedName) {
                 const el = document.getElementById('loading-player-name');
                 if (el) el.textContent = loggedName;
               }
             } else {
-              // Canceló sin iniciar sesión: volver a mostrar el name-prompt
-              prompt.classList.add('visible');
+              prompt.style.display = '';
             }
           }
         });
