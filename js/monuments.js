@@ -911,7 +911,8 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
     sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
     if (window._sbUserId) window.sbSetPlaying(window._sbUserId, false).catch(() => {});
     closeModal();
-    if (_friendRealtimeChannel) { window.sb.removeChannel(_friendRealtimeChannel); _friendRealtimeChannel = null; }
+    if (_friendRealtimeChannel)  { window.sb.removeChannel(_friendRealtimeChannel);  _friendRealtimeChannel = null; }
+    if (_friendshipsChannel)     { window.sb.removeChannel(_friendshipsChannel);     _friendshipsChannel = null; }
     await window.sbLogout?.();
     window._accountLoggedIn = false;
     window._sbUserId = null;
@@ -1280,6 +1281,7 @@ document.getElementById('loading-profile-btn')?.addEventListener('click', () => 
 });
 
 let _friendRealtimeChannel = null;
+let _friendshipsChannel    = null;
 let _socialListPollInterval = null;
 
 function _patchFriendStatusInDOM(friendId) {
@@ -1329,6 +1331,18 @@ function _subscribeFriendStatuses(friendIds) {
         if (typeof _applyFriendPanelStatus === 'function') _applyFriendPanelStatus(currentFriendProfile);
       }
     })
+    .subscribe();
+}
+
+function _subscribeFriendshipChanges(userId) {
+  if (_friendshipsChannel) { window.sb.removeChannel(_friendshipsChannel); _friendshipsChannel = null; }
+  if (!userId) return;
+  _friendshipsChannel = window.sb
+    .channel('friendship-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships',
+        filter: `user_a=eq.${userId}` }, () => loadSocialData(false))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships',
+        filter: `user_b=eq.${userId}` }, () => loadSocialData(false))
     .subscribe();
 }
 
@@ -1478,6 +1492,7 @@ async function loadSocialData(showLoader = true) {
   renderSocial(document.getElementById('loading-social-search-input')?.value || '');
   updateSocialTabCounts();
   _subscribeFriendStatuses(socialData.friends.map(f => f.id));
+  _subscribeFriendshipChanges(window._sbUserId);
   _startSocialListPoll();
 }
 
