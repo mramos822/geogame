@@ -1340,10 +1340,10 @@ function _subscribeFriendshipChanges(userId) {
   if (!userId) return;
   _friendshipsChannel = window.sb
     .channel('friendship-changes')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships',
-        filter: `user_a=eq.${userId}` }, () => loadSocialData(false))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships',
-        filter: `user_b=eq.${userId}` }, () => loadSocialData(false))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, (payload) => {
+      const row = payload.new || payload.old || {};
+      if (row.user_a === userId || row.user_b === userId) loadSocialData(false);
+    })
     .subscribe();
 }
 
