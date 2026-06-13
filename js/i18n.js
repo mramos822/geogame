@@ -18,6 +18,7 @@ const I18N = {
     'common.play': 'Jugar', 'common.total': 'Puntuación total', 'common.city': 'Ciudad',
     'common.speedBonus': '¡Bonus velocidad!', 'common.continue': 'Continuar',
     // Primer ingreso (nombre)
+    'panel2.welcome1': '¡Bienvenido/a a GeoChallenge!', 'panel2.welcome2': '¿Qué modo quieres jugar?',
     'name.welcome': '¡Bienvenido!', 'name.askName': '¿Cómo te llamas?',
     'name.ph': 'Tu nombre...', 'name.confirm': 'Confirmar',
     'name.orDivider': 'o', 'name.hasAccount': '¿Tienes cuenta? Inicia sesión o regístrate',
@@ -120,6 +121,7 @@ const I18N = {
     'common.average': 'Average', 'common.highscore': 'Highscore', 'common.bestscore': 'Best score',
     'common.play': 'Play', 'common.total': 'Total score', 'common.city': 'City',
     'common.speedBonus': 'Speed bonus!', 'common.continue': 'Continue',
+    'panel2.welcome1': 'Welcome to GeoChallenge!', 'panel2.welcome2': 'Which mode do you want to play?',
     'name.welcome': 'Welcome!', 'name.askName': "What's your name?",
     'name.ph': 'Your name...', 'name.confirm': 'Confirm',
     'name.orDivider': 'or', 'name.hasAccount': 'Have an account? Sign in / Register',

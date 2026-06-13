@@ -25,7 +25,9 @@
 <body>
 
   <div id="loading-screen">
-    <img class="loading-planet" src="images/planet.png" alt="">
+<div class="loading-planet-wrap">
+      <img class="loading-planet" src="images/planet.png" alt="">
+    </div>
     <img class="loading-clouds" src="images/clouds.png" alt="">
     <img class="loading-clouds loading-clouds2" src="images/clouds.png" alt="">
     <img class="loading-clouds loading-clouds3" src="images/clouds.png" alt="">
@@ -40,6 +42,10 @@
     <div class="loading-clouds-fade loading-clouds-fade3"></div>
     <img class="flightatt-loading" src="images/characters/flightattpost2/1.png" alt="">
     <div class="flightatt-loading-shadow"></div>
+    <div class="loading-panel2-text2-wrap" id="loading-panel2-text2" style="display:none">
+      <img class="loading-panel2-text2-img" src="images/text2.png" alt="" draggable="false" oncontextmenu="return false">
+      <div class="loading-panel2-text2-label"><span data-i18n="panel2.welcome1">¡Bienvenido/a a GeoChallenge!</span><br><span data-i18n="panel2.welcome2">¿Qué modo quieres jugar?</span></div>
+    </div>
     <div class="loading-btn-row" style="display:none">
       <div class="loading-btn-wrap" style="display:none" id="loading-shapes-wrap">
         <span class="loading-btn-label" data-i18n="mode.shapes">Países</span>
@@ -73,24 +79,24 @@
         <button class="loading-lang-option" type="button" data-lang="es">Español</button>
       </div>
     </div>
-    <div class="loading-center-group">
+    <div class="loading-bar-track">
+      <div class="loading-bar-fill" id="loading-bar-fill"></div>
+    </div>
+    <div class="loading-pct" id="loading-pct">0%</div>
+    <div class="loading-plane-wrap">
       <img class="loading-plane" src="images/plane.png" alt="" draggable="false" oncontextmenu="return false">
-      <div class="loading-bar-track">
-        <div class="loading-bar-fill" id="loading-bar-fill"></div>
+    </div>
+<div class="loading-actions" id="loading-actions">
+      <div class="loading-play-single" id="loading-play-single">
+        <img src="images/buttons/es-play.png" alt="Jugar" draggable="false" oncontextmenu="return false">
       </div>
-      <div class="loading-pct" id="loading-pct">0%</div>
-      <div class="loading-actions" id="loading-actions">
-        <div class="loading-play-single" id="loading-play-single">
-          <img src="images/buttons/es-play.png" alt="Jugar" draggable="false" oncontextmenu="return false">
+      <div class="loading-secondary-btns">
+        <div class="loading-secondary-btn" id="loading-social-btn">
+          <img src="images/buttons/es-social.png" alt="Social" draggable="false" oncontextmenu="return false">
+          <div class="social-notif-badge" id="social-notif-badge" style="display:none">!</div>
         </div>
-        <div class="loading-secondary-btns">
-          <div class="loading-secondary-btn" id="loading-social-btn">
-            <img src="images/buttons/es-social.png" alt="Social" draggable="false" oncontextmenu="return false">
-            <div class="social-notif-badge" id="social-notif-badge" style="display:none">!</div>
-          </div>
-          <div class="loading-secondary-btn" id="loading-profile-btn">
-            <img src="images/buttons/es-profile.png" alt="Perfil" draggable="false" oncontextmenu="return false">
-          </div>
+        <div class="loading-secondary-btn" id="loading-profile-btn">
+          <img src="images/buttons/es-profile.png" alt="Perfil" draggable="false" oncontextmenu="return false">
         </div>
       </div>
     </div>
@@ -196,6 +202,13 @@
       <span class="profile-btn-label" id="profile-btn-label"></span>
       <img class="profile-account1" src="images/account1.png" alt="" draggable="false" oncontextmenu="return false">
       <img class="profile-account2" src="images/account2.png" alt="" draggable="false" oncontextmenu="return false">
+    </div>
+    <div class="loading-panel2-worldtour" id="loading-panel2-worldtour" style="display:none">
+      <img src="images/buttons/es-worldtour.png" alt="World Tour" draggable="false" oncontextmenu="return false">
+    </div>
+    <div class="loading-panel2-back" id="loading-panel2-back" style="display:none">
+      <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+      <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
     </div>
 
     <!-- Popup: link expirado -->
@@ -619,7 +632,7 @@
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
     </div>
-    <div id="loading-version">Ver. 2.6.48</div>
+    <div id="loading-version">Ver. 2.6.49</div>
   </div>
 
   <div id="splash-screen" class="game-bg-screen" style="display:none">

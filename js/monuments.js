@@ -112,23 +112,63 @@
     pctEl.textContent   = pct + '%';
     if (done >= total) {
       window.__loadingReady = true;
-      const actions = document.getElementById('loading-actions');
-      if (actions) actions.style.display = 'flex';
-      document.getElementById('loading-play-wrap').style.display = 'flex';
-      playBtn.addEventListener('animationend', () => playBtn.classList.add('loaded'), { once: true });
-      const flagsBtn = document.getElementById('loading-flags-btn');
-      document.getElementById('loading-flags-wrap').style.display = 'flex';
-      flagsBtn.addEventListener('animationend', () => flagsBtn.classList.add('loaded'), { once: true });
-      const shapesBtn = document.getElementById('loading-shapes-btn');
-      document.getElementById('loading-shapes-wrap').style.display = 'flex';
-      shapesBtn.addEventListener('animationend', () => shapesBtn.classList.add('loaded'), { once: true });
-      const mode4Btn = document.getElementById('loading-mode4-btn');
-      document.getElementById('loading-mode4-wrap').style.display = 'flex';
-      mode4Btn.addEventListener('animationend', () => mode4Btn.classList.add('loaded'), { once: true });
 
-      const accountWrap = document.getElementById('profile-account-btn');
-      if (accountWrap) accountWrap.style.display = 'block';
+      function fireEntranceAnimations() {
+        document.querySelectorAll('.flightatt-loading, .flightatt-loading-shadow').forEach(el => {
+          requestAnimationFrame(() => el.classList.add('entered'));
+        });
+        const planeWrap = document.querySelector('.loading-plane-wrap');
+        if (planeWrap) {
+          requestAnimationFrame(() => planeWrap.classList.add('plane-ready'));
+          planeWrap.addEventListener('transitionend', () => planeWrap.classList.add('plane-above'), { once: true });
+        }
+        const logo = document.querySelector('.loading-logo');
+        if (logo) requestAnimationFrame(() => logo.classList.add('logo-ready'));
+        const planetWrap = document.querySelector('.loading-planet-wrap');
+        if (planetWrap) requestAnimationFrame(() => planetWrap.classList.add('planet-ready'));
+        requestAnimationFrame(() => {
+          barFill.closest('.loading-bar-track')?.classList.add('bar-done');
+          pctEl?.classList.add('bar-done');
+        });
+        const actions = document.getElementById('loading-actions');
+        if (actions) actions.style.display = 'flex';
+        document.getElementById('loading-play-wrap').style.display = 'flex';
+        playBtn.addEventListener('animationend', () => playBtn.classList.add('loaded'), { once: true });
+        const flagsBtn = document.getElementById('loading-flags-btn');
+        document.getElementById('loading-flags-wrap').style.display = 'flex';
+        flagsBtn.addEventListener('animationend', () => flagsBtn.classList.add('loaded'), { once: true });
+        const shapesBtn = document.getElementById('loading-shapes-btn');
+        document.getElementById('loading-shapes-wrap').style.display = 'flex';
+        shapesBtn.addEventListener('animationend', () => shapesBtn.classList.add('loaded'), { once: true });
+        const mode4Btn = document.getElementById('loading-mode4-btn');
+        document.getElementById('loading-mode4-wrap').style.display = 'flex';
+        mode4Btn.addEventListener('animationend', () => mode4Btn.classList.add('loaded'), { once: true });
+        const accountWrap = document.getElementById('profile-account-btn');
+        if (accountWrap) accountWrap.style.display = 'block';
+        const resultsBtn = document.getElementById('loading-results-btn');
+        if (resultsBtn) resultsBtn.style.display = 'block';
+      }
 
+      // Esperar a que name-prompt y account-modal estén cerrados antes de animar
+      const namePrompt   = document.getElementById('name-prompt');
+      const accountModal = document.getElementById('account-modal');
+      const nameBlocking    = namePrompt   && namePrompt.classList.contains('visible');
+      const accountBlocking = accountModal && accountModal.classList.contains('open');
+
+      if (!nameBlocking && !accountBlocking) {
+        fireEntranceAnimations();
+      } else {
+        let nameOk    = !nameBlocking;
+        let accountOk = !accountBlocking;
+        function checkAndFire() { if (nameOk && accountOk) { obs.disconnect(); fireEntranceAnimations(); } }
+        const obs = new MutationObserver(() => {
+          if (!nameOk    && namePrompt   && !namePrompt.classList.contains('visible')) nameOk = true;
+          if (!accountOk && accountModal && !accountModal.classList.contains('open'))  accountOk = true;
+          checkAndFire();
+        });
+        if (namePrompt)   obs.observe(namePrompt,   { attributes: true, attributeFilter: ['class', 'style'] });
+        if (accountModal) obs.observe(accountModal, { attributes: true, attributeFilter: ['class'] });
+      }
       const fmt = v => v > 0 ? '🏆 ' + v.toLocaleString() : '';
       const playHs      = parseInt(localStorage.getItem('geochallenge_highscore') || '0', 10);
       const flagsHs     = parseInt(localStorage.getItem('flagsHighscore')         || '0', 10);
@@ -586,15 +626,71 @@ window.campaignBase = function () {
   return (window.campaign && window.campaign.active) ? (window.campaign.base || 0) : 0;
 };
 
+document.getElementById('loading-results-btn')?.addEventListener('click', () => {
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+  document.getElementById('loading-screen').style.display = 'none';
+  if (typeof showResultsScreen === 'function') showResultsScreen();
+});
+
 document.getElementById('loading-play-single')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+  [
+    document.getElementById('loading-actions'),
+    document.getElementById('loading-version'),
+    document.querySelector('.loading-plane-wrap'),
+    document.getElementById('profile-account-btn'),
+  ].forEach(el => { if (el) el.style.display = 'none'; });
+  const lg = document.querySelector('.loading-logo');
+  if (lg) {
+    lg.getAnimations().forEach(a => a.cancel());
+    lg.classList.add('logo-ready', 'panel2-logo');
+  }
+  const back = document.getElementById('loading-panel2-back');
+  if (back) back.style.display = 'block';
+  const wt = document.getElementById('loading-panel2-worldtour');
+  if (wt) wt.style.display = 'block';
+  const t2 = document.getElementById('loading-panel2-text2');
+  if (t2) t2.style.display = 'block';
+});
+
+document.getElementById('loading-panel2-back')?.addEventListener('click', () => {
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+  document.getElementById('loading-panel2-back').style.display = 'none';
+  const wt = document.getElementById('loading-panel2-worldtour');
+  if (wt) wt.style.display = 'none';
+  const t2b = document.getElementById('loading-panel2-text2');
+  if (t2b) t2b.style.display = 'none';
+  const lgBack = document.querySelector('.loading-logo');
+  if (lgBack) {
+    lgBack.style.transition = 'none';
+    lgBack.classList.remove('panel2-logo');
+    requestAnimationFrame(() => { lgBack.style.transition = ''; });
+  }
+  const actions = document.getElementById('loading-actions');
+  if (actions) actions.style.display = 'flex';
+  const ver = document.getElementById('loading-version');
+  if (ver) ver.style.display = '';
+  const acct = document.getElementById('profile-account-btn');
+  if (acct) acct.style.display = 'block';
+  const pw = document.querySelector('.loading-plane-wrap');
+  if (pw) pw.style.display = 'block';
+  const lg = document.querySelector('.loading-logo');
+  if (lg) lg.style.display = 'block';
+});
+
+document.getElementById('loading-panel2-worldtour')?.addEventListener('click', () => {
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+  window.startCampaign();
+});
+
+window.startCampaign = function () {
   window.campaign.active = true;
   window.campaign.idx = 0;
   window.campaign.base = 0;
   window.campaign.scores = {};
   window.lastModeScore = 0;
   document.getElementById('loading-flags-btn').click();
-});
+};
 
 // ── MODAL CUENTA ─────────────────────────────────────────────────────────────
 (function () {
@@ -819,11 +915,17 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
     if (!v) { wrap.style.display = 'none'; return; }
     wrap.style.display = 'flex';
     let score = 0;
-    if (v.length >= 6)  score++;
-    if (v.length >= 10) score++;
+    if (v.length >= 8)  score++;
+    if (v.length >= 12) score++;
     if (/[A-Z]/.test(v) && /[a-z]/.test(v)) score++;
     if (/[0-9]/.test(v)) score++;
     if (/[^a-zA-Z0-9]/.test(v)) score++;
+    // Penalizar contraseñas comunes, repeticiones y secuencias
+    const commonPasswords = ['123456','1234567','12345678','123456789','password','contraseña','111111','000000','qwerty','abc123','654321','987654','112233','123123','aaaaaa','888888','666666','999999','pass123'];
+    const isCommon    = commonPasswords.includes(v.toLowerCase());
+    const isRepeating = /^(.)\1+$/.test(v);
+    const isSequential = /^(0123|1234|2345|3456|4567|5678|6789|abcd|bcde|cdef|qwer|asdf|zxcv)/i.test(v);
+    if (isCommon || isRepeating || isSequential) score = 0;
     if (score <= 1)      { fill.style.width = '33%';  fill.style.background = '#e74c3c'; label.style.color = '#e74c3c'; label.textContent = t('account.passWeak'); }
     else if (score <= 3) { fill.style.width = '66%';  fill.style.background = '#f39c12'; label.style.color = '#c87800'; label.textContent = t('account.passMedium'); }
     else                 { fill.style.width = '100%'; fill.style.background = '#2bd14b'; label.style.color = '#1a7a30'; label.textContent = t('account.passStrong'); }
@@ -945,11 +1047,13 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
     if (!v) { wrap.style.display = 'none'; return; }
     wrap.style.display = 'flex';
     let score = 0;
-    if (v.length >= 6)  score++;
-    if (v.length >= 10) score++;
+    if (v.length >= 8)  score++;
+    if (v.length >= 12) score++;
     if (/[A-Z]/.test(v) && /[a-z]/.test(v)) score++;
     if (/[0-9]/.test(v)) score++;
     if (/[^a-zA-Z0-9]/.test(v)) score++;
+    const _common2 = ['123456','1234567','12345678','123456789','password','contraseña','111111','000000','qwerty','abc123','654321','987654','112233','123123','aaaaaa','888888','666666','999999','pass123'];
+    if (_common2.includes(v.toLowerCase()) || /^(.)\1+$/.test(v) || /^(0123|1234|2345|3456|4567|5678|6789|abcd|bcde|cdef|qwer|asdf|zxcv)/i.test(v)) score = 0;
     if (score <= 1)      { fill.style.width = '33%';  fill.style.background = '#e74c3c'; label.style.color = '#e74c3c'; label.textContent = t('account.passWeak'); }
     else if (score <= 3) { fill.style.width = '66%';  fill.style.background = '#f39c12'; label.style.color = '#c87800'; label.textContent = t('account.passMedium'); }
     else                 { fill.style.width = '100%'; fill.style.background = '#2bd14b'; label.style.color = '#1a7a30'; label.textContent = t('account.passStrong'); }
@@ -1268,6 +1372,7 @@ _updateProfileBtnLabel();
     if (accountBtn && accountModal) {
       accountBtn.addEventListener('click', () => {
         try { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); } catch (e) {}
+        prompt.classList.remove('visible');
         prompt.style.display = 'none';
         if (typeof window.openAccountModal === 'function') window.openAccountModal();
         else accountModal.classList.add('open');
@@ -1282,6 +1387,7 @@ _updateProfileBtnLabel();
                 if (el) el.textContent = loggedName;
               }
             } else {
+              prompt.classList.add('visible');
               prompt.style.display = '';
             }
           }
@@ -2321,6 +2427,88 @@ window.gameStoppers.push(() => {
   try { if (typeof timeupOverlay !== 'undefined' && timeupOverlay) { timeupOverlay.style.display = 'none'; timeupOverlay.classList.remove('timeup-in','timeup-out'); } } catch (e) {}
 });
 
+window.resetEntranceElements = function () {
+  const fa = document.querySelector('.flightatt-loading');
+  const sh = document.querySelector('.flightatt-loading-shadow');
+  const pw = document.querySelector('.loading-plane-wrap');
+  const lg = document.querySelector('.loading-logo');
+  const pl = document.querySelector('.loading-planet-wrap');
+  [fa, sh, pw, lg, pl].forEach(el => el && el.getAnimations().forEach(a => a.cancel()));
+  if (fa) { fa.classList.remove('entered');               fa.style.transform = 'translate(-50%,-50%) scaleX(-1) translateX(55cqmin)'; }
+  if (sh) { sh.classList.remove('entered');               sh.style.transform = 'translate(-50%,-50%) translateX(-55cqmin)'; }
+  if (pw) { pw.classList.remove('plane-ready','plane-above'); pw.style.transform = 'translate(-50%,-50%) translateY(32cqmin)'; pw.style.display = ''; }
+  if (lg) { lg.classList.remove('logo-ready','panel2-logo'); lg.style.opacity = '0'; lg.style.transform = 'translateX(-50%) scale(1.5)'; lg.style.display = ''; }
+  if (pl) { pl.classList.remove('planet-ready');          pl.style.opacity = '0'; pl.style.transform = 'translateX(-50%) scale(1.25)'; }
+  // Restaurar elementos del primer panel que pudo haber ocultado el Play
+  const ver = document.getElementById('loading-version');
+  if (ver) ver.style.display = '';
+  const back2 = document.getElementById('loading-panel2-back');
+  if (back2) back2.style.display = 'none';
+  const wt2 = document.getElementById('loading-panel2-worldtour');
+  if (wt2) wt2.style.display = 'none';
+  const t2r = document.getElementById('loading-panel2-text2');
+  if (t2r) t2r.style.display = 'none';
+};
+
+window.replayEntranceAnimations = function () {
+  const flightEl   = document.querySelector('.flightatt-loading');
+  const shadowEl   = document.querySelector('.flightatt-loading-shadow');
+  const planeWrap  = document.querySelector('.loading-plane-wrap');
+  const logo       = document.querySelector('.loading-logo');
+  const planetWrap = document.querySelector('.loading-planet-wrap');
+
+  if (planeWrap) planeWrap.classList.remove('plane-above');
+
+  // Limpiar inline styles del reset de quitToMenu; WAAPI toma el control desde from
+  [flightEl, shadowEl, planeWrap, logo, planetWrap].forEach(el => {
+    if (!el) return;
+    el.style.transform = '';
+    el.style.opacity   = '';
+  });
+
+  const opts700 = { duration: 700, easing: 'ease-out', fill: 'forwards' };
+  const opts500 = { duration: 500, easing: 'ease-out', fill: 'forwards' };
+
+  if (flightEl) flightEl.animate([
+    { transform: 'translate(-50%,-50%) scaleX(-1) translateX(55cqmin)' },
+    { transform: 'translate(-50%,-50%) scaleX(-1) translateX(0)' }
+  ], opts700);
+
+  if (shadowEl) shadowEl.animate([
+    { transform: 'translate(-50%,-50%) translateX(-55cqmin)' },
+    { transform: 'translate(-50%,-50%) translateX(0)' }
+  ], opts700);
+
+  if (planeWrap) {
+    const anim = planeWrap.animate([
+      { transform: 'translate(-50%,-50%) translateY(32cqmin)' },
+      { transform: 'translate(-50%,-50%) translateY(0)' }
+    ], opts700);
+    anim.onfinish = () => planeWrap.classList.add('plane-above');
+  }
+
+  if (logo) logo.animate([
+    { transform: 'translateX(-50%) scale(1.5)', opacity: '0' },
+    { transform: 'translateX(-50%) scale(1)',   opacity: '1' }
+  ], opts700);
+
+  if (planetWrap) planetWrap.animate([
+    { transform: 'translateX(-50%) scale(1.25)', opacity: '0' },
+    { transform: 'translateX(-50%) scale(1)',    opacity: '1' }
+  ], opts500);
+
+  const resultsBtn = document.getElementById('loading-results-btn');
+  if (resultsBtn) resultsBtn.style.display = 'block';
+
+  // Restaurar elementos del primer panel (pueden haber quedado ocultos por el panel2)
+  const actions = document.getElementById('loading-actions');
+  if (actions) actions.style.display = 'flex';
+  const acct = document.getElementById('profile-account-btn');
+  if (acct) acct.style.display = 'block';
+  const ver = document.getElementById('loading-version');
+  if (ver) ver.style.display = '';
+};
+
 // Termina la partida en curso (cualquier modo) y vuelve al menú principal sin recargar.
 function quitToMenu() {
   window._setPlaying(false);
@@ -2386,10 +2574,13 @@ function quitToMenu() {
   });
 
   // 8) Mostrar el menú principal limpio
+  if (typeof window.resetEntranceElements === 'function') window.resetEntranceElements();
+
   const ls = document.getElementById('loading-screen');
   if (ls) { ls.style.display = ''; ls.classList.remove('table-shown'); }
   ['loading-table-group','loading-social-group','loading-friend-group','loading-addfriend-group','loading-blocked-group','loading-sent-group']
     .forEach(id => document.getElementById(id)?.classList.add('table-gone'));
+  if (typeof window.replayEntranceAnimations === 'function') window.replayEntranceAnimations();
   if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
   if (typeof window.refreshIngamePower === 'function') window.refreshIngamePower();
 }
@@ -4151,9 +4342,11 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
   // Liberar la RAM del juego recién terminado antes de volver al menú (el video se
   // vuelve a setear más abajo con swapHowtoVideo).
   if (typeof window.releaseGameMemory === 'function') window.releaseGameMemory();
+  if (typeof window.resetEntranceElements === 'function') window.resetEntranceElements();
   document.getElementById('loading-screen').style.display = '';
   document.getElementById('loading-screen').classList.remove('table-shown');
   document.getElementById('loading-table-group')?.classList.add('table-gone');
+  if (typeof window.replayEntranceAnimations === 'function') window.replayEntranceAnimations();
   document.getElementById('loading-social-group')?.classList.add('table-gone');
   document.getElementById('loading-friend-group')?.classList.add('table-gone');
   document.getElementById('loading-addfriend-group')?.classList.add('table-gone');
