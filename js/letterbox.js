@@ -33,7 +33,7 @@
 
     // Mover los hijos directos de <body> al stage, salvo scripts/estilos,
     // el aviso de pantalla y el lector temporal de resolución.
-    var keepOut = { 'screen-warning': 1, 'temp-res-readout': 1, 'app-stage': 1, 'app-stage-outer': 1 };
+    var keepOut = { 'screen-warning': 1, 'temp-res-readout': 1, 'app-stage': 1, 'app-stage-outer': 1, 'init-cover': 1 };
     var kids = Array.prototype.slice.call(document.body.childNodes);
     kids.forEach(function (n) {
       if (n.nodeType === 1) {
@@ -57,10 +57,14 @@
     var vp = window.visualViewport;
     var w = vp ? vp.width  : window.innerWidth;
     var h = vp ? vp.height : window.innerHeight;
-    // Keep the largest dimensions seen so the stage doesn't shrink when the
-    // iOS keyboard opens and reduces visualViewport.height.
-    if (w > baseW || h > baseH) { baseW = w; baseH = h; }
-    var fit = Math.min(baseW / VISIBLE_W, baseH / VISIBLE_H);
+    var fitW = w, fitH = h;
+    // On iOS, track the largest dimensions seen so the keyboard-open event
+    // (which shrinks visualViewport.height) doesn't rescale the stage.
+    if (document.body.classList.contains('is-ios')) {
+      if (w > baseW || h > baseH) { baseW = w; baseH = h; }
+      fitW = baseW; fitH = baseH;
+    }
+    var fit = Math.min(fitW / VISIBLE_W, fitH / VISIBLE_H);
     document.documentElement.style.setProperty('--app-fit', fit);
   }
 

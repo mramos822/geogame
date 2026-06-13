@@ -1462,9 +1462,11 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
   wrap.classList.add('confirm-pressed');
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
   gameoverScreen.style.display = 'none';
+  if (typeof window.resetEntranceElements === 'function') window.resetEntranceElements();
   document.getElementById('loading-screen').style.display = '';
   document.getElementById('loading-screen').classList.remove('table-shown');
   document.getElementById('loading-table-group')?.classList.add('table-gone');
+  if (typeof window.replayEntranceAnimations === 'function') window.replayEntranceAnimations();
   if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
 
   // refresh highscore displays

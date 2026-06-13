@@ -249,9 +249,11 @@ document.getElementById('final-confirm-back-wrap')?.addEventListener('click', ()
   setTimeout(() => w.classList.remove('confirm-pressed'), 50);
   if (typeof window.stopResultsMusic === 'function') window.stopResultsMusic();
   hideFinalScreen();
+  if (typeof window.resetEntranceElements === 'function') window.resetEntranceElements();
   document.getElementById('loading-screen').style.display = '';
   document.getElementById('loading-screen').classList.remove('table-shown');
   document.getElementById('loading-table-group')?.classList.add('table-gone');
+  if (typeof window.replayEntranceAnimations === 'function') window.replayEntranceAnimations();
   if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
   // Liberar la RAM de la campaña recién terminada (fondos/personajes/ranks/canvas/
   // video). Así la app no acumula memoria entre sesiones y la siguiente partida o
