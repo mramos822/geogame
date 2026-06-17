@@ -1502,9 +1502,18 @@ function _patchFriendStatusInDOM(friendId) {
   const rk = (typeof getRank === 'function') ? getRank(f.score) : null;
   document.querySelectorAll(`.loading-social-row[data-friend-id="${friendId}"]`).forEach(row => {
     if (row.querySelector('.loading-social-status')) {
+      const prevCls = (row.className.match(/status-(\w+)/) || [])[1];
       row.className = row.className.replace(/status-\w+/, 'status-' + st.cls);
       const statusEl = row.querySelector('.loading-social-status');
-      if (statusEl) statusEl.innerHTML = `<span class="dot ${st.cls}"></span>${socialStatusText(f)}`;
+      if (statusEl && prevCls !== st.cls) {
+        statusEl.innerHTML = `<span class="dot ${st.cls}"></span>${socialStatusText(f)}`;
+      } else if (statusEl) {
+        // Solo actualizar el texto, sin tocar el dot (no reinicia la animación)
+        const textNode = statusEl.lastChild;
+        const newText = socialStatusText(f);
+        if (textNode && textNode.nodeType === Node.TEXT_NODE) textNode.textContent = newText;
+        else if (textNode && textNode.nodeType !== Node.ELEMENT_NODE) statusEl.innerHTML = `<span class="dot ${st.cls}"></span>${newText}`;
+      }
     }
     const avatarEl = row.querySelector('.loading-social-avatar');
     if (avatarEl && f.avatar) avatarEl.src = f.avatar;
