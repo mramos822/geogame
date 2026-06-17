@@ -99,7 +99,7 @@ window.sbGetFriends = async function(userId) {
     return {
       id:     p.id,
       name:   p.username,
-      score:  p.hs_total || 0,
+      score:  p.hs_total || ((p.hs_flags||0)+(p.hs_shapes||0)+(p.hs_cities||0)+(p.hs_monuments||0)),
       avatar: p.avatar_url || 'images/profilepic/ppdefault.png',
     };
   });
@@ -200,7 +200,7 @@ window.sbLoadSocialData = async function(userId) {
     return {
       friendshipId: row.id,
       id: p.id, name: p.username || '?',
-      score: p.hs_total || 0,
+      score: p.hs_total || ((p.hs_flags||0)+(p.hs_shapes||0)+(p.hs_cities||0)+(p.hs_monuments||0)),
       avatar: p.avatar_url || 'images/profilepic/ppdefault.png',
       hs_flags: p.hs_flags||0, hs_shapes: p.hs_shapes||0,
       hs_cities: p.hs_cities||0, hs_monuments: p.hs_monuments||0,
