@@ -851,6 +851,11 @@ window.startCampaign = function () {
     closeModal();
   });
 
+  ['login-user','login-pass'].forEach(id => {
+    document.getElementById(id)?.addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('login-submit')?.click();
+    });
+  });
   document.getElementById('login-submit')?.addEventListener('click', () => {
     const userEl  = document.getElementById('login-user');
     const passEl  = document.getElementById('login-pass');
