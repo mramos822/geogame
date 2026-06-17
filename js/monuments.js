@@ -37,7 +37,7 @@
   ];
 
   const AUDIO = [
-    'sfx/check.mp3','sfx/postgameloop.mp3','sfx/pin.mp3',
+    'sfx/check.mp3','sfx/postgameloop.mp3','sfx/menuloop.mp3','sfx/pin.mp3',
     'sfx/countdown.mp3','sfx/cuentaregresiva.mp3','sfx/error.mp3',
     'sfx/acertar.mp3','sfx/verynice.mp3','sfx/tag.mp3',
     'sfx/bonus.mp3','sfx/timesup.mp3','sfx/gamemusic.mp3','sfx/select.mp3',
@@ -147,6 +147,13 @@
         if (accountWrap) accountWrap.style.display = 'block';
         const resultsBtn = document.getElementById('loading-results-btn');
         if (resultsBtn) resultsBtn.style.display = 'block';
+        // Autoplay bloqueado por el browser hasta el primer gesto — arrancar en el primer click/touch
+        const _startMenuMusic = () => {
+          if (sfxMenuMusic.paused) playMusic(sfxMenuMusic);
+        };
+        ['click','touchend','keydown'].forEach(ev =>
+          document.addEventListener(ev, _startMenuMusic, { once: true, passive: true })
+        );
       }
 
       // Esperar a que name-prompt y account-modal estén cerrados antes de animar
@@ -352,8 +359,11 @@ const sfxPostgame  = new Audio('sfx/postgameloop.mp3');
 sfxPostgame.loop   = true;
 const sfxGameMusic = new Audio('sfx/gamemusic.mp3');
 sfxGameMusic.loop  = true;
+const sfxMenuMusic = new Audio('sfx/menuloop.mp3');
+sfxMenuMusic.loop  = true;
+window.sfxMenuMusic = sfxMenuMusic;
 const sfxSelect    = new Audio('sfx/select.mp3');
-if (localStorage.getItem('muted') === 'true') { sfxCheck.volume = 0; sfxPostgame.volume = 0; sfxGameMusic.volume = 0; sfxSelect.volume = 0; }
+if (localStorage.getItem('muted') === 'true') { sfxCheck.volume = 0; sfxPostgame.volume = 0; sfxGameMusic.volume = 0; sfxMenuMusic.volume = 0; sfxSelect.volume = 0; }
 [sfxCheck, sfxSelect].forEach(sfx => { sfx.load(); });
 
 // ── MÚSICA EN LOOP: motor Web Audio SOLO en iOS ───────────────────────────────
@@ -420,6 +430,7 @@ window.resetSplashEntry = function () {
 const _iosMusicURL = new Map([
   [sfxGameMusic, 'sfx/gamemusic.mp3'],
   [sfxPostgame,  'sfx/postgameloop.mp3'],
+  [sfxMenuMusic, 'sfx/menuloop.mp3'],
 ]);
 let _iosCtx    = null;
 const _iosBufs = new Map();   // url -> AudioBuffer
@@ -490,7 +501,7 @@ function playMusicIOS(track) {
   }
   _iosWanted = track;
   // que ningún <audio> de música suene en paralelo al motor
-  [sfxPostgame, sfxGameMusic].forEach(t => t.pause());
+  [sfxPostgame, sfxGameMusic, sfxMenuMusic].forEach(t => t.pause());
   if (ctx.state === 'suspended') ctx.resume().catch(() => {});
 
   if (!track) { iosStopMusic(); return; }                       // corte inmediato
@@ -2586,7 +2597,7 @@ function quitToMenu() {
    sfxTickdown, sfxTimesUp, sfxGameMusic].forEach(s => {
     try { if (s) { s.pause(); s.currentTime = 0; } } catch (e) {}
   });
-  try { playMusic(sfxPostgame); } catch (e) {}
+  try { playMusic(sfxMenuMusic); } catch (e) {}
 
   // 3) Resetear el estado de juego de monuments/cities
   // Desactivar práctica ANTES de resetState para que no filtre las colas normales
@@ -2780,7 +2791,7 @@ function loadGameSFX() {
 
 // Camino PC (y fallback): <audio> HTML de siempre. NO TOCAR.
 function playMusicHTML(track) {
-  [sfxPostgame, sfxGameMusic].forEach(t => { if (t !== track) { t.pause(); t.currentTime = 0; } });
+  [sfxPostgame, sfxGameMusic, sfxMenuMusic].forEach(t => { if (t !== track) { t.pause(); t.currentTime = 0; } });
   if (!track) return;
   // si el mismo track ya está sonando, dejarlo continuar (no reiniciar el loop)
   if (!track.paused && !track.ended) {
@@ -4251,7 +4262,7 @@ function endGame() {
         if (typeof window.resetEntranceElements === 'function') window.resetEntranceElements();
         const ls = document.getElementById('loading-screen');
         if (ls) { ls.style.display = 'flex'; ls.style.opacity = '1'; }
-        try { playMusic(sfxPostgame); } catch(e) {}
+        try { playMusic(sfxMenuMusic); } catch(e) {}
         if (typeof window.showEntranceElementsStatic === 'function') window.showEntranceElementsStatic();
         { const lpg = document.getElementById('loading-practice-group'); lpg.classList.remove('table-gone'); lpg.classList.add('panel-visible'); }
         document.getElementById('practice-mode-section').style.display = 'none';
@@ -4609,6 +4620,7 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
   document.getElementById('loading-screen').classList.remove('table-shown');
   document.getElementById('loading-table-group')?.classList.add('table-gone');
   if (typeof window.replayEntranceAnimations === 'function') window.replayEntranceAnimations();
+  if (typeof playMusic !== 'undefined') playMusic(window.sfxMenuMusic || sfxMenuMusic);
   document.getElementById('loading-social-group')?.classList.add('table-gone');
   document.getElementById('loading-friend-group')?.classList.add('table-gone');
   document.getElementById('loading-addfriend-group')?.classList.add('table-gone');
@@ -4751,7 +4763,7 @@ function sfxPlay(sfx) {
 }
 
 function getAllSfx() {
-  return [sfxCheck, sfxPostgame, sfxGameMusic, sfxSelect, sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus, sfxTickdown, sfxTimesUp,
+  return [sfxCheck, sfxPostgame, sfxGameMusic, sfxMenuMusic, sfxSelect, sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus, sfxTickdown, sfxTimesUp,
     typeof sfxLevel2  !== 'undefined' ? sfxLevel2        : null,
     window.sfxCheer  || null,
     window.sfxLoop   || null,

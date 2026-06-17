@@ -1150,7 +1150,7 @@ function hideShapesMode() {
     if (typeof window.resetEntranceElements === 'function') window.resetEntranceElements();
     const ls = document.getElementById('loading-screen');
     if (ls) { ls.style.display = 'flex'; ls.style.opacity = '1'; }
-    try { if (typeof playMusic !== 'undefined') playMusic(sfxPostgame); } catch(e) {}
+    try { if (typeof playMusic !== 'undefined') playMusic(window.sfxMenuMusic || sfxMenuMusic); } catch(e) {}
     if (typeof window.showEntranceElementsStatic === 'function') window.showEntranceElementsStatic();
     document.getElementById('loading-practice-group').style.display = 'flex';
     document.getElementById('practice-mode-section').style.display = 'none';

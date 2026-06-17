@@ -127,8 +127,10 @@ const sfxPostgame  = new Audio('sfx/postgameloop.mp3');
 sfxPostgame.loop   = true;
 const sfxGameMusic = new Audio('sfx/gamemusic.mp3');
 sfxGameMusic.loop  = true;
+const sfxMenuMusic = new Audio('sfx/menuloop.mp3');
+sfxMenuMusic.loop  = true;
 const sfxSelect    = new Audio('sfx/select.mp3');
-if (localStorage.getItem('muted') === 'true') { sfxCheck.volume = 0; sfxPostgame.volume = 0; sfxGameMusic.volume = 0; sfxSelect.volume = 0; }
+if (localStorage.getItem('muted') === 'true') { sfxCheck.volume = 0; sfxPostgame.volume = 0; sfxGameMusic.volume = 0; sfxMenuMusic.volume = 0; sfxSelect.volume = 0; }
 
 document.getElementById('loading-play-btn').addEventListener('mouseenter', () => {
   sfxSelect.currentTime = 0; sfxSelect.play();
@@ -174,12 +176,13 @@ function loadGameSFX() {
 }
 
 function playMusic(track) {
-  [sfxPostgame, sfxGameMusic].forEach(t => { if (t !== track) { t.pause(); t.currentTime = 0; } });
+  [sfxPostgame, sfxGameMusic, sfxMenuMusic].forEach(t => { if (t !== track) { t.pause(); t.currentTime = 0; } });
   if (!track) return;
   track.currentTime = 0;
   const p = track.play();
   if (p) p.catch(() => {});
 }
+window.sfxMenuMusic = sfxMenuMusic;
 
 // ── CONFIG ──────────────────────────────────────────────────────────────────
 const GAME_DURATION   = window.GAME_DURATION;
@@ -1478,6 +1481,7 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
   document.getElementById('loading-screen').classList.remove('table-shown');
   document.getElementById('loading-table-group')?.classList.add('table-gone');
   if (typeof window.replayEntranceAnimations === 'function') window.replayEntranceAnimations();
+  playMusic(sfxMenuMusic);
   if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
 
   // refresh highscore displays
@@ -1645,7 +1649,7 @@ let restartFlightAtt;
 let isMuted = localStorage.getItem('muted') === 'true';
 
 function getAllSfx() {
-  return [sfxCheck, sfxPostgame, sfxGameMusic, sfxSelect, sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus, sfxTickdown, sfxTimesUp,
+  return [sfxCheck, sfxPostgame, sfxGameMusic, sfxMenuMusic, sfxSelect, sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus, sfxTickdown, sfxTimesUp,
     typeof sfxLevel2 !== 'undefined' ? sfxLevel2 : null].filter(Boolean);
 }
 
