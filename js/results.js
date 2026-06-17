@@ -312,6 +312,7 @@ function showResultsScreen() {
     if (cs.shapes    != null) payload.shapes    = cs.shapes;
     if (cs.game      != null) payload.cities    = cs.game;
     if (cs.monuments != null) payload.monuments = cs.monuments;
+    payload.total = resultsScreen._total || 0;
     if (Object.keys(payload).length > 0) {
       window.sbSaveScores(window._sbUserId, payload)
         .then(() => window.sbGetProfile(window._sbUserId))

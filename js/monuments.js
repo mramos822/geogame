@@ -280,13 +280,12 @@ async function syncLocalDataToAccount(userId) {
 // Copia los hs de Supabase a localStorage (toma el máximo) para que el display
 // en partida muestre el récord correcto sin necesidad de llegar al final.
 function syncHsFromProfile(profile) {
-  const total = (profile.hs_flags||0) + (profile.hs_shapes||0) + (profile.hs_cities||0) + (profile.hs_monuments||0);
   const map = {
     flagsHighscore:          profile.hs_flags     || 0,
     shapesHighscore:         profile.hs_shapes    || 0,
     geochallenge_highscore:  profile.hs_cities    || 0,
     monumentsHighscore:      profile.hs_monuments || 0,
-    totalHighscore:          total,
+    totalHighscore:          profile.hs_total     || 0,
   };
   Object.entries(map).forEach(([k, v]) => {
     const cur = parseInt(localStorage.getItem(k) || '0', 10);
@@ -1572,7 +1571,7 @@ function _subscribeFriendStatuses(friendIds) {
         }
       }
       // Actualizar score si cambió (amigo terminó partida)
-      const newScore = (updated.hs_flags||0)+(updated.hs_shapes||0)+(updated.hs_cities||0)+(updated.hs_monuments||0);
+      const newScore = updated.hs_total || 0;
       if (newScore !== f.score) {
         f.score       = newScore;
         f.hs_flags    = updated.hs_flags    || 0;
@@ -4550,13 +4549,13 @@ let confirmStep = 0;
 let confirmCooldown = false;
 function confirmCooldownLock() {
   confirmCooldown = true;
-  setTimeout(() => { confirmCooldown = false; }, 100);
+  setTimeout(() => { confirmCooldown = false; }, 600);
 }
 
 document.querySelector('.splash-confirm-wrap')?.addEventListener('click', () => {
   if (confirmCooldown) return;
   confirmCooldownLock();
-  const a = new Audio('sfx/check.mp3'); a.volume = isMuted ? 0 : 1; a.muted = isMuted; a.play();
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   const wrap = document.querySelector('.splash-confirm-wrap');
   wrap.classList.add('confirm-pressed');
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
@@ -4595,7 +4594,7 @@ document.querySelector('.splash-confirm-wrap')?.addEventListener('click', () => 
 document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () => {
   if (confirmCooldown) return;
   confirmCooldownLock();
-  const a = new Audio('sfx/check.mp3'); a.volume = isMuted ? 0 : 1; a.muted = isMuted; a.play();
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   const wrap = document.querySelector('.gameover-confirm-wrap');
   wrap.classList.add('confirm-pressed');
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);

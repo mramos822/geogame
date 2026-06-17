@@ -76,6 +76,7 @@ window.sbSaveScores = async function(userId, scores) {
     updates['avg_sum_' + k]     = (profile['avg_sum_' + k]     || 0) + scores[k];
     updates['play_count_' + k]  = (profile['play_count_' + k]  || 0) + 1;
   });
+  if (scores.total != null && scores.total > (profile.hs_total || 0)) updates.hs_total = scores.total;
   if (Object.keys(updates).length) {
     updates.play_count = (profile.play_count || 0) + 1;
     await window.sbUpdateProfile(userId, updates);
@@ -88,8 +89,8 @@ window.sbGetFriends = async function(userId) {
   const { data, error } = await sb
     .from('friendships')
     .select(`id, status, initiated_by,
-      profile_a:user_a(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments),
-      profile_b:user_b(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments)`)
+      profile_a:user_a(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total),
+      profile_b:user_b(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total)`)
     .or(`user_a.eq.${userId},user_b.eq.${userId}`)
     .eq('status', 'accepted');
   if (error) throw error;
@@ -98,7 +99,7 @@ window.sbGetFriends = async function(userId) {
     return {
       id:     p.id,
       name:   p.username,
-      score:  (p.hs_flags||0) + (p.hs_shapes||0) + (p.hs_cities||0) + (p.hs_monuments||0),
+      score:  p.hs_total || 0,
       avatar: p.avatar_url || 'images/profilepic/ppdefault.png',
     };
   });
@@ -190,17 +191,16 @@ window.sbUploadAvatar = async function(userId, blob) {
 window.sbLoadSocialData = async function(userId) {
   const { data, error } = await sb.from('friendships')
     .select(`id, status, initiated_by, user_a, user_b,
-      pa:user_a(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,play_count,last_active,is_playing),
-      pb:user_b(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,play_count,last_active,is_playing)`)
+      pa:user_a(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing),
+      pb:user_b(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing)`)
     .or(`user_a.eq.${userId},user_b.eq.${userId}`);
   if (error) throw error;
   function toEntry(row) {
     const p = row.pa.id === userId ? row.pb : row.pa;
-    const total = (p.hs_flags||0)+(p.hs_shapes||0)+(p.hs_cities||0)+(p.hs_monuments||0);
     return {
       friendshipId: row.id,
       id: p.id, name: p.username || '?',
-      score: total,
+      score: p.hs_total || 0,
       avatar: p.avatar_url || 'images/profilepic/ppdefault.png',
       hs_flags: p.hs_flags||0, hs_shapes: p.hs_shapes||0,
       hs_cities: p.hs_cities||0, hs_monuments: p.hs_monuments||0,
