@@ -147,8 +147,18 @@
         if (accountWrap) accountWrap.style.display = 'block';
         const resultsBtn = document.getElementById('loading-results-btn');
         if (resultsBtn) resultsBtn.style.display = 'block';
-        // sfxMenuMusic y playMusic se declaran fuera del IIFE; diferir para que estén disponibles
-        setTimeout(() => { try { if (typeof playMusic === 'function' && window.sfxMenuMusic) playMusic(window.sfxMenuMusic); } catch(e) {} }, 0);
+        // Arrancar menuloop con muted autoplay trick (browsers siempre permiten muted)
+        setTimeout(() => {
+          const m = window.sfxMenuMusic;
+          if (!m) return;
+          m.loop = true;
+          m.currentTime = 0;
+          m.muted = true;
+          const p = m.play();
+          const unmute = () => { m.muted = localStorage.getItem('muted') === 'true'; };
+          if (p && typeof p.then === 'function') p.then(unmute).catch(() => {});
+          else unmute();
+        }, 0);
       }
 
       // Esperar a que name-prompt y account-modal estén cerrados antes de animar
