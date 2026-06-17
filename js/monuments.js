@@ -3437,7 +3437,8 @@ function resetState() {
     score: 0,
     displayedScore: 0,
     dots: 0,
-    cityPool: practiceGetCityPool(),      // ordered by diff; used for normal mode pool cycling
+    cityPool: shuffle(practiceGetCityPool()),
+    cityQueues: makeCityQueues(null),     // weighted random for normal mode
     practiceCityFullPool: practiceGetCityPool(), // fixed reference for practice exhaustion + picking
     monumentPool: shuffle(practiceGetMonumentPool()),
     monumentsCorrectCount: 0,
@@ -3706,11 +3707,7 @@ function nextCity() {
       }
       state.currentCity = practiceCityPickNext();
     } else {
-      if (state.poolIndex >= state.cityPool.length) {
-        state.cityPool = shuffle(practiceGetCityPool());
-        state.poolIndex = 0;
-      }
-      state.currentCity = state.cityPool[state.poolIndex++];
+      state.currentCity = pickCity(state.cityQueues, state.correctCount);
     }
     state.cityShownAt = Date.now();
     state.phase = 'waiting';
