@@ -114,7 +114,7 @@ function showFlagsMode() {
   flagsLuggageWrap.style.display  = 'none';
   flagsFlagidWrap.style.display   = 'none';
 
-  flagsTimerEl.textContent = FLAGS_GAME_DURATION;
+  { const _pc = window.practiceConfig; const _inf = _pc && _pc.active && _pc.timer === 0; flagsTimerEl.textContent = _pc && _pc.active ? (_inf ? '∞' : _pc.timer) : FLAGS_GAME_DURATION; flagsTimerEl.classList.toggle('timer-number-infinity', !!_inf); }
   flagsTimerEl.style.color = '';
   flagsTimerImg.src = 'images/countdown2.png';
   flagsTimerImg.style.animationPlayState = 'paused';
@@ -142,6 +142,7 @@ function showFlagsMode() {
     flagsFlagidLabel.textContent = '';
     flagsTimerImg.style.animationPlayState = 'running';
     if (typeof playMusic !== 'undefined') playMusic(sfxGameMusic);
+    if (window._practiceStats) window._practiceStats.startTime = Date.now();
     flagsMachine3.classList.add('scrolling');
     flagsMachine3b.classList.add('scrolling');
     flagsStreak = 0;
@@ -157,6 +158,15 @@ function showFlagsMode() {
     flagsIsFirstRound = true;
     flagsAnswered = new Set();
     flagsLastChosen = null;
+    if (window.practiceConfig && window.practiceConfig.active) {
+      // Reiniciar desbloqueos para que la primera ronda siempre empiece en inicio
+      flagsEasyUnlocked = false; flagsMediumUnlocked = false;
+      flagsHardUnlocked = false; flagsInsaneUnlocked = false;
+      flagsCorrectCount = 0;
+      flagsPracticePool = buildFlagsPracticePool(window.practiceConfig.continents, window.practiceConfig.difficulty);
+      flagsPracticeRemaining = [...flagsPracticePool];
+      flagsPracticeCurrent = flagsPracticePickNext(null);
+    }
     flagsGroupIds = flagsTopGroupIds.slice();
     flagsLuggageWrap.classList.remove('flags-six-mode');
     // Reset all group inline styles that may be stuck from a previous game's
@@ -176,6 +186,10 @@ function showFlagsMode() {
     flagsBottomGroupIds.forEach(id => {
       const g = document.getElementById(id);
       if (g) g.style.display = 'none';
+    });
+    ['flags-check-overlay','flags-wrong-overlay'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.classList.remove('animate'); el.style.display = ''; el.style.opacity = ''; }
     });
     startFlagsRound();
     startFlagsTimer();
@@ -242,6 +256,20 @@ for (const group of FLAG_SIMILAR_GROUPS) {
 const flagsTopGroupIds    = ['flags-luggage-left-group', 'flags-luggage-group', 'flags-luggage-right-group'];
 const flagsBottomGroupIds = ['flags-luggage-bl-group', 'flags-luggage-bc-group', 'flags-luggage-br-group'];
 let flagsGroupIds = flagsTopGroupIds.slice();
+
+function disableAllLuggageGroups() {
+  [...flagsTopGroupIds, ...flagsBottomGroupIds].forEach(id => {
+    const g = document.getElementById(id);
+    if (g) {
+      g.style.pointerEvents = 'none';
+      g.style.cursor = 'default';
+      g.classList.remove('luggage-enter-active');
+      g.style.animation = 'none';
+    }
+  });
+  flagsLuggageWrap.style.pointerEvents = 'none';
+  flagsLuggageWrap.style.cursor = 'default';
+}
 let flagsStreak = 0;
 let flagsEasyUnlocked = false;
 let flagsSixUnlocked = false;   // 6 maletas desde correcta 3
@@ -252,6 +280,77 @@ let flagsCorrectCount = 0;
 let flagsIsFirstRound = true;
 let flagsAnswered = new Set();
 let flagsLastChosen = null;
+let flagsPracticePool = [];
+let flagsPracticeRemaining = [];
+let flagsPracticeCurrent = null;
+
+// Picks the next practice country using the same tier-unlock logic as normal mode,
+// capped at practiceConfig.difficulty. Excludes `exc` (pass current when wrong, null when correct).
+function flagsPracticePickNext(exc) {
+  const diff = (window.practiceConfig && window.practiceConfig.difficulty) || 'dificil';
+  const pool = exc ? flagsPracticeRemaining.filter(c => c !== exc) : flagsPracticeRemaining;
+  const fallback = pool.length ? pool : flagsPracticeRemaining;
+  const unlockedTiers = ['inicio'];
+  if (flagsEasyUnlocked   && diff !== 'inicio')                          unlockedTiers.push('easy');
+  if (flagsMediumUnlocked && (diff === 'medio' || diff === 'dificil'))   unlockedTiers.push('medium');
+  if (flagsHardUnlocked   && diff === 'dificil')                         unlockedTiers.push('hard');
+  if (flagsInsaneUnlocked && diff === 'dificil')                         unlockedTiers.push('insane');
+  // Filter to unlocked tiers; if continent has no countries there, expand progressively
+  const ALL_TIERS = ['inicio', 'easy', 'medium', 'hard', 'insane'];
+  const tierSet = new Set(unlockedTiers.flatMap(t => COUNTRIES[t] || []));
+  let tiered = fallback.filter(c => tierSet.has(c));
+  if (!tiered.length) {
+    for (const tier of ALL_TIERS) {
+      if (unlockedTiers.includes(tier)) continue;
+      (COUNTRIES[tier] || []).forEach(c => tierSet.add(c));
+      tiered = fallback.filter(c => tierSet.has(c));
+      if (tiered.length) break;
+    }
+  }
+  const pick = tiered.length ? tiered : fallback;
+  return pick[Math.floor(Math.random() * pick.length)] || null;
+}
+
+function buildFlagsPracticePool(continents, difficulty) {
+  const sh = a => { for (let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a; };
+  const hasFlag = c => !!COUNTRY_FLAGS[c];
+  const inCont  = c => !continents || continents.has(FLAG_COUNTRY_CONTINENT[c]);
+  const ok      = c => hasFlag(c) && inCont(c);
+  const diff = difficulty || 'dificil';
+  const ALL_TIERS = ['inicio', 'easy', 'medium', 'hard', 'insane'];
+
+  // Tiers allowed by difficulty ceiling (cumulative)
+  const allowedTiers = ['inicio'];
+  if (diff !== 'inicio') allowedTiers.push('easy');
+  if (diff === 'medio' || diff === 'dificil') allowedTiers.push('medium');
+  if (diff === 'dificil') { allowedTiers.push('hard'); allowedTiers.push('insane'); }
+
+  const seen = new Set();
+  const pool = [];
+  const add = c => { if (!seen.has(c)) { seen.add(c); pool.push(c); } };
+
+  // Step 1: add allowed tiers filtered by continent
+  for (const tier of allowedTiers) (COUNTRIES[tier] || []).filter(ok).forEach(add);
+
+  // Step 2: if pool is thin (<6), supplement from next harder tiers (still continent-filtered)
+  if (pool.length < 6) {
+    for (const tier of ALL_TIERS) {
+      if (allowedTiers.includes(tier)) continue;
+      (COUNTRIES[tier] || []).filter(ok).forEach(add);
+      if (pool.length >= 6) break;
+    }
+  }
+
+  // Step 3: final fallback — drop continent filter if still too few
+  if (pool.length < 6) {
+    for (const tier of ALL_TIERS) {
+      (COUNTRIES[tier] || []).filter(hasFlag).forEach(add);
+      if (pool.length >= 6) break;
+    }
+  }
+
+  return sh(pool);
+}
 
 // Ventana de respuesta por ronda, en segundos. Debe coincidir con la duración de
 // la animación #flags-findluggage.scrolling (css/style.css) que marca el wrong por demora.
@@ -313,19 +412,21 @@ function initFlagsLeaderboard() {
   flagsLastPlayerRank = -1;
   flagsMockPlayers = buildFlagsFriendPlayers(); // refrescar con la lista real de amigos
 
-  flagsMockPlayers.forEach(p => {
-    const el = document.createElement('div');
-    el.className = 'lb-entry';
-    el.id = `flags-lb-${p.id}`;
-    el.innerHTML = (p.avatar
-      ? `<div class="lb-avatar lb-avatar-img-wrap"><img class="lb-avatar-img" src="${p.avatar}" onerror="this.parentNode.innerHTML='${p.initial}';this.parentNode.style.background='${p.color}'"></div>`
-      : `<div class="lb-avatar" style="background:${p.color}">${p.initial}</div>`)
-      + `<span class="lb-score">${p.score.toLocaleString()}</span>`;
-    el.style.transition = 'none';
-    el.style.top = '-9999px';
-    flagsLbElements[el.id] = el;
-    lb.appendChild(el);
-  });
+  if (!window.practiceConfig || !window.practiceConfig.active) {
+    flagsMockPlayers.forEach(p => {
+      const el = document.createElement('div');
+      el.className = 'lb-entry';
+      el.id = `flags-lb-${p.id}`;
+      el.innerHTML = (p.avatar
+        ? `<div class="lb-avatar lb-avatar-img-wrap"><img class="lb-avatar-img" src="${p.avatar}" onerror="this.parentNode.innerHTML='${p.initial}';this.parentNode.style.background='${p.color}'"></div>`
+        : `<div class="lb-avatar" style="background:${p.color}">${p.initial}</div>`)
+        + `<span class="lb-score">${p.score.toLocaleString()}</span>`;
+      el.style.transition = 'none';
+      el.style.top = '-9999px';
+      flagsLbElements[el.id] = el;
+      lb.appendChild(el);
+    });
+  }
 
   const playerEl = document.createElement('div');
   playerEl.className = 'lb-entry lb-player';
@@ -399,6 +500,12 @@ function flagsPositionLeaderboard(playerScore, animate) {
 function sortFlagsLeaderboard(playerScore) {
   if (playerScore === flagsLastLbScore) return;
   flagsLastLbScore = playerScore;
+  if (window.practiceConfig && window.practiceConfig.active) {
+    const sc = playerScore + ((typeof window.campaignBase === 'function') ? window.campaignBase() : 0);
+    const scoreEl = flagsLbElements['flags-lb-player']?.querySelector('.lb-score');
+    if (scoreEl) scoreEl.textContent = sc.toLocaleString();
+    return;
+  }
   flagsPositionLeaderboard(playerScore, true);
 }
 
@@ -413,14 +520,18 @@ function flagsUpdateDotsUI() {
 }
 
 function flagsAdvanceDot() {
+  if (window.practiceConfig && window.practiceConfig.active) return;
   flagsDots++;
   flagsUpdateDotsUI();
 
   if (flagsDots >= FLAGS_DOTS_NEEDED && !flagsProgressContainer.classList.contains('train-animation')) {
     flagsProgressContainer.classList.add('train-animation');
 
-    flagsTimeLeft = Math.min(flagsTimeLeft + FLAGS_BONUS_TIME, 99);
-    flagsTimerEl.textContent = flagsTimeLeft;
+    const _flagsInfNow = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
+    if (!_flagsInfNow) {
+      flagsTimeLeft = Math.min(flagsTimeLeft + FLAGS_BONUS_TIME, 99);
+      flagsTimerEl.textContent = flagsTimeLeft;
+    }
     if (typeof playTimeBonus === 'function') playTimeBonus(document.getElementById('flags-time-bonus'), FLAGS_BONUS_TIME);
     const prevColor = flagsTimerEl.style.color;
     flagsTimerEl.style.color = '#00ff88';
@@ -431,10 +542,10 @@ function flagsAdvanceDot() {
         flagsDots = Math.max(0, flagsDots - FLAGS_DOTS_NEEDED);
         flagsProgressContainer.classList.remove('train-animation', 'dots-fade-out');
         flagsUpdateDotsUI();
-        if (flagsTimeLeft <= 10) {
+        if (flagsTimeLeft > 0 && flagsTimeLeft <= 10) {
           flagsTimerEl.style.color = '#ffffff';
           flagsTimerImg.src = 'images/countdownred2.png';
-        } else {
+        } else if (flagsTimeLeft > 10) {
           flagsTimerEl.style.color = prevColor;
           flagsTimerImg.src = 'images/countdown2.png';
         }
@@ -674,6 +785,10 @@ function startFlagsRound() {
               if (g) g.style.display = 'none';
             });
           }
+          if (window.practiceConfig && window.practiceConfig.active && flagsPracticeRemaining.length > 1) {
+            const others = flagsPracticeRemaining.filter(x => x !== flagsPracticeCurrent);
+            flagsPracticeCurrent = others[Math.floor(Math.random() * others.length)];
+          }
           startFlagsRound();
         }, 50);
       }, 750);
@@ -681,11 +796,24 @@ function startFlagsRound() {
   };
   flagsFindLuggage.addEventListener('animationend', onFindLuggageEnd);
 
-  const inicioCountries  = (COUNTRIES.inicio  || []).filter(c => COUNTRY_FLAGS[c]);
-  const easyCountries    = (COUNTRIES.easy    || []).filter(c => COUNTRY_FLAGS[c]);
-  const mediumCountries  = (COUNTRIES.medium  || []).filter(c => COUNTRY_FLAGS[c]);
-  const hardCountries    = (COUNTRIES.hard    || []).filter(c => COUNTRY_FLAGS[c]);
-  const insaneCountries  = (COUNTRIES.insane  || []).filter(c => COUNTRY_FLAGS[c]);
+  const _practiceContFilter = c => {
+    if (!window.practiceConfig || !window.practiceConfig.active) return true;
+    return window.practiceConfig.continents.has(FLAG_COUNTRY_CONTINENT[c]);
+  };
+  let inicioCountries  = (COUNTRIES.inicio  || []).filter(c => COUNTRY_FLAGS[c] && _practiceContFilter(c));
+  let easyCountries    = (COUNTRIES.easy    || []).filter(c => COUNTRY_FLAGS[c] && _practiceContFilter(c));
+  const mediumCountries  = (COUNTRIES.medium  || []).filter(c => COUNTRY_FLAGS[c] && _practiceContFilter(c));
+  const hardCountries    = (COUNTRIES.hard    || []).filter(c => COUNTRY_FLAGS[c] && _practiceContFilter(c));
+  const insaneCountries  = (COUNTRIES.insane  || []).filter(c => COUNTRY_FLAGS[c] && _practiceContFilter(c));
+  // Fallback: si el continente tiene pocas banderas inicio, rellenar con easy sin filtro
+  if (window.practiceConfig && window.practiceConfig.active && inicioCountries.length < 3) {
+    const easyAll = (COUNTRIES.easy || []).filter(c => COUNTRY_FLAGS[c] && !inicioCountries.includes(c));
+    inicioCountries = [...inicioCountries, ...easyAll].slice(0, Math.max(inicioCountries.length + easyAll.length, 6));
+  }
+  if (window.practiceConfig && window.practiceConfig.active && easyCountries.length < 3) {
+    const easyAll = (COUNTRIES.easy || []).filter(c => COUNTRY_FLAGS[c] && !easyCountries.includes(c));
+    easyCountries = [...easyCountries, ...easyAll];
+  }
 
   const easyInitPool = [...inicioCountries, ...easyCountries];
   const fullPool = flagsIsFirstRound
@@ -717,7 +845,19 @@ function startFlagsRound() {
   }
 
   let chosen;
-  if (flagsInsaneUnlocked) {
+  if (window.practiceConfig && window.practiceConfig.active) {
+    if (!flagsPracticeCurrent || flagsPracticeRemaining.length === 0) {
+      clearInterval(flagsTimerIntervalId);
+      flagsRunning = false;
+      clearFlagsElimination();
+      disableAllLuggageGroups();
+      flagsLuggageWrap.classList.add('flags-game-ended');
+      if (typeof sfxTimesUp !== 'undefined') { sfxTimesUp.currentTime = 0; sfxPlay(sfxTimesUp); }
+      endFlagsGame();
+      return;
+    }
+    chosen = flagsPracticeCurrent;
+  } else if (flagsInsaneUnlocked) {
     // insane vs hard+lower — 1:5 at 30 → 5:1 at 50
     const insaneParts = Math.min(Math.floor((flagsCorrectCount - 30) / 5) + 1, 5);
     const lowerParts  = Math.max(6 - insaneParts, 1);
@@ -739,8 +879,13 @@ function startFlagsRound() {
     let chosenPool = fullPool.filter(c => !excluded(c));
     if (!chosenPool.length) { flagsAnswered.clear(); chosenPool = fullPool.filter(c => c !== flagsLastChosen); }
     if (!chosenPool.length) chosenPool = fullPool;
+    // Fallback final: si el continente no tiene nada, usar easy global
+    if (!chosenPool.length) {
+      chosenPool = [...(COUNTRIES.inicio || []), ...(COUNTRIES.easy || [])].filter(c => COUNTRY_FLAGS[c]);
+    }
     chosen = chosenPool[Math.floor(Math.random() * chosenPool.length)];
   }
+  if (!chosen) return; // pool completamente vacía, no iniciar ronda
   flagsLastChosen = chosen;
   flagsFlagidLabel.textContent = (typeof tCountry === 'function') ? tCountry(chosen) : chosen;
   // Ajustar tamaño si el nombre es largo. Todo en vmin para escalar con el
@@ -758,14 +903,49 @@ function startFlagsRound() {
   }
 
   // Distractors: prefer visually similar flags from correcta 23 onward
-  const useSimilar = flagsCorrectCount >= 35 && FLAG_SIMILAR[chosen];
+  const _inPractice = window.practiceConfig && window.practiceConfig.active;
+  const _practiceContFilter2 = _inPractice
+    ? c => COUNTRY_FLAGS[c] && window.practiceConfig.continents.has(FLAG_COUNTRY_CONTINENT[c])
+    : () => true;
+  const useSimilar = !_inPractice && flagsCorrectCount >= 35 && FLAG_SIMILAR[chosen];
   const similarAvailable = useSimilar
     ? [...(FLAG_SIMILAR[chosen] || [])].filter(c => COUNTRY_FLAGS[c] && c !== chosen)
     : [];
-  const nonsimilar = fullPool.filter(c => c !== chosen && !similarAvailable.includes(c)).sort(() => Math.random() - 0.5);
+  // Build distractor base: in practice, limit to unlocked tiers (same as pick logic)
+  let _distractorBase;
+  if (_inPractice) {
+    const _dUnlocked = ['inicio'];
+    const _diff2 = (window.practiceConfig && window.practiceConfig.difficulty) || 'dificil';
+    if (flagsEasyUnlocked   && _diff2 !== 'inicio')                          _dUnlocked.push('easy');
+    if (flagsMediumUnlocked && (_diff2 === 'medio' || _diff2 === 'dificil')) _dUnlocked.push('medium');
+    if (flagsHardUnlocked   && _diff2 === 'dificil')                         _dUnlocked.push('hard');
+    if (flagsInsaneUnlocked && _diff2 === 'dificil')                         _dUnlocked.push('insane');
+    const _dSet = new Set(_dUnlocked.flatMap(t => COUNTRIES[t] || []));
+    _distractorBase = flagsPracticePool.filter(c => _dSet.has(c));
+    // Expand to next tiers if too few for slot count
+    const ALL_TIERS = ['inicio', 'easy', 'medium', 'hard', 'insane'];
+    for (const tier of ALL_TIERS) {
+      if (_distractorBase.length >= flagsGroupIds.length + 2) break;
+      if (_dUnlocked.includes(tier)) continue;
+      (COUNTRIES[tier] || []).forEach(c => { if (COUNTRY_FLAGS[c] && !_dSet.has(c)) { _dSet.add(c); if (flagsPracticePool.includes(c)) _distractorBase.push(c); } });
+    }
+    if (_distractorBase.length < flagsGroupIds.length) _distractorBase = flagsPracticePool;
+  } else {
+    _distractorBase = fullPool;
+  }
+  const nonsimilar = _distractorBase.filter(c => c !== chosen && !similarAvailable.includes(c)).sort(() => Math.random() - 0.5);
   similarAvailable.sort(() => Math.random() - 0.5);
-  // Fill distractors with similars first, then pad with random
-  const distractorPool = [...similarAvailable, ...nonsimilar];
+  // Fill distractors with similars first, then pad with filtered pool, then pad with easy (continent-filtered in practice)
+  let distractorPool = [...similarAvailable, ...nonsimilar];
+  if (distractorPool.length < flagsGroupIds.length - 1) {
+    const fallbackBase = _inPractice
+      ? _distractorBase
+      : [...(COUNTRIES.inicio || []), ...(COUNTRIES.easy || [])];
+    const globalEasy = fallbackBase
+      .filter(c => COUNTRY_FLAGS[c] && c !== chosen && !distractorPool.includes(c) && _practiceContFilter2(c))
+      .sort(() => Math.random() - 0.5);
+    distractorPool = [...distractorPool, ...globalEasy];
+  }
 
   const slotCount = flagsGroupIds.length;
   const correctSlot = Math.floor(Math.random() * slotCount);
@@ -987,7 +1167,8 @@ function startFlagsRound() {
           if (!flagsRunning) return;
           // Hide all current groups
           const allGroupIds = [...flagsTopGroupIds, ...flagsBottomGroupIds];
-          if (!document.body.classList.contains('recording-mode')) {
+          const _practiceLastOne = window.practiceConfig && window.practiceConfig.active && correct && flagsPracticeRemaining.length === 1;
+          if (!document.body.classList.contains('recording-mode') && !_practiceLastOne) {
             allGroupIds.forEach(gid => {
               const g = document.getElementById(gid);
               if (g) { g.classList.remove('luggage-enter-active'); g.style.animation = ''; g.style.transition = ''; g.style.transform = ''; g.style.transformOrigin = ''; g.style.opacity = '0'; g.style.willChange = ''; }
@@ -996,6 +1177,20 @@ function startFlagsRound() {
           setTimeout(() => {
             if (!flagsRunning) return;
             if (document.body.classList.contains('recording-mode')) return;
+            if (window.practiceConfig && window.practiceConfig.active) {
+              if (correct) {
+                flagsPracticeRemaining = flagsPracticeRemaining.filter(x => x !== flagsPracticeCurrent);
+                flagsPracticeCurrent = flagsPracticeRemaining.length ? flagsPracticePickNext(null) : null;
+              } else if (flagsPracticeRemaining.length > 1) {
+                flagsPracticeCurrent = flagsPracticePickNext(flagsPracticeCurrent);
+              }
+              // wrong + 1 remaining: keep flagsPracticeCurrent as-is
+              // If pool exhausted, don't restore luggage visibility — let startFlagsRound end the game
+              if (!flagsPracticeCurrent) {
+                startFlagsRound();
+                return;
+              }
+            }
             allGroupIds.forEach(gid => {
               const g = document.getElementById(gid);
               if (g) g.style.opacity = '';
@@ -1049,6 +1244,25 @@ function hideFlagsMode() {
 
   const finalScore = Math.round(flagsScore);
   window.lastModeScore = finalScore;
+
+  // ── PRÁCTICA: redirigir al panel ──────────────────────────
+  if (window.practiceConfig && window.practiceConfig.active) {
+    window.practiceConfig.active = false;
+    document.body.classList.remove('practice-mode');
+    if (typeof window.resetEntranceElements === 'function') window.resetEntranceElements();
+    const ls = document.getElementById('loading-screen');
+    if (ls) { ls.style.display = 'flex'; ls.style.opacity = '1'; }
+    try { if (typeof playMusic !== 'undefined') playMusic(sfxPostgame); } catch(e) {}
+    if (typeof window.showEntranceElementsStatic === 'function') window.showEntranceElementsStatic();
+    document.getElementById('loading-practice-group').style.display = 'flex';
+    document.getElementById('practice-mode-section').style.display = 'none';
+    document.getElementById('practice-config-section').style.display = 'none';
+    if (window._practiceStats) { window._practiceStats.correct = flagsCorrectCount; window._practiceStats.wrong = flagsWrongCount; }
+    window.showPracticeScore(finalScore);
+    return;
+  }
+  // ──────────────────────────────────────────────────────────
+
   const base = (typeof window.campaignBase === 'function') ? window.campaignBase() : 0;
   const finalScoreEl = document.getElementById('final-score-value');
   if (finalScoreEl) finalScoreEl.textContent = (finalScore + base).toLocaleString();
@@ -1129,44 +1343,62 @@ function flagsHardReset() {
   clearTimeout(flagsSpeedBonusHideId);
   try { clearFlagsElimination(); } catch (e) {}
   if (typeof sfxCountdown !== 'undefined') { try { sfxCountdown.pause(); sfxCountdown.currentTime = 0; } catch (e) {} }
-  // Ocultar/parar máquina, equipaje, banderas, overlays y countdown
-  [flagsMachine, flagsMachine2, flagsMachine3, flagsMachine3b].forEach(m => {
-    if (!m) return;
-    m.style.display = 'none';
-    m.style.animationPlayState = '';
-    m.classList.remove('scrolling');
-  });
-  flagsFindLuggage.style.display = 'none';
-  flagsFindLuggage.classList.remove('scrolling');
-  flagsLuggageWrap.style.display = 'none';
-  flagsLuggageWrap.classList.remove('flags-six-mode');
-  flagsFlagImg.style.display = 'none'; flagsFlagImg.src = '';
-  flagsFlagidWrap.style.display = 'none';
-  flagsPregameEl.style.display = 'none';
-  flagsTimeupEl.style.display = 'none';
-  flagsSpeedBonusText.classList.remove('visible');
-  ['flags-check-overlay','flags-wrong-overlay'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) { el.classList.remove('animate'); el.style.display = ''; el.style.opacity = ''; }
-  });
-  flagsBottomGroupIds.forEach(id => { const g = document.getElementById(id); if (g) g.style.display = 'none'; });
+  if (window._powerQuitOverlay) {
+    // Solo pausar animaciones; dejar la UI visible detrás del overlay
+    [flagsMachine, flagsMachine2, flagsMachine3, flagsMachine3b, flagsFindLuggage].forEach(m => {
+      if (m) m.style.animationPlayState = 'paused';
+    });
+    // Deshabilitar maletines: sin hover ni click durante el overlay de game over
+    disableAllLuggageGroups();
+    if (flagsLuggageWrap) flagsLuggageWrap.classList.add('flags-game-ended');
+    // Detener el titilo del countdown
+    if (flagsTimerImg) flagsTimerImg.style.animationPlayState = 'paused';
+  } else {
+    // Ocultar/parar máquina, equipaje, banderas, overlays y countdown
+    [flagsMachine, flagsMachine2, flagsMachine3, flagsMachine3b].forEach(m => {
+      if (!m) return;
+      m.style.display = 'none';
+      m.style.animationPlayState = '';
+      m.classList.remove('scrolling');
+    });
+    flagsFindLuggage.style.display = 'none';
+    flagsFindLuggage.classList.remove('scrolling');
+    flagsLuggageWrap.style.display = 'none';
+    flagsLuggageWrap.classList.remove('flags-six-mode');
+    flagsFlagImg.style.display = 'none'; flagsFlagImg.src = '';
+    flagsFlagidWrap.style.display = 'none';
+    flagsPregameEl.style.display = 'none';
+    flagsTimeupEl.style.display = 'none';
+    flagsSpeedBonusText.classList.remove('visible');
+    ['flags-check-overlay','flags-wrong-overlay'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.classList.remove('animate'); el.style.display = ''; el.style.opacity = ''; }
+    });
+    flagsBottomGroupIds.forEach(id => { const g = document.getElementById(id); if (g) g.style.display = 'none'; });
+  }
 }
 window.gameStoppers = window.gameStoppers || [];
 window.gameStoppers.push(flagsHardReset);
 
 // ── TIMER ─────────────────────────────────────────────────────────────────────
 function startFlagsTimer() {
-  flagsTimeLeft = FLAGS_GAME_DURATION;
+  const _flagsInfinite = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
+  flagsTimeLeft = _flagsInfinite ? 0 : (window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer > 0)
+    ? window.practiceConfig.timer
+    : FLAGS_GAME_DURATION;
   flagsScore          = 0;
   flagsDisplayedScore = 0;
   flagsWrongCount     = 0;
   if (typeof setModeCounts !== 'undefined') setModeCounts(0, 0);
   flagsScoreEl.textContent = (((typeof window.campaignBase === 'function') ? window.campaignBase() : 0)).toLocaleString();
   flagsRunning  = true;
+  if (_flagsInfinite) { flagsTimerEl.textContent = '∞'; flagsTimerEl.classList.add('timer-number-infinity'); }
 
   flagsTimerIntervalId = setInterval(() => {
+    if (_flagsInfinite) return;
     flagsTimeLeft--;
     flagsTimerEl.textContent = flagsTimeLeft;
+    flagsTimerEl.classList.remove('timer-number-infinity');
 
     if (flagsTimeLeft <= 10) {
       flagsTimerEl.style.color = '#ffffff';
@@ -1177,7 +1409,7 @@ function startFlagsTimer() {
       clearInterval(flagsTimerIntervalId);
       flagsRunning = false;
       clearFlagsElimination();
-      flagsLuggageWrap.style.pointerEvents = 'none';
+      disableAllLuggageGroups();
       flagsLuggageWrap.classList.add('flags-game-ended');
       if (typeof sfxTimesUp !== 'undefined') { sfxTimesUp.currentTime = 0; sfxPlay(sfxTimesUp); }
       endFlagsGame();
@@ -1238,7 +1470,7 @@ document.getElementById('loading-flags-btn').addEventListener('click', () => {
     document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check1.png');
     document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong1.png');
     const label = document.querySelector('.splash-text2-label');
-    if (label) { label.textContent = t('splash.flags.1'); label.classList.remove('step2'); }
+    { const _pk = (window.practiceConfig && window.practiceConfig.active) ? 'splash.practice.flags.1' : 'splash.flags.1'; if (label) { label.textContent = t(_pk); label.classList.remove('step2'); } }
     const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
     if (howtoWrap) howtoWrap.classList.remove('slide-down');
     const howtoTitle = document.querySelector('.splash-howtoplay-title');

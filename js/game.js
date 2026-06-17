@@ -603,6 +603,7 @@ function sortLeaderboard(playerScore) {
 initLeaderboard();
 
 function resetState() {
+  const _isPrac = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.mode === 'game';
   state = {
     phase: 'idle',
     timeLeft: GAME_DURATION,
@@ -610,6 +611,8 @@ function resetState() {
     displayedScore: 0,
     dots: 0,
     cityQueues: makeCityQueues(),
+    practiceCityPool: _isPrac ? makePracticeCityPool(window.practiceConfig.continents) : null,
+    practiceCityIdx: 0,
     correctCount: 0,
     currentCity: null,
     cityShownAt: 0,
@@ -808,7 +811,15 @@ function spawnStars(cx, cy) {
 
 // ── NEXT CITY ─────────────────────────────────────────────────────────────────
 function nextCity() {
-  state.currentCity = pickCity(state.cityQueues, state.correctCount);
+  if (state.practiceCityPool) {
+    if (state.practiceCityIdx >= state.practiceCityPool.length) {
+      state.practiceCityPool = makePracticeCityPool(window.practiceConfig.continents);
+      state.practiceCityIdx = 0;
+    }
+    state.currentCity = state.practiceCityPool[state.practiceCityIdx++];
+  } else {
+    state.currentCity = pickCity(state.cityQueues, state.correctCount);
+  }
   state.cityShownAt = Date.now();
   state.phase = 'waiting';
   slideTagIn(state.currentCity.name, state.currentCity.country);
@@ -1392,7 +1403,7 @@ function startGame() {
   gameWrapper.querySelectorAll('.city-tag-ghost').forEach(g => g.remove());
 
   // Resetear timer visualmente antes del pregame countdown
-  timerNumberEl.textContent = GAME_DURATION;
+  { const _pc = window.practiceConfig; timerNumberEl.textContent = (_pc && _pc.active) ? (_pc.timer === 0 ? '∞' : _pc.timer) : GAME_DURATION; }
   timerNumberEl.style.color = '';
   countdownImg.src = 'images/countdown.png';
 

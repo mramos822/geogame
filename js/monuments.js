@@ -559,7 +559,7 @@ document.getElementById('loading-play-btn').addEventListener('click', () => {
     const howtoTitleCity = document.querySelector('.splash-howtoplay-title');
     if (howtoTitleCity) howtoTitleCity.textContent = 'City Blitz';
     const label = document.querySelector('.splash-text2-label');
-    if (label) { label.textContent = t('splash.cities.1'); label.classList.remove('step2'); }
+    { const _pk = (window.practiceConfig && window.practiceConfig.active) ? 'splash.practice.cities.1' : 'splash.cities.1'; if (label) { label.textContent = t(_pk); label.classList.remove('step2'); } }
   });
 });
 
@@ -649,6 +649,8 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
   if (back) back.style.display = 'block';
   const wt = document.getElementById('loading-panel2-worldtour');
   if (wt) wt.style.display = 'block';
+  const pr = document.getElementById('loading-panel2-practice');
+  if (pr) pr.style.display = 'block';
   const t2 = document.getElementById('loading-panel2-text2');
   if (t2) t2.style.display = 'block';
 });
@@ -658,6 +660,8 @@ document.getElementById('loading-panel2-back')?.addEventListener('click', () => 
   document.getElementById('loading-panel2-back').style.display = 'none';
   const wt = document.getElementById('loading-panel2-worldtour');
   if (wt) wt.style.display = 'none';
+  const prb = document.getElementById('loading-panel2-practice');
+  if (prb) prb.style.display = 'none';
   const t2b = document.getElementById('loading-panel2-text2');
   if (t2b) t2b.style.display = 'none';
   const lgBack = document.querySelector('.loading-logo');
@@ -673,9 +677,9 @@ document.getElementById('loading-panel2-back')?.addEventListener('click', () => 
   const acct = document.getElementById('profile-account-btn');
   if (acct) acct.style.display = 'block';
   const pw = document.querySelector('.loading-plane-wrap');
-  if (pw) pw.style.display = 'block';
+  if (pw) { pw.style.display = ''; pw.style.opacity = '1'; pw.style.transform = 'translate(-50%,-50%) translateY(0)'; pw.classList.add('plane-above'); }
   const lg = document.querySelector('.loading-logo');
-  if (lg) lg.style.display = 'block';
+  if (lg) { lg.style.display = ''; lg.style.opacity = '1'; lg.style.transform = 'translateX(-50%) scale(1)'; }
 });
 
 document.getElementById('loading-panel2-worldtour')?.addEventListener('click', () => {
@@ -2423,6 +2427,14 @@ window.gameStoppers.push(() => {
   try { gameAborted = true; clearTimeout(endGameTimeout1); clearTimeout(endGameTimeout2); } catch (e) {}
   try { clearInterval(timerIntervalId); } catch (e) {}
   try { if (animFrameId) cancelAnimationFrame(animFrameId); animFrameId = null; } catch (e) {}
+  if (window._powerQuitOverlay) {
+    // Bloquear canvas durante el overlay de game over de práctica
+    try { mapGameOver = true; } catch (e) {}
+    try { if (state) state.phase = 'idle'; } catch (e) {}
+    try { if (canvas) canvas.style.pointerEvents = 'none'; } catch (e) {}
+    // Detener el titilo del countdown
+    try { if (countdownImg) countdownImg.style.animationPlayState = 'paused'; } catch (e) {}
+  }
   try { if (typeof pregameCountdownEl !== 'undefined' && pregameCountdownEl) pregameCountdownEl.style.display = 'none'; } catch (e) {}
   try { if (typeof timeupOverlay !== 'undefined' && timeupOverlay) { timeupOverlay.style.display = 'none'; timeupOverlay.classList.remove('timeup-in','timeup-out'); } } catch (e) {}
 });
@@ -2446,8 +2458,52 @@ window.resetEntranceElements = function () {
   if (back2) back2.style.display = 'none';
   const wt2 = document.getElementById('loading-panel2-worldtour');
   if (wt2) wt2.style.display = 'none';
+  const pr2 = document.getElementById('loading-panel2-practice');
+  if (pr2) pr2.style.display = 'none';
   const t2r = document.getElementById('loading-panel2-text2');
   if (t2r) t2r.style.display = 'none';
+  const lpg = document.getElementById('loading-practice-group');
+  if (lpg) lpg.style.display = 'none';
+};
+
+// Muestra el loading en el panel2 de práctica sin animar (retorno desde práctica)
+window.showEntranceElementsStatic = function () {
+  const fa = document.querySelector('.flightatt-loading');
+  const sh = document.querySelector('.flightatt-loading-shadow');
+  const pw = document.querySelector('.loading-plane-wrap');
+  const lg = document.querySelector('.loading-logo');
+  const pl = document.querySelector('.loading-planet-wrap');
+
+  [fa, sh, pw, lg, pl].forEach(el => el && el.getAnimations().forEach(a => a.cancel()));
+
+  // Flightatt y sombra: posición final visible (panel2 las muestra)
+  if (fa) { fa.style.transform = 'translate(-50%,-50%) scaleX(-1) translateX(0)'; fa.style.opacity = ''; }
+  if (sh) { sh.style.transform = 'translate(-50%,-50%) translateX(0)'; sh.style.opacity = ''; }
+  // Avión y logo: invisibles con opacity (display queda '', así back-button los restaura sin luchar con display:none)
+  if (pw) { pw.style.display = ''; pw.style.opacity = '0'; pw.style.transform = 'translate(-50%,-50%) translateY(32cqmin)'; }
+  if (lg) { lg.style.display = ''; lg.style.opacity = '0'; lg.style.transform = 'translateX(-50%) scale(1.5)'; }
+  // Planeta visible
+  if (pl) { pl.style.transform = 'translateX(-50%) scale(1)'; pl.style.opacity = '1'; }
+
+  const ver = document.getElementById('loading-version');
+  if (ver) ver.style.display = '';
+
+  // Ocultar acciones panel1; mostrar panel2 directamente
+  document.getElementById('loading-actions') && (document.getElementById('loading-actions').style.display = 'none');
+  const back2 = document.getElementById('loading-panel2-back');
+  if (back2) back2.style.display = '';
+  const wt2 = document.getElementById('loading-panel2-worldtour');
+  if (wt2) wt2.style.display = '';
+  const pr2 = document.getElementById('loading-panel2-practice');
+  if (pr2) pr2.style.display = '';
+  const t2r = document.getElementById('loading-panel2-text2');
+  if (t2r) t2r.style.display = '';
+
+  // account-btn solo en panel1 — ocultarlo en panel2
+  const acct = document.getElementById('profile-account-btn');
+  if (acct) acct.style.display = 'none';
+  const resultsBtn = document.getElementById('loading-results-btn');
+  if (resultsBtn) resultsBtn.style.display = 'none';
 };
 
 window.replayEntranceAnimations = function () {
@@ -2458,6 +2514,10 @@ window.replayEntranceAnimations = function () {
   const planetWrap = document.querySelector('.loading-planet-wrap');
 
   if (planeWrap) planeWrap.classList.remove('plane-above');
+
+  // Restaurar display (puede haber quedado none por showEntranceElementsStatic)
+  if (planeWrap) planeWrap.style.display = '';
+  if (logo) logo.style.display = '';
 
   // Limpiar inline styles del reset de quitToMenu; WAAPI toma el control desde from
   [flightEl, shadowEl, planeWrap, logo, planetWrap].forEach(el => {
@@ -2518,6 +2578,9 @@ function quitToMenu() {
   // 1) Detener loops (timers/animaciones) de todos los modos
   window.gameStoppers.forEach(fn => { try { fn(); } catch (e) {} });
 
+  // Capturar _wasInPractice ANTES de gameStoppers (por si alguno toca practiceConfig)
+  const _wasInPractice = window.practiceConfig && window.practiceConfig.active;
+
   // 2) Cortar TODO el audio del juego y poner la música del menú
   [sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus,
    sfxTickdown, sfxTimesUp, sfxGameMusic].forEach(s => {
@@ -2526,6 +2589,15 @@ function quitToMenu() {
   try { playMusic(sfxPostgame); } catch (e) {}
 
   // 3) Resetear el estado de juego de monuments/cities
+  // Desactivar práctica ANTES de resetState para que no filtre las colas normales
+  const _practiceScore = (() => {
+    let sc = 0;
+    try { sc = (typeof state !== 'undefined' && state) ? state.score : 0; } catch(e) {}
+    try { if (window.pendingGameMode === 'flags'  && typeof flagsScore  !== 'undefined') sc = Math.round(flagsScore); } catch(e) {}
+    try { if (window.pendingGameMode === 'shapes' && typeof shapesScore !== 'undefined') sc = Math.round(shapesScore); } catch(e) {}
+    return sc;
+  })();
+  if (_wasInPractice) { window.practiceConfig.active = false; document.body.classList.remove('practice-mode'); }
   try { resetState(); } catch (e) {}
 
   // 4) Limpiar diálogos, overlays, animaciones y movimiento ingame
@@ -2543,6 +2615,7 @@ function quitToMenu() {
   reset('flags-pregame-countdown', el => { el.style.display = 'none'; });
   reset('timeup-overlay',       el => { el.style.display = 'none'; el.classList.remove('timeup-in','timeup-out'); });
   reset('flags-timeup-overlay', el => { el.style.display = 'none'; el.classList.remove('timeup-in','timeup-out'); });
+  reset('powerquit-overlay',    el => { el.style.display = 'none'; el.classList.remove('timeup-in','timeup-out'); });
   reset('flags-check-overlay',  el => { el.classList.remove('animate'); el.style.display = 'none'; el.style.opacity = ''; });
   reset('flags-wrong-overlay',  el => { el.classList.remove('animate'); el.style.display = 'none'; el.style.opacity = ''; });
   // Apagar los puntos del progreso y el "trencito" (todos los modos)
@@ -2577,7 +2650,23 @@ function quitToMenu() {
   if (typeof window.resetEntranceElements === 'function') window.resetEntranceElements();
 
   const ls = document.getElementById('loading-screen');
-  if (ls) { ls.style.display = ''; ls.classList.remove('table-shown'); }
+  if (ls) { ls.style.display = _wasInPractice ? 'flex' : ''; ls.style.opacity = '1'; ls.classList.remove('table-shown'); }
+
+  // Si salimos con power desde modo práctica → score popup + panel práctica
+  if (_wasInPractice) {
+    if (typeof window.showEntranceElementsStatic === 'function') window.showEntranceElementsStatic();
+    { const lpg = document.getElementById('loading-practice-group'); lpg.classList.remove('table-gone'); lpg.classList.add('panel-visible'); }
+    document.getElementById('practice-mode-section').style.display = 'none';
+    document.getElementById('practice-config-section').style.display = 'none';
+    if (window._practiceStats) {
+      const _pm = window.pendingGameMode;
+      if (_pm === 'flags')  { window._practiceStats.correct = (typeof flagsCorrectCount  !== 'undefined' ? flagsCorrectCount  : 0); window._practiceStats.wrong = (typeof flagsWrongCount !== 'undefined' ? flagsWrongCount : 0); }
+      else if (_pm === 'shapes') { window._practiceStats.correct = (typeof shapesCorrectCount !== 'undefined' ? shapesCorrectCount : 0); window._practiceStats.wrong = (typeof shapesWrongAnswerCount !== 'undefined' ? shapesWrongAnswerCount : 0); }
+      else { window._practiceStats.correct = correctCount || 0; window._practiceStats.wrong = wrongCount || 0; }
+    }
+    window.showPracticeScore(_practiceScore);
+    return;
+  }
   ['loading-table-group','loading-social-group','loading-friend-group','loading-addfriend-group','loading-blocked-group','loading-sent-group']
     .forEach(id => document.getElementById(id)?.classList.add('table-gone'));
   if (typeof window.replayEntranceAnimations === 'function') window.replayEntranceAnimations();
@@ -2624,7 +2713,35 @@ window.quitToMenu = quitToMenu;
     sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
     if (quitPopup) quitPopup.style.display = 'none';
     document.body.classList.remove('quit-open');
-    quitToMenu();
+
+    // Parar timers pero no limpiar pantalla aún (el flag evita que hardReset oculte la UI)
+    window._powerQuitOverlay = true;
+    window.gameStoppers.forEach(fn => { try { fn(); } catch(e) {} });
+    window._powerQuitOverlay = false;
+
+    // En pregame (splash visible) o fuera de práctica: salir directo sin overlay
+    const inPregame = isVisible('splash-screen') ||
+                      isVisible('flags-pregame-countdown') ||
+                      isVisible('pregame-countdown');
+    const inPractice = window.practiceConfig && window.practiceConfig.active;
+    const goOverlay = document.getElementById('powerquit-overlay');
+    if (!goOverlay || inPregame || !inPractice) { quitToMenu(); return; }
+
+    sfxGameMusic.pause();
+    sfxTimesUp.currentTime = 0; sfxPlay(sfxTimesUp);
+    goOverlay.style.display = 'flex';
+    goOverlay.classList.remove('timeup-out');
+    goOverlay.classList.add('timeup-in');
+
+    setTimeout(() => {
+      goOverlay.classList.remove('timeup-in');
+      goOverlay.classList.add('timeup-out');
+      setTimeout(() => {
+        goOverlay.style.display = 'none';
+        goOverlay.classList.remove('timeup-out');
+        quitToMenu();
+      }, 400);
+    }, 1800);
   });
   // Reacciona a cualquier cambio de display (las pantallas se togglean por estilo inline)
   const obs = new MutationObserver(refreshIngamePower);
@@ -2860,6 +2977,7 @@ let animFrameId    = null;
 let timerIntervalId = null;
 let speedBonusHideId = null;
 let gameAborted = false;
+let mapGameOver = false;
 
 let highscore = parseInt(localStorage.getItem('geochallenge_highscore') || '0', 10);
 let monumentsHighscore = parseInt(localStorage.getItem('monumentsHighscore') || '0', 10);
@@ -2875,6 +2993,7 @@ updateSplashHighscore();
 // ── GRADE COUNTS ─────────────────────────────────────────────────────────────
 let gradeCounts = { perfect: 0, good: 0, fair: 0 };
 let wrongCount = 0;
+let correctCount = 0;
 
 function setModeCounts(correct, wrong) {
   gradeCounts = { perfect: correct, good: 0, fair: 0 };
@@ -3092,19 +3211,21 @@ function initLeaderboard() {
   mockPlayers = buildFriendPlayers(); // refrescar con la lista real de amigos
   highscorePlayer.score = getTotalHighscore(); // ★ best = highscore global de campaña
 
-  mockPlayers.forEach(p => {
-    const el = document.createElement('div');
-    el.className = 'lb-entry';
-    el.id = `lb-${p.id}`;
-    const avatarHTML = p.avatar
-      ? `<div class="lb-avatar lb-avatar-img-wrap"><img class="lb-avatar-img" src="${p.avatar}" onerror="this.parentNode.innerHTML='${p.initial}';this.parentNode.style.background='${p.color}'"></div>`
-      : `<div class="lb-avatar" style="background:${p.color}">${p.initial}</div>`;
-    el.innerHTML = avatarHTML + `<span class="lb-score">${p.score.toLocaleString()}</span>`;
-    el.style.transition = 'none';
-    el.style.top = '-9999px';
-    lbElements[el.id] = el;
-    lb.appendChild(el);
-  });
+  if (!window.practiceConfig || !window.practiceConfig.active) {
+    mockPlayers.forEach(p => {
+      const el = document.createElement('div');
+      el.className = 'lb-entry';
+      el.id = `lb-${p.id}`;
+      const avatarHTML = p.avatar
+        ? `<div class="lb-avatar lb-avatar-img-wrap"><img class="lb-avatar-img" src="${p.avatar}" onerror="this.parentNode.innerHTML='${p.initial}';this.parentNode.style.background='${p.color}'"></div>`
+        : `<div class="lb-avatar" style="background:${p.color}">${p.initial}</div>`;
+      el.innerHTML = avatarHTML + `<span class="lb-score">${p.score.toLocaleString()}</span>`;
+      el.style.transition = 'none';
+      el.style.top = '-9999px';
+      lbElements[el.id] = el;
+      lb.appendChild(el);
+    });
+  }
 
   const playerEl = document.createElement('div');
   playerEl.className = 'lb-entry lb-player';
@@ -3164,7 +3285,8 @@ function positionLeaderboard(playerScore, animate) {
   }
 
   all.forEach((p, rank) => {
-    lbElements[`lb-${p.id}`].style.top = ((rank - windowStart) * rowH) + 'px';
+    const el = lbElements[`lb-${p.id}`];
+    if (el) el.style.top = ((rank - windowStart) * rowH) + 'px';
   });
 
   const scoreEl = lbElements['lb-player'].querySelector('.lb-score');
@@ -3175,6 +3297,12 @@ let lastLbScore = -1;
 function sortLeaderboard(playerScore) {
   if (playerScore === lastLbScore) return;
   lastLbScore = playerScore;
+  if (window.practiceConfig && window.practiceConfig.active) {
+    const sc = playerScore + (window.campaignBase ? window.campaignBase() : 0);
+    const scoreEl = lbElements['lb-player']?.querySelector('.lb-score');
+    if (scoreEl) scoreEl.textContent = sc.toLocaleString();
+    return;
+  }
   positionLeaderboard(playerScore, true);
 }
 
@@ -3184,18 +3312,88 @@ initLeaderboard();
 if (typeof onFriendsUpdate === 'function') onFriendsUpdate(() => initLeaderboard());
 if (typeof loadFriends === 'function') loadFriends();
 
+function practiceGetCityPool() {
+  const pc = window.practiceConfig;
+  if (!pc.active || pc.mode !== 'game') return [...CITIES];
+  const ok   = c => pc.continents.has(CITY_COUNTRY_CONTINENT[c.country]);
+  // Cities mode: always include all difficulty tiers (diff radio is monuments-only)
+  const ALL_DIFFS = ['inicio', 'facil', 'medio', 'dificil'];
+  const seen = new Set(); const pool = [];
+  const add = c => { if (!seen.has(c.name)) { seen.add(c.name); pool.push(c); } };
+  // Step 1: all tiers + continent filter
+  for (const d of ALL_DIFFS) CITIES.filter(c => c.diff === d && ok(c)).forEach(add);
+  // Step 2: final fallback — drop continent filter if still thin
+  if (pool.length < 4) for (const d of ALL_DIFFS) CITIES.filter(c => c.diff === d).forEach(add);
+  return pool;
+}
+
+// Practice city picker: progressive tier gating like flags/shapes.
+// inicio+facil always unlocked; medio at 5 correct; dificil at 15 correct.
+function practiceCityPickNext() {
+  const pc = window.practiceConfig;
+  const continents = pc && pc.continents && pc.continents.length ? pc.continents : null;
+  const ok = c => !continents || continents.includes(COUNTRY_TO_CONTINENT[c.country]);
+
+  const TIERS = ['inicio', 'facil'];
+  if (correctCount >= 5)  TIERS.push('medio');
+  if (correctCount >= 15) TIERS.push('dificil');
+
+  const fullPool   = state.practiceCityFullPool;
+  const notPerfect = fullPool.filter(c => !state.citiesPerfect.has(c.name));
+  const lastName   = state.currentCity ? state.currentCity.name : null;
+
+  // Build pool from unlocked tiers, continent-filtered
+  let pool = (notPerfect.length ? notPerfect : fullPool)
+    .filter(c => TIERS.includes(c.diff) && ok(c) && c.name !== lastName);
+
+  // Supplement from next harder tier if thin
+  if (pool.length < 4) {
+    const NEXT_TIERS = ['inicio', 'facil', 'medio', 'dificil'];
+    pool = (notPerfect.length ? notPerfect : fullPool)
+      .filter(c => NEXT_TIERS.includes(c.diff) && ok(c) && c.name !== lastName);
+  }
+
+  // Final fallback: drop continent filter
+  if (!pool.length) {
+    pool = (notPerfect.length ? notPerfect : fullPool)
+      .filter(c => c.name !== lastName);
+  }
+  if (!pool.length) pool = fullPool;
+
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+function practiceGetMonumentPool() {
+  const pc = window.practiceConfig;
+  if (!pc.active || pc.mode !== 'monuments') return [...MONUMENTS_EASY];
+  const diff = pc.difficulty;
+  const allowed = diff === 'facil' ? new Set(['facil'])
+                : diff === 'medio' ? new Set(['facil', 'medio'])
+                : null; // dificil = todos
+  const pool = allowed
+    ? MONUMENTS.filter(m => allowed.has(MONUMENT_DIFF[m.img] || 'medio'))
+    : [...MONUMENTS];
+  return pool.length ? pool : [...MONUMENTS_EASY];
+}
+function practiceGetDuration() {
+  const pc = window.practiceConfig;
+  if (!pc.active) return GAME_DURATION;
+  return pc.timer > 0 ? pc.timer : 0;
+}
+
 function resetState() {
   state = {
     phase: 'idle',
-    timeLeft: GAME_DURATION,
+    timeLeft: practiceGetDuration(),
     score: 0,
     displayedScore: 0,
     dots: 0,
-    cityPool: shuffle([...CITIES]),
-    monumentPool: shuffle([...MONUMENTS_EASY]),
+    cityPool: practiceGetCityPool(),      // ordered by diff; used for normal mode pool cycling
+    practiceCityFullPool: practiceGetCityPool(), // fixed reference for practice exhaustion + picking
+    monumentPool: shuffle(practiceGetMonumentPool()),
     monumentsCorrectCount: 0,
     monumentsUnlocked: false,
     monumentsSeen: new Set(),
+    citiesPerfect: new Set(),
     poolIndex: 0,
     currentCity: null,
     cityShownAt: 0,
@@ -3285,7 +3483,8 @@ function slideTagIn(cityName, countryCode) {
   if (countryCode) {
     slideTagIn._countryTimer = setTimeout(() => {
       slideTagIn._hintShown = true;
-      setTagText(`${dispCity}, ${countryCode}`);
+      const countryName = (typeof getCityCountryName === 'function') ? getCityCountryName(countryCode) : countryCode;
+      setTagText(`${dispCity}, ${countryName}`);
     }, 5000);
   }
 
@@ -3340,14 +3539,18 @@ function showTimeBonus() {
 }
 
 function advanceDot() {
+  if (window.practiceConfig && window.practiceConfig.active) return;
   state.dots++;
   updateDotsUI();
 
   if (state.dots >= DOTS_NEEDED && !progressContainer.classList.contains('train-animation')) {
     progressContainer.classList.add('train-animation');
 
-    state.timeLeft = Math.min(state.timeLeft + BONUS_TIME, 99);
-    timerNumberEl.textContent = state.timeLeft;
+    const _isInfinite = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
+    if (!_isInfinite) {
+      state.timeLeft = Math.min(state.timeLeft + BONUS_TIME, 99);
+      timerNumberEl.textContent = state.timeLeft;
+    }
     showTimeBonus();
 
     const originalColor = timerNumberEl.style.color;
@@ -3361,10 +3564,10 @@ function advanceDot() {
         progressContainer.classList.remove('train-animation', 'dots-fade-out');
         updateDotsUI();
 
-        if (state.timeLeft <= 10) {
+        if (state.timeLeft > 0 && state.timeLeft <= 10) {
           timerNumberEl.style.color = '#ffffff';
           countdownImg.src = window.pendingGameMode === 'monuments' ? 'images/countdownred4.png' : 'images/countdownred.png';
-        } else {
+        } else if (state.timeLeft > 10) {
           timerNumberEl.style.color = originalColor;
           countdownImg.src = window.pendingGameMode === 'monuments' ? 'images/countdown4.png' : 'images/countdown.png';
         }
@@ -3421,13 +3624,20 @@ function spawnStars(cx, cy) {
 function nextCity() {
   // Si se abandonó la partida (volvió al menú), no reactivar nada
   if (!state || document.getElementById('loading-screen')?.style.display !== 'none') return;
+  if (mapGameOver) return;
   if (window.pendingGameMode === 'monuments') {
     if (document.body.classList.contains('recording-mode')) {
       state.currentCity = MONUMENTS.find(m => m.name === 'Coliseo Romano') || MONUMENTS_EASY[0];
     } else {
       if (state.poolIndex >= state.monumentPool.length) {
-        const base = state.monumentsUnlocked ? MONUMENTS : MONUMENTS_EASY;
+        const isPrac = window.practiceConfig && window.practiceConfig.active;
+        const base = isPrac ? practiceGetMonumentPool() : (state.monumentsUnlocked ? MONUMENTS : MONUMENTS_EASY);
         const unseen = base.filter(m => !state.monumentsSeen.has(m.name));
+        if (isPrac && unseen.length === 0) {
+          mapGameOver = true; canvas.style.pointerEvents = 'none';
+          endGame();
+          return;
+        }
         state.monumentPool = shuffle(unseen.length ? unseen : [...base]);
         state.poolIndex = 0;
       }
@@ -3437,11 +3647,21 @@ function nextCity() {
     state.phase = 'waiting';
     slideMonumentIn(state.currentCity);
   } else {
-    if (state.poolIndex >= state.cityPool.length) {
-      state.cityPool = shuffle([...CITIES]);
-      state.poolIndex = 0;
+    const isPrac = window.practiceConfig && window.practiceConfig.active;
+    if (isPrac) {
+      // Use the pool fixed at game start — never re-compute to avoid stale-config bugs
+      const fullPool = state.practiceCityFullPool;
+      if (fullPool.every(c => state.citiesPerfect.has(c.name))) {
+        mapGameOver = true; canvas.style.pointerEvents = 'none'; endGame(); return;
+      }
+      state.currentCity = practiceCityPickNext();
+    } else {
+      if (state.poolIndex >= state.cityPool.length) {
+        state.cityPool = shuffle(practiceGetCityPool());
+        state.poolIndex = 0;
+      }
+      state.currentCity = state.cityPool[state.poolIndex++];
     }
-    state.currentCity = state.cityPool[state.poolIndex++];
     state.cityShownAt = Date.now();
     state.phase = 'waiting';
     slideTagIn(state.currentCity.name, state.currentCity.country);
@@ -3512,7 +3732,7 @@ function slideMonumentIn(monument) {
 
 // ── CLICK ─────────────────────────────────────────────────────────────────────
 canvas.addEventListener('click', (e) => {
-  if (!state || state.phase !== 'waiting') return;
+  if (mapGameOver || !state || state.phase !== 'waiting') return;
   state.phase = 'animating';
   const isRecordingMonuments = document.body.classList.contains('recording-mode') && window.pendingGameMode === 'monuments';
   if (slideTagIn._countryTimer) { clearTimeout(slideTagIn._countryTimer); slideTagIn._countryTimer = null; }
@@ -3538,6 +3758,7 @@ canvas.addEventListener('click', (e) => {
     state.streak = 0;
   } else {
     state.streak++;
+    correctCount++;
   }
   const streakMult = 1 + Math.floor(state.streak / 4) * 0.3;
 
@@ -3566,11 +3787,16 @@ canvas.addEventListener('click', (e) => {
     permanent: grade === 'perfect' || isRecordingMonuments,
   });
 
+  const isPractice = window.practiceConfig && window.practiceConfig.active;
+
   if (grade !== 'wayoff') {
     advanceDot();
     if (window.pendingGameMode === 'monuments') {
-      state.monumentsSeen.add(state.currentCity.name);
-      if (!state.monumentsUnlocked) {
+      // En práctica: solo marcar como visto si fue PERFECT; si no, vuelve al pool
+      if (!isPractice || grade === 'perfect') {
+        state.monumentsSeen.add(state.currentCity.name);
+      }
+      if (!isPractice && !state.monumentsUnlocked) {
         state.monumentsCorrectCount++;
         if (state.monumentsCorrectCount >= 3) {
           state.monumentsUnlocked = true;
@@ -3579,6 +3805,15 @@ canvas.addEventListener('click', (e) => {
           state.poolIndex = 0;
         }
       }
+    }
+  } else if (isPractice && window.pendingGameMode === 'monuments') {
+    // wayoff en práctica: no eliminar del pool tampoco
+  }
+
+  // En práctica con ciudades: perfecto → marcar como completada; si no, sigue en el pool (practiceCityFullPool la mantiene disponible)
+  if (isPractice && window.pendingGameMode === 'game') {
+    if (grade === 'perfect') {
+      state.citiesPerfect.add(state.currentCity.name);
     }
   }
 
@@ -3610,6 +3845,7 @@ canvas.addEventListener('click', (e) => {
                           }, 200);
                         }
                         setTimeout(() => {
+                          if (state.phase === 'idle') return;
                           state.phase = 'waiting';
                           if (!isRecordingMonuments) nextCity();
                         }, 350);
@@ -3943,14 +4179,18 @@ if (state.sunburst) {
 
 // ── TIMER ─────────────────────────────────────────────────────────────────────
 function startTimer() {
-  timerNumberEl.textContent = state.timeLeft;
+  const _practiceInfinite = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
+  if (_practiceInfinite) { timerNumberEl.textContent = '∞'; timerNumberEl.classList.add('timer-number-infinity'); }
+  else { timerNumberEl.textContent = state.timeLeft; timerNumberEl.classList.remove('timer-number-infinity'); }
   timerNumberEl.style.color = '';
   countdownImg.src = window.pendingGameMode === 'monuments' ? 'images/countdown4.png' : 'images/countdown.png';
   countdownImg.style.animationPlayState = 'running';
 
   timerIntervalId = setInterval(() => {
+    if (_practiceInfinite) return;
     state.timeLeft--;
     timerNumberEl.textContent = state.timeLeft;
+    timerNumberEl.classList.remove('timer-number-infinity');
 
     if (state.timeLeft <= 10) {
       timerNumberEl.style.color = '#ffffff';
@@ -3967,6 +4207,7 @@ function startTimer() {
 
 let endGameTimeout1 = null, endGameTimeout2 = null;
 function endGame() {
+  mapGameOver = true;
   gameAborted = false;
   clearInterval(timerIntervalId);
   if (slideMonumentIn._nameTimer) { clearTimeout(slideMonumentIn._nameTimer); slideMonumentIn._nameTimer = null; }
@@ -3993,8 +4234,6 @@ function endGame() {
 
       cancelAnimationFrame(animFrameId);
       animFrameId = null;
-      // Liberar pixel buffers del canvas en iOS para reducir pico de memoria
-      // antes de que el siguiente modo empiece a decodificar sus assets.
       if (IS_IOS) {
         canvas.width = 1; canvas.height = 1;
         badgeOverlay.width = 1; badgeOverlay.height = 1;
@@ -4003,6 +4242,25 @@ function endGame() {
       scoreDisplayEl.style.display = 'none';
       const cwHide = document.getElementById('countdown-widget');
       if (cwHide) cwHide.style.display = 'none';
+
+      // ── PRÁCTICA: redirigir al panel de práctica ──────────
+      if (window.practiceConfig && window.practiceConfig.active) {
+        window.practiceConfig.active = false;
+        document.body.classList.remove('practice-mode');
+        const sc = state.score;
+        if (typeof window.resetEntranceElements === 'function') window.resetEntranceElements();
+        const ls = document.getElementById('loading-screen');
+        if (ls) { ls.style.display = 'flex'; ls.style.opacity = '1'; }
+        try { playMusic(sfxPostgame); } catch(e) {}
+        if (typeof window.showEntranceElementsStatic === 'function') window.showEntranceElementsStatic();
+        { const lpg = document.getElementById('loading-practice-group'); lpg.classList.remove('table-gone'); lpg.classList.add('panel-visible'); }
+        document.getElementById('practice-mode-section').style.display = 'none';
+        document.getElementById('practice-config-section').style.display = 'none';
+        if (window._practiceStats) { window._practiceStats.correct = correctCount || 0; window._practiceStats.wrong = wrongCount || 0; }
+        window.showPracticeScore(sc);
+        return;
+      }
+      // ─────────────────────────────────────────────────────
       window.lastModeScore = state.score;
       finalScoreEl.textContent = (state.score + (window.campaignBase ? window.campaignBase() : 0)).toLocaleString();
       let isNewHighscore = false;
@@ -4153,6 +4411,7 @@ function startGame() {
     sfxCountdown.pause();
     sfxCountdown.currentTime = 0;
   }
+  mapGameOver = false;
   clearInterval(timerIntervalId);
   if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
   canvas.style.pointerEvents = '';
@@ -4176,12 +4435,14 @@ function startGame() {
   resetState();
   gradeCounts = { perfect: 0, good: 0, fair: 0 };
   wrongCount = 0;
+  correctCount = 0;
   updateGradeCountsUI();
   updateWrongCountUI();
   updateDotsUI();
   scoreValueEl.textContent     = (window.campaignBase ? window.campaignBase() : 0).toLocaleString();
   lastLbScore = -1;
   lastPlayerRank = -1;
+  if (window.practiceConfig && window.practiceConfig.active) initLeaderboard();
   sortLeaderboard(0);
   resultLabel.className        = '';
   speedBonusText.classList.remove('visible');
@@ -4209,7 +4470,7 @@ function startGame() {
     tbReset.classList.remove('show', 'fade');
   }
 
-  timerNumberEl.textContent = GAME_DURATION;
+  { const _dur = practiceGetDuration(); const _inf = window.practiceConfig && window.practiceConfig.active && _dur === 0; timerNumberEl.textContent = (window.practiceConfig && window.practiceConfig.active) ? (_inf ? '∞' : _dur) : GAME_DURATION; timerNumberEl.classList.toggle('timer-number-infinity', !!_inf); }
   timerNumberEl.style.color = '';
   countdownImg.src = window.pendingGameMode === 'monuments' ? 'images/countdown4.png' : 'images/countdown.png';
 
@@ -4228,6 +4489,7 @@ function startGame() {
 
   runPregameCountdown(() => {
     playMusic(sfxGameMusic);
+    if (window._practiceStats) window._practiceStats.startTime = Date.now();
     if (!(document.body.classList.contains('recording-mode') && window.pendingGameMode === 'monuments')) {
       startTimer();
     }
@@ -4644,3 +4906,270 @@ document.getElementById('vol-btn')?.addEventListener('click', () => {
 
 
 
+
+// ═══════════════════════════════════════════════════════════════
+// PRACTICE TOUR — Panel, config, lógica
+// ═══════════════════════════════════════════════════════════════
+window.practiceConfig = {
+  active: false,
+  mode: null,        // 'game'|'flags'|'shapes'|'monuments'
+  continents: new Set(['america','europa','africa','asia','oceania']),
+  timer: 60,         // segundos; 0 = infinito
+  difficulty: 'facil', // solo monumentos
+};
+
+// Muestra panel práctica, oculta panel 2
+function showPracticePanel() {
+  document.getElementById('loading-screen')?.classList.add('table-shown');
+  const lpg = document.getElementById('loading-practice-group');
+  lpg.style.display = '';
+  lpg.classList.remove('panel-visible', 'table-gone');
+  void lpg.offsetWidth;
+  lpg.classList.add('panel-visible');
+  // Resetear a sección de modos
+  document.getElementById('practice-mode-section').style.display = '';
+  document.getElementById('practice-config-section').style.display = 'none';
+  document.getElementById('practice-score-popup').style.display = 'none';
+}
+
+// Vuelve de práctica al panel 2
+function hidePracticePanel() {
+  const lpg = document.getElementById('loading-practice-group');
+  document.getElementById('loading-screen')?.classList.remove('table-shown');
+  lpg.classList.remove('panel-visible');
+  lpg.classList.add('table-gone');
+  setTimeout(() => {
+    lpg.style.display = 'none';
+    lpg.classList.remove('table-gone');
+  }, 400);
+}
+
+// Muestra popup de score al terminar sesión
+function buildPracticeImgRow(rowId, count, imgSrc, startDelay) {
+  const row = document.getElementById(rowId);
+  if (!row) return;
+  row.innerHTML = '';
+  row.style.gap = '0px';
+  if (count === 0) {
+    const none = document.createElement('span');
+    none.textContent = 'None';
+    none.style.cssText = 'font-family:VAGRoundBold,"Arial Black",sans-serif;font-size:1.8cqmin;color:#888;';
+    row.appendChild(none);
+    return;
+  }
+  // Squeeze logic igual que post-game: IMG_W en cqmin, max 12, aprieta con margin negativo
+  const IMG_W = 3.5;   // cqmin, coincide con .practice-score-imgs-row img
+  const BASE_GAP = 0.2; // cqmin gap normal
+  const MAX_W = 12 * IMG_W + 11 * BASE_GAP;
+  const gap = count > 1 ? (count > 12 ? (MAX_W - count * IMG_W) / (count - 1) : BASE_GAP) : 0;
+  for (let i = 0; i < count; i++) {
+    const img = document.createElement('img');
+    img.src = imgSrc;
+    img.alt = '';
+    img.style.animationDelay = `${startDelay + i * 0.08}s`;
+    img.style.zIndex = 16 + i;
+    if (i < count - 1) img.style.marginRight = gap + 'cqmin';
+    row.appendChild(img);
+  }
+}
+
+window.showPracticeScore = function(score) {
+  // Mostrar panel sin animación de entrada (venimos del game over)
+  document.getElementById('loading-screen')?.classList.add('table-shown');
+  const lpg = document.getElementById('loading-practice-group');
+  lpg.style.display = '';
+  lpg.classList.remove('table-gone');
+  lpg.classList.add('panel-visible');
+  // Restaurar config del modo jugado
+  const mode = window.practiceConfig.mode;
+  document.getElementById('practice-mode-section').style.display = 'none';
+  const cfg = document.getElementById('practice-config-section');
+  cfg.style.display = '';
+  cfg.classList.toggle('practice-mode-monuments', mode === 'monuments');
+  document.getElementById('practice-continents').style.display = mode !== 'monuments' ? '' : 'none';
+  document.getElementById('practice-difficulty').style.display = mode === 'monuments' ? '' : 'none';
+
+  const popup = document.getElementById('practice-score-popup');
+  document.getElementById('practice-score-val').textContent = score.toLocaleString();
+  const stats = window._practiceStats || {};
+  const elapsed = stats.startTime ? Math.round((Date.now() - stats.startTime) / 1000) : 0;
+  const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
+  const ss = String(elapsed % 60).padStart(2, '0');
+  const timeEl = document.getElementById('practice-score-time');
+  if (timeEl) timeEl.textContent = mm + ':' + ss;
+
+  const correct = stats.correct || 0;
+  const wrong   = stats.wrong   || 0;
+  const checkSrc = mode === 'flags' ? 'images/check1.png'
+                 : mode === 'shapes' ? 'images/check2.png'
+                 : mode === 'monuments' ? 'images/check4.png'
+                 : 'images/check3.png';
+  const wrongSrc = mode === 'flags' ? 'images/wrong1.png'
+                 : mode === 'shapes' ? 'images/wrong2.png'
+                 : mode === 'monuments' ? 'images/wrong4.png'
+                 : 'images/wrong3.png';
+  buildPracticeImgRow('practice-score-checks-row', correct, checkSrc, 0);
+  buildPracticeImgRow('practice-score-wrongs-row', wrong, wrongSrc, correct * 0.08 + 0.1);
+  const correctEl = document.getElementById('practice-score-correct');
+  if (correctEl) correctEl.textContent = 'x' + correct;
+  const wrongEl = document.getElementById('practice-score-wrong');
+  if (wrongEl) wrongEl.textContent = 'x' + wrong;
+
+  popup.style.display = 'flex';
+};
+
+// ── Click en es-practice button
+document.getElementById('loading-panel2-practice')?.addEventListener('click', () => {
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+  showPracticePanel();
+});
+
+// ── Back desde práctica: si está en config vuelve a modos, si está en modos vuelve al panel 2
+document.getElementById('practice-back-wrap')?.addEventListener('click', () => {
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+  const configVisible = document.getElementById('practice-config-section')?.style.display !== 'none';
+  if (configVisible) { backFromConfig(); } else { hidePracticePanel(); }
+});
+
+// ── Botones de modo
+const PRACTICE_MODE_LABELS = { flags: 'Suitcase Shuffle', shapes: 'Map Mayhem', game: 'City Blitz', monuments: 'Landmark Loco' };
+const PRACTICE_MODE_VIDEOS = { flags: 'images/howtoplay/howtoplay1.mp4', shapes: 'images/howtoplay/howtoplay2.mp4', game: 'images/howtoplay/howtoplay3.mp4', monuments: 'images/howtoplay/howtoplay4.mp4' };
+document.querySelectorAll('.practice-mode-item').forEach(btn => {
+  btn.addEventListener('click', () => {
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    const mode = btn.dataset.mode;
+    window.practiceConfig.mode = mode;
+    // Ocultar "Elige un modo"
+    const chooseLabel = document.querySelector('.practice-choose-label');
+    if (chooseLabel) chooseLabel.style.display = 'none';
+    // Mostrar config
+    document.getElementById('practice-mode-section').style.display = 'none';
+    const cfg = document.getElementById('practice-config-section');
+    cfg.style.display = '';
+    cfg.classList.toggle('practice-mode-monuments', mode === 'monuments');
+    // Nombre del modo
+    document.getElementById('practice-config-title').textContent = PRACTICE_MODE_LABELS[mode] || mode;
+    // Video howtoplay
+    const vid = document.getElementById('practice-config-video');
+    if (vid) { vid.src = PRACTICE_MODE_VIDEOS[mode]; vid.load(); vid.play().catch(() => {}); }
+    // Mostrar continentes o dificultad según el modo
+    const showCont = mode !== 'monuments';
+    document.getElementById('practice-continents').style.display  = showCont ? '' : 'none';
+    document.getElementById('practice-difficulty').style.display  = showCont ? 'none' : '';
+  });
+});
+
+// ── Continente toggle
+document.querySelectorAll('.practice-continent-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const activos = document.querySelectorAll('.practice-continent-btn.active');
+    if (btn.classList.contains('active') && activos.length <= 1) {
+      btn.classList.add('continent-error');
+      setTimeout(() => btn.classList.remove('continent-error'), 350);
+      return;
+    }
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    btn.classList.toggle('active');
+  });
+});
+
+// ── Timer pills
+const TIMER_IDX_TO_SEC = { 1: 30, 2: 60, 3: 120, 4: 180, 5: 0 };
+
+function updateTimerUI(idx) {
+  // imagen
+  document.querySelectorAll('.practice-time-img').forEach(img => {
+    img.classList.toggle('active', parseInt(img.dataset.timeidx, 10) === idx);
+  });
+  // fill del range (webkit via background gradient)
+  const range = document.getElementById('practice-timeline-range');
+  if (range) {
+    const pct = (idx - 1) / 4 * 100;
+    range.style.background = `linear-gradient(to right, #073A79 ${pct}%, rgba(7,58,121,0.25) ${pct}%)`;
+  }
+}
+
+const practiceRange = document.getElementById('practice-timeline-range');
+if (practiceRange) {
+  let _lastRangeIdx = 2;
+  practiceRange.addEventListener('input', () => {
+    const idx = parseInt(practiceRange.value, 10);
+    if (idx !== _lastRangeIdx) {
+      const s = new Audio('sfx/select.mp3');
+      if (localStorage.getItem('muted') !== 'true') s.play().catch(() => {});
+      _lastRangeIdx = idx;
+    }
+    window.practiceConfig.timer = TIMER_IDX_TO_SEC[idx];
+    updateTimerUI(idx);
+  });
+}
+// init con el default (idx 2 → 60s)
+updateTimerUI(2);
+
+// ── Dificultad (monuments) — radio: solo uno activo
+document.querySelectorAll('.practice-diff-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (btn.classList.contains('active')) return;
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    document.querySelectorAll('.practice-diff-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+
+function backFromConfig() {
+  document.getElementById('practice-config-section').style.display = 'none';
+  document.getElementById('practice-mode-section').style.display = '';
+  const chooseLabel = document.querySelector('.practice-choose-label');
+  if (chooseLabel) chooseLabel.style.display = '';
+  const vid = document.getElementById('practice-config-video');
+  if (vid) { vid.pause(); vid.src = ''; }
+}
+
+// ── OK en popup score
+document.getElementById('practice-score-btn')?.addEventListener('click', function() {
+  this.classList.add('confirm-pressed');
+  setTimeout(() => this.classList.remove('confirm-pressed'), 200);
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+  document.getElementById('practice-score-popup').style.display = 'none';
+});
+
+// ── Start
+document.getElementById('practice-start-btn')?.addEventListener('click', function() {
+  this.classList.add('confirm-pressed');
+  setTimeout(() => this.classList.remove('confirm-pressed'), 200);
+
+  const mode = window.practiceConfig.mode;
+  if (!mode) return;
+
+  // Validar continentes (solo para modos con filtro)
+  const continents = new Set(
+    [...document.querySelectorAll('.practice-continent-btn.active')].map(b => b.dataset.continent)
+  );
+  if (mode !== 'monuments' && continents.size === 0) {
+    alert('Selecciona al menos un continente.');
+    return;
+  }
+  const activeD = document.querySelector('.practice-diff-btn.active');
+
+  window.practiceConfig.active      = true;
+  window.practiceConfig.continents  = continents;
+  // difficulty solo aplica a monuments; los demás modos usan 'dificil' (sin restricción)
+  window.practiceConfig.difficulty  = mode === 'monuments' ? (activeD ? activeD.dataset.diff : 'facil') : 'dificil';
+  window._practiceStats = { correct: 0, wrong: 0, startTime: Date.now() };
+  document.body.classList.add('practice-mode');
+
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+
+  { const lpg = document.getElementById('loading-practice-group'); lpg.classList.remove('panel-visible'); lpg.classList.add('table-gone'); }
+  const ls = document.getElementById('loading-screen');
+  if (ls) ls.style.display = 'flex';
+
+  const btnMap = {
+    'game':      'loading-play-btn',
+    'monuments': 'loading-mode4-btn',
+    'flags':     'loading-flags-btn',
+    'shapes':    'loading-shapes-btn',
+  };
+  const btnId = btnMap[mode];
+  if (btnId) document.getElementById(btnId)?.click();
+});

@@ -206,9 +206,196 @@
     <div class="loading-panel2-worldtour" id="loading-panel2-worldtour" style="display:none">
       <img src="images/buttons/es-worldtour.png" alt="World Tour" draggable="false" oncontextmenu="return false">
     </div>
+    <div class="loading-panel2-practice" id="loading-panel2-practice" style="display:none">
+      <img src="images/buttons/es-practice.png" alt="Practice" draggable="false" oncontextmenu="return false">
+    </div>
     <div class="loading-panel2-back" id="loading-panel2-back" style="display:none">
       <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
       <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+    </div>
+    <!-- ── PANEL 3: PRACTICE TOUR ─────────────────────────────────────────── -->
+    <div id="loading-practice-group" style="display:none">
+      <!-- Mesa (igual posición/tamaño que el panel de perfil) -->
+      <img class="practice-table-img" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
+
+      <!-- Título -->
+      <div class="practice-titlebar">
+        <img class="loading-social-planet" src="images/practice.png" alt="" draggable="false" oncontextmenu="return false">
+        <span class="loading-social-title" data-i18n="practice.title">Gira de Práctica</span>
+        <img class="loading-social-planet" src="images/practice.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+
+      <!-- Back button -->
+      <div class="practice-back-wrap" id="practice-back-wrap">
+        <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+        <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+
+      <!-- "Elige un modo" — misma fuente y posición que "Has jugado X veces" del perfil -->
+      <span class="loading-play-count practice-choose-label" data-i18n="practice.chooseMode">Elige un modo</span>
+
+      <!-- Selección de modo -->
+      <div class="practice-section" id="practice-mode-section">
+        <div class="practice-mode-grid">
+          <div class="practice-mode-item" data-mode="flags">
+            <img class="practice-mode-img" src="images/buttons/map1.png" draggable="false" oncontextmenu="return false">
+            <span class="practice-mode-name">Suitcase Shuffle</span>
+          </div>
+          <div class="practice-mode-item" data-mode="shapes">
+            <img class="practice-mode-img" src="images/buttons/map2.png" draggable="false" oncontextmenu="return false">
+            <span class="practice-mode-name">Map Mayhem</span>
+          </div>
+          <div class="practice-mode-item" data-mode="game">
+            <img class="practice-mode-img" src="images/buttons/map3.png" draggable="false" oncontextmenu="return false">
+            <span class="practice-mode-name">City Blitz</span>
+          </div>
+          <div class="practice-mode-item" data-mode="monuments">
+            <img class="practice-mode-img" src="images/buttons/map4.png" draggable="false" oncontextmenu="return false">
+            <span class="practice-mode-name">Landmark Loco</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Configuración (aparece al elegir modo) -->
+      <div class="practice-section" id="practice-config-section" style="display:none">
+
+        <!-- Columna izquierda: título + video howtoplay (fuera del flujo) -->
+        <div class="practice-config-left">
+          <span class="practice-config-modename" id="practice-config-title"></span>
+          <video class="practice-config-video" id="practice-config-video" autoplay loop muted playsinline></video>
+        </div>
+
+        <div class="practice-config-inner">
+          <!-- Columna derecha: opciones -->
+          <div class="practice-config-right">
+            <!-- Filtro continentes -->
+            <div class="practice-continents" id="practice-continents">
+              <div class="practice-continent-grid">
+                <div class="practice-continent-btn active" data-continent="america">
+                  <div class="practice-continent-img-wrap">
+                    <img src="images/buttons/america.png" draggable="false" oncontextmenu="return false">
+                    <img class="practice-continent-x" src="images/buttons/X.png" draggable="false" oncontextmenu="return false">
+                  </div>
+                  <span data-i18n="practice.america">América</span>
+                </div>
+                <div class="practice-continent-btn active" data-continent="europa">
+                  <div class="practice-continent-img-wrap">
+                    <img src="images/buttons/europe.png" draggable="false" oncontextmenu="return false">
+                    <img class="practice-continent-x" src="images/buttons/X.png" draggable="false" oncontextmenu="return false">
+                  </div>
+                  <span data-i18n="practice.europa">Europa</span>
+                </div>
+                <div class="practice-continent-btn active" data-continent="asia">
+                  <div class="practice-continent-img-wrap">
+                    <img src="images/buttons/asia.png" draggable="false" oncontextmenu="return false">
+                    <img class="practice-continent-x" src="images/buttons/X.png" draggable="false" oncontextmenu="return false">
+                  </div>
+                  <span data-i18n="practice.asia">Asia</span>
+                </div>
+                <div class="practice-continent-btn active" data-continent="africa">
+                  <div class="practice-continent-img-wrap">
+                    <img src="images/buttons/africa.png" draggable="false" oncontextmenu="return false">
+                    <img class="practice-continent-x" src="images/buttons/X.png" draggable="false" oncontextmenu="return false">
+                  </div>
+                  <span data-i18n="practice.africa">África</span>
+                </div>
+                <div class="practice-continent-btn active" data-continent="oceania">
+                  <div class="practice-continent-img-wrap">
+                    <img src="images/buttons/oceania.png" draggable="false" oncontextmenu="return false">
+                    <img class="practice-continent-x" src="images/buttons/X.png" draggable="false" oncontextmenu="return false">
+                  </div>
+                  <span data-i18n="practice.oceania">Oceanía</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Dificultad (solo monumentos) -->
+            <div class="practice-difficulty" id="practice-difficulty" style="display:none">
+              <div class="practice-diff-grid">
+                <div class="practice-diff-btn active" data-diff="facil">
+                  <div class="practice-continent-img-wrap">
+                    <img src="images/buttons/easy.png" draggable="false" oncontextmenu="return false">
+                    <img class="practice-continent-x" src="images/buttons/X.png" draggable="false" oncontextmenu="return false">
+                  </div>
+                  <span data-i18n="practice.easy">Fácil</span>
+                </div>
+                <div class="practice-diff-btn" data-diff="medio">
+                  <div class="practice-continent-img-wrap">
+                    <img src="images/buttons/medium.png" draggable="false" oncontextmenu="return false">
+                    <img class="practice-continent-x" src="images/buttons/X.png" draggable="false" oncontextmenu="return false">
+                  </div>
+                  <span data-i18n="practice.medium">Medio</span>
+                </div>
+                <div class="practice-diff-btn" data-diff="dificil">
+                  <div class="practice-continent-img-wrap">
+                    <img src="images/buttons/hard.png" draggable="false" oncontextmenu="return false">
+                    <img class="practice-continent-x" src="images/buttons/X.png" draggable="false" oncontextmenu="return false">
+                  </div>
+                  <span data-i18n="practice.hard">Difícil</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Selector de tiempo -->
+            <div class="practice-timer-section">
+              <div class="practice-timer-with-img">
+                <div class="practice-timer-imgs">
+                  <img src="images/buttons/time1.png" class="practice-time-img" data-timeidx="1">
+                  <img src="images/buttons/time2.png" class="practice-time-img" data-timeidx="2">
+                  <img src="images/buttons/time3.png" class="practice-time-img" data-timeidx="3">
+                  <img src="images/buttons/time4.png" class="practice-time-img" data-timeidx="4">
+                  <img src="images/buttons/time5.png" class="practice-time-img" data-timeidx="5">
+                </div>
+                <div class="practice-timeline-wrap">
+                  <input type="range" class="practice-timeline-range" id="practice-timeline-range" min="1" max="5" step="1" value="2">
+                  <div class="practice-timeline-labels">
+                    <span>30s</span>
+                    <span>1min</span>
+                    <span>2min</span>
+                    <span>3min</span>
+                    <span style="font-family:Arial,sans-serif">∞</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Inicio -->
+            <div class="practice-start-wrap" id="practice-start-btn">
+              <img class="practice-confirm1" src="images/confirm1.png" draggable="false" oncontextmenu="return false">
+              <img class="practice-confirm2" src="images/confirm2.png" draggable="false" oncontextmenu="return false">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Popup score de práctica -->
+    <div class="practice-score-popup" id="practice-score-popup" style="display:none">
+      <div class="practice-score-inner">
+        <div class="practice-score-title" data-i18n="practice.sessionOver">Sesión terminada</div>
+        <div class="practice-score-val-wrap">
+          <img class="practice-score-points-img" src="images/points.png" draggable="false" oncontextmenu="return false">
+          <div class="practice-score-val" id="practice-score-val">0</div>
+        </div>
+        <div class="practice-score-time-row">
+          <span class="practice-score-time-icon">⏱</span>
+          <span class="practice-score-time" id="practice-score-time">00:00</span>
+        </div>
+        <div class="practice-score-cw-row">
+          <div class="practice-score-cw-line">
+            <div class="practice-score-imgs-row" id="practice-score-checks-row"></div>
+            <span class="practice-score-cw-count" id="practice-score-correct">x0</span>
+          </div>
+          <div class="practice-score-cw-line">
+            <div class="practice-score-imgs-row" id="practice-score-wrongs-row"></div>
+            <span class="practice-score-cw-count" id="practice-score-wrong">x0</span>
+          </div>
+        </div>
+        <div class="practice-score-ok-wrap" id="practice-score-btn">
+          <img class="practice-confirm1" src="images/confirm1.png" draggable="false" oncontextmenu="return false">
+          <img class="practice-confirm2" src="images/confirm2.png" draggable="false" oncontextmenu="return false">
+        </div>
+      </div>
     </div>
 
     <!-- Popup: link expirado -->
@@ -632,7 +819,7 @@
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
     </div>
-    <div id="loading-version">Ver. 2.6.49</div>
+    <div id="loading-version">Ver. 2.6.50</div>
   </div>
 
   <div id="splash-screen" class="game-bg-screen" style="display:none">
@@ -876,6 +1063,9 @@
   <div id="timeup-overlay" style="display:none">
     <img src="images/countdown/timeup.png" alt="Time Up">
   </div>
+  <div id="powerquit-overlay" style="display:none">
+    <img src="images/countdown/gameover.png" alt="Game Over">
+  </div>
 
   <div id="vol-btn">
     <img id="vol-img" src="images/vol1.png" alt="">
@@ -1056,6 +1246,7 @@
   <script src="js/i18n.js"></script>
   <script src="js/i18n-data.js"></script>
   <script src="js/manifest.js"></script>
+  <script src="js/practice-data.js"></script>
   <script src="js/cities.js"></script>
   <script src="js/countries.js"></script>
   <script src="js/places.js"></script>

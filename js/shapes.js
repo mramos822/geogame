@@ -6,6 +6,18 @@ let shapesRoundStartTime = null;
 let shapesTimeLeft = window.GAME_DURATION;
 let shapesTimerIntervalId = null;
 let shapesRunning = false;
+let shapesGameOver = false;
+
+function shapesBlockInput() {
+  if (document.getElementById('shapes-input-blocker')) return;
+  const b = document.createElement('div');
+  b.id = 'shapes-input-blocker';
+  b.style.cssText = 'position:absolute;inset:0;z-index:9999;pointer-events:all;cursor:default;';
+  (window.appStage || document.body).appendChild(b);
+}
+function shapesUnblockInput() {
+  document.getElementById('shapes-input-blocker')?.remove();
+}
 let shapesDots = 0;
 let shapesTrainTimeouts = [];
 let shapesCurrentImg = null, shapesCurrentImg2 = null, shapesCurrentClip = null;
@@ -22,6 +34,49 @@ let shapesScoreRafId = null;
 let shapesAnsweredSet = new Set();
 let shapesWrongCooldown = new Map(); // country name → remaining questions before re-entry
 let shapesCorrectCount = 0;
+let shapesPracticePool = [];
+let shapesPracticeRemaining = [];
+let shapesPracticeCurrent = null;
+
+function buildShapesPracticePool(continents, difficulty) {
+  const sh = a => { for (let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a; };
+  const ok     = c => !continents || continents.has(SHAPE_COUNTRY_CONTINENT[c.name]);
+  const inTier = (arr, c) => arr.has ? arr.has(c.name) : arr.includes(c.name);
+  const ALL_POOLS = [SHAPES_POOL_INICIO, SHAPES_POOL_FACIL, SHAPES_POOL_MEDIO, SHAPES_POOL_DIFICIL];
+  const diff = difficulty || 'dificil';
+
+  // Pools allowed by difficulty ceiling (cumulative)
+  const allowedPools = [SHAPES_POOL_INICIO];
+  if (diff !== 'inicio') allowedPools.push(SHAPES_POOL_FACIL);
+  if (diff === 'medio' || diff === 'dificil') allowedPools.push(SHAPES_POOL_MEDIO);
+  if (diff === 'dificil') allowedPools.push(SHAPES_POOL_DIFICIL);
+
+  const seen = new Set();
+  const result = [];
+  const add = c => { if (!seen.has(c.name)) { seen.add(c.name); result.push(c); } };
+
+  // Step 1: add allowed pools filtered by continent
+  for (const pool of allowedPools) sh(SHAPE_COUNTRIES.filter(c => inTier(pool, c) && ok(c))).forEach(add);
+
+  // Step 2: if pool is thin (<4), supplement from next harder pools (still continent-filtered)
+  if (result.length < 4) {
+    for (const pool of ALL_POOLS) {
+      if (allowedPools.includes(pool)) continue;
+      sh(SHAPE_COUNTRIES.filter(c => inTier(pool, c) && ok(c))).forEach(add);
+      if (result.length >= 4) break;
+    }
+  }
+
+  // Step 3: final fallback — drop continent filter if still too few
+  if (result.length < 4) {
+    for (const pool of ALL_POOLS) {
+      sh(SHAPE_COUNTRIES.filter(c => inTier(pool, c))).forEach(add);
+      if (result.length >= 4) break;
+    }
+  }
+
+  return result;
+}
 
 function positionShapesCountdown() {
   const cwEl = document.getElementById('shapes-countdown-widget');
@@ -80,7 +135,9 @@ function showCountryShape(country, ext1, ext2, startDelay) {
 
     const cwNum = document.createElement('div');
     cwNum.id = 'shapes-timer-number';
-    cwNum.textContent = '60';
+    { const _inf0 = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
+      cwNum.textContent = (window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer > 0) ? window.practiceConfig.timer : (_inf0 ? '∞' : window.GAME_DURATION);
+      if (_inf0) cwNum.classList.add('timer-number-infinity'); }
     cwNum.style.color = 'white';
 
     const dotsEl = document.createElement('div');
@@ -213,7 +270,32 @@ function showCountryShape(country, ext1, ext2, startDelay) {
     correctIdx = 0;
   } else {
     const correctLabel = SHAPE_COUNTRIES.find(c => c.name === country).label;
-    const shuffled = getActiveShapesPool()
+    let _distractorBase;
+    if (window.practiceConfig && window.practiceConfig.active) {
+      // Limit distractors to the same unlocked tiers as the pick logic
+      const _sUnlocked = new Set(SHAPES_POOL_INICIO);
+      const _sDiff = (window.practiceConfig && window.practiceConfig.difficulty) || 'dificil';
+      if (shapesCorrectCount >= 1  && _sDiff !== 'inicio') SHAPES_POOL_FACIL.forEach(n => _sUnlocked.add(n));
+      if (shapesCorrectCount >= 10 && (_sDiff === 'medio' || _sDiff === 'dificil')) {
+        const limit = shapesCorrectCount >= 24 ? SHAPES_POOL_MEDIO.length : shapesCorrectCount >= 17 ? 50 : 25;
+        SHAPES_POOL_MEDIO.slice(0, limit).forEach(n => _sUnlocked.add(n));
+      }
+      if (shapesCorrectCount >= 30 && _sDiff === 'dificil') SHAPES_POOL_DIFICIL.forEach(n => _sUnlocked.add(n));
+      _distractorBase = shapesPracticePool.filter(c => _sUnlocked.has(c.name));
+      // Expand if too few distractors
+      if (_distractorBase.length < 4) {
+        const ordered = [SHAPES_POOL_FACIL, SHAPES_POOL_MEDIO, SHAPES_POOL_DIFICIL];
+        for (const tier of ordered) {
+          tier.forEach(n => _sUnlocked.add(n));
+          _distractorBase = shapesPracticePool.filter(c => _sUnlocked.has(c.name));
+          if (_distractorBase.length >= 4) break;
+        }
+      }
+      if (_distractorBase.length < 4) _distractorBase = shapesPracticePool;
+    } else {
+      _distractorBase = getActiveShapesPool();
+    }
+    const shuffled = _distractorBase
       .filter(c => c.name !== country && c.label !== correctLabel)
       .sort(() => Math.random() - 0.5);
     const usedLabels = new Set([correctLabel]);
@@ -283,7 +365,7 @@ function showCountryShape(country, ext1, ext2, startDelay) {
       tag.style.transform = base;
       tag.classList.remove('shape-tag-enter');
       tag.style.animationDelay = '';
-      tag.style.pointerEvents = 'auto';
+      if (!shapesGameOver) tag.style.pointerEvents = 'auto';
       if (i === tagConfigs.length - 1) shapesRoundStartTime = performance.now();
     });
 
@@ -297,18 +379,18 @@ function showCountryShape(country, ext1, ext2, startDelay) {
     tagLabel.style.cssText = 'position:absolute;top:50%;left:52%;transform:translate(-50%,-50%);font-family:"VAGRoundBold","Arial Black",sans-serif;font-size:3.7cqmin;color:#2a1a00;font-weight:bold;white-space:nowrap;pointer-events:none;';
 
     tag.addEventListener('mouseenter', () => {
-      if (anyClicked || !shapesRunning) return;
+      if (anyClicked || !shapesRunning || shapesGameOver) return;
       tagImg.src = 'images/tag2yellow.png';
       tag.style.transform = base + ' scale(1.1)';
       if (typeof sfxSelect !== 'undefined') { sfxSelect.currentTime = 0; sfxPlay(sfxSelect); }
     });
     tag.addEventListener('mouseleave', () => {
-      if (anyClicked || !shapesRunning) return;
+      if (anyClicked || !shapesRunning || shapesGameOver) return;
       tagImg.src = 'images/tag2.png';
       tag.style.transform = base;
     });
     tag.addEventListener('click', () => {
-      if (anyClicked || !shapesRunning) return;
+      if (anyClicked || !shapesRunning || shapesGameOver) return;
       anyClicked = true;
       tag.style.transform = base + ' scale(1.1)';
       tag.style.cursor = 'default';
@@ -356,18 +438,27 @@ function showCountryShape(country, ext1, ext2, startDelay) {
         const speedBonus = ratio > 0 ? Math.round(pts * (SHAPES_SPEED_MULT - 1) * ratio) : 0;
         shapesScore += pts + speedBonus + inRowBonus;
         shapesAnimateScore();
-        if (typeof positionLeaderboard !== 'undefined') positionLeaderboard(shapesScore, true);
-        shapesDots++;
+        if (typeof positionLeaderboard !== 'undefined') {
+          if (window.practiceConfig && window.practiceConfig.active) {
+            const _sc = shapesScore + ((typeof window.campaignBase === 'function') ? window.campaignBase() : 0);
+            const _sel = typeof lbElements !== 'undefined' ? lbElements['lb-player']?.querySelector('.lb-score') : null;
+            if (_sel) _sel.textContent = _sc.toLocaleString();
+          } else {
+            positionLeaderboard(shapesScore, true);
+          }
+        }
+        if (!(window.practiceConfig && window.practiceConfig.active)) shapesDots++;
         const dotsContainer = document.getElementById('shapes-progress-dots');
-        if (dotsContainer) {
+        if (dotsContainer && !(window.practiceConfig && window.practiceConfig.active)) {
           dotsContainer.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('filled', i < shapesDots));
           if (shapesDots >= 10 && !dotsContainer.classList.contains('train-animation')) {
             dotsContainer.classList.add('train-animation');
-            shapesTimeLeft = Math.min(shapesTimeLeft + 5, 99);
+            const _shapesInfNow = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
+            if (!_shapesInfNow) shapesTimeLeft = Math.min(shapesTimeLeft + 5, 99);
             if (typeof playTimeBonus === 'function') playTimeBonus(document.getElementById('shapes-time-bonus'), 5);
             const tEl = document.getElementById('shapes-timer-number');
             const tImg = document.getElementById('shapes-timer-img');
-            if (tEl) { const orig = tEl.style.color; tEl.textContent = shapesTimeLeft; tEl.style.color = '#00ff88';
+            if (tEl) { const orig = tEl.style.color; if (!_shapesInfNow) tEl.textContent = shapesTimeLeft; tEl.style.color = '#00ff88';
               const t1 = setTimeout(() => {
                 dotsContainer.classList.add('dots-fade-out');
                 const t2 = setTimeout(() => {
@@ -375,8 +466,8 @@ function showCountryShape(country, ext1, ext2, startDelay) {
                   shapesDots = Math.max(0, shapesDots - 10);
                   dotsContainer.classList.remove('train-animation', 'dots-fade-out');
                   dotsContainer.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('filled', i < shapesDots));
-                  if (shapesTimeLeft <= 10) { tEl.style.color = '#ffffff'; if (tImg) tImg.src = 'images/countdownred3.png'; }
-                  else { tEl.style.color = orig; if (tImg) tImg.src = 'images/countdown3.png'; }
+                  if (shapesTimeLeft > 0 && shapesTimeLeft <= 10) { tEl.style.color = '#ffffff'; if (tImg) tImg.src = 'images/countdownred3.png'; }
+                  else if (shapesTimeLeft > 10) { tEl.style.color = orig; if (tImg) tImg.src = 'images/countdown3.png'; }
                 }, 500);
                 shapesTrainTimeouts.push(t2);
               }, 2000);
@@ -411,8 +502,61 @@ function showCountryShape(country, ext1, ext2, startDelay) {
       setTimeout(() => {
         tagEls.forEach(t => { t.style.transform = getComputedStyle(t).transform; t.classList.add('shape-tag-exit'); });
         setTimeout(() => {
+          if (!shapesRunning) { tagEls.forEach(t => t.remove()); return; }
+          if (window.practiceConfig && window.practiceConfig.active && shapesPracticePool.length) {
+            if (isCorrect) {
+              shapesPracticeRemaining = shapesPracticeRemaining.filter(x => x !== shapesPracticeCurrent);
+            }
+            if (shapesPracticeRemaining.length === 0) {
+              // Pool exhausted — all correct, show timesup
+              clearInterval(shapesTimerIntervalId);
+              shapesRunning = false;
+              shapesGameOver = true;
+              shapesBlockInput();
+              clearTimeout(shapesTagsTimeout); shapesTagsTimeout = null;
+              document.querySelectorAll('.shapes-tag').forEach(el => { el.style.cursor = 'default'; el.style.pointerEvents = 'none'; });
+              clearTimeout(shapesCurrentAnimTimeout);
+              clearTimeout(shapesCurrentClipFadeTimeout);
+              if (shapesCurrentImg)  shapesCurrentImg.style.transition  = 'none';
+              if (shapesCurrentImg2) shapesCurrentImg2.style.transition = 'none';
+              const tImg2 = document.getElementById('shapes-timer-img');
+              if (tImg2) tImg2.style.animationPlayState = 'paused';
+              if (typeof sfxTimesUp !== 'undefined') { sfxTimesUp.currentTime = 0; sfxPlay(sfxTimesUp); }
+              if (typeof playMusic  !== 'undefined') playMusic(null);
+              const timeupEl2 = document.getElementById('timeup-overlay');
+              if (timeupEl2) {
+                timeupEl2.style.zIndex = '300';
+                timeupEl2.style.display = 'flex';
+                timeupEl2.classList.remove('timeup-out');
+                timeupEl2.classList.add('timeup-in');
+                shapesEndTimeout1 = setTimeout(() => {
+                  timeupEl2.classList.remove('timeup-in');
+                  timeupEl2.classList.add('timeup-out');
+                  shapesEndTimeout2 = setTimeout(() => {
+                    timeupEl2.style.display = 'none';
+                    timeupEl2.classList.remove('timeup-out');
+                    hideShapesMode();
+                  }, 400);
+                }, 1800);
+              } else {
+                hideShapesMode();
+              }
+              return;
+            }
+            // Pick next: on wrong with >1 remaining pick a different one; on wrong with 1 remaining keep same
+            if (!isCorrect && shapesPracticeRemaining.length > 1) {
+              shapesPracticeCurrent = shapesPracticePickNext(shapesPracticeCurrent);
+            } else if (isCorrect) {
+              shapesPracticeCurrent = shapesPracticePickNext(null);
+            }
+            // if wrong and only 1 remaining, shapesPracticeCurrent stays the same
+            tagEls.forEach(t => t.remove());
+            svgEl.remove(); board.remove(); img.remove(); clip.remove();
+            const next = shapesPracticeCurrent;
+            showCountryShape(next.name, next.ext1, next.ext2);
+            return;
+          }
           tagEls.forEach(t => t.remove());
-          if (!shapesRunning) return;
           svgEl.remove();
           board.remove();
           img.remove();
@@ -702,7 +846,39 @@ function getActiveShapesPool() {
     SHAPES_POOL_MEDIO.slice(0, limit).forEach(n => names.add(n));
   }
   if (shapesCorrectCount >= 30) SHAPES_POOL_DIFICIL.forEach(n => names.add(n));
-  return SHAPE_COUNTRIES.filter(c => names.has(c.name));
+  let pool = SHAPE_COUNTRIES.filter(c => names.has(c.name));
+  if (window.practiceConfig && window.practiceConfig.active && window.practiceConfig.mode === 'shapes') {
+    const conts = window.practiceConfig.continents;
+    const byContinent = c => conts.has(SHAPE_COUNTRY_CONTINENT[c.name]);
+    // Construir pool filtrado por continente con fallback progresivo por nivel
+    const inicioFiltered = SHAPE_COUNTRIES.filter(c => SHAPES_POOL_INICIO.has(c.name) && byContinent(c));
+    const facil          = SHAPE_COUNTRIES.filter(c => SHAPES_POOL_FACIL.includes(c.name) && byContinent(c));
+    const medio          = SHAPE_COUNTRIES.filter(c => SHAPES_POOL_MEDIO.includes(c.name) && byContinent(c));
+    const dificil        = SHAPE_COUNTRIES.filter(c => SHAPES_POOL_DIFICIL.includes(c.name) && byContinent(c));
+    const MIN = 4;
+    let filled = [...inicioFiltered];
+    if (filled.length < MIN) {
+      const need = MIN - filled.length;
+      const extra = facil.filter(c => !filled.includes(c));
+      filled = [...filled, ...extra.slice(0, need)];
+    }
+    if (filled.length < MIN) {
+      const need = MIN - filled.length;
+      const extra = medio.filter(c => !filled.includes(c));
+      filled = [...filled, ...extra.slice(0, need)];
+    }
+    if (filled.length < MIN) {
+      const need = MIN - filled.length;
+      const extra = dificil.filter(c => !filled.includes(c));
+      filled = [...filled, ...extra.slice(0, need)];
+    }
+    // Pool completo filtrado para el juego (inicio + niveles desbloqueados)
+    const fullFiltered = pool.filter(byContinent);
+    pool = fullFiltered.length ? fullFiltered : [...filled, ...facil, ...medio];
+    // Garantizar que los de inicio (+ fallback) siempre están en el pool
+    filled.forEach(c => { if (!pool.includes(c)) pool.push(c); });
+  }
+  return pool;
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -743,34 +919,74 @@ function runShapesPregame(onDone) {
 // Detiene y resetea TODO el modo siluetas (sin scoring ni gameover). Lo usa quitToMenu.
 function shapesHardReset() {
   shapesAborted = true;
+  const _cwImgReset = document.getElementById('shapes-timer-img');
+  if (_cwImgReset) _cwImgReset.style.animationPlayState = 'paused';
   clearTimeout(shapesPregameTimeout); shapesPregameTimeout = null;
   clearTimeout(shapesEndTimeout1); clearTimeout(shapesEndTimeout2);
   clearTimeout(shapesTagsTimeout); shapesTagsTimeout = null;
   clearInterval(shapesTimerIntervalId);
+  if (window._powerQuitOverlay) {
+    // Bloquear interacciones durante el overlay de game over; los tags quedan visibles
+    shapesGameOver = true;
+    shapesBlockInput();
+  } else {
+    shapesUnblockInput();
+  }
   if (shapesScoreRafId) { cancelAnimationFrame(shapesScoreRafId); shapesScoreRafId = null; }
   clearTimeout(shapesCurrentAnimTimeout);
   clearTimeout(shapesCurrentClipFadeTimeout);
   clearTimeout(shapesSpeedBonusHideId);
   if (typeof sfxCountdown !== 'undefined') { try { sfxCountdown.pause(); sfxCountdown.currentTime = 0; } catch (e) {} }
-  // Quitar silueta/tag/board en curso y el countdown widget
-  document.querySelectorAll('.shapes-tag').forEach(t => t.remove());
-  document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
-  document.querySelectorAll('.shapes-stage-el').forEach(el => { try { el.remove(); } catch (e) {} });
-  shapesCurrentImg = shapesCurrentImg2 = shapesCurrentClip = null;
-  shapesCurrentBoard = shapesCurrentSvg = null;
-  document.getElementById('shapes-countdown-widget')?.remove();
-  document.getElementById('pregame-countdown') && (document.getElementById('pregame-countdown').style.display = 'none');
-  const shTimeup = document.getElementById('timeup-overlay');
-  if (shTimeup) { shTimeup.style.display = 'none'; shTimeup.classList.remove('timeup-in','timeup-out'); shTimeup.style.zIndex = ''; }
-  const sbt = document.getElementById('speed-bonus-text');
-  if (sbt) sbt.classList.remove('visible');
+  if (!window._powerQuitOverlay) {
+    // Quitar silueta/tag/board en curso y el countdown widget
+    document.querySelectorAll('.shapes-tag').forEach(t => t.remove());
+    document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
+    document.querySelectorAll('.shapes-stage-el').forEach(el => { try { el.remove(); } catch (e) {} });
+    shapesCurrentImg = shapesCurrentImg2 = shapesCurrentClip = null;
+    shapesCurrentBoard = shapesCurrentSvg = null;
+    document.getElementById('shapes-countdown-widget')?.remove();
+    document.getElementById('pregame-countdown') && (document.getElementById('pregame-countdown').style.display = 'none');
+    const shTimeup = document.getElementById('timeup-overlay');
+    if (shTimeup) { shTimeup.style.display = 'none'; shTimeup.classList.remove('timeup-in','timeup-out'); shTimeup.style.zIndex = ''; }
+    const sbt = document.getElementById('speed-bonus-text');
+    if (sbt) sbt.classList.remove('visible');
+  }
 }
 window.gameStoppers = window.gameStoppers || [];
 window.gameStoppers.push(shapesHardReset);
 
+// Picks the next practice shape using the same tier-unlock logic as normal mode,
+// capped at practiceConfig.difficulty. Excludes `exc` (pass current when wrong, null when correct).
+function shapesPracticePickNext(exc) {
+  const diff = (window.practiceConfig && window.practiceConfig.difficulty) || 'dificil';
+  const pool = exc ? shapesPracticeRemaining.filter(c => c !== exc) : shapesPracticeRemaining;
+  const fallback = pool.length ? pool : shapesPracticeRemaining;
+  const unlocked = new Set(SHAPES_POOL_INICIO);
+  if (shapesCorrectCount >= 1  && diff !== 'inicio') SHAPES_POOL_FACIL.forEach(n => unlocked.add(n));
+  if (shapesCorrectCount >= 10 && (diff === 'medio' || diff === 'dificil')) {
+    const limit = shapesCorrectCount >= 24 ? SHAPES_POOL_MEDIO.length
+                : shapesCorrectCount >= 17 ? 50 : 25;
+    SHAPES_POOL_MEDIO.slice(0, limit).forEach(n => unlocked.add(n));
+  }
+  if (shapesCorrectCount >= 30 && diff === 'dificil') SHAPES_POOL_DIFICIL.forEach(n => unlocked.add(n));
+  let tiered = fallback.filter(c => unlocked.has(c.name));
+  if (!tiered.length) {
+    // Continent has no unlocked-tier shapes; expand progressively to next tiers
+    const ordered = [SHAPES_POOL_FACIL, SHAPES_POOL_MEDIO, SHAPES_POOL_DIFICIL];
+    for (const tier of ordered) {
+      tier.forEach(n => unlocked.add(n));
+      tiered = fallback.filter(c => unlocked.has(c.name));
+      if (tiered.length) break;
+    }
+  }
+  const pick = tiered.length ? tiered : fallback;
+  return pick[Math.floor(Math.random() * pick.length)] || null;
+}
+
 // ── SHOW / HIDE SHAPES MODE ───────────────────────────────────────────────────
 function showShapesMode() {
   shapesAborted = false; // nueva sesión: habilitar de nuevo
+  shapesUnblockInput();
   if (typeof loadGameSFX !== 'undefined') loadGameSFX();
   if (typeof playMusic   !== 'undefined') playMusic(null);
 
@@ -780,11 +996,18 @@ function showShapesMode() {
   const rightPanel = document.getElementById('right-panel');
   if (rightPanel) { rightPanel.style.display = 'flex'; rightPanel.style.zIndex = '120'; }
 
+  document.querySelectorAll('.game-bg-city').forEach(el => { el.src = 'images/bg/level2complete.png'; });
   shapesScore = 0; shapesDisplayedScore = 0; shapesStreak = 0; shapesDots = 0;
   shapesTrainTimeouts.forEach(clearTimeout); shapesTrainTimeouts = [];
   shapesAnsweredSet    = new Set();
   shapesWrongCooldown  = new Map();
   shapesCorrectCount   = 0;
+  if (window.practiceConfig && window.practiceConfig.active) {
+    if (typeof initLeaderboard !== 'undefined') initLeaderboard();
+    shapesPracticePool = buildShapesPracticePool(window.practiceConfig.continents, window.practiceConfig.difficulty);
+    shapesPracticeRemaining = [...shapesPracticePool];
+    shapesPracticeCurrent = shapesPracticeRemaining.length ? shapesPracticePickNext(null) : null;
+  }
   shapesWrongAnswerCount = 0;
   if (typeof setModeCounts !== 'undefined') setModeCounts(0, 0);
 
@@ -810,6 +1033,9 @@ function showShapesMode() {
   let c;
   if (document.body.classList.contains('recording-mode')) {
     c = SHAPE_COUNTRIES.find(co => co.name === 'China');
+  } else if (window.practiceConfig && window.practiceConfig.active && shapesPracticePool.length) {
+    if (!shapesPracticeCurrent) { clearInterval(shapesTimerIntervalId); shapesRunning = false; hideShapesMode(); return; }
+    c = shapesPracticeCurrent;
   } else {
     const initActive = getActiveShapesPool();
     const initPool   = initActive.filter(co => !shapesAnsweredSet.has(co.name));
@@ -820,15 +1046,23 @@ function showShapesMode() {
 
   runShapesPregame(() => {
     if (typeof playMusic !== 'undefined') playMusic(sfxGameMusic);
-    shapesTimeLeft = window.GAME_DURATION;
+    if (window._practiceStats) window._practiceStats.startTime = Date.now();
+    const _shapesInfinite = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
+    shapesTimeLeft = _shapesInfinite ? 0 : (window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer > 0)
+      ? window.practiceConfig.timer
+      : window.GAME_DURATION;
     shapesRunning  = true;
+    shapesGameOver = false;
+    const tElInit = document.getElementById('shapes-timer-number');
+    if (_shapesInfinite && tElInit) { tElInit.textContent = '∞'; tElInit.classList.add('timer-number-infinity'); }
 
     clearInterval(shapesTimerIntervalId);
     shapesTimerIntervalId = setInterval(() => {
+      if (_shapesInfinite) return;
       const tEl  = document.getElementById('shapes-timer-number');
       const tImg = document.getElementById('shapes-timer-img');
       shapesTimeLeft--;
-      if (tEl) tEl.textContent = shapesTimeLeft;
+      if (tEl) { tEl.textContent = shapesTimeLeft; tEl.classList.remove('timer-number-infinity'); }
       if (shapesTimeLeft <= 10) {
         if (tEl)  tEl.style.color = '#ffffff';
         if (tImg) tImg.src = 'images/countdownred3.png';
@@ -839,6 +1073,8 @@ function showShapesMode() {
       if (shapesTimeLeft <= 0) {
         clearInterval(shapesTimerIntervalId);
         shapesRunning = false;
+        shapesGameOver = true;
+        shapesBlockInput();
         clearTimeout(shapesTagsTimeout); shapesTagsTimeout = null;
         document.querySelectorAll('.shapes-tag').forEach(el => { el.style.cursor = 'default'; el.style.pointerEvents = 'none'; });
         document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
@@ -879,6 +1115,7 @@ function showShapesMode() {
 }
 
 function hideShapesMode() {
+  shapesUnblockInput();
   // freeze & remove in-progress country display
   document.querySelectorAll('.shapes-tag').forEach(t => t.remove());
   document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
@@ -905,6 +1142,25 @@ function hideShapesMode() {
   // final score & highscore
   const finalScore = Math.round(shapesScore);
   window.lastModeScore = finalScore;
+
+  // ── PRÁCTICA: redirigir al panel ──────────────────────────
+  if (window.practiceConfig && window.practiceConfig.active) {
+    window.practiceConfig.active = false;
+    document.body.classList.remove('practice-mode');
+    if (typeof window.resetEntranceElements === 'function') window.resetEntranceElements();
+    const ls = document.getElementById('loading-screen');
+    if (ls) { ls.style.display = 'flex'; ls.style.opacity = '1'; }
+    try { if (typeof playMusic !== 'undefined') playMusic(sfxPostgame); } catch(e) {}
+    if (typeof window.showEntranceElementsStatic === 'function') window.showEntranceElementsStatic();
+    document.getElementById('loading-practice-group').style.display = 'flex';
+    document.getElementById('practice-mode-section').style.display = 'none';
+    document.getElementById('practice-config-section').style.display = 'none';
+    if (window._practiceStats) { window._practiceStats.correct = shapesCorrectCount; window._practiceStats.wrong = shapesWrongAnswerCount; }
+    window.showPracticeScore(finalScore);
+    return;
+  }
+  // ──────────────────────────────────────────────────────────
+
   const baseShapes = (typeof window.campaignBase === 'function') ? window.campaignBase() : 0;
   const finalScoreEl = document.getElementById('final-score-value');
   if (finalScoreEl) finalScoreEl.textContent = (finalScore + baseShapes).toLocaleString();
@@ -960,7 +1216,9 @@ document.getElementById('loading-shapes-btn').addEventListener('click', () => {
   if (typeof playMusic !== 'undefined') playMusic(sfxPostgame);
   requestAnimationFrame(() => {
     document.getElementById('splash-screen').classList.add('mode-flags', 'mode-shapes');
+    document.getElementById('splash-screen').classList.remove('mode-monuments');
     document.getElementById('gameover-screen').classList.add('mode-flags', 'mode-shapes');
+    document.getElementById('gameover-screen').classList.remove('mode-monuments');
     window.swapHowtoVideo?.('images/howtoplay/howtoplay2.mp4');
     document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men5.png');
     document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men6.png');
@@ -972,7 +1230,7 @@ document.getElementById('loading-shapes-btn').addEventListener('click', () => {
     document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check2.png');
     document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong2.png');
     const label = document.querySelector('.splash-text2-label');
-    if (label) { label.textContent = t('splash.shapes.1'); label.classList.remove('step2'); }
+    { const _pk = (window.practiceConfig && window.practiceConfig.active) ? 'splash.practice.shapes.1' : 'splash.shapes.1'; if (label) { label.textContent = t(_pk); label.classList.remove('step2'); } }
     const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
     if (howtoWrap) howtoWrap.classList.remove('slide-down');
     const howtoTitle = document.querySelector('.splash-howtoplay-title');
@@ -1021,7 +1279,7 @@ document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check4.png');
   document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong4.png');
   const label = document.querySelector('.splash-text2-label');
-  if (label) { label.textContent = t('splash.monuments.1'); label.classList.remove('step2'); }
+  { const _pk = (window.practiceConfig && window.practiceConfig.active) ? 'splash.practice.monuments.1' : 'splash.monuments.1'; if (label) { label.textContent = t(_pk); label.classList.remove('step2'); } }
   const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
   if (howtoWrap) howtoWrap.classList.remove('slide-down');
   const howtoTitle = document.querySelector('.splash-howtoplay-title');
