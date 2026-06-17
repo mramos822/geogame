@@ -147,13 +147,7 @@
         if (accountWrap) accountWrap.style.display = 'block';
         const resultsBtn = document.getElementById('loading-results-btn');
         if (resultsBtn) resultsBtn.style.display = 'block';
-        // Autoplay bloqueado por el browser hasta el primer gesto — arrancar en el primer click/touch
-        const _startMenuMusic = () => {
-          if (sfxMenuMusic.paused) playMusic(sfxMenuMusic);
-        };
-        ['click','touchend','keydown'].forEach(ev =>
-          document.addEventListener(ev, _startMenuMusic, { once: true, passive: true })
-        );
+        try { playMusic(sfxMenuMusic); } catch(e) {}
       }
 
       // Esperar a que name-prompt y account-modal estén cerrados antes de animar
