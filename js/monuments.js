@@ -147,7 +147,8 @@
         if (accountWrap) accountWrap.style.display = 'block';
         const resultsBtn = document.getElementById('loading-results-btn');
         if (resultsBtn) resultsBtn.style.display = 'block';
-        try { playMusic(sfxMenuMusic); } catch(e) {}
+        // sfxMenuMusic y playMusic se declaran fuera del IIFE; diferir para que estén disponibles
+        setTimeout(() => { try { if (typeof playMusic === 'function' && window.sfxMenuMusic) playMusic(window.sfxMenuMusic); } catch(e) {} }, 0);
       }
 
       // Esperar a que name-prompt y account-modal estén cerrados antes de animar
