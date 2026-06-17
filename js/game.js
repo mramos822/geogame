@@ -179,11 +179,8 @@ function playMusic(track) {
   [sfxPostgame, sfxGameMusic, sfxMenuMusic].forEach(t => { if (t !== track) { t.pause(); t.currentTime = 0; } });
   if (!track) return;
   track.currentTime = 0;
-  const wasMuted = track.muted;
-  if (track === sfxMenuMusic) track.muted = true;
   const p = track.play();
-  if (p) p.then(() => { track.muted = wasMuted || isMuted; }).catch(() => {});
-  else track.muted = wasMuted || isMuted;
+  if (p) p.catch(() => {});
 }
 window.sfxMenuMusic = sfxMenuMusic;
 
@@ -610,15 +607,14 @@ initLeaderboard();
 
 function resetState() {
   const _isPrac = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.mode === 'game';
+  const _pracConts = _isPrac ? window.practiceConfig.continents : null;
   state = {
     phase: 'idle',
     timeLeft: GAME_DURATION,
     score: 0,
     displayedScore: 0,
     dots: 0,
-    cityQueues: makeCityQueues(),
-    practiceCityPool: _isPrac ? makePracticeCityPool(window.practiceConfig.continents) : null,
-    practiceCityIdx: 0,
+    cityQueues: makeCityQueues(_pracConts),
     correctCount: 0,
     currentCity: null,
     cityShownAt: 0,
@@ -817,15 +813,7 @@ function spawnStars(cx, cy) {
 
 // ── NEXT CITY ─────────────────────────────────────────────────────────────────
 function nextCity() {
-  if (state.practiceCityPool) {
-    if (state.practiceCityIdx >= state.practiceCityPool.length) {
-      state.practiceCityPool = makePracticeCityPool(window.practiceConfig.continents);
-      state.practiceCityIdx = 0;
-    }
-    state.currentCity = state.practiceCityPool[state.practiceCityIdx++];
-  } else {
-    state.currentCity = pickCity(state.cityQueues, state.correctCount);
-  }
+  state.currentCity = pickCity(state.cityQueues, state.correctCount);
   state.cityShownAt = Date.now();
   state.phase = 'waiting';
   slideTagIn(state.currentCity.name, state.currentCity.country);

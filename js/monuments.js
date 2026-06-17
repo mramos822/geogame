@@ -147,17 +147,30 @@
         if (accountWrap) accountWrap.style.display = 'block';
         const resultsBtn = document.getElementById('loading-results-btn');
         if (resultsBtn) resultsBtn.style.display = 'block';
-        // Arrancar menuloop con muted autoplay trick (browsers siempre permiten muted)
+        // Arrancar menuloop; si autoplay bloqueado, esperar primer gesto
         setTimeout(() => {
           const m = window.sfxMenuMusic;
           if (!m) return;
           m.loop = true;
           m.currentTime = 0;
-          m.muted = true;
+          const isMuted = localStorage.getItem('muted') === 'true';
+          m.muted = isMuted;
           const p = m.play();
-          const unmute = () => { m.muted = localStorage.getItem('muted') === 'true'; };
-          if (p && typeof p.then === 'function') p.then(unmute).catch(() => {});
-          else unmute();
+          if (p && typeof p.then === 'function') {
+            p.catch(() => {
+              // Autoplay bloqueado: arrancar en el primer gesto del usuario
+              const onGesture = () => {
+                m.currentTime = 0;
+                m.play().catch(() => {});
+                document.removeEventListener('click',      onGesture, true);
+                document.removeEventListener('touchstart', onGesture, true);
+                document.removeEventListener('keydown',    onGesture, true);
+              };
+              document.addEventListener('click',      onGesture, { once: true, capture: true });
+              document.addEventListener('touchstart', onGesture, { once: true, capture: true });
+              document.addEventListener('keydown',    onGesture, { once: true, capture: true });
+            });
+          }
         }, 0);
       }
 
@@ -905,6 +918,12 @@ window.startCampaign = function () {
             if (typeof _updateProfileBtnLabel === 'function') _updateProfileBtnLabel();
             if (typeof loadFriends === 'function') loadFriends();
             if (typeof window.sbUpdateLastActive === 'function') window.sbUpdateLastActive(data.user.id).catch(() => {});
+            // Heartbeat: actualiza last_active cada 45s mientras el usuario esté logueado
+            clearInterval(window._presenceHeartbeat);
+            window._presenceHeartbeat = setInterval(() => {
+              if (window._sbUserId && typeof window.sbUpdateLastActive === 'function')
+                window.sbUpdateLastActive(window._sbUserId).catch(() => {});
+            }, 45000);
             const displayName = profile.username || uVal;
             const nameEl   = document.getElementById('account-welcome-name');
             const prefixEl = document.getElementById('account-welcome-prefix');
@@ -2810,12 +2829,8 @@ function playMusicHTML(track) {
     return;
   }
   track.currentTime = 0;
-  // Muted autoplay trick: browsers always allow muted autoplay; unmute immediately after start
-  const wasMuted = track.muted;
-  if (track === sfxMenuMusic) track.muted = true;
   const p = track.play();
-  if (p) p.then(() => { track.muted = wasMuted || isMuted; }).catch(() => {});
-  else track.muted = wasMuted || isMuted;
+  if (p) p.catch(() => {});
 }
 
 function playMusic(track) {
@@ -3356,10 +3371,11 @@ function practiceGetCityPool() {
 // inicio+facil always unlocked; medio at 5 correct; dificil at 15 correct.
 function practiceCityPickNext() {
   const pc = window.practiceConfig;
-  const continents = pc && pc.continents && pc.continents.length ? pc.continents : null;
-  const ok = c => !continents || continents.includes(COUNTRY_TO_CONTINENT[c.country]);
+  const continents = (pc && pc.continents && pc.continents.size > 0) ? pc.continents : null;
+  const ok = c => !continents || continents.has(CITY_COUNTRY_CONTINENT[c.country]);
 
-  const TIERS = ['inicio', 'facil'];
+  const TIERS = ['inicio'];
+  if (correctCount >= 1)  TIERS.push('facil');
   if (correctCount >= 5)  TIERS.push('medio');
   if (correctCount >= 15) TIERS.push('dificil');
 

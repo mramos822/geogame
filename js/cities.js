@@ -296,12 +296,6 @@ const CITIES = [
 ];
 
 // Pool ordenada por dificultad para modo práctica (respeta filtro de continentes)
-function makePracticeCityPool(continents) {
-  const sh = a => { for (let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a; };
-  const ok = c => !continents || continents.has(CITY_COUNTRY_CONTINENT[c.country]);
-  return ['inicio','facil','medio','dificil'].flatMap(d => sh(CITIES.filter(c => c.diff===d && ok(c))));
-}
-
 // Desbloqueo y pesos por tramo de respuestas correctas:
 //   0–2   → solo inicio (100%)
 //   3–9   → inicio 55%, facil 45%
@@ -314,7 +308,8 @@ const CITY_UNLOCK_TIERS = [
   { at: 20, weights: { inicio: 0.15, facil: 0.35, medio: 0.35, dificil: 0.15 } },
 ];
 
-function makeCityQueues() {
+// continents: Set de strings (o null para sin filtro)
+function makeCityQueues(continents) {
   const shuffle = arr => {
     for (let i = arr.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -322,11 +317,18 @@ function makeCityQueues() {
     }
     return arr;
   };
+  const ok = c => !continents || continents.has(CITY_COUNTRY_CONTINENT[c.country]);
+  const fallback = d => {
+    // Si el continente no tiene ciudades en este tier, rellenar con el siguiente tier
+    let list = CITIES.filter(c => c.diff === d && ok(c));
+    if (list.length < 2) list = CITIES.filter(c => c.diff === d); // sin filtro
+    return shuffle(list);
+  };
   return {
-    inicio:  { list: shuffle(CITIES.filter(c => c.diff === 'inicio')),  i: 0 },
-    facil:   { list: shuffle(CITIES.filter(c => c.diff === 'facil')),   i: 0 },
-    medio:   { list: shuffle(CITIES.filter(c => c.diff === 'medio')),   i: 0 },
-    dificil: { list: shuffle(CITIES.filter(c => c.diff === 'dificil')), i: 0 },
+    inicio:  { list: fallback('inicio'),  i: 0 },
+    facil:   { list: fallback('facil'),   i: 0 },
+    medio:   { list: fallback('medio'),   i: 0 },
+    dificil: { list: fallback('dificil'), i: 0 },
     _shuffle: shuffle,
   };
 }
