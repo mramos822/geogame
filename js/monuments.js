@@ -2795,8 +2795,12 @@ function playMusicHTML(track) {
     return;
   }
   track.currentTime = 0;
+  // Muted autoplay trick: browsers always allow muted autoplay; unmute immediately after start
+  const wasMuted = track.muted;
+  if (track === sfxMenuMusic) track.muted = true;
   const p = track.play();
-  if (p) p.catch(() => {});
+  if (p) p.then(() => { track.muted = wasMuted || isMuted; }).catch(() => {});
+  else track.muted = wasMuted || isMuted;
 }
 
 function playMusic(track) {

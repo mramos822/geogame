@@ -179,8 +179,11 @@ function playMusic(track) {
   [sfxPostgame, sfxGameMusic, sfxMenuMusic].forEach(t => { if (t !== track) { t.pause(); t.currentTime = 0; } });
   if (!track) return;
   track.currentTime = 0;
+  const wasMuted = track.muted;
+  if (track === sfxMenuMusic) track.muted = true;
   const p = track.play();
-  if (p) p.catch(() => {});
+  if (p) p.then(() => { track.muted = wasMuted || isMuted; }).catch(() => {});
+  else track.muted = wasMuted || isMuted;
 }
 window.sfxMenuMusic = sfxMenuMusic;
 
