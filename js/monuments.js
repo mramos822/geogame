@@ -565,7 +565,10 @@ document.getElementById('loading-play-btn').addEventListener('mouseenter', () =>
 window._setPlaying = function(playing) {
   window._isPlaying = !!playing;
   if (window._sbUserId) window.sbSetPlaying(window._sbUserId, playing).catch(() => {});
-  if (playing) window._scoresUploadedThisGame = false; // reset para la nueva partida
+  if (playing) {
+    window._scoresUploadedThisGame = false;
+    window._gameSessionId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
+  }
   // Al volver de una partida, entregar invitaciones que llegaron mientras jugaba
   else if (typeof window.flushQueuedInvite === 'function') window.flushQueuedInvite();
 };
@@ -1094,9 +1097,8 @@ window.startCampaign = function () {
     window._sbProfile = null;
     document.body.classList.remove('account-logged');
     localStorage.removeItem('profilePhoto');
-    localStorage.removeItem('playerName');
     applyStoredProfilePic();
-    // Limpiar scores completo (vuelven a 0 como guest) — nombre y foto persisten
+    // playerName se mantiene para que el usuario no sea reconocido como primera vez
     clearLocalScores(true);
     if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
     _updateProfileBtnLabel();

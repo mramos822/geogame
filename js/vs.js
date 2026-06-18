@@ -814,6 +814,17 @@ window.VS = (() => {
       match => _showIncomingPopup(match),
       () => { if (typeof window.dismissInviteNotif === 'function') window.dismissInviteNotif(); } // host canceló
     );
+    // Consulta inmediata de invitaciones pendientes que llegaron antes de conectar
+    const uid = window._sbUserId;
+    if (uid && window.sb) {
+      window.sb.from('matches')
+        .select('id, host_id, guest_id, status, seed')
+        .eq('guest_id', uid).eq('status', 'pending')
+        .order('created_at', { ascending: false }).limit(1)
+        .then(({ data }) => {
+          if (data && data[0]) _showIncomingPopup(data[0]);
+        }).catch(() => {});
+    }
   };
 
   // Exponer funciones para monuments.js

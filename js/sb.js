@@ -67,20 +67,17 @@ window.sbUpdateProfile = async function(userId, fields) {
   if (error) throw error;
 };
 
-window.sbSaveScores = async function(userId, scores) {
-  const profile = await window.sbGetProfile(userId);
-  const updates = {};
-  ['flags','shapes','cities','monuments'].forEach(k => {
-    if (scores[k] == null) return;
-    if (scores[k] > (profile['hs_' + k] || 0)) updates['hs_' + k] = scores[k];
-    updates['avg_sum_' + k]     = (profile['avg_sum_' + k]     || 0) + scores[k];
-    updates['play_count_' + k]  = (profile['play_count_' + k]  || 0) + 1;
+window.sbSaveScores = async function(userId, scores, sessionId) {
+  const { error } = await sb.rpc('add_game_score', {
+    p_user_id:    userId,
+    p_session_id: sessionId || ('fallback-' + Date.now()),
+    p_flags:      scores.flags     ?? 0,
+    p_shapes:     scores.shapes    ?? 0,
+    p_cities:     scores.cities    ?? 0,
+    p_monuments:  scores.monuments ?? 0,
+    p_total:      scores.total     ?? 0,
   });
-  if (scores.total != null && scores.total > (profile.hs_total || 0)) updates.hs_total = scores.total;
-  if (Object.keys(updates).length) {
-    updates.play_count = (profile.play_count || 0) + 1;
-    await window.sbUpdateProfile(userId, updates);
-  }
+  if (error) throw error;
 };
 
 // Registra el resultado de una partida versus en el perfil propio (W o L).

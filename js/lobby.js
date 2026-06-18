@@ -318,24 +318,29 @@ window.LB = (() => {
 
   async function listPublic() {
     const { data: lobbies, error } = await window.sb.from('lobbies')
-      .select('id, code, name, host_id, max_players, created_at, h:host_id(username)')
+      .select('id, code, name, host_id, max_players, created_at')
       .eq('is_public', true).eq('status', 'waiting')
       .order('created_at', { ascending: false }).limit(30);
     if (error) { console.warn('[LB] listPublic:', error.message); return []; }
     if (!lobbies || !lobbies.length) return [];
-    // Conteo de miembros por sala con una consulta aparte (el embed count es poco fiable)
     const ids = lobbies.map(l => l.id);
     const counts = {};
+    const hostNames = {};
     try {
       const { data: mems } = await window.sb.from('lobby_members').select('lobby_id').in('lobby_id', ids);
       (mems || []).forEach(m => { counts[m.lobby_id] = (counts[m.lobby_id] || 0) + 1; });
     } catch (e) {}
+    try {
+      const hostIds = [...new Set(lobbies.map(l => l.host_id))];
+      const { data: hosts } = await window.sb.from('profiles').select('id, username').in('id', hostIds);
+      (hosts || []).forEach(h => { hostNames[h.id] = h.username; });
+    } catch (e) {}
     return lobbies.map(l => ({
       id: l.id, code: l.code, name: l.name || '',
-      hostName: (l.h && l.h.username) || '?',
+      hostName: hostNames[l.host_id] || '?',
       count: counts[l.id] || 0,
       max: l.max_players || 10,
-    })).filter(l => l.count > 0 && l.count < l.max);
+    })).filter(l => l.count < l.max);
   }
 
   function cleanup() {

@@ -304,8 +304,10 @@ function showResultsScreen() {
   updateHighscores();
 
   // Subir scores a Supabase en background (una sola vez por partida)
+  // La deduplicación real es server-side via game_logs(user_id, session_id) UNIQUE
   if (!window._scoresUploadedThisGame && window._accountLoggedIn && window._sbUserId) {
     window._scoresUploadedThisGame = true;
+    const _sid = window._gameSessionId;
     const cs = window.campaign?.scores || {};
     const payload = {};
     if (cs.flags     != null) payload.flags     = cs.flags;
@@ -314,7 +316,7 @@ function showResultsScreen() {
     if (cs.monuments != null) payload.monuments = cs.monuments;
     payload.total = resultsScreen._total || 0;
     if (Object.keys(payload).length > 0) {
-      window.sbSaveScores(window._sbUserId, payload)
+      window.sbSaveScores(window._sbUserId, payload, _sid)
         .then(() => window.sbGetProfile(window._sbUserId))
         .then(profile => {
           window._sbProfile = profile;
