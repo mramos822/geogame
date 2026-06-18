@@ -25,7 +25,11 @@ async function loadFriends() {
   }
   try {
     const data = await window.sbLoadSocialData(window._sbUserId);
-    _friendsCache = data.friends.map(f => ({ name: f.name, score: f.score, avatar: f.avatar || '' }));
+    _friendsCache = data.friends.map(f => ({
+      id: f.id, name: f.name, score: f.score,
+      avatar: f.avatar || '', last_active: f.last_active || null,
+      is_playing: f.is_playing || false,
+    }));
   } catch (e) {
     console.warn('[friends] error cargando:', e.message);
     _friendsCache = [];

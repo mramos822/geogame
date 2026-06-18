@@ -339,6 +339,18 @@ window.refreshProfileStats = function () {
   if (elName) elName.textContent = localStorage.getItem('playerName') || 'John';
   const elPlays = document.getElementById('loading-play-count');
   if (elPlays) elPlays.textContent = tn('profile.playedTimes', plays);
+  // Record de versus (solo con cuenta; oculto si nunca jugó versus)
+  const vsEl = document.getElementById('loading-vs-record');
+  if (vsEl) {
+    const w = (p && window._accountLoggedIn) ? (p.vs_wins || 0) : 0;
+    const l = (p && window._accountLoggedIn) ? (p.vs_losses || 0) : 0;
+    if (p && window._accountLoggedIn && (w > 0 || l > 0)) {
+      vsEl.style.display = '';
+      vsEl.innerHTML = t('profile.vsRecord', { w: `<span class="vs-w">${w}</span>`, l: `<span class="vs-l">${l}</span>` });
+    } else {
+      vsEl.style.display = 'none';
+    }
+  }
   const gamesHs = { 1: flagsHs, 2: shapesHs, 3: playHs, 4: monumentsHs };
   [1,2,3,4].forEach(i => {
     const el = document.getElementById('loading-games-avg' + i);
@@ -551,8 +563,11 @@ document.getElementById('loading-play-btn').addEventListener('mouseenter', () =>
 
 // Helper global: actualiza is_playing en Supabase si hay sesión activa
 window._setPlaying = function(playing) {
+  window._isPlaying = !!playing;
   if (window._sbUserId) window.sbSetPlaying(window._sbUserId, playing).catch(() => {});
   if (playing) window._scoresUploadedThisGame = false; // reset para la nueva partida
+  // Al volver de una partida, entregar invitaciones que llegaron mientras jugaba
+  else if (typeof window.flushQueuedInvite === 'function') window.flushQueuedInvite();
 };
 
 document.getElementById('loading-play-btn').addEventListener('click', () => {
@@ -921,6 +936,8 @@ window.startCampaign = function () {
             if (typeof _updateProfileBtnLabel === 'function') _updateProfileBtnLabel();
             if (typeof loadFriends === 'function') loadFriends();
             if (typeof window.sbUpdateLastActive === 'function') window.sbUpdateLastActive(data.user.id).catch(() => {});
+            // Escuchar invitaciones versus en tiempo real
+            if (typeof window._vsStartListening === 'function') window._vsStartListening();
             // Heartbeat: actualiza last_active cada 45s mientras el usuario esté logueado
             clearInterval(window._presenceHeartbeat);
             window._presenceHeartbeat = setInterval(() => {
@@ -1295,7 +1312,16 @@ async function _onSessionReady(userId) {
     if (typeof loadFriends === 'function') loadFriends();  // poblar barra ingame con amigos reales
     _updateProfileBtnLabel();
   } catch(e) {}
-  _subscribeFriendshipChanges(userId);  // suscribir una sola vez al login
+  _subscribeFriendshipChanges(userId);
+  if (typeof window._vsStartListening === 'function') window._vsStartListening();
+  // Escuchar invitaciones a salas (push de amigos)
+  if (window.LB && typeof window.LB.listenForInvites === 'function') {
+    window.LB.listenForInvites(p => { if (typeof window.showLobbyIncomingInvite === 'function') window.showLobbyIncomingInvite(p); });
+  }
+  // Al recargar: cerrar/transferir mis salas en espera de la sesión anterior
+  // (refresh = salir de la sala), y si entré por link de invitación, unirme.
+  if (window.LB && typeof window.LB.cleanupMine === 'function') window.LB.cleanupMine();
+  if (typeof window.tryPendingLobbyJoin === 'function') window.tryPendingLobbyJoin();
 }
 document.addEventListener('sbSessionReady', (e) => _onSessionReady(e.detail?.userId));
 // Si el evento ya fue disparado antes de que este listener se registrara, ejecutar ahora
@@ -1792,7 +1818,12 @@ async function loadSocialData(showLoader = true) {
   try {
     socialData = await window.sbLoadSocialData(window._sbUserId);
     if (typeof window.Friends !== 'undefined') {
-      window.Friends._setCache(socialData.friends.map(f => ({ name: f.name, score: f.score, avatar: f.avatar || '' })));
+      // Conservar id/last_active/is_playing: los paneles de invitar usan getFriends()
+      // y necesitan el estado en vivo (conectado/jugando), igual que el panel social.
+      window.Friends._setCache(socialData.friends.map(f => ({
+        id: f.id, name: f.name, score: f.score, avatar: f.avatar || '',
+        last_active: f.last_active || null, is_playing: f.is_playing || false,
+      })));
     }
   } catch (e) {
     console.warn('[social] error cargando:', e.message);
@@ -1962,6 +1993,16 @@ function openFriendProfile(friend) {
   setText('loading-friend-name', friend.name);
   setText('loading-friend-total', friend.score.toLocaleString());
   setText('loading-friend-play-count', tn('profile.friendPlayed', friend.play_count || 0));
+  const fvsEl = document.getElementById('loading-friend-vs-record');
+  if (fvsEl) {
+    const fw = friend.vs_wins || 0, fl = friend.vs_losses || 0;
+    if (fw > 0 || fl > 0) {
+      fvsEl.style.display = '';
+      fvsEl.innerHTML = t('profile.vsRecord', { w: `<span class="vs-w">${fw}</span>`, l: `<span class="vs-l">${fl}</span>` });
+    } else {
+      fvsEl.style.display = 'none';
+    }
+  }
 
   const modeHs = [friend.hs_flags||0, friend.hs_shapes||0, friend.hs_cities||0, friend.hs_monuments||0];
   modeHs.forEach((hs, k) => {
@@ -2518,6 +2559,7 @@ window.resetEntranceElements = function () {
   if (t2r) t2r.style.display = 'none';
   const lpg = document.getElementById('loading-practice-group');
   if (lpg) lpg.style.display = 'none';
+  if (typeof window.hideVersusPanel === 'function') window.hideVersusPanel();
 };
 
 // Muestra el loading en el panel2 de práctica sin animar (retorno desde práctica)
@@ -2628,6 +2670,14 @@ window.replayEntranceAnimations = function () {
 // Termina la partida en curso (cualquier modo) y vuelve al menú principal sin recargar.
 function quitToMenu() {
   window._setPlaying(false);
+  // Si salgo de una partida versus en curso, avisar al rival (gana por abandono)
+  if (window._vsActive && typeof window._vsAbandon === 'function') {
+    try { window._vsAbandon(); } catch (e) {}
+  }
+  // Si salgo de una partida de lobby en curso, abandonar la sala
+  if (window._lobbyActive && typeof window._lobbyAbandon === 'function') {
+    try { window._lobbyAbandon(); } catch (e) {}
+  }
   // Invalida cualquier callback diferido (nextCity, pines, badges, etc.) en vuelo
   window.gameSession = (window.gameSession || 0) + 1;
 
@@ -4585,6 +4635,11 @@ document.querySelector('.splash-confirm-wrap')?.addEventListener('click', () => 
     confirmStep = 1;
     window.waitForHowtoVideo();
   } else {
+    // Lanzamiento normal (no versus/lobby): asegurar que el leaderboard use amigos,
+    // y que la selección de banderas vuelva a Math.random (no la semilla sincronizada).
+    window._vsActive = false;
+    window._lobbyActive = false;
+    if (typeof window.flagsClearSeed === 'function') window.flagsClearSeed();
     if (window.pendingGameMode === 'flags') {
       splashScreen.style.display = 'none';
       if (typeof showFlagsMode !== 'undefined') showFlagsMode();
@@ -5076,7 +5131,11 @@ window.showPracticeScore = function(score) {
 // ── Click en es-practice button
 document.getElementById('loading-panel2-versus')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
-  // TODO: abrir panel versus
+  if (!window._accountLoggedIn) {
+    document.getElementById('social-lock-popup')?.classList.add('open');
+    return;
+  }
+  if (typeof window.showVersusPanel === 'function') window.showVersusPanel();
 });
 
 document.getElementById('loading-panel2-practice')?.addEventListener('click', () => {

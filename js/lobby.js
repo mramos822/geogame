@@ -1,0 +1,994 @@
+// ── LOBBY (versus grupal hasta 10 jugadores) ────────────────────────────────────
+// Salas para partidas de 2 a 10 jugadores. Soporta:
+//   • Privadas: con código compartible + invitar amigos.
+//   • Públicas: aparecen en la lista de salas abiertas (aleatorio).
+// El HOST controla la sala: ve el roster, kickea y decide cuándo empezar.
+// Todos juegan las MISMAS preguntas (RNG sembrado, igual que el 1v1) y compiten
+// en el leaderboard en vivo. Al final se muestra un ranking.
+
+// ── Backend (Supabase) ──────────────────────────────────────────────────────────
+window.LB = (() => {
+  let _lobbyId  = null;
+  let _hostId   = null;
+  let _channel  = null;
+  let _members  = [];     // [{id, name, avatar, score, isHost}]
+  let _lobby    = null;   // fila de la tabla lobbies
+  let _seed     = null;
+  let _onMembers   = null;
+  let _onStart     = null;
+  let _onClosed    = null;  // me kickearon ('kicked') o el host cerró ('closed')
+  let _onCountdown = null;  // host inició la cuenta regresiva
+  let _onCancel    = null;  // se canceló la cuenta regresiva
+  let _onNotReady  = null;  // alguien marcó "no estoy listo"
+
+  function _myId() { return window._sbUserId || null; }
+  function isHost()      { return !!_hostId && _hostId === _myId(); }
+  function getMembers()  { return _members; }
+  function getLobby()    { return _lobby; }
+  function getCode()     { return _lobby ? _lobby.code : null; }
+  function getId()       { return _lobbyId; }
+  function getSeed()     { return _seed; }
+
+  function _genCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sin I/O/0/1 (ambiguos)
+    let c = '';
+    for (let i = 0; i < 6; i++) c += chars[Math.floor(Math.random() * chars.length)];
+    return c;
+  }
+
+  async function _fetchMembers() {
+    if (!_lobbyId) return;
+    const { data, error } = await window.sb.from('lobby_members')
+      .select('user_id, score, joined_at, p:user_id(username, avatar_url)')
+      .eq('lobby_id', _lobbyId).order('joined_at');
+    if (error) { console.warn('[LB] fetchMembers:', error.message); return; }
+    _members = (data || []).map(m => ({
+      id:     m.user_id,
+      name:   (m.p && m.p.username) || '?',
+      avatar: (m.p && m.p.avatar_url) || 'images/profilepic/ppdefault.png',
+      score:  m.score || 0,
+      isHost: m.user_id === _hostId,
+    }));
+    // Si ya no figuro entre los miembros (y la partida no empezó) → me kickearon.
+    const uid = _myId();
+    if (uid && _lobbyId && !window._lobbyActive && !_members.some(m => m.id === uid)) {
+      const cb = _onClosed; cleanup(); if (cb) cb('kicked');
+      return;
+    }
+    if (_onMembers) _onMembers(_members);
+  }
+
+  function _subscribe() {
+    if (_channel) _channel.unsubscribe();
+    const lid = _lobbyId;
+    const uid = _myId();
+    _channel = window.sb.channel('lobby-' + lid, { config: { broadcast: { self: true }, presence: { key: uid || 'anon' } } })
+      // Cuenta regresiva sincronizada (efímera, sin tocar la DB)
+      .on('broadcast', { event: 'cd' },       ({ payload }) => { if (_onCountdown) _onCountdown(payload || {}); })
+      .on('broadcast', { event: 'cancel' },   () => { if (_onCancel) _onCancel(); })
+      .on('broadcast', { event: 'notready' }, ({ payload }) => { if (_onNotReady) _onNotReady(payload || {}); })
+      // Cualquier cambio de miembros (alta/baja/score) → re-consultar a la sala.
+      // _fetchMembers detecta si me kickearon (ya no figuro en la lista). No filtramos
+      // por lobby_id en cliente porque el payload de DELETE no siempre trae las columnas.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lobby_members' }, () => {
+        _fetchMembers();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lobbies' }, payload => {
+        if (!payload.new || payload.new.id !== lid) return;
+        _lobby  = payload.new;
+        _hostId = payload.new.host_id;
+        if (payload.new.status === 'active' && _onStart) { _seed = payload.new.seed; _onStart(payload.new); }
+        else if (payload.new.status === 'closed' && _onClosed) { const cb = _onClosed; cleanup(); cb('closed'); }
+        else { _fetchMembers(); } // cambió el host (u otro campo) → re-render con el nuevo host
+      })
+      // Presencia: si alguien refresca o cierra la pestaña, su presencia "cae".
+      .on('presence', { event: 'leave' }, ({ key }) => {
+        if (!key || key === uid) return;
+        clearTimeout(_graceTimers[key]);
+        _graceTimers[key] = setTimeout(() => _handleMemberGone(key), GRACE_MS);
+      })
+      .on('presence', { event: 'join' }, ({ key }) => {
+        if (key && _graceTimers[key]) { clearTimeout(_graceTimers[key]); delete _graceTimers[key]; }
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') { try { await _channel.track({ uid: uid, t: Date.now() }); } catch (e) {} }
+      });
+  }
+
+  // Limpieza por desconexión (refresh/cierre de pestaña) durante la espera.
+  const GRACE_MS = 5000;
+  const _graceTimers = {};
+  async function _handleMemberGone(goneId) {
+    delete _graceTimers[goneId];
+    if (!_lobbyId || window._lobbyActive) return;          // solo en sala en espera
+    if (!_lobby || _lobby.status !== 'waiting') return;
+    const present = _members.map(m => m.id);
+    if (!present.includes(goneId)) return;                  // ya no estaba
+    if (goneId === _hostId) {
+      // Se fue el HOST: lo promueve el miembro vivo que se unió primero (excluyendo al ido).
+      const heir = _members.filter(m => m.id !== goneId)[0];
+      if (heir && heir.id === _myId()) {
+        try {
+          await window.sb.from('lobbies').update({ host_id: _myId() }).eq('id', _lobbyId);
+          await window.sb.from('lobby_members').delete().eq('lobby_id', _lobbyId).eq('user_id', goneId);
+        } catch (e) {}
+      } else if (!heir) {
+        // no queda nadie vivo → cerrar (lo intenta cualquiera)
+        try { await window.sb.from('lobbies').update({ status: 'closed' }).eq('id', _lobbyId); } catch (e) {}
+      }
+    } else if (isHost()) {
+      // Se fue un miembro normal: lo saca el host.
+      try { await window.sb.from('lobby_members').delete().eq('lobby_id', _lobbyId).eq('user_id', goneId); } catch (e) {}
+    }
+  }
+
+  // Borra salas "waiting" abandonadas para no llenar la DB:
+  //  • las mías anteriores (un host = máx. 1 sala en espera)
+  //  • cualquiera global con más de 2h sin empezar (huérfanas por cierre de pestaña)
+  async function _cleanupStale() {
+    const uid = _myId();
+    const cutoff = new Date(Date.now() - 2 * 3600 * 1000).toISOString();
+    try {
+      if (uid) await window.sb.from('lobbies').delete().eq('host_id', uid).eq('status', 'waiting');
+      await window.sb.from('lobbies').delete().eq('status', 'waiting').lt('created_at', cutoff);
+    } catch (e) {}
+  }
+
+  async function create(isPublic) {
+    const uid = _myId();
+    if (!uid) throw new Error('not logged in');
+    await _cleanupStale();
+    const { data, error } = await window.sb.from('lobbies')
+      .insert({ host_id: uid, code: _genCode(), is_public: !!isPublic, mode: 'flags', status: 'waiting', max_players: 10 })
+      .select().single();
+    if (error) throw error;
+    _lobbyId = data.id; _hostId = uid; _lobby = data; _seed = null;
+    await window.sb.from('lobby_members').insert({ lobby_id: _lobbyId, user_id: uid, score: 0 });
+    // Nombre por defecto: "Sala de {host}" (best-effort: si la columna no existe, se ignora)
+    const myName = (window._sbProfile && window._sbProfile.username) || localStorage.getItem('playerName') || 'Host';
+    const defName = ((typeof t === 'function' ? t('lobby.roomOf') : 'Sala de')) + ' ' + myName;
+    try { await window.sb.from('lobbies').update({ name: defName }).eq('id', _lobbyId); _lobby.name = defName; } catch (e) {}
+    _subscribe();
+    await _fetchMembers();
+    return data;
+  }
+
+  // Restaura una sala en espera de la que sigo siendo miembro (tras recargar/volver).
+  async function restoreActive() {
+    const uid = _myId();
+    if (!uid || _lobbyId) return null;
+    const { data, error } = await window.sb.from('lobby_members')
+      .select('lobby_id, l:lobby_id(*)').eq('user_id', uid).limit(10);
+    if (error) return null;
+    const row = (data || []).find(r => r.l && r.l.status === 'waiting');
+    if (!row) return null;
+    const lobby = row.l;
+    _lobbyId = lobby.id; _hostId = lobby.host_id; _lobby = lobby; _seed = null;
+    _subscribe();
+    await _fetchMembers();
+    return lobby;
+  }
+
+  // Al (re)iniciar sesión: limpiar salas en espera que hosteaba en una sesión previa
+  // (p. ej. refresqué la web). Si tenían gente, transfiero el host; si no, cierro.
+  async function cleanupMine() {
+    const uid = _myId();
+    if (!uid) return;
+    try {
+      const { data: hosted } = await window.sb.from('lobbies')
+        .select('id').eq('host_id', uid).eq('status', 'waiting');
+      for (const lob of (hosted || [])) {
+        const { data: mems } = await window.sb.from('lobby_members')
+          .select('user_id, joined_at').eq('lobby_id', lob.id).order('joined_at');
+        const others = (mems || []).filter(m => m.user_id !== uid);
+        if (others.length) await window.sb.from('lobbies').update({ host_id: others[0].user_id }).eq('id', lob.id);
+        else               await window.sb.from('lobbies').update({ status: 'closed' }).eq('id', lob.id);
+        await window.sb.from('lobby_members').delete().eq('lobby_id', lob.id).eq('user_id', uid);
+      }
+    } catch (e) {}
+  }
+
+  async function setPublic(isPublic) {
+    if (!isHost() || !_lobbyId) return;
+    try {
+      await window.sb.from('lobbies').update({ is_public: !!isPublic }).eq('id', _lobbyId);
+      if (_lobby) _lobby.is_public = !!isPublic;
+    } catch (e) {}
+  }
+  function isPublic() { return !!(_lobby && _lobby.is_public); }
+
+  async function setName(name) {
+    if (!isHost() || !_lobbyId) return;
+    try {
+      await window.sb.from('lobbies').update({ name: name }).eq('id', _lobbyId);
+      if (_lobby) _lobby.name = name;
+    } catch (e) {}
+  }
+  function getName() { return (_lobby && _lobby.name) || ''; }
+
+  async function joinByCode(code) {
+    if (!_myId()) throw new Error('not logged in');
+    const { data, error } = await window.sb.from('lobbies')
+      .select('*').eq('code', (code || '').toUpperCase())
+      .order('created_at', { ascending: false }).limit(1).maybeSingle();
+    if (error || !data) throw new Error('not_found');
+    if (data.status !== 'waiting') throw new Error('started');
+    return _joinLobby(data);
+  }
+
+  async function joinById(id) {
+    const { data, error } = await window.sb.from('lobbies')
+      .select('*').eq('id', id).eq('status', 'waiting').maybeSingle();
+    if (error || !data) throw new Error('not found');
+    return _joinLobby(data);
+  }
+
+  async function _joinLobby(lobby) {
+    const uid = _myId();
+    const { count } = await window.sb.from('lobby_members')
+      .select('*', { count: 'exact', head: true }).eq('lobby_id', lobby.id);
+    if (count != null && count >= (lobby.max_players || 10)) throw new Error('full');
+    _lobbyId = lobby.id; _hostId = lobby.host_id; _lobby = lobby; _seed = null;
+    await window.sb.from('lobby_members').upsert({ lobby_id: lobby.id, user_id: uid, score: 0 });
+    _subscribe();
+    await _fetchMembers();
+    return lobby;
+  }
+
+  async function leave() {
+    const uid = _myId();
+    const lid = _lobbyId;
+    if (!lid) return;
+    const wasHost = isHost();
+    // El que se unió primero entre los que quedan (los miembros vienen por joined_at)
+    const heir = _members.filter(m => m.id !== uid)[0] || null;
+    cleanup(); // limpiar el estado local YA: oculta "Mi sala" sin esperar a la red
+    try {
+      if (wasHost) {
+        if (heir) await window.sb.from('lobbies').update({ host_id: heir.id }).eq('id', lid); // transferir host
+        else      await window.sb.from('lobbies').update({ status: 'closed' }).eq('id', lid);  // sala vacía → cerrar
+      }
+      await window.sb.from('lobby_members').delete().eq('lobby_id', lid).eq('user_id', uid);
+    } catch (e) {}
+  }
+
+  // Transferir el host a otro miembro (manual, botón 👑)
+  async function transferHost(userId) {
+    if (!isHost() || !_lobbyId || userId === _myId()) return;
+    try {
+      await window.sb.from('lobbies').update({ host_id: userId }).eq('id', _lobbyId);
+      _hostId = userId; if (_lobby) _lobby.host_id = userId;
+      _fetchMembers();
+    } catch (e) {}
+  }
+
+  async function kick(userId) {
+    if (!isHost() || !_lobbyId) return;
+    try { await window.sb.from('lobby_members').delete().eq('lobby_id', _lobbyId).eq('user_id', userId); } catch (e) {}
+    _fetchMembers();
+  }
+
+  async function start() {
+    if (!isHost() || !_lobbyId) return;
+    if (_members.length < 2) return; // hace falta al menos 2
+    const seed = Math.floor(Math.random() * 1_000_000);
+    _seed = seed;
+    await window.sb.from('lobbies').update({ status: 'active', seed }).eq('id', _lobbyId);
+    // El propio host arranca por el realtime UPDATE, igual que el resto.
+  }
+
+  async function reportScore(score) {
+    if (!_lobbyId) return;
+    try { await window.sb.from('lobby_members').update({ score }).eq('lobby_id', _lobbyId).eq('user_id', _myId()); } catch (e) {}
+  }
+
+  // ── Broadcast efímero (cuenta regresiva / no estoy listo) ──────────────────────
+  function _bcast(event, payload) {
+    if (_channel) { try { _channel.send({ type: 'broadcast', event, payload: payload || {} }); } catch (e) {} }
+  }
+  function sendCountdown(until) { _bcast('cd', { until }); }
+  function sendCancel()         { _bcast('cancel'); }
+  function sendNotReady(name)   { _bcast('notready', { name }); }
+
+  // ── Invitación push a un amigo (broadcast a su canal personal) ──────────────────
+  function sendInvite(toUser, payload) {
+    if (!toUser) return;
+    const ch = window.sb.channel('lobbyinv-' + toUser);
+    ch.subscribe(status => {
+      if (status === 'SUBSCRIBED') {
+        ch.send({ type: 'broadcast', event: 'invite', payload: payload || {} })
+          .finally(() => setTimeout(() => { try { ch.unsubscribe(); } catch (e) {} }, 1500));
+      }
+    });
+  }
+
+  let _inviteChannel = null;
+  function listenForInvites(onInvite) {
+    const uid = _myId();
+    if (!uid) return;
+    if (_inviteChannel) _inviteChannel.unsubscribe();
+    _inviteChannel = window.sb.channel('lobbyinv-' + uid)
+      .on('broadcast', { event: 'invite' }, ({ payload }) => { if (onInvite) onInvite(payload || {}); })
+      .subscribe();
+  }
+
+  async function listPublic() {
+    const { data: lobbies, error } = await window.sb.from('lobbies')
+      .select('id, code, name, host_id, max_players, created_at, h:host_id(username)')
+      .eq('is_public', true).eq('status', 'waiting')
+      .order('created_at', { ascending: false }).limit(30);
+    if (error) { console.warn('[LB] listPublic:', error.message); return []; }
+    if (!lobbies || !lobbies.length) return [];
+    // Conteo de miembros por sala con una consulta aparte (el embed count es poco fiable)
+    const ids = lobbies.map(l => l.id);
+    const counts = {};
+    try {
+      const { data: mems } = await window.sb.from('lobby_members').select('lobby_id').in('lobby_id', ids);
+      (mems || []).forEach(m => { counts[m.lobby_id] = (counts[m.lobby_id] || 0) + 1; });
+    } catch (e) {}
+    return lobbies.map(l => ({
+      id: l.id, code: l.code, name: l.name || '',
+      hostName: (l.h && l.h.username) || '?',
+      count: counts[l.id] || 0,
+      max: l.max_players || 10,
+    })).filter(l => l.count > 0 && l.count < l.max);
+  }
+
+  function cleanup() {
+    if (_channel) { _channel.unsubscribe(); _channel = null; }
+    Object.values(_graceTimers).forEach(clearTimeout);
+    for (const k in _graceTimers) delete _graceTimers[k];
+    _lobbyId = _hostId = _lobby = _seed = null;
+    _members = [];
+    _onMembers = _onStart = _onClosed = _onCountdown = _onCancel = _onNotReady = null;
+  }
+
+  return {
+    create, joinByCode, joinById, leave, kick, start, reportScore, listPublic, cleanup,
+    sendCountdown, sendCancel, sendNotReady, setPublic, isPublic, restoreActive, transferHost, cleanupMine,
+    sendInvite, listenForInvites, setName, getName,
+    isHost, getMembers, getLobby, getCode, getId, getSeed,
+    onMembers:   cb => { _onMembers = cb; },
+    onStart:     cb => { _onStart = cb; },
+    onClosed:    cb => { _onClosed = cb; },
+    onCountdown: cb => { _onCountdown = cb; },
+    onCancel:    cb => { _onCancel = cb; },
+    onNotReady:  cb => { _onNotReady = cb; },
+  };
+})();
+
+// ── UI + integración de juego ────────────────────────────────────────────────────
+window.Lobby = (() => {
+  const T = (k, d) => (typeof t === 'function' ? t(k) : d);
+
+  // ── Roster del lobby ──────────────────────────────────────────────────────────
+  function _renderMembers(members) {
+    const list = document.getElementById('lobby-members');
+    if (!list) return;
+    const host = window.LB.isHost();
+    const myId = window._sbUserId;
+    list.innerHTML = '';
+    members.forEach(m => {
+      const row = document.createElement('div');
+      row.className = 'lobby-member-row' + (m.isHost ? ' is-host' : '');
+      row.innerHTML =
+        `<img class="lobby-member-avatar" src="${m.avatar}" draggable="false" oncontextmenu="return false">` +
+        `<span class="lobby-member-name">${m.name}${m.id === myId ? ' (' + T('lobby.you', 'tú') + ')' : ''}</span>` +
+        (m.isHost ? `<span class="lobby-member-badge">${T('lobby.host', 'HOST')}</span>` : '') +
+        ((host && !m.isHost) ? `<button class="lobby-host-btn" data-id="${m.id}" title="${T('lobby.makeHost', 'Hacer host')}">👑</button>` : '') +
+        ((host && !m.isHost) ? `<button class="lobby-kick-btn" data-id="${m.id}" title="${T('lobby.kick', 'Expulsar')}">✕</button>` : '');
+      list.appendChild(row);
+    });
+    list.querySelectorAll('.lobby-kick-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+        window.LB.kick(btn.dataset.id);
+      });
+    });
+    list.querySelectorAll('.lobby-host-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+        window.LB.transferHost(btn.dataset.id);
+        if (typeof window.showVersusToast === 'function') window.showVersusToast(T('lobby.hostTransferred', 'Host transferido'));
+      });
+    });
+    // Contador y estado del botón empezar
+    const cnt = document.getElementById('lobby-count');
+    if (cnt) cnt.textContent = members.length + '/10';
+    const startBtn = document.getElementById('lobby-start-btn');
+    if (startBtn) {
+      startBtn.disabled = members.length < 2;
+      startBtn.classList.toggle('disabled', members.length < 2);
+    }
+    // Mostrar los botones según haya o no cuenta regresiva en curso
+    _applyCountdownButtons(_counting);
+    _refreshLobbyName(); // refrescar nombre (cambia el host o el nombre)
+    // Si el popup de invitar está abierto, refrescarlo para reflejar quién entró/salió
+    const ip = document.getElementById('lobby-invite-popup');
+    if (ip && ip.style.display !== 'none') _openInvitePopup();
+  }
+
+  // ── Cuenta regresiva de inicio (10s, cancelable) ───────────────────────────────
+  let _counting = false;
+  let _cdInterval = null;
+
+  function _applyCountdownButtons(active) {
+    const host    = window.LB.isHost();
+    const cd       = document.getElementById('lobby-countdown');
+    const startB   = document.getElementById('lobby-start-btn');
+    const cancelB  = document.getElementById('lobby-cancel-btn');
+    const nrB      = document.getElementById('lobby-notready-btn');
+    const wait     = document.getElementById('lobby-wait-msg');
+    if (cd)      cd.style.display      = active ? '' : 'none';
+    if (startB)  startB.style.display  = (!active && host)  ? '' : 'none';
+    if (cancelB) cancelB.style.display = (active && host)   ? '' : 'none';
+    if (nrB)     nrB.style.display     = (active && !host)  ? '' : 'none';
+    if (wait)    wait.style.display    = (!active && !host) ? '' : 'none';
+  }
+
+  function _startCountdown(until) {
+    _counting = true;
+    _applyCountdownButtons(true);
+    clearInterval(_cdInterval);
+    const tick = () => {
+      const remain = Math.ceil((until - Date.now()) / 1000);
+      const cd = document.getElementById('lobby-countdown');
+      if (cd) cd.textContent = T('lobby.starting', 'Empezando en') + ' ' + Math.max(0, remain) + '…';
+      if (remain <= 0) {
+        clearInterval(_cdInterval); _cdInterval = null;
+        if (window.LB.isHost()) window.LB.start(); // solo el host dispara el inicio real
+      }
+    };
+    tick();
+    _cdInterval = setInterval(tick, 200);
+  }
+
+  function _stopCountdown() {
+    _counting = false;
+    clearInterval(_cdInterval); _cdInterval = null;
+    _applyCountdownButtons(false);
+  }
+
+  // ── Entrar al lobby (tras crear/unirse) ────────────────────────────────────────
+  function enterLobby() {
+    const codeEl = document.getElementById('lobby-code');
+    if (codeEl) codeEl.textContent = window.LB.getCode() || '------';
+    const inviteBtn = document.getElementById('lobby-invite-btn');
+    if (inviteBtn) inviteBtn.style.display = window.LB.isHost() ? '' : 'none';
+    _updateVisibilityBtn();
+    _refreshLobbyName();
+
+    _counting = false;
+    window.LB.onMembers(_renderMembers);
+    window.LB.onStart(lobby => _launchLobbyFlags(lobby.seed));
+    window.LB.onClosed(reason => {
+      // Si todavía no empezó la partida, avisar y volver a la lista
+      if (!window._lobbyActive) {
+        _stopCountdown();
+        _backToVersusFromLobby();
+        if (typeof window.showVersusToast === 'function') {
+          window.showVersusToast(reason === 'kicked'
+            ? T('lobby.kicked', 'Te expulsaron de la sala')
+            : T('lobby.closed', 'El host cerró la sala'));
+        }
+      }
+    });
+    // Cuenta regresiva sincronizada
+    window.LB.onCountdown(p => { if (p && p.until) _startCountdown(p.until); });
+    window.LB.onCancel(() => {
+      _stopCountdown();
+      if (typeof window.showVersusToast === 'function') window.showVersusToast(T('lobby.cancelled', 'Cuenta regresiva cancelada'));
+    });
+    window.LB.onNotReady(p => {
+      if (typeof window.showVersusToast === 'function') {
+        window.showVersusToast(((p && p.name) || T('lobby.someone', 'Alguien')) + ' ' + T('lobby.notReadyMsg', 'no está listo'));
+      }
+    });
+    _renderMembers(window.LB.getMembers());
+  }
+
+  function _backToVersusFromLobby() {
+    if (typeof window.versusGoTo === 'function') window.versusGoTo('amistoso');
+  }
+
+  // ── Lista de salas públicas (aleatorio) ────────────────────────────────────────
+  async function loadPublicList() {
+    const list  = document.getElementById('versus-public-list');
+    const empty = document.getElementById('versus-public-empty');
+    if (!list) return;
+    list.innerHTML = `<div class="versus-empty-inline">${T('lobby.loading', 'Cargando salas…')}</div>`;
+    let rooms = [];
+    try { rooms = await window.LB.listPublic(); } catch (e) {}
+    list.innerHTML = '';
+    if (!rooms.length) {
+      if (empty) empty.style.display = 'block';
+      return;
+    }
+    if (empty) empty.style.display = 'none';
+    rooms.forEach(r => {
+      const row = document.createElement('div');
+      row.className = 'versus-friend-row';
+      row.innerHTML =
+        `<div class="versus-friend-info">` +
+          `<span class="versus-friend-name">${r.name || (T('lobby.roomOf', 'Sala de') + ' ' + r.hostName)}</span>` +
+          `<span class="versus-friend-status">${r.count}/${r.max} ${T('lobby.players', 'jugadores')}</span>` +
+        `</div>` +
+        `<button class="versus-challenge-btn" data-id="${r.id}">${T('lobby.join', 'Unirse')}</button>`;
+      list.appendChild(row);
+    });
+    list.querySelectorAll('.versus-challenge-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+        try {
+          await window.LB.joinById(btn.dataset.id);
+          if (typeof window.versusGoTo === 'function') window.versusGoTo('lobby');
+          enterLobby();
+        } catch (e) {
+          if (typeof window.showVersusToast === 'function') window.showVersusToast(T('lobby.joinError', 'No se pudo unir a la sala'));
+        }
+      });
+    });
+  }
+
+  // ── Lanzar la partida de banderas en modo lobby ────────────────────────────────
+  function _launchLobbyFlags(seed) {
+    _stopCountdown();
+    window.practiceConfig = window.practiceConfig || {};
+    window.practiceConfig.active = false;
+    window.pendingGameMode = 'flags';
+    if (typeof window._setPlaying === 'function') window._setPlaying(true);
+
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('loading-versus-group')?.classList.add('table-gone');
+    document.getElementById('loading-versus-group')?.classList.remove('panel-visible');
+    document.getElementById('splash-screen').style.display = 'none';
+
+    // Estado de modo lobby: leaderboard con TODOS los rivales, RNG sembrado.
+    window._lobbyActive = true;
+    _refreshLobbyOpponents();
+
+    // Cuando cambian los scores de la sala (realtime) → actualizar leaderboard
+    window.LB.onMembers(() => {
+      _refreshLobbyOpponents();
+      if (typeof window.flagsSetLobbyScores === 'function') window.flagsSetLobbyScores(window._lobbyMembers);
+    });
+    // Si el host cierra a mitad, no hacemos nada disruptivo: la partida sigue local.
+
+    if (typeof window.flagsSetSeed === 'function') window.flagsSetSeed(seed);
+    if (typeof showFlagsMode === 'function') showFlagsMode();
+  }
+
+  // Construye window._lobbyMembers = rivales (todos menos yo)
+  function _refreshLobbyOpponents() {
+    const myId = window._sbUserId;
+    window._lobbyMembers = window.LB.getMembers()
+      .filter(m => m.id !== myId)
+      .map(m => ({ id: m.id, name: m.name, avatar: m.avatar, score: m.score || 0 }));
+  }
+
+  // Reporte de respuesta desde flags.js
+  window._lobbyReportAnswer = function(score) {
+    if (!window.LB.getId()) return;
+    window.LB.reportScore(score);
+  };
+
+  // ── Fin de partida → ranking ───────────────────────────────────────────────────
+  window._lobbyHandleGameEnd = function(myFinalScore) {
+    if (window.LB.getId()) window.LB.reportScore(myFinalScore);
+    setTimeout(() => {
+      const myId = window._sbUserId;
+      const members = window.LB.getMembers().map(m => ({
+        ...m,
+        score: m.id === myId ? Math.max(myFinalScore, m.score || 0) : (m.score || 0),
+      }));
+      members.sort((a, b) => b.score - a.score);
+      _showLobbyResult(members);
+    }, 700);
+  };
+
+  function _showLobbyResult(members) {
+    const myId   = window._sbUserId;
+    const screen = document.getElementById('lobby-result-screen');
+    const list   = document.getElementById('lobby-result-list');
+    const title  = document.getElementById('lobby-result-title');
+    if (!screen || !list) return;
+    const myRank = members.findIndex(m => m.id === myId) + 1;
+    if (title) {
+      title.textContent = myRank === 1
+        ? T('vs.result.win', '¡GANASTE!')
+        : T('lobby.placed', 'Quedaste #{n}').replace('{n}', myRank);
+      title.className = 'vs-result-title ' + (myRank === 1 ? 'win' : 'lose');
+    }
+    const medals = ['🥇', '🥈', '🥉'];
+    list.innerHTML = '';
+    members.forEach((m, i) => {
+      const row = document.createElement('div');
+      row.className = 'lobby-result-row' + (m.id === myId ? ' is-me' : '');
+      row.innerHTML =
+        `<span class="lobby-result-pos">${medals[i] || (i + 1)}</span>` +
+        `<img class="lobby-result-avatar" src="${m.avatar}" draggable="false" oncontextmenu="return false">` +
+        `<span class="lobby-result-name">${m.name}${m.id === myId ? ' (' + T('lobby.you', 'tú') + ')' : ''}</span>` +
+        `<span class="lobby-result-score">${(m.score || 0).toLocaleString()}</span>`;
+      list.appendChild(row);
+    });
+    screen.style.display = 'flex';
+    try { if (typeof playMusic === 'function' && typeof sfxPostgame !== 'undefined') playMusic(sfxPostgame); } catch (e) {}
+  }
+
+  function _returnFromLobbyResult() {
+    const screen = document.getElementById('lobby-result-screen');
+    if (screen) screen.style.display = 'none';
+    window._lobbyActive = false;
+    window._lobbyMembers = [];
+    if (typeof window.flagsClearSeed === 'function') window.flagsClearSeed();
+    window.LB.cleanup();
+    if (typeof window.quitToMenu === 'function') window.quitToMenu();
+  }
+
+  // Salir de una partida lobby en curso (botón power/quit)
+  window._lobbyAbandon = function() {
+    window._lobbyActive = false;
+    window._lobbyMembers = [];
+    if (typeof window.flagsClearSeed === 'function') window.flagsClearSeed();
+    if (window.LB.getId()) { try { window.LB.leave(); } catch (e) {} }
+  };
+
+  document.addEventListener('DOMContentLoaded', () => {
+    // Empezar → dispara cuenta regresiva de 10s (no inicia ya); el host puede cancelar.
+    document.getElementById('lobby-start-btn')?.addEventListener('click', () => {
+      if (window.LB.getMembers().length < 2) return;
+      if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+      window.LB.sendCountdown(Date.now() + 10000);
+    });
+    // Cancelar la cuenta regresiva (host)
+    document.getElementById('lobby-cancel-btn')?.addEventListener('click', () => {
+      if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+      window.LB.sendCancel();
+    });
+    // "No estoy listo" (cualquier jugador) → avisa a todos; el host decide cancelar
+    document.getElementById('lobby-notready-btn')?.addEventListener('click', () => {
+      if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+      const myName = localStorage.getItem('playerName') || T('lobby.someone', 'Alguien');
+      window.LB.sendNotReady(myName);
+    });
+    document.getElementById('lobby-leave-btn')?.addEventListener('click', () => {
+      if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+      _stopCountdown();
+      window.LB.leave();
+      _backToVersusFromLobby();
+    });
+    // Nombre de la sala (host): ✎ editar, ✓ confirmar (Enter también confirma)
+    document.getElementById('lobby-name-edit-btn')?.addEventListener('click', () => {
+      if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+      _beginEditName();
+    });
+    document.getElementById('lobby-name-confirm-btn')?.addEventListener('click', () => {
+      if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+      _confirmEditName();
+    });
+    document.getElementById('lobby-name-input')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); _confirmEditName(); }
+    });
+    document.getElementById('lobby-result-back')?.addEventListener('click', () => {
+      if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+      _returnFromLobbyResult();
+    });
+    const _copyCode = () => {
+      const code = window.LB.getCode();
+      if (code && navigator.clipboard) navigator.clipboard.writeText(code).catch(() => {});
+      if (typeof window.showVersusToast === 'function') window.showVersusToast(T('lobby.copied', '¡Código copiado!'));
+    };
+    document.getElementById('lobby-code-copy')?.addEventListener('click', _copyCode);
+
+    // "+ Invitar": abre el popup con amigos conectados + copiar link
+    document.getElementById('lobby-invite-btn')?.addEventListener('click', () => {
+      if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+      _openInvitePopup();
+    });
+    document.getElementById('lobby-copylink-btn')?.addEventListener('click', () => {
+      if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+      _copyJoinLink();
+    });
+    document.getElementById('lobby-invite-close')?.addEventListener('click', () => {
+      if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+      const p = document.getElementById('lobby-invite-popup'); if (p) p.style.display = 'none';
+    });
+
+    // Toggle público/privado (solo host)
+    document.getElementById('lobby-visibility-btn')?.addEventListener('click', async () => {
+      if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+      await window.LB.setPublic(!window.LB.isPublic());
+      _updateVisibilityBtn();
+      if (typeof window.showVersusToast === 'function') {
+        window.showVersusToast(window.LB.isPublic() ? T('lobby.nowPublic', 'Sala ahora PÚBLICA') : T('lobby.nowPrivate', 'Sala ahora PRIVADA'));
+      }
+    });
+
+    // Deep-link: ?join=CÓDIGO → recordar para unirse cuando haya sesión
+    try {
+      const params = new URLSearchParams(location.search);
+      const code = params.get('join');
+      if (code) {
+        _pendingJoinCode = code.toUpperCase();
+        // limpiar la URL para no reintentar al recargar
+        params.delete('join');
+        const qs = params.toString();
+        history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
+      }
+    } catch (e) {}
+    tryPendingJoin();
+  });
+
+  // ── Botón visibilidad (host) ───────────────────────────────────────────────────
+  function _updateVisibilityBtn() {
+    const btn = document.getElementById('lobby-visibility-btn');
+    if (!btn) return;
+    if (!window.LB.isHost()) { btn.style.display = 'none'; return; }
+    btn.style.display = '';
+    btn.textContent = window.LB.isPublic() ? T('lobby.public', '🌐 Pública') : T('lobby.private', '🔒 Privada');
+    btn.classList.toggle('is-public', window.LB.isPublic());
+  }
+
+  // Nombre de la sala: el host lo edita con ✎/✓; para el resto es texto en vivo.
+  let _editingName = false;
+  function _refreshLobbyName() {
+    const text  = document.getElementById('lobby-name-text');
+    const edit  = document.getElementById('lobby-name-edit-btn');
+    const input = document.getElementById('lobby-name-input');
+    const conf  = document.getElementById('lobby-name-confirm-btn');
+    if (!text) return;
+    const host = window.LB.isHost();
+    const name = window.LB.getName() || T('lobby.unnamed', 'Sala');
+    if (_editingName && host) return; // no pisar mientras edita
+    text.textContent = name;
+    text.style.display   = '';
+    if (input) input.style.display = 'none';
+    if (conf)  conf.style.display  = 'none';
+    if (edit)  edit.style.display  = host ? '' : 'none';
+  }
+  function _beginEditName() {
+    if (!window.LB.isHost()) return;
+    _editingName = true;
+    const text  = document.getElementById('lobby-name-text');
+    const edit  = document.getElementById('lobby-name-edit-btn');
+    const input = document.getElementById('lobby-name-input');
+    const conf  = document.getElementById('lobby-name-confirm-btn');
+    if (text) text.style.display = 'none';
+    if (edit) edit.style.display = 'none';
+    if (input) { input.style.display = ''; input.value = window.LB.getName() || ''; input.focus(); input.select(); }
+    if (conf) conf.style.display = '';
+  }
+  async function _confirmEditName() {
+    const input = document.getElementById('lobby-name-input');
+    const val = input ? (input.value || '').trim() : '';
+    _editingName = false;
+    if (val) await window.LB.setName(val); // propaga a todos por realtime
+    _refreshLobbyName();
+  }
+
+  // ── Link de invitación + deep-link ─────────────────────────────────────────────
+  function _buildJoinLink() {
+    const code = window.LB.getCode();
+    if (!code) return '';
+    return location.origin + location.pathname + '?join=' + code;
+  }
+  function _copyJoinLink(friendName) {
+    const link = _buildJoinLink();
+    if (link && navigator.clipboard) navigator.clipboard.writeText(link).catch(() => {});
+    if (typeof window.showVersusToast === 'function') {
+      window.showVersusToast(friendName
+        ? T('lobby.sharedWith', 'Compartí el link con {name}').replace('{name}', friendName)
+        : T('lobby.linkCopied', '¡Link copiado!'));
+    }
+  }
+
+  let _pendingJoinCode = null;
+  function tryPendingJoin() {
+    if (!_pendingJoinCode) return;
+    if (!window._accountLoggedIn || !window._sbUserId) return; // se reintenta al loguear
+    const code = _pendingJoinCode;
+    _pendingJoinCode = null;
+    (async () => {
+      try {
+        await window.LB.joinByCode(code);
+        if (typeof window.showVersusPanel === 'function') window.showVersusPanel();
+        if (typeof window.versusGoTo === 'function') window.versusGoTo('lobby');
+        enterLobby();
+      } catch (e) {
+        const msg = e && e.message === 'started'
+          ? T('lobby.started', 'La partida ya empezó')
+          : T('lobby.notFound', 'Sala no encontrada');
+        if (typeof window.showVersusToast === 'function') window.showVersusToast(msg);
+      }
+    })();
+  }
+  window.tryPendingLobbyJoin = tryPendingJoin;
+
+  // Restaura mi sala en espera al iniciar sesión (para que aparezca "Mi sala")
+  async function tryRestore() {
+    try {
+      const lobby = await window.LB.restoreActive();
+      if (lobby) enterLobby(); // cablea callbacks y renderiza (oculto hasta abrir)
+    } catch (e) {}
+  }
+  window.tryRestoreLobby = tryRestore;
+
+  // ── Popup de invitar amigos (con cooldown de 30s por amigo) ─────────────────────
+  const INVITE_COOLDOWN_MS = 30000;
+  const _inviteCooldowns = {}; // friendId → timestamp de expiración
+
+  function _setInviteBtnCooldown(btn, friendId) {
+    const until = _inviteCooldowns[friendId] || 0;
+    const remain = Math.ceil((until - Date.now()) / 1000);
+    if (remain <= 0) {
+      btn.disabled = false;
+      btn.classList.remove('disabled');
+      btn.textContent = T('lobby.invite', '+ Invitar');
+      return false;
+    }
+    btn.disabled = true;
+    btn.classList.add('disabled');
+    btn.textContent = T('lobby.disabled', 'Inhabilitado') + ' ' + remain + 's';
+    clearTimeout(btn._cdT);
+    btn._cdT = setTimeout(() => _setInviteBtnCooldown(btn, friendId), 1000);
+    return true;
+  }
+
+  function _openInvitePopup() {
+    const pop   = document.getElementById('lobby-invite-popup');
+    const list  = document.getElementById('lobby-invite-list');
+    const empty = document.getElementById('lobby-invite-empty');
+    if (!pop || !list) return;
+    list.innerHTML = '';
+    const friends = (typeof getFriends === 'function') ? getFriends() : [];
+    const memberIds = new Set(window.LB.getMembers().map(m => m.id));
+    const statusOf = f => (typeof getStatusObj === 'function')
+      ? getStatusObj(f).cls
+      : ((f.last_active && (Date.now() - new Date(f.last_active)) / 1000 < 120) ? (f.is_playing ? 'playing' : 'online') : 'offline');
+    // Mostrar conectados Y jugando (como en social); ocultar offline.
+    const shown = friends.filter(f => statusOf(f) !== 'offline');
+    if (!shown.length) {
+      if (empty) empty.style.display = 'block';
+    } else {
+      if (empty) empty.style.display = 'none';
+      shown.forEach(f => {
+        const inRoom  = memberIds.has(f.id);
+        const playing = statusOf(f) === 'playing';
+        const statusTxt = playing ? T('social.playing', 'Jugando') : T('versus.online', 'Conectado');
+        const row = document.createElement('div');
+        row.className = 'versus-friend-row' + (playing ? ' playing' : '');
+        const btnHtml = inRoom
+          ? `<button class="versus-challenge-btn disabled" disabled>${T('lobby.inRoom', 'En la sala')}</button>`
+          : `<button class="versus-challenge-btn" data-id="${f.id}" data-name="${f.name}">${T('lobby.invite', '+ Invitar')}</button>`;
+        row.innerHTML =
+          `<img class="versus-friend-avatar" src="${f.avatar || 'images/profilepic/ppdefault.png'}" draggable="false" oncontextmenu="return false">` +
+          `<div class="versus-friend-info"><span class="versus-friend-name">${f.name}</span>` +
+          `<span class="versus-friend-status${playing ? ' playing' : ''}"><span class="versus-friend-dot${playing ? ' playing' : ''}"></span>${statusTxt}</span></div>` +
+          btnHtml;
+        list.appendChild(row);
+      });
+      list.querySelectorAll('.versus-challenge-btn[data-id]').forEach(btn => {
+        _setInviteBtnCooldown(btn, btn.dataset.id); // aplicar cooldown si sigue activo
+        btn.addEventListener('click', () => {
+          if (btn.disabled) return;
+          if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+          const fid = btn.dataset.id;
+          const myName = localStorage.getItem('playerName') || T('lobby.someone', 'Alguien');
+          window.LB.sendInvite(fid, { code: window.LB.getCode(), lobbyId: window.LB.getId(), fromName: myName });
+          if (typeof window.showVersusToast === 'function') {
+            window.showVersusToast(T('lobby.sentInvite', 'Invitación enviada a {name}').replace('{name}', btn.dataset.name));
+          }
+          _inviteCooldowns[fid] = Date.now() + INVITE_COOLDOWN_MS;
+          _setInviteBtnCooldown(btn, fid);
+        });
+      });
+    }
+    pop.style.display = 'flex';
+  }
+
+  // ── Notificación NO bloqueante arriba (genérica: invitaciones a sala y retos 1v1) ─
+  // La barra cuenta UNA sola vez (10s) desde que llega; entrar/salir de paneles NO la
+  // reinicia. ✓ acepta, ✗ rechaza, y al expirar se ejecuta el rechazo.
+  const NOTIF_MS = 10000;
+  let _notifTimer   = null;
+  let _notifAccept  = null;
+  let _notifDecline = null;
+  let _queuedNotif  = null;  // invitación recibida mientras jugaba → se muestra al volver
+
+  // Entregar la invitación encolada al terminar la partida (la llama _setPlaying(false))
+  window.flushQueuedInvite = function() {
+    if (_queuedNotif && !window._isPlaying && !window._lobbyActive && !window._vsActive) {
+      const o = _queuedNotif; _queuedNotif = null; showInviteNotif(o);
+    }
+  };
+
+  function _setInviteBadges(show) {
+    ['play-invite-badge', 'versus-invite-badge'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = show ? 'flex' : 'none';
+    });
+  }
+
+  // opts: { name, sub, onAccept, onDecline }  (onDecline también corre al expirar)
+  function showInviteNotif(opts) {
+    opts = opts || {};
+    // Si estoy jugando, encolar y entregar cuando termine la partida.
+    if (window._isPlaying || window._lobbyActive || window._vsActive) { _queuedNotif = opts; return; }
+    const banner = document.getElementById('lobby-invite-notif');
+    const bar    = document.getElementById('lobby-notif-bar');
+    if (!banner) return;
+    _notifAccept  = opts.onAccept  || null;
+    _notifDecline = opts.onDecline || null;
+    const nameEl = document.getElementById('lobby-notif-name');
+    if (nameEl) nameEl.textContent = opts.name || T('lobby.someone', 'Alguien');
+    const subEl = document.getElementById('lobby-notif-sub');
+    if (subEl) subEl.textContent = opts.sub || T('lobby.invitedYou', 'te invitó a su sala');
+    banner.style.display = 'block';
+    _setInviteBadges(true);
+    if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+    if (bar) {
+      bar.style.transition = 'none';
+      bar.style.width = '100%';
+      void bar.offsetWidth; // forzar reflow para que el 100% quede aplicado antes de animar
+      bar.style.transition = 'width ' + NOTIF_MS + 'ms linear';
+      bar.style.width = '0%';
+    }
+    clearTimeout(_notifTimer);
+    _notifTimer = setTimeout(() => { const d = _notifDecline; _dismissNotif(); if (d) d(); }, NOTIF_MS);
+  }
+  function _dismissNotif() {
+    const banner = document.getElementById('lobby-invite-notif');
+    if (banner) {
+      banner.classList.add('leaving');
+      setTimeout(() => { banner.style.display = 'none'; banner.classList.remove('leaving'); }, 300);
+    }
+    _setInviteBadges(false);
+    clearTimeout(_notifTimer);
+    _notifAccept = _notifDecline = null;
+  }
+  window.showInviteNotif = showInviteNotif;
+  window.dismissInviteNotif = _dismissNotif; // p. ej. cuando el host cancela el reto
+
+  // Invitación a sala (grupo): usa el banner genérico
+  function showIncomingInvite(payload) {
+    if (!payload || !payload.code) return;
+    showInviteNotif({
+      name: payload.fromName,
+      sub:  T('lobby.invitedYou', 'te invitó a su sala'),
+      onAccept: async () => {
+        try {
+          await window.LB.joinByCode(payload.code);
+          if (typeof window.showVersusPanel === 'function') window.showVersusPanel();
+          if (typeof window.versusGoTo === 'function') window.versusGoTo('lobby');
+          enterLobby();
+        } catch (e) {
+          const msg = (e && e.message === 'started') ? T('lobby.started', 'La partida ya empezó') : T('lobby.notFound', 'Sala no encontrada');
+          if (typeof window.showVersusToast === 'function') window.showVersusToast(msg);
+        }
+      },
+    });
+  }
+  window.showLobbyIncomingInvite = showIncomingInvite;
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('lobby-notif-accept')?.addEventListener('click', () => {
+      if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+      const a = _notifAccept; _dismissNotif(); if (a) a();
+    });
+    document.getElementById('lobby-notif-decline')?.addEventListener('click', () => {
+      if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+      const d = _notifDecline; _dismissNotif(); if (d) d();
+    });
+  });
+
+  // Mantener el popup de invitar al día con el estado real de los amigos (conectado/
+  // jugando/en la sala), igual que el panel social. Se re-renderiza con cada refresco.
+  if (typeof onFriendsUpdate === 'function') {
+    onFriendsUpdate(() => {
+      const p = document.getElementById('lobby-invite-popup');
+      if (p && p.style.display !== 'none') _openInvitePopup();
+    });
+  }
+
+  return { enterLobby, loadPublicList, tryPendingJoin, tryRestore, showIncomingInvite, showInviteNotif };
+})();

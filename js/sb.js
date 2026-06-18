@@ -83,6 +83,19 @@ window.sbSaveScores = async function(userId, scores) {
   }
 };
 
+// Registra el resultado de una partida versus en el perfil propio (W o L).
+// Cada cliente actualiza SOLO su propio record según su resultado.
+window.sbRecordVersusResult = async function(userId, won) {
+  const profile = await window.sbGetProfile(userId);
+  const updates = won
+    ? { vs_wins:   (profile.vs_wins   || 0) + 1 }
+    : { vs_losses: (profile.vs_losses || 0) + 1 };
+  await window.sbUpdateProfile(userId, updates);
+  // Mantener la caché local al día para reflejarlo en el perfil sin recargar
+  if (window._sbProfile) Object.assign(window._sbProfile, updates);
+  return updates;
+};
+
 // ── AMIGOS ────────────────────────────────────────────────────────────────────
 
 window.sbGetFriends = async function(userId) {
@@ -191,8 +204,8 @@ window.sbUploadAvatar = async function(userId, blob) {
 window.sbLoadSocialData = async function(userId) {
   const { data, error } = await sb.from('friendships')
     .select(`id, status, initiated_by, user_a, user_b,
-      pa:user_a(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing),
-      pb:user_b(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing)`)
+      pa:user_a(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing,vs_wins,vs_losses),
+      pb:user_b(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing,vs_wins,vs_losses)`)
     .or(`user_a.eq.${userId},user_b.eq.${userId}`);
   if (error) throw error;
   function toEntry(row) {
@@ -207,6 +220,7 @@ window.sbLoadSocialData = async function(userId) {
       play_count: p.play_count||0,
       last_active: p.last_active || null,
       is_playing: p.is_playing || false,
+      vs_wins: p.vs_wins||0, vs_losses: p.vs_losses||0,
     };
   }
   const rows = data || [];

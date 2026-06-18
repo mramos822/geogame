@@ -89,6 +89,7 @@
 <div class="loading-actions" id="loading-actions">
       <div class="loading-play-single" id="loading-play-single">
         <img src="images/buttons/es-play.png" alt="Jugar" draggable="false" oncontextmenu="return false">
+        <div class="social-notif-badge" id="play-invite-badge" style="display:none">!</div>
       </div>
       <div class="loading-secondary-btns">
         <div class="loading-secondary-btn" id="loading-social-btn">
@@ -125,6 +126,7 @@
     </div>
 
     <span class="loading-play-count" id="loading-play-count"></span>
+    <span class="loading-vs-record" id="loading-vs-record"></span>
     <div class="loading-games-col">
       <span class="loading-games-title" data-i18n="common.average">Promedio</span>
       <div class="loading-games-row">
@@ -208,6 +210,7 @@
     </div>
     <div class="loading-panel2-versus" id="loading-panel2-versus" style="display:none">
       <img src="images/buttons/es-versus.png" alt="Versus" draggable="false" oncontextmenu="return false">
+      <div class="social-notif-badge" id="versus-invite-badge" style="display:none">!</div>
     </div>
     <div class="loading-panel2-practice" id="loading-panel2-practice" style="display:none">
       <img src="images/buttons/es-practice.png" alt="Practice" draggable="false" oncontextmenu="return false">
@@ -216,6 +219,146 @@
       <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
       <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
     </div>
+    <!-- ── PANEL 4: VERSUS ───────────────────────────────────────────────── -->
+    <div id="loading-versus-group" class="table-gone">
+      <img class="practice-table-img" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
+      <div class="practice-titlebar">
+        <span class="loading-social-title">Gira Competitiva</span>
+      </div>
+      <span class="versus-subtitle" id="versus-subtitle"></span>
+      <div class="practice-back-wrap" id="versus-back-wrap">
+        <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+        <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+
+      <!-- ROOT: Amistoso / Competitivo -->
+      <div class="versus-screen" id="versus-screen-root">
+        <button class="versus-menu-btn" id="versus-btn-amistoso" type="button">
+          <span class="versus-menu-title" data-i18n="versus.friendly">Versus Amistoso</span>
+          <span class="versus-menu-desc" data-i18n="versus.friendlyDesc">Juega con amigos o gente al azar</span>
+        </button>
+        <button class="versus-menu-btn versus-menu-disabled" id="versus-btn-competitivo" type="button" disabled>
+          <span class="versus-menu-title" data-i18n="versus.competitive">Versus Competitivo</span>
+          <span class="versus-menu-soon" data-i18n="versus.soon">Próximamente</span>
+        </button>
+      </div>
+
+      <!-- AMISTOSO: Amigos / Grupo / Aleatorio -->
+      <div class="versus-screen" id="versus-screen-amistoso" style="display:none">
+        <button class="versus-menu-btn" id="versus-btn-amigos" type="button">
+          <span class="versus-menu-title" data-i18n="versus.friends">Amigos</span>
+          <span class="versus-menu-desc" data-i18n="versus.friendsDesc">Reta a un amigo conectado (1v1)</span>
+        </button>
+        <button class="versus-menu-btn" id="versus-btn-grupo" type="button">
+          <span class="versus-menu-title" data-i18n="versus.group">Grupo</span>
+          <span class="versus-menu-desc" data-i18n="versus.groupDesc">Sala privada de hasta 10</span>
+        </button>
+        <button class="versus-menu-btn" id="versus-btn-aleatorio" type="button">
+          <span class="versus-menu-title" data-i18n="versus.random">Aleatorio</span>
+          <span class="versus-menu-desc" data-i18n="versus.randomDesc">Únete a salas públicas</span>
+        </button>
+      </div>
+
+      <!-- AMIGOS: reto 1v1 directo -->
+      <div class="versus-screen" id="versus-screen-amigos" style="display:none">
+        <div id="versus-friends-list"></div>
+        <div id="versus-empty-msg" class="versus-empty-msg" data-i18n="versus.noneOnline">No hay amigos conectados ahora.</div>
+      </div>
+
+      <!-- GRUPO: crear/unirse privado -->
+      <div class="versus-screen" id="versus-screen-grupo" style="display:none">
+        <button class="versus-menu-btn" id="versus-btn-create-private" type="button">
+          <span class="versus-menu-title" data-i18n="lobby.createRoom">Crear sala</span>
+          <span class="versus-menu-desc" data-i18n="lobby.createRoomDesc">Pública por defecto · podés privatizarla adentro</span>
+        </button>
+        <div class="versus-join-box">
+          <span class="versus-join-label" data-i18n="lobby.joinByCode">Unirse con un código</span>
+          <div class="versus-join-row">
+            <input id="versus-join-code" class="versus-code-input" type="text" maxlength="6" placeholder="ABC123" autocomplete="off" spellcheck="false">
+            <button id="versus-btn-join-code" class="versus-challenge-btn" type="button" data-i18n="lobby.join">Unirse</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ALEATORIO: lista de salas públicas -->
+      <div class="versus-screen" id="versus-screen-aleatorio" style="display:none">
+        <button class="versus-menu-btn versus-menu-btn-sm" id="versus-btn-create-public" type="button">
+          <span class="versus-menu-title" data-i18n="lobby.createPublic">Crear sala pública</span>
+        </button>
+        <div id="versus-public-list" class="versus-list-box"></div>
+        <div id="versus-public-empty" class="versus-empty-msg" data-i18n="lobby.noRooms">No hay salas abiertas ahora.</div>
+      </div>
+
+      <!-- LOBBY -->
+      <div class="versus-screen" id="versus-screen-lobby" style="display:none">
+        <div class="lobby-name-row" id="lobby-name-row">
+          <span class="lobby-name-text" id="lobby-name-text"></span>
+          <button class="lobby-name-edit-btn" id="lobby-name-edit-btn" type="button" style="display:none" aria-label="Editar nombre">✎</button>
+          <input id="lobby-name-input" class="lobby-name-input" type="text" maxlength="22" autocomplete="off" spellcheck="false" placeholder="Nombre de la sala" style="display:none">
+          <button class="lobby-name-confirm-btn" id="lobby-name-confirm-btn" type="button" style="display:none" aria-label="Confirmar nombre">✓</button>
+        </div>
+        <div class="lobby-topbar">
+          <div class="lobby-code-wrap" id="lobby-code-copy" title="Copiar código">
+            <span class="lobby-code-label" data-i18n="lobby.code">Código:</span>
+            <span class="lobby-code" id="lobby-code">------</span>
+            <span class="lobby-code-copy-icon">⧉</span>
+          </div>
+          <span class="lobby-count" id="lobby-count">0/10</span>
+          <button class="lobby-visibility-btn" id="lobby-visibility-btn" type="button" style="display:none"></button>
+          <button class="versus-challenge-btn lobby-invite-btn" id="lobby-invite-btn" type="button" data-i18n="lobby.invite">+ Invitar</button>
+        </div>
+        <div id="lobby-members" class="versus-list-box"></div>
+        <div class="lobby-footer">
+          <span class="lobby-wait-msg" id="lobby-wait-msg" data-i18n="lobby.waitingHost">Esperando que el host empiece…</span>
+          <span class="lobby-countdown" id="lobby-countdown" style="display:none"></span>
+          <button class="versus-start-btn" id="lobby-start-btn" type="button" data-i18n="lobby.start">Empezar</button>
+          <button class="versus-start-btn lobby-cancel-btn" id="lobby-cancel-btn" type="button" style="display:none" data-i18n="lobby.cancel">Cancelar</button>
+          <button class="versus-challenge-btn lobby-notready-btn" id="lobby-notready-btn" type="button" style="display:none" data-i18n="lobby.notReady">No estoy listo</button>
+          <button class="versus-challenge-btn lobby-leave-btn" id="lobby-leave-btn" type="button" data-i18n="lobby.leave">Salir</button>
+        </div>
+      </div>
+
+      <button class="versus-return-lobby" id="versus-return-lobby" type="button" style="display:none">
+        <span>↩</span><span data-i18n="lobby.myRoom">Mi sala</span>
+      </button>
+
+      <div id="versus-toast" class="versus-toast"></div>
+    </div>
+
+    <!-- Popup: invitación saliente (host espera) -->
+    <div id="vs-outgoing-popup" class="vs-popup-overlay" style="display:none">
+      <div class="vs-popup-box">
+        <img class="vs-popup-pic" id="vs-out-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
+        <span class="vs-popup-name" id="vs-out-name"></span>
+        <span class="vs-popup-sub">Esperando respuesta…</span>
+        <div class="vs-popup-timer-wrap"><div class="vs-popup-timer-bar" id="vs-out-bar"></div></div>
+        <div class="vs-popup-confirm" id="vs-out-cancel">
+          <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+          <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+        </div>
+      </div>
+    </div>
+
+    <!-- Popup: invitación entrante (guest acepta/rechaza) -->
+    <div id="vs-incoming-popup" class="vs-popup-overlay" style="display:none">
+      <div class="vs-popup-box">
+        <img class="vs-popup-pic" id="vs-in-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
+        <span class="vs-popup-name" id="vs-in-name"></span>
+        <span class="vs-popup-sub">¡Te retó a Gira Competitiva!</span>
+        <div class="vs-popup-timer-wrap"><div class="vs-popup-timer-bar" id="vs-in-bar"></div></div>
+        <div class="vs-incoming-btns">
+          <div class="vs-popup-confirm vs-accept-btn" id="vs-in-accept">
+            <img src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
+            <img src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
+          </div>
+          <div class="vs-popup-confirm vs-decline-btn" id="vs-in-decline">
+            <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+            <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ── PANEL 3: PRACTICE TOUR ─────────────────────────────────────────── -->
     <div id="loading-practice-group" style="display:none">
       <!-- Mesa (igual posición/tamaño que el panel de perfil) -->
@@ -671,6 +814,7 @@
       <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
     </div>
     <span class="loading-play-count" id="loading-friend-play-count"></span>
+    <span class="loading-vs-record" id="loading-friend-vs-record"></span>
     <div class="loading-games-col">
       <span class="loading-games-title" data-i18n="common.average">Promedio</span>
       <div class="loading-games-row">
@@ -822,7 +966,88 @@
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
     </div>
-    <div id="loading-version">Ver. 2.6.63</div>
+    <div id="loading-version">Ver. 2.6.64</div>
+  </div>
+
+  <!-- Pantalla de resultado versus (W/L) — fuera del loading-screen para verse tras la partida -->
+  <div id="vs-result-screen" class="vs-popup-overlay" style="display:none">
+    <div class="vs-popup-box">
+      <span class="vs-result-title" id="vs-result-title"></span>
+      <span class="vs-popup-sub" id="vs-result-sub" style="display:none"></span>
+      <div class="vs-result-scores">
+        <div class="vs-result-side">
+          <img class="vs-result-pic" id="vs-result-me-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="vs-result-name" id="vs-result-me-name">Tú</span>
+          <span class="vs-result-score" id="vs-result-me-score">0</span>
+        </div>
+        <span class="vs-result-vs">VS</span>
+        <div class="vs-result-side">
+          <img class="vs-result-pic" id="vs-result-opp-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="vs-result-name" id="vs-result-opp-name"></span>
+          <span class="vs-result-score" id="vs-result-opp-score">0</span>
+        </div>
+      </div>
+      <div class="vs-popup-confirm" id="vs-result-back">
+        <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+        <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+    </div>
+  </div>
+
+  <!-- Ranking de resultado del lobby (grupal) -->
+  <div id="lobby-result-screen" class="vs-popup-overlay" style="display:none">
+    <div class="vs-popup-box">
+      <span class="vs-result-title" id="lobby-result-title"></span>
+      <div id="lobby-result-list" class="lobby-result-list"></div>
+      <div class="vs-popup-confirm" id="lobby-result-back">
+        <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+        <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirmación genérica del versus (p. ej. crear sala teniendo una activa) -->
+  <div id="versus-confirm-popup" class="vs-popup-overlay" style="display:none">
+    <div class="vs-popup-box">
+      <span class="vs-popup-sub" id="versus-confirm-msg"></span>
+      <div class="vs-incoming-btns">
+        <div class="vs-popup-confirm vs-accept-btn" id="versus-confirm-yes">
+          <img src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
+          <img src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
+        </div>
+        <div class="vs-popup-confirm vs-decline-btn" id="versus-confirm-no">
+          <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+          <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notificación (no bloqueante) de invitación a sala: baja desde arriba con barra de 10s -->
+  <div id="lobby-invite-notif" class="lobby-invite-notif" style="display:none">
+    <div class="lobby-notif-row">
+      <div class="lobby-notif-text">
+        <span class="lobby-notif-name" id="lobby-notif-name"></span>
+        <span class="lobby-notif-sub" id="lobby-notif-sub" data-i18n="lobby.invitedYou">te invitó a su sala</span>
+      </div>
+      <button class="lobby-notif-btn accept" id="lobby-notif-accept" type="button" aria-label="Aceptar">✓</button>
+      <button class="lobby-notif-btn decline" id="lobby-notif-decline" type="button" aria-label="Rechazar">✕</button>
+    </div>
+    <div class="lobby-notif-bar"><div class="lobby-notif-bar-fill" id="lobby-notif-bar"></div></div>
+  </div>
+
+  <!-- Popup: invitar amigos a la sala -->
+  <div id="lobby-invite-popup" class="vs-popup-overlay" style="display:none">
+    <div class="vs-popup-box lobby-invite-box">
+      <span class="vs-popup-name" data-i18n="lobby.inviteTitle">Invitar amigos</span>
+      <button class="versus-start-btn lobby-copylink-btn" id="lobby-copylink-btn" type="button" data-i18n="lobby.copyLink">Copiar link</button>
+      <div id="lobby-invite-list" class="versus-list-box lobby-invite-list"></div>
+      <div id="lobby-invite-empty" class="versus-empty-inline" data-i18n="versus.noneOnline" style="display:none">No hay amigos conectados ahora.</div>
+      <div class="vs-popup-confirm" id="lobby-invite-close">
+        <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+        <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+    </div>
   </div>
 
   <div id="splash-screen" class="game-bg-screen" style="display:none">
@@ -1105,6 +1330,7 @@
 
   </div>
 
+
   <div id="flags-countdown-widget">
     <img src="images/countdown2.png" alt="">
     <div id="flags-timer-number">60</div>
@@ -1254,6 +1480,8 @@
   <script src="js/countries.js"></script>
   <script src="js/places.js"></script>
   <script src="js/friends.js"></script>
+  <script src="js/vs.js"></script>
+  <script src="js/lobby.js"></script>
   <script src="js/monuments.js"></script>
   <script src="js/flags.js"></script>
   <script src="js/shapes.js"></script>

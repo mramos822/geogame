@@ -158,6 +158,7 @@ function showFlagsMode() {
     flagsIsFirstRound = true;
     flagsAnswered = new Set();
     flagsLastChosen = null;
+    if (_flagsSyncedVersus()) flagsVsIndex = 0;
     if (window.practiceConfig && window.practiceConfig.active) {
       // Reiniciar desbloqueos para que la primera ronda siempre empiece en inicio
       flagsEasyUnlocked = false; flagsMediumUnlocked = false;
@@ -280,6 +281,35 @@ let flagsCorrectCount = 0;
 let flagsIsFirstRound = true;
 let flagsAnswered = new Set();
 let flagsLastChosen = null;
+
+// ── RNG SEMBRADO PARA VERSUS ──────────────────────────────────────────────────
+// En versus, la selección de bandera/distractores/slots debe ser idéntica para
+// ambos jugadores. Para eso usamos un RNG dedicado (solo lo consume la selección),
+// independiente de cualquier otra llamada a Math.random (animaciones, emotes, etc.)
+// que ocurriría en distinto orden en cada cliente y desincronizaría todo.
+let flagsVsIndex = 0;          // índice de ronda compartido (mismo en ambos)
+let _flagsSeededRand = null;   // generador determinista (null ⇒ usa Math.random)
+function _flagsSyncedVersus() { return window._vsActive || window._lobbyActive; }
+function flagsRand() { return (_flagsSyncedVersus() && _flagsSeededRand) ? _flagsSeededRand() : Math.random(); }
+function flagsShuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(flagsRand() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+window.flagsSetSeed = function(seed) {
+  let s = (seed >>> 0) || 1;
+  _flagsSeededRand = function() {
+    s = (s + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  flagsVsIndex = 0;
+};
+window.flagsClearSeed = function() { _flagsSeededRand = null; flagsVsIndex = 0; };
+
 let flagsPracticePool = [];
 let flagsPracticeRemaining = [];
 let flagsPracticeCurrent = null;
@@ -380,6 +410,29 @@ const FLAGS_LB_GAP     = 4;
 // Amigos desde la capa de datos compartida (js/friends.js -> getFriends()),
 // la misma que usan la barra de monuments y las pantallas results/final.
 function buildFlagsFriendPlayers() {
+  // En modo lobby el leaderboard muestra a TODOS los rivales de la sala, en vivo.
+  if (window._lobbyActive && Array.isArray(window._lobbyMembers)) {
+    return window._lobbyMembers.map((m, i) => ({
+      id: 'lob' + m.id,
+      name: m.name,
+      score: m.score || 0,
+      avatar: m.avatar || '',
+      color: FLAGS_LB_COLORS[i % FLAGS_LB_COLORS.length],
+      initial: (m.name && m.name[0]) ? m.name[0].toUpperCase() : '?',
+    }));
+  }
+  // En modo versus 1v1 el leaderboard compite SOLO contra el oponente, en vivo.
+  if (window._vsActive && window._vsOpponent) {
+    const o = window._vsOpponent;
+    return [{
+      id: 'vsopp',
+      name: o.name,
+      score: window._vsOppScore || 0,
+      avatar: o.avatar || '',
+      color: FLAGS_LB_COLORS[0],
+      initial: (o.name && o.name[0]) ? o.name[0].toUpperCase() : '?',
+    }];
+  }
   const src = (typeof getFriends === 'function') ? getFriends() : [];
   return src.map((f, i) => ({
     id: `friend${i}`,
@@ -451,7 +504,7 @@ function initFlagsLeaderboard() {
 // Si la lista de amigos cambia (datos reales del servidor) mientras se juega flags,
 // reconstruir su barra. Fuera de flags se reconstruye sola al iniciar la partida.
 if (typeof onFriendsUpdate === 'function') {
-  onFriendsUpdate(() => { if (flagsRunning) initFlagsLeaderboard(); });
+  onFriendsUpdate(() => { if (flagsRunning && !_flagsSyncedVersus()) initFlagsLeaderboard(); });
 }
 
 function flagsPositionLeaderboard(playerScore, animate) {
@@ -486,11 +539,16 @@ function flagsPositionLeaderboard(playerScore, animate) {
   let windowEnd   = Math.min(all.length, windowStart + FLAGS_LB_WINDOW);
   windowStart     = Math.max(0, windowEnd - FLAGS_LB_WINDOW);
 
+  // Anclar las filas ABAJO: si hay menos filas que la ventana (p.ej. versus = 2),
+  // empujarlas hacia el fondo en vez de dejarlas flotando arriba con hueco abajo.
+  const visibleRows  = windowEnd - windowStart;
+  const bottomOffset = Math.max(0, FLAGS_LB_WINDOW - visibleRows) * rowH;
+
   if (!animate) Object.values(flagsLbElements).forEach(el => { el.style.transition = 'none'; });
 
   all.forEach((p, rank) => {
     const el = flagsLbElements[`flags-lb-${p.id}`];
-    if (el) el.style.top = ((rank - windowStart) * rowH) + 'px';
+    if (el) el.style.top = ((rank - windowStart) * rowH + bottomOffset) + 'px';
   });
 
   const scoreEl = flagsLbElements['flags-lb-player']?.querySelector('.lb-score');
@@ -508,6 +566,34 @@ function sortFlagsLeaderboard(playerScore) {
   }
   flagsPositionLeaderboard(playerScore, true);
 }
+
+// Versus: actualizar el score del oponente en el leaderboard y reordenar con animación
+// (misma animación de adelantamiento/emotes que la barra de amigos normal).
+function flagsSetVsOpponentScore(score) {
+  window._vsOppScore = score;
+  const opp = flagsMockPlayers.find(p => p.id === 'vsopp');
+  if (!opp) return;
+  opp.score = score;
+  const el = flagsLbElements['flags-lb-vsopp'];
+  if (el) { const s = el.querySelector('.lb-score'); if (s) s.textContent = score.toLocaleString(); }
+  flagsPositionLeaderboard(flagsLastLbScore >= 0 ? flagsLastLbScore : 0, true);
+}
+window.flagsSetVsOpponentScore = flagsSetVsOpponentScore;
+
+// Lobby: refrescar el score en vivo de TODOS los rivales y reordenar con animación.
+function flagsSetLobbyScores(members) {
+  if (!Array.isArray(members)) return;
+  members.forEach(m => {
+    const p = flagsMockPlayers.find(x => x.id === 'lob' + m.id);
+    if (p) {
+      p.score = m.score || 0;
+      const el = flagsLbElements['flags-lb-lob' + m.id];
+      if (el) { const s = el.querySelector('.lb-score'); if (s) s.textContent = (m.score || 0).toLocaleString(); }
+    }
+  });
+  flagsPositionLeaderboard(flagsLastLbScore >= 0 ? flagsLastLbScore : 0, true);
+}
+window.flagsSetLobbyScores = flagsSetLobbyScores;
 
 const flagsProgressContainer = document.getElementById('flags-progress-dots');
 const flagsProgressDots      = flagsProgressContainer ? flagsProgressContainer.querySelectorAll('.dot') : [];
@@ -735,6 +821,20 @@ function startFlagsRound() {
   if (document.body.classList.contains('recording-mode')) {
     return startFlagsRoundRecording();
   }
+  // Versus: la dificultad/desbloqueos se rigen por el índice de ronda COMPARTIDO,
+  // no por los aciertos individuales, así ambos jugadores ven la MISMA bandera en
+  // la misma ronda aunque uno vaya ganando.
+  if (_flagsSyncedVersus()) {
+    flagsIsFirstRound   = flagsVsIndex === 0;
+    flagsEasyUnlocked   = flagsVsIndex >= 1;
+    flagsSixUnlocked    = flagsVsIndex >= 3;
+    flagsMediumUnlocked = flagsVsIndex >= 8;
+    flagsHardUnlocked   = flagsVsIndex >= 17;
+    flagsInsaneUnlocked = flagsVsIndex >= 30;
+    flagsGroupIds = flagsSixUnlocked
+      ? [...flagsTopGroupIds, ...flagsBottomGroupIds]
+      : flagsTopGroupIds.slice();
+  }
   // Reset findluggage to initial position and restart scroll animation
   flagsFindLuggage.style.transition = '';
   flagsFindLuggage.style.animation  = 'none';
@@ -841,8 +941,11 @@ function startFlagsRound() {
       wp = [...Array(partsA).fill(rA).flat(), ...Array(partsB).fill(rB).flat()];
     }
     if (!wp.length) wp = fullPool;
-    return wp[Math.floor(Math.random() * wp.length)];
+    return wp[Math.floor(flagsRand() * wp.length)];
   }
+
+  // En versus/lobby la curva de dificultad la marca el índice de ronda compartido.
+  const selCount = _flagsSyncedVersus() ? flagsVsIndex : flagsCorrectCount;
 
   let chosen;
   if (window.practiceConfig && window.practiceConfig.active) {
@@ -859,20 +962,20 @@ function startFlagsRound() {
     chosen = flagsPracticeCurrent;
   } else if (flagsInsaneUnlocked) {
     // insane vs hard+lower — 1:5 at 30 → 5:1 at 50
-    const insaneParts = Math.min(Math.floor((flagsCorrectCount - 30) / 5) + 1, 5);
+    const insaneParts = Math.min(Math.floor((selCount - 30) / 5) + 1, 5);
     const lowerParts  = Math.max(6 - insaneParts, 1);
     const lowerPool   = [...easyInitPool, ...mediumCountries, ...hardCountries];
     chosen = weightedPick(insaneParts, insaneCountries, lowerParts, lowerPool);
   } else if (flagsHardUnlocked) {
     // hard vs medium+easy+inicio — 1:5 at 17 → 5:1 at 37
-    const hardParts  = Math.min(Math.floor((flagsCorrectCount - 17) / 5) + 1, 5);
+    const hardParts  = Math.min(Math.floor((selCount - 17) / 5) + 1, 5);
     const lowerParts = Math.max(6 - hardParts, 1);
     const lowerPool  = [...easyInitPool, ...mediumCountries];
     chosen = weightedPick(hardParts, hardCountries, lowerParts, lowerPool);
   } else if (flagsMediumUnlocked) {
     // medium vs easy+inicio
     // 1:5 at 3 correct → 5:1 at 15 correct
-    const mediumParts = Math.min(Math.floor((flagsCorrectCount - 8) / 3) + 1, 5);
+    const mediumParts = Math.min(Math.floor((selCount - 8) / 3) + 1, 5);
     const easyParts   = Math.max(6 - mediumParts, 1);
     chosen = weightedPick(mediumParts, mediumCountries, easyParts, easyInitPool);
   } else {
@@ -883,10 +986,13 @@ function startFlagsRound() {
     if (!chosenPool.length) {
       chosenPool = [...(COUNTRIES.inicio || []), ...(COUNTRIES.easy || [])].filter(c => COUNTRY_FLAGS[c]);
     }
-    chosen = chosenPool[Math.floor(Math.random() * chosenPool.length)];
+    chosen = chosenPool[Math.floor(flagsRand() * chosenPool.length)];
   }
   if (!chosen) return; // pool completamente vacía, no iniciar ronda
   flagsLastChosen = chosen;
+  // Versus: registrar la bandera mostrada y avanzar el índice compartido, así la
+  // lista de exclusión y la dificultad quedan idénticas en todos los clientes.
+  if (_flagsSyncedVersus()) { flagsAnswered.add(chosen); flagsVsIndex++; }
   flagsFlagidLabel.textContent = (typeof tCountry === 'function') ? tCountry(chosen) : chosen;
   // Ajustar tamaño si el nombre es largo. Todo en vmin para escalar con el
   // viewport igual que la imagen de flagid (49.4cqmin); maxW = 41.7cqmin en px.
@@ -907,7 +1013,7 @@ function startFlagsRound() {
   const _practiceContFilter2 = _inPractice
     ? c => COUNTRY_FLAGS[c] && window.practiceConfig.continents.has(FLAG_COUNTRY_CONTINENT[c])
     : () => true;
-  const useSimilar = !_inPractice && flagsCorrectCount >= 35 && FLAG_SIMILAR[chosen];
+  const useSimilar = !_inPractice && selCount >= 35 && FLAG_SIMILAR[chosen];
   const similarAvailable = useSimilar
     ? [...(FLAG_SIMILAR[chosen] || [])].filter(c => COUNTRY_FLAGS[c] && c !== chosen)
     : [];
@@ -933,22 +1039,21 @@ function startFlagsRound() {
   } else {
     _distractorBase = fullPool;
   }
-  const nonsimilar = _distractorBase.filter(c => c !== chosen && !similarAvailable.includes(c)).sort(() => Math.random() - 0.5);
-  similarAvailable.sort(() => Math.random() - 0.5);
+  const nonsimilar = flagsShuffle(_distractorBase.filter(c => c !== chosen && !similarAvailable.includes(c)));
+  flagsShuffle(similarAvailable);
   // Fill distractors with similars first, then pad with filtered pool, then pad with easy (continent-filtered in practice)
   let distractorPool = [...similarAvailable, ...nonsimilar];
   if (distractorPool.length < flagsGroupIds.length - 1) {
     const fallbackBase = _inPractice
       ? _distractorBase
       : [...(COUNTRIES.inicio || []), ...(COUNTRIES.easy || [])];
-    const globalEasy = fallbackBase
-      .filter(c => COUNTRY_FLAGS[c] && c !== chosen && !distractorPool.includes(c) && _practiceContFilter2(c))
-      .sort(() => Math.random() - 0.5);
+    const globalEasy = flagsShuffle(fallbackBase
+      .filter(c => COUNTRY_FLAGS[c] && c !== chosen && !distractorPool.includes(c) && _practiceContFilter2(c)));
     distractorPool = [...distractorPool, ...globalEasy];
   }
 
   const slotCount = flagsGroupIds.length;
-  const correctSlot = Math.floor(Math.random() * slotCount);
+  const correctSlot = Math.floor(flagsRand() * slotCount);
 
   // Apply six-mode layout before animations so positions are correct when luggages drop
   if (flagsSixUnlocked) flagsLuggageWrap.classList.add('flags-six-mode');
@@ -1004,7 +1109,7 @@ function startFlagsRound() {
   clearFlagsElimination();
   const wrongSlots = [];
   for (let s = 0; s < slotCount; s++) if (s !== correctSlot) wrongSlots.push(s);
-  wrongSlots.sort(() => Math.random() - 0.5);
+  flagsShuffle(wrongSlots);
   const fadeSlot = (slotIdx) => {
     const g = document.getElementById(flagsGroupIds[slotIdx]);
     if (g) { g.classList.add('flags-faded'); g.style.pointerEvents = 'none'; g.style.cursor = 'default'; }
@@ -1143,6 +1248,8 @@ function startFlagsRound() {
         flagsScore += pts + speedBonus + inRowBonus;
         flagsAnimateScore();
         sortFlagsLeaderboard(flagsScore);
+        if (typeof window._vsReportAnswer === 'function') window._vsReportAnswer(true, Math.round(flagsScore));
+        if (typeof window._lobbyReportAnswer === 'function' && window._lobbyActive) window._lobbyReportAnswer(Math.round(flagsScore));
         if (typeof showScorePopup !== 'undefined') showScorePopup(pts + speedBonus);
         if (speedBonus > 0) {
           clearTimeout(flagsSpeedBonusHideId);
@@ -1156,6 +1263,8 @@ function startFlagsRound() {
         flagsIsFirstRound = false;
         flagsWrongCount++;
         if (typeof sfxError !== 'undefined') { sfxError.currentTime = 0; sfxPlay(sfxError); }
+        if (typeof window._vsReportAnswer === 'function') window._vsReportAnswer(false, Math.round(flagsScore));
+        if (typeof window._lobbyReportAnswer === 'function' && window._lobbyActive) window._lobbyReportAnswer(Math.round(flagsScore));
       }
       const overlay = document.getElementById(correct ? 'flags-check-overlay' : 'flags-wrong-overlay');
       if (overlay) {
@@ -1244,6 +1353,17 @@ function hideFlagsMode() {
 
   const finalScore = Math.round(flagsScore);
   window.lastModeScore = finalScore;
+
+  // ── LOBBY (grupal): ranking en vez del gameover normal ──
+  if (window._lobbyActive && typeof window._lobbyHandleGameEnd === 'function') {
+    window._lobbyHandleGameEnd(finalScore);
+    return;
+  }
+  // ── VERSUS 1v1: pantalla de resultado W/L en vez del gameover normal ──
+  if (window._vsActive && typeof window._vsHandleGameEnd === 'function') {
+    window._vsHandleGameEnd(finalScore);
+    return;
+  }
 
   // ── PRÁCTICA: redirigir al panel ──────────────────────────
   if (window.practiceConfig && window.practiceConfig.active) {
@@ -1379,6 +1499,7 @@ function flagsHardReset() {
 }
 window.gameStoppers = window.gameStoppers || [];
 window.gameStoppers.push(flagsHardReset);
+window.flagsHardReset = flagsHardReset;
 
 // ── TIMER ─────────────────────────────────────────────────────────────────────
 function startFlagsTimer() {
