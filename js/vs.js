@@ -23,6 +23,7 @@ window.VS = (() => {
   let _onScore   = null; // cb(hostScore, guestScore)
   let _onEnd     = null; // cb(winnerId)
   let _onOppLeft = null; // cb() — el rival se desconectó/abandonó
+  let _onWrong   = null; // cb() — el rival falló una pregunta
   let _pollId    = null;
   let _started   = false; // evita que _onStart se dispare más de una vez
   let _oppGoneTimer = null; // gracia antes de declarar abandono por presencia
@@ -48,8 +49,8 @@ window.VS = (() => {
       .channel('match-' + matchId, { config: { presence: { key: uid || 'anon' } } })
       .on('postgres_changes', {
         event: 'UPDATE', schema: 'public', table: 'matches',
+        filter: 'id=eq.' + matchId,
       }, payload => {
-        if (payload.new.id !== matchId) return;
         const m = payload.new;
         _match = m;
         if (m.status === 'active' && _onStart && !_started) { _started = true; _onStart(m); }
@@ -58,6 +59,15 @@ window.VS = (() => {
         if (m.status === 'abandoned' && _onOppLeft) { clearTimeout(_oppGoneTimer); _onOppLeft(); }
         if (m.status === 'active' && _onScore) _onScore(m.host_score, m.guest_score);
       })
+      // Score en tiempo real del rival: broadcast inmediato (no espera el WAL de postgres_changes)
+      .on('broadcast', { event: 'score' }, ({ payload }) => {
+        if (!payload || !_match) return;
+        if (_role === 'host') _match.guest_score = payload.score || 0;
+        else                  _match.host_score  = payload.score || 0;
+        if (_onScore) _onScore(_match.host_score, _match.guest_score);
+      })
+      // El rival falló → señal visual en mi pantalla
+      .on('broadcast', { event: 'wrong' }, () => { if (_onWrong) _onWrong(); })
       // Presencia: detecta cierre de pestaña / pérdida de conexión del rival.
       .on('presence', { event: 'leave' }, ({ key }) => {
         if (!key || key === uid) return; // el que se fue soy yo o un desconocido
@@ -89,17 +99,18 @@ window.VS = (() => {
       .channel('invites-' + uid)
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'matches',
+        filter: 'guest_id=eq.' + uid,
       }, payload => {
         const m = payload.new;
-        // Filtrar en cliente: solo invitaciones donde soy el guest
-        if (m.guest_id === uid && m.status === 'pending' && _onInvite) _onInvite(m);
+        if (m.status === 'pending' && _onInvite) _onInvite(m);
       })
       .on('postgres_changes', {
         event: 'UPDATE', schema: 'public', table: 'matches',
+        filter: 'guest_id=eq.' + uid,
       }, payload => {
         const m = payload.new;
         // El host canceló/expiró el reto antes de que yo respondiera → descartar la noti
-        if (m.guest_id === uid && (m.status === 'expired' || m.status === 'declined' || m.status === 'cancelled') && _onInviteCancel) _onInviteCancel(m);
+        if ((m.status === 'expired' || m.status === 'declined' || m.status === 'cancelled') && _onInviteCancel) _onInviteCancel(m);
       })
       .subscribe();
   }
@@ -173,8 +184,13 @@ window.VS = (() => {
   async function reportScore(score) {
     if (!_matchId || !_role) return;
     const field = _role === 'host' ? 'host_score' : 'guest_score';
-    await window.sb.from('matches')
-      .update({ [field]: score }).eq('id', _matchId);
+    // Broadcast inmediato para que el rival vea el score sin esperar el WAL
+    if (_channel) { try { _channel.send({ type: 'broadcast', event: 'score', payload: { score } }); } catch (e) {} }
+    await window.sb.from('matches').update({ [field]: score }).eq('id', _matchId);
+  }
+
+  function sendWrong() {
+    if (_channel) { try { _channel.send({ type: 'broadcast', event: 'wrong', payload: {} }); } catch (e) {} }
   }
 
   // ── Terminar partida (host cierra, decide winner) ──────────────────────────
@@ -206,7 +222,7 @@ window.VS = (() => {
     clearInterval(_pollId);
     clearTimeout(_oppGoneTimer);
     _matchId = _role = _match = null;
-    _onStart = _onScore = _onEnd = _onOppLeft = null;
+    _onStart = _onScore = _onEnd = _onOppLeft = _onWrong = null;
     _started = false;
     _restoreRandom();
   }
@@ -221,6 +237,7 @@ window.VS = (() => {
     abandon,
     cancelInvite,
     reportScore,
+    sendWrong,
     listenForInvites,
     stopListeningForInvites,
     cleanup,
@@ -228,6 +245,7 @@ window.VS = (() => {
     onScore:   cb => { _onScore = cb; },
     onEnd:     cb => { _onEnd = cb; },
     onOppLeft: cb => { _onOppLeft = cb; },
+    onWrong:   cb => { _onWrong = cb; },
     getMatch: () => _match,
     getRole:  () => _role,
     getMatchId: () => _matchId,
@@ -621,6 +639,7 @@ window.VS = (() => {
   window._vsReportAnswer = function(correct, score) {
     if (!window.VS.getMatchId()) return;
     window.VS.reportScore(score);
+    if (!correct) window.VS.sendWrong();
   };
 
   // ── Fin de partida → pantalla de resultado W/L ─────────────────────────────
@@ -769,6 +788,11 @@ window.VS = (() => {
       if (typeof window.flagsSetVsOpponentScore === 'function') {
         window.flagsSetVsOpponentScore(oppScore);
       }
+    });
+
+    // El rival falló → flash rojo en el panel de leaderboard
+    window.VS.onWrong(() => {
+      if (typeof window.flagsTriggerOpponentWrong === 'function') window.flagsTriggerOpponentWrong();
     });
 
     window.VS.onEnd(winnerId => {

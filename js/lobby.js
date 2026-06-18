@@ -20,6 +20,7 @@ window.LB = (() => {
   let _onCountdown = null;  // host inició la cuenta regresiva
   let _onCancel    = null;  // se canceló la cuenta regresiva
   let _onNotReady  = null;  // alguien marcó "no estoy listo"
+  let _onWrong     = null;  // alguien falló una pregunta → señal visual
 
   function _myId() { return window._sbUserId || null; }
   function isHost()      { return !!_hostId && _hostId === _myId(); }
@@ -67,14 +68,16 @@ window.LB = (() => {
       .on('broadcast', { event: 'cd' },       ({ payload }) => { if (_onCountdown) _onCountdown(payload || {}); })
       .on('broadcast', { event: 'cancel' },   () => { if (_onCancel) _onCancel(); })
       .on('broadcast', { event: 'notready' }, ({ payload }) => { if (_onNotReady) _onNotReady(payload || {}); })
+      .on('broadcast', { event: 'wrong' },    () => { if (_onWrong) _onWrong(); })
       // Cualquier cambio de miembros (alta/baja/score) → re-consultar a la sala.
       // _fetchMembers detecta si me kickearon (ya no figuro en la lista). No filtramos
       // por lobby_id en cliente porque el payload de DELETE no siempre trae las columnas.
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lobby_members' }, () => {
         _fetchMembers();
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lobbies' }, payload => {
-        if (!payload.new || payload.new.id !== lid) return;
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lobbies',
+        filter: 'id=eq.' + lid }, payload => {
+        if (!payload.new) return;
         _lobby  = payload.new;
         _hostId = payload.new.host_id;
         if (payload.new.status === 'active' && _onStart) { _seed = payload.new.seed; _onStart(payload.new); }
@@ -289,6 +292,7 @@ window.LB = (() => {
   function sendCountdown(until) { _bcast('cd', { until }); }
   function sendCancel()         { _bcast('cancel'); }
   function sendNotReady(name)   { _bcast('notready', { name }); }
+  function sendWrong()          { _bcast('wrong', {}); }
 
   // ── Invitación push a un amigo (broadcast a su canal personal) ──────────────────
   function sendInvite(toUser, payload) {
@@ -340,12 +344,12 @@ window.LB = (() => {
     for (const k in _graceTimers) delete _graceTimers[k];
     _lobbyId = _hostId = _lobby = _seed = null;
     _members = [];
-    _onMembers = _onStart = _onClosed = _onCountdown = _onCancel = _onNotReady = null;
+    _onMembers = _onStart = _onClosed = _onCountdown = _onCancel = _onNotReady = _onWrong = null;
   }
 
   return {
     create, joinByCode, joinById, leave, kick, start, reportScore, listPublic, cleanup,
-    sendCountdown, sendCancel, sendNotReady, setPublic, isPublic, restoreActive, transferHost, cleanupMine,
+    sendCountdown, sendCancel, sendNotReady, sendWrong, setPublic, isPublic, restoreActive, transferHost, cleanupMine,
     sendInvite, listenForInvites, setName, getName,
     isHost, getMembers, getLobby, getCode, getId, getSeed,
     onMembers:   cb => { _onMembers = cb; },
@@ -354,6 +358,7 @@ window.LB = (() => {
     onCountdown: cb => { _onCountdown = cb; },
     onCancel:    cb => { _onCancel = cb; },
     onNotReady:  cb => { _onNotReady = cb; },
+    onWrong:     cb => { _onWrong = cb; },
   };
 })();
 
@@ -552,6 +557,10 @@ window.Lobby = (() => {
       _refreshLobbyOpponents();
       if (typeof window.flagsSetLobbyScores === 'function') window.flagsSetLobbyScores(window._lobbyMembers);
     });
+    // Alguien en la sala falló → flash rojo en el panel de leaderboard
+    window.LB.onWrong(() => {
+      if (typeof window.flagsTriggerOpponentWrong === 'function') window.flagsTriggerOpponentWrong();
+    });
     // Si el host cierra a mitad, no hacemos nada disruptivo: la partida sigue local.
 
     if (typeof window.flagsSetSeed === 'function') window.flagsSetSeed(seed);
@@ -567,9 +576,10 @@ window.Lobby = (() => {
   }
 
   // Reporte de respuesta desde flags.js
-  window._lobbyReportAnswer = function(score) {
+  window._lobbyReportAnswer = function(correct, score) {
     if (!window.LB.getId()) return;
     window.LB.reportScore(score);
+    if (!correct) window.LB.sendWrong();
   };
 
   // ── Fin de partida → ranking ───────────────────────────────────────────────────

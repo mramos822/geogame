@@ -470,9 +470,10 @@ function initFlagsLeaderboard() {
       const el = document.createElement('div');
       el.className = 'lb-entry';
       el.id = `flags-lb-${p.id}`;
-      el.innerHTML = (p.avatar
-        ? `<div class="lb-avatar lb-avatar-img-wrap"><img class="lb-avatar-img" src="${p.avatar}" onerror="this.parentNode.innerHTML='${p.initial}';this.parentNode.style.background='${p.color}'"></div>`
-        : `<div class="lb-avatar" style="background:${p.color}">${p.initial}</div>`)
+      el.innerHTML = `<span class="lb-rank rank-other"></span>`
+        + (p.avatar
+          ? `<div class="lb-avatar lb-avatar-img-wrap"><img class="lb-avatar-img" src="${p.avatar}" onerror="this.parentNode.innerHTML='${p.initial}';this.parentNode.style.background='${p.color}'"></div>`
+          : `<div class="lb-avatar" style="background:${p.color}">${p.initial}</div>`)
         + `<span class="lb-score">${p.score.toLocaleString()}</span>`;
       el.style.transition = 'none';
       el.style.top = '-9999px';
@@ -484,7 +485,8 @@ function initFlagsLeaderboard() {
   const playerEl = document.createElement('div');
   playerEl.className = 'lb-entry lb-player';
   playerEl.id = 'flags-lb-player';
-  playerEl.innerHTML = `<div class="lb-avatar"><img class="lb-avatar-img" src="${localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png'}"></div>`
+  playerEl.innerHTML = `<span class="lb-rank rank-other"></span>`
+                     + `<div class="lb-avatar"><img class="lb-avatar-img" src="${localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png'}"></div>`
                      + `<span class="lb-score" id="flags-lb-player-score">0</span>`;
   playerEl.style.transition = 'none';
   playerEl.style.top = '-9999px';
@@ -551,6 +553,16 @@ function flagsPositionLeaderboard(playerScore, animate) {
     if (el) el.style.top = ((rank - windowStart) * rowH + bottomOffset) + 'px';
   });
 
+  // Actualizar número de posición en cada fila del leaderboard
+  all.forEach((p, rank) => {
+    const el = flagsLbElements[`flags-lb-${p.id}`];
+    if (!el) return;
+    const rankEl = el.querySelector('.lb-rank');
+    if (!rankEl) return;
+    rankEl.textContent = rank + 1;
+    rankEl.className = 'lb-rank ' + (rank === 0 ? 'rank-1' : rank === 1 ? 'rank-2' : rank === 2 ? 'rank-3' : 'rank-other');
+  });
+
   const scoreEl = flagsLbElements['flags-lb-player']?.querySelector('.lb-score');
   if (scoreEl) scoreEl.textContent = playerScore.toLocaleString();
 }
@@ -579,6 +591,23 @@ function flagsSetVsOpponentScore(score) {
   flagsPositionLeaderboard(flagsLastLbScore >= 0 ? flagsLastLbScore : 0, true);
 }
 window.flagsSetVsOpponentScore = flagsSetVsOpponentScore;
+
+// Flash rojo en el panel derecho y en la fila del oponente cuando alguien falla en versus/lobby.
+window.flagsTriggerOpponentWrong = function() {
+  const panel = document.getElementById('flags-right-panel');
+  if (panel) {
+    panel.classList.remove('vs-wrong-flash');
+    void panel.offsetWidth;
+    panel.classList.add('vs-wrong-flash');
+  }
+  // En 1v1 también parpadea la fila del rival
+  const oppEl = flagsLbElements['flags-lb-vsopp'];
+  if (oppEl) {
+    oppEl.classList.remove('lb-wrong-flash');
+    void oppEl.offsetWidth;
+    oppEl.classList.add('lb-wrong-flash');
+  }
+};
 
 // Lobby: refrescar el score en vivo de TODOS los rivales y reordenar con animación.
 function flagsSetLobbyScores(members) {
@@ -1249,7 +1278,7 @@ function startFlagsRound() {
         flagsAnimateScore();
         sortFlagsLeaderboard(flagsScore);
         if (typeof window._vsReportAnswer === 'function') window._vsReportAnswer(true, Math.round(flagsScore));
-        if (typeof window._lobbyReportAnswer === 'function' && window._lobbyActive) window._lobbyReportAnswer(Math.round(flagsScore));
+        if (typeof window._lobbyReportAnswer === 'function' && window._lobbyActive) window._lobbyReportAnswer(true, Math.round(flagsScore));
         if (typeof showScorePopup !== 'undefined') showScorePopup(pts + speedBonus);
         if (speedBonus > 0) {
           clearTimeout(flagsSpeedBonusHideId);
@@ -1264,7 +1293,7 @@ function startFlagsRound() {
         flagsWrongCount++;
         if (typeof sfxError !== 'undefined') { sfxError.currentTime = 0; sfxPlay(sfxError); }
         if (typeof window._vsReportAnswer === 'function') window._vsReportAnswer(false, Math.round(flagsScore));
-        if (typeof window._lobbyReportAnswer === 'function' && window._lobbyActive) window._lobbyReportAnswer(Math.round(flagsScore));
+        if (typeof window._lobbyReportAnswer === 'function' && window._lobbyActive) window._lobbyReportAnswer(false, Math.round(flagsScore));
       }
       const overlay = document.getElementById(correct ? 'flags-check-overlay' : 'flags-wrong-overlay');
       if (overlay) {
