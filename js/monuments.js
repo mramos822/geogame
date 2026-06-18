@@ -677,6 +677,8 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
   if (back) back.style.display = 'block';
   const wt = document.getElementById('loading-panel2-worldtour');
   if (wt) wt.style.display = 'block';
+  const vs = document.getElementById('loading-panel2-versus');
+  if (vs) vs.style.display = 'block';
   const pr = document.getElementById('loading-panel2-practice');
   if (pr) pr.style.display = 'block';
   const t2 = document.getElementById('loading-panel2-text2');
@@ -688,6 +690,8 @@ document.getElementById('loading-panel2-back')?.addEventListener('click', () => 
   document.getElementById('loading-panel2-back').style.display = 'none';
   const wt = document.getElementById('loading-panel2-worldtour');
   if (wt) wt.style.display = 'none';
+  const vsb = document.getElementById('loading-panel2-versus');
+  if (vsb) vsb.style.display = 'none';
   const prb = document.getElementById('loading-panel2-practice');
   if (prb) prb.style.display = 'none';
   const t2b = document.getElementById('loading-panel2-text2');
@@ -2506,6 +2510,8 @@ window.resetEntranceElements = function () {
   if (back2) back2.style.display = 'none';
   const wt2 = document.getElementById('loading-panel2-worldtour');
   if (wt2) wt2.style.display = 'none';
+  const vs2 = document.getElementById('loading-panel2-versus');
+  if (vs2) vs2.style.display = 'none';
   const pr2 = document.getElementById('loading-panel2-practice');
   if (pr2) pr2.style.display = 'none';
   const t2r = document.getElementById('loading-panel2-text2');
@@ -2542,6 +2548,8 @@ window.showEntranceElementsStatic = function () {
   if (back2) back2.style.display = '';
   const wt2 = document.getElementById('loading-panel2-worldtour');
   if (wt2) wt2.style.display = '';
+  const vs2s = document.getElementById('loading-panel2-versus');
+  if (vs2s) vs2s.style.display = '';
   const pr2 = document.getElementById('loading-panel2-practice');
   if (pr2) pr2.style.display = '';
   const t2r = document.getElementById('loading-panel2-text2');
@@ -5066,6 +5074,11 @@ window.showPracticeScore = function(score) {
 };
 
 // ── Click en es-practice button
+document.getElementById('loading-panel2-versus')?.addEventListener('click', () => {
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+  // TODO: abrir panel versus
+});
+
 document.getElementById('loading-panel2-practice')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   showPracticePanel();

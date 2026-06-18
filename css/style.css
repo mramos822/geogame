@@ -1253,6 +1253,7 @@ body.is-ios .wrong-count-total { top: 29.5cqmin; }
   pointer-events: none;
 }
 #loading-screen.table-shown .loading-panel2-worldtour,
+#loading-screen.table-shown .loading-panel2-versus,
 #loading-screen.table-shown .loading-panel2-practice,
 #loading-screen.table-shown .loading-panel2-back,
 #loading-screen.table-shown .loading-panel2-text2 {
@@ -2832,7 +2833,7 @@ body.is-ios .wrong-count-total { top: 29.5cqmin; }
 
 .loading-panel2-worldtour {
   position: absolute;
-  top: 32%;
+  top: 26%;
   left: 65%;
   transform: translate(-50%, -50%);
   cursor: pointer;
@@ -2849,9 +2850,28 @@ body.is-ios .wrong-count-total { top: 29.5cqmin; }
 .loading-panel2-worldtour:hover img { transform: scale(1.08); }
 .loading-panel2-worldtour:active img { transform: scale(0.97); }
 
+.loading-panel2-versus {
+  position: absolute;
+  top: 47%;
+  left: 65%;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  z-index: 10;
+}
+.loading-panel2-versus img {
+  display: block;
+  width: 52.5cqmin;
+  height: auto;
+  user-select: none;
+  -webkit-user-drag: none;
+  transition: transform 0.15s ease-out;
+}
+.loading-panel2-versus:hover img { transform: scale(1.08); }
+.loading-panel2-versus:active img { transform: scale(0.97); }
+
 .loading-panel2-practice {
   position: absolute;
-  top: 62%;
+  top: 68%;
   left: 65%;
   transform: translate(-50%, -50%);
   cursor: pointer;
