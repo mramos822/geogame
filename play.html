@@ -1,0 +1,1512 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+  <meta name="color-scheme" content="light dark">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="icon" type="image/png" href="images/planet3.png">
+  <title>GeoChallenge</title>
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6238929099865050" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="preload" href="images/characters/men3.png" as="image">
+  <link rel="preload" href="images/characters/men4.png" as="image">
+  <link rel="preload" href="images/characters/girl3.png" as="image">
+  <link rel="preload" href="images/characters/girl4.png" as="image">
+  <link rel="preload" href="images/characters/men5.png" as="image">
+  <link rel="preload" href="images/characters/men6.png" as="image">
+  <link rel="preload" href="images/characters/women4.png" as="image">
+  <link rel="preload" href="images/characters/women5.png" as="image">
+  <link rel="preload" href="images/characters/girl5.png" as="image">
+  <link rel="preload" href="images/characters/girl6.png" as="image">
+  <link rel="preload" href="images/bg/level2complete.png" as="image">
+</head>
+<body>
+
+  <div id="loading-screen">
+<div class="loading-planet-wrap">
+      <img class="loading-planet" src="images/planet.png" alt="">
+    </div>
+    <img class="loading-clouds" src="images/clouds.png" alt="">
+    <img class="loading-clouds loading-clouds2" src="images/clouds.png" alt="">
+    <img class="loading-clouds loading-clouds3" src="images/clouds.png" alt="">
+    <img class="loading-clouds-b" src="images/clouds.png" alt="">
+    <img class="loading-clouds-b loading-clouds-b2" src="images/clouds.png" alt="">
+    <img class="loading-clouds-b loading-clouds-b3" src="images/clouds.png" alt="">
+    <img class="loading-clouds-c" src="images/clouds.png" alt="">
+    <img class="loading-clouds-c loading-clouds-c2" src="images/clouds.png" alt="">
+    <img class="loading-clouds-c loading-clouds-c3" src="images/clouds.png" alt="">
+    <div class="loading-clouds-fade"></div>
+    <div class="loading-clouds-fade loading-clouds-fade2"></div>
+    <div class="loading-clouds-fade loading-clouds-fade3"></div>
+    <img class="flightatt-loading" src="images/characters/flightattpost2/1.png" alt="">
+    <div class="flightatt-loading-shadow"></div>
+    <div class="loading-panel2-text2-wrap" id="loading-panel2-text2" style="display:none">
+      <img class="loading-panel2-text2-img" src="images/text2.png" alt="" draggable="false" oncontextmenu="return false">
+      <div class="loading-panel2-text2-label"><span data-i18n="panel2.welcome1">¡Bienvenido/a a GeoChallenge!</span><br><span data-i18n="panel2.welcome2">¿Qué modo quieres jugar?</span></div>
+    </div>
+    <div class="loading-btn-row" style="display:none">
+      <div class="loading-btn-wrap" style="display:none" id="loading-shapes-wrap">
+        <span class="loading-btn-label" data-i18n="mode.shapes">Países</span>
+        <img id="loading-shapes-btn" src="images/buttons/es-play.png" alt="Modo Siluetas" draggable="false" oncontextmenu="return false">
+        <span class="loading-btn-hs" id="loading-shapes-hs"></span>
+      </div>
+      <div class="loading-btn-wrap loading-play-wrap" style="display:none" id="loading-play-wrap">
+        <span class="loading-btn-label" data-i18n="mode.cities">Ciudades</span>
+        <img id="loading-play-btn" src="images/buttons/es-play.png" alt="Jugar" draggable="false" oncontextmenu="return false">
+        <span class="loading-btn-hs" id="loading-play-hs"></span>
+      </div>
+      <div class="loading-btn-wrap" style="display:none" id="loading-flags-wrap">
+        <span class="loading-btn-label" data-i18n="mode.flags">Banderas</span>
+        <img id="loading-flags-btn" src="images/buttons/es-play.png" alt="Modo Banderas" draggable="false" oncontextmenu="return false">
+        <span class="loading-btn-hs" id="loading-flags-hs"></span>
+      </div>
+      <div class="loading-btn-wrap" style="display:none" id="loading-mode4-wrap">
+        <span class="loading-btn-label" data-i18n="mode.monuments">Monumentos</span>
+        <img id="loading-mode4-btn" src="images/buttons/es-play.png" alt="Modo Monumentos" draggable="false" oncontextmenu="return false">
+        <span class="loading-btn-hs" id="loading-mode4-hs"></span>
+      </div>
+    </div>
+    <img class="loading-logo" src="images/logo.png" alt="City Blitz" draggable="false" oncontextmenu="return false">
+    <div class="loading-lang" id="loading-lang">
+      <button class="loading-lang-toggle" id="loading-lang-toggle" type="button">
+        <span class="loading-lang-current" id="loading-lang-current">Español</span>
+        <span class="loading-lang-caret">▾</span>
+      </button>
+      <div class="loading-lang-menu" id="loading-lang-menu">
+        <button class="loading-lang-option" type="button" data-lang="en">English</button>
+        <button class="loading-lang-option" type="button" data-lang="es">Español</button>
+      </div>
+    </div>
+    <div class="loading-bar-track">
+      <div class="loading-bar-fill" id="loading-bar-fill"></div>
+    </div>
+    <div class="loading-pct" id="loading-pct">0%</div>
+    <div class="loading-plane-wrap">
+      <img class="loading-plane" src="images/plane.png" alt="" draggable="false" oncontextmenu="return false">
+    </div>
+<div class="loading-actions" id="loading-actions">
+      <div class="loading-play-single" id="loading-play-single">
+        <img src="images/buttons/es-play.png" alt="Jugar" draggable="false" oncontextmenu="return false">
+        <div class="social-notif-badge" id="play-invite-badge" style="display:none">!</div>
+      </div>
+      <div class="loading-secondary-btns">
+        <div class="loading-secondary-btn" id="loading-social-btn">
+          <img src="images/buttons/es-social.png" alt="Social" draggable="false" oncontextmenu="return false">
+          <div class="social-notif-badge" id="social-notif-badge" style="display:none">!</div>
+        </div>
+        <div class="loading-secondary-btn" id="loading-profile-btn">
+          <img src="images/buttons/es-profile.png" alt="Perfil" draggable="false" oncontextmenu="return false">
+        </div>
+      </div>
+    </div>
+    <div id="loading-table-group" class="table-gone">
+    <img class="loading-howtotable" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
+    <div class="loading-profile-pic-wrap" id="loading-profile-pic-wrap">
+      <img class="loading-profile-pic" id="loading-profile-pic-main" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
+      <div class="loading-profile-pic-overlay" id="loading-profile-pic-overlay">
+        <span id="loading-profile-pic-pencil">✎</span>
+        <div class="pic-upload-spinner" id="loading-profile-pic-spinner" style="display:none"></div>
+      </div>
+      <input type="file" id="loading-profile-pic-input" accept="image/*" style="display:none">
+    </div>
+    <div class="loading-name-wrap" id="loading-name-wrap">
+      <span class="loading-player-name" id="loading-player-name"></span>
+      <button class="loading-name-edit" id="loading-name-edit" type="button" aria-label="Cambiar nombre">✎</button>
+      <input class="loading-name-input" id="loading-name-input" type="text" maxlength="12" autocomplete="off" spellcheck="false">
+      <div class="loading-name-confirm" id="loading-name-confirm" role="button" aria-label="Confirmar nombre">
+        <img class="loading-name-confirm1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
+        <img class="loading-name-confirm2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+    </div>
+    <div class="loading-play-confirm-wrap" id="loading-play-confirm-wrap">
+      <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+      <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+    </div>
+
+    <span class="loading-play-count" id="loading-play-count"></span>
+    <span class="loading-vs-record" id="loading-vs-record"></span>
+    <div class="loading-games-col">
+      <span class="loading-games-title" data-i18n="common.average">Promedio</span>
+      <div class="loading-games-row">
+        <img class="loading-games-game" src="images/game1.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark1.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs1" id="loading-games-hs1">0</span>
+        </div>
+      </div>
+      <div class="loading-games-row">
+        <img class="loading-games-game" src="images/game2.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark2.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs2" id="loading-games-hs2">0</span>
+        </div>
+      </div>
+      <div class="loading-games-row">
+        <img class="loading-games-game" src="images/game3.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark3.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs3" id="loading-games-hs3">0</span>
+        </div>
+      </div>
+      <div class="loading-games-row">
+        <img class="loading-games-game" src="images/game4.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark4.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs4" id="loading-games-hs4">0</span>
+        </div>
+      </div>
+    </div>
+    <div class="loading-games-col loading-games-col2">
+      <span class="loading-games-title" data-i18n="common.highscore">Highscore</span>
+      <div class="loading-games-row">
+        <img class="loading-games-game loading-games-spacer" src="images/game1.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark1.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs1" id="loading-games-avg1">0</span>
+          <span class="loading-games-crown">👑</span>
+        </div>
+      </div>
+      <div class="loading-games-row">
+        <img class="loading-games-game loading-games-spacer" src="images/game2.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark2.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs2" id="loading-games-avg2">0</span>
+          <span class="loading-games-crown">👑</span>
+        </div>
+      </div>
+      <div class="loading-games-row">
+        <img class="loading-games-game loading-games-spacer" src="images/game3.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark3.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs3" id="loading-games-avg3">0</span>
+          <span class="loading-games-crown">👑</span>
+        </div>
+      </div>
+      <div class="loading-games-row">
+        <img class="loading-games-game loading-games-spacer" src="images/game4.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark4.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs4" id="loading-games-avg4">0</span>
+          <span class="loading-games-crown">👑</span>
+        </div>
+      </div>
+    </div>
+    <img class="loading-games-rank" id="loading-games-rank" src="images/ranks/1.png" alt="" draggable="false" oncontextmenu="return false">
+    <span class="loading-games-rank-label" id="loading-games-rank-label"></span>
+    <span class="loading-games-hs-label" data-i18n="common.highscore">Highscore</span>
+    <img class="loading-games-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">
+    <span class="loading-games-total" id="loading-games-total">0</span>
+    </div>
+
+    <div class="profile-account-wrap" id="profile-account-btn">
+      <span class="profile-btn-label" id="profile-btn-label"></span>
+      <img class="profile-account1" src="images/account1.png" alt="" draggable="false" oncontextmenu="return false">
+      <img class="profile-account2" src="images/account2.png" alt="" draggable="false" oncontextmenu="return false">
+    </div>
+    <div class="loading-panel2-worldtour" id="loading-panel2-worldtour" style="display:none">
+      <img src="images/buttons/es-worldtour.png" alt="World Tour" draggable="false" oncontextmenu="return false">
+    </div>
+    <div class="loading-panel2-versus" id="loading-panel2-versus" style="display:none">
+      <img src="images/buttons/es-versus.png" alt="Versus" draggable="false" oncontextmenu="return false">
+      <div class="social-notif-badge" id="versus-invite-badge" style="display:none">!</div>
+    </div>
+    <div class="loading-panel2-practice" id="loading-panel2-practice" style="display:none">
+      <img src="images/buttons/es-practice.png" alt="Practice" draggable="false" oncontextmenu="return false">
+    </div>
+    <div class="loading-panel2-back" id="loading-panel2-back" style="display:none">
+      <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+      <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+    </div>
+    <!-- ── PANEL 4: VERSUS ───────────────────────────────────────────────── -->
+    <div id="loading-versus-group" class="table-gone">
+      <img class="practice-table-img" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
+      <div class="practice-titlebar">
+        <span class="loading-social-title">Gira Competitiva</span>
+        <button id="versus-notif-bell" class="versus-notif-bell" type="button" title="Invitaciones pendientes">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6V11c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+          <span id="versus-notif-badge" class="versus-notif-badge" style="display:none">0</span>
+        </button>
+      </div>
+      <!-- Inbox de invitaciones pendientes -->
+      <div id="versus-notif-panel" class="versus-notif-panel" style="display:none">
+        <div class="versus-notif-panel-head" data-i18n="notif.inbox">Invitaciones</div>
+        <div id="versus-notif-list" class="versus-notif-list"></div>
+        <div id="versus-notif-empty" class="versus-notif-empty" style="display:none" data-i18n="notif.empty">Sin invitaciones pendientes</div>
+      </div>
+      <span class="versus-subtitle" id="versus-subtitle"></span>
+      <div class="practice-back-wrap" id="versus-back-wrap">
+        <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+        <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+
+      <!-- ROOT: Amistoso / Competitivo -->
+      <div class="versus-screen" id="versus-screen-root">
+        <button class="versus-menu-btn" id="versus-btn-amistoso" type="button">
+          <span class="versus-menu-title" data-i18n="versus.friendly">Versus Amistoso</span>
+          <span class="versus-menu-desc" data-i18n="versus.friendlyDesc">Juega con amigos o gente al azar</span>
+        </button>
+        <button class="versus-menu-btn versus-menu-disabled" id="versus-btn-competitivo" type="button" disabled>
+          <span class="versus-menu-title" data-i18n="versus.competitive">Versus Competitivo</span>
+          <span class="versus-menu-soon" data-i18n="versus.soon">Próximamente</span>
+        </button>
+      </div>
+
+      <!-- AMISTOSO: Amigos / Grupo / Aleatorio -->
+      <div class="versus-screen" id="versus-screen-amistoso" style="display:none">
+        <button class="versus-menu-btn" id="versus-btn-amigos" type="button">
+          <span class="versus-menu-title" data-i18n="versus.friends">Amigos</span>
+          <span class="versus-menu-desc" data-i18n="versus.friendsDesc">Reta a un amigo conectado (1v1)</span>
+        </button>
+        <button class="versus-menu-btn" id="versus-btn-grupo" type="button">
+          <span class="versus-menu-title" data-i18n="versus.group">Grupo</span>
+          <span class="versus-menu-desc" data-i18n="versus.groupDesc">Sala privada de hasta 10</span>
+        </button>
+        <button class="versus-menu-btn" id="versus-btn-aleatorio" type="button">
+          <span class="versus-menu-title" data-i18n="versus.random">Aleatorio</span>
+          <span class="versus-menu-desc" data-i18n="versus.randomDesc">Únete a salas públicas</span>
+        </button>
+      </div>
+
+      <!-- AMIGOS: reto 1v1 directo -->
+      <div class="versus-screen" id="versus-screen-amigos" style="display:none">
+        <div id="versus-friends-list"></div>
+        <div id="versus-empty-msg" class="versus-empty-msg" data-i18n="versus.noneOnline">No hay amigos conectados ahora.</div>
+      </div>
+
+      <!-- GRUPO: crear/unirse privado -->
+      <div class="versus-screen" id="versus-screen-grupo" style="display:none">
+        <button class="versus-menu-btn" id="versus-btn-create-private" type="button">
+          <span class="versus-menu-title" data-i18n="lobby.createRoom">Crear sala</span>
+          <span class="versus-menu-desc" data-i18n="lobby.createRoomDesc">Pública por defecto · podés privatizarla adentro</span>
+        </button>
+        <div class="versus-join-box">
+          <span class="versus-join-label" data-i18n="lobby.joinByCode">Unirse con un código</span>
+          <div class="versus-join-row">
+            <input id="versus-join-code" class="versus-code-input" type="text" maxlength="6" placeholder="ABC123" autocomplete="off" spellcheck="false">
+            <button id="versus-btn-join-code" class="versus-challenge-btn" type="button" data-i18n="lobby.join">Unirse</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ALEATORIO: lista de salas públicas -->
+      <div class="versus-screen" id="versus-screen-aleatorio" style="display:none">
+        <button class="versus-menu-btn versus-menu-btn-sm" id="versus-btn-create-public" type="button">
+          <span class="versus-menu-title" data-i18n="lobby.createPublic">Crear sala pública</span>
+        </button>
+        <div id="versus-public-list" class="versus-list-box"></div>
+        <div id="versus-public-empty" class="versus-empty-msg" data-i18n="lobby.noRooms">No hay salas abiertas ahora.</div>
+      </div>
+
+      <!-- LOBBY -->
+      <div class="versus-screen" id="versus-screen-lobby" style="display:none">
+        <div class="lobby-name-row" id="lobby-name-row">
+          <span class="lobby-name-text" id="lobby-name-text"></span>
+          <button class="lobby-name-edit-btn" id="lobby-name-edit-btn" type="button" style="display:none" aria-label="Editar nombre">✎</button>
+          <input id="lobby-name-input" class="lobby-name-input" type="text" maxlength="22" autocomplete="off" spellcheck="false" placeholder="Nombre de la sala" style="display:none">
+          <button class="lobby-name-confirm-btn" id="lobby-name-confirm-btn" type="button" style="display:none" aria-label="Confirmar nombre">✓</button>
+        </div>
+        <div class="lobby-topbar">
+          <div class="lobby-code-wrap" id="lobby-code-copy" title="Copiar código">
+            <span class="lobby-code-label" data-i18n="lobby.code">Código:</span>
+            <span class="lobby-code" id="lobby-code">------</span>
+            <span class="lobby-code-copy-icon">⧉</span>
+          </div>
+          <span class="lobby-count" id="lobby-count">0/10</span>
+          <button class="lobby-visibility-btn" id="lobby-visibility-btn" type="button" style="display:none"></button>
+          <button class="versus-challenge-btn lobby-invite-btn" id="lobby-invite-btn" type="button" data-i18n="lobby.invite">+ Invitar</button>
+        </div>
+        <div id="lobby-members" class="versus-list-box"></div>
+        <div class="lobby-footer">
+          <span class="lobby-wait-msg" id="lobby-wait-msg" data-i18n="lobby.waitingHost">Esperando que el host empiece…</span>
+          <span class="lobby-countdown" id="lobby-countdown" style="display:none"></span>
+          <button class="versus-start-btn" id="lobby-start-btn" type="button" data-i18n="lobby.start">Empezar</button>
+          <button class="versus-start-btn lobby-cancel-btn" id="lobby-cancel-btn" type="button" style="display:none" data-i18n="lobby.cancel">Cancelar</button>
+          <button class="versus-challenge-btn lobby-notready-btn" id="lobby-notready-btn" type="button" style="display:none" data-i18n="lobby.notReady">No estoy listo</button>
+          <button class="versus-challenge-btn lobby-leave-btn" id="lobby-leave-btn" type="button" data-i18n="lobby.leave">Salir</button>
+        </div>
+      </div>
+
+      <button class="versus-return-lobby" id="versus-return-lobby" type="button" style="display:none">
+        <span>↩</span><span data-i18n="lobby.myRoom">Mi sala</span>
+      </button>
+
+      <div id="versus-toast-stack" class="versus-toast-stack"></div>
+    </div>
+
+    <!-- Popup: invitación saliente (host espera) -->
+    <div id="vs-outgoing-popup" class="vs-popup-overlay" style="display:none">
+      <div class="vs-popup-box">
+        <img class="vs-popup-pic" id="vs-out-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
+        <span class="vs-popup-name" id="vs-out-name"></span>
+        <span class="vs-popup-sub">Esperando respuesta…</span>
+        <div class="vs-popup-timer-wrap"><div class="vs-popup-timer-bar" id="vs-out-bar"></div></div>
+        <div class="vs-popup-confirm" id="vs-out-cancel">
+          <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+          <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+        </div>
+      </div>
+    </div>
+
+    <!-- Popup: invitación entrante (guest acepta/rechaza) -->
+    <div id="vs-incoming-popup" class="vs-popup-overlay" style="display:none">
+      <div class="vs-popup-box">
+        <img class="vs-popup-pic" id="vs-in-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
+        <span class="vs-popup-name" id="vs-in-name"></span>
+        <span class="vs-popup-sub">¡Te retó a Gira Competitiva!</span>
+        <div class="vs-popup-timer-wrap"><div class="vs-popup-timer-bar" id="vs-in-bar"></div></div>
+        <div class="vs-incoming-btns">
+          <div class="vs-popup-confirm vs-accept-btn" id="vs-in-accept">
+            <img src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
+            <img src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
+          </div>
+          <div class="vs-popup-confirm vs-decline-btn" id="vs-in-decline">
+            <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+            <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PANEL 3: PRACTICE TOUR ─────────────────────────────────────────── -->
+    <div id="loading-practice-group" style="display:none">
+      <!-- Mesa (igual posición/tamaño que el panel de perfil) -->
+      <img class="practice-table-img" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
+
+      <!-- Título -->
+      <div class="practice-titlebar">
+        <img class="loading-social-planet" src="images/practice.png" alt="" draggable="false" oncontextmenu="return false">
+        <span class="loading-social-title" data-i18n="practice.title">Gira de Práctica</span>
+        <img class="loading-social-planet" src="images/practice.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+
+      <!-- Back button -->
+      <div class="practice-back-wrap" id="practice-back-wrap">
+        <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+        <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+
+      <!-- "Elige un modo" — misma fuente y posición que "Has jugado X veces" del perfil -->
+      <span class="loading-play-count practice-choose-label" data-i18n="practice.chooseMode">Elige un modo</span>
+
+      <!-- Selección de modo -->
+      <div class="practice-section" id="practice-mode-section">
+        <div class="practice-mode-grid">
+          <div class="practice-mode-item" data-mode="flags">
+            <img class="practice-mode-img" src="images/buttons/map1.png" draggable="false" oncontextmenu="return false">
+            <span class="practice-mode-name">Suitcase Shuffle</span>
+          </div>
+          <div class="practice-mode-item" data-mode="shapes">
+            <img class="practice-mode-img" src="images/buttons/map2.png" draggable="false" oncontextmenu="return false">
+            <span class="practice-mode-name">Map Mayhem</span>
+          </div>
+          <div class="practice-mode-item" data-mode="game">
+            <img class="practice-mode-img" src="images/buttons/map3.png" draggable="false" oncontextmenu="return false">
+            <span class="practice-mode-name">City Blitz</span>
+          </div>
+          <div class="practice-mode-item" data-mode="monuments">
+            <img class="practice-mode-img" src="images/buttons/map4.png" draggable="false" oncontextmenu="return false">
+            <span class="practice-mode-name">Landmark Loco</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Configuración (aparece al elegir modo) -->
+      <div class="practice-section" id="practice-config-section" style="display:none">
+
+        <!-- Columna izquierda: título + video howtoplay (fuera del flujo) -->
+        <div class="practice-config-left">
+          <span class="practice-config-modename" id="practice-config-title"></span>
+          <video class="practice-config-video" id="practice-config-video" autoplay loop muted playsinline></video>
+        </div>
+
+        <div class="practice-config-inner">
+          <!-- Columna derecha: opciones -->
+          <div class="practice-config-right">
+            <!-- Filtro continentes -->
+            <div class="practice-continents" id="practice-continents">
+              <div class="practice-continent-grid">
+                <div class="practice-continent-btn active" data-continent="america">
+                  <div class="practice-continent-img-wrap">
+                    <img src="images/buttons/america.png" draggable="false" oncontextmenu="return false">
+                    <img class="practice-continent-x" src="images/buttons/X.png" draggable="false" oncontextmenu="return false">
+                  </div>
+                  <span data-i18n="practice.america">América</span>
+                </div>
+                <div class="practice-continent-btn active" data-continent="europa">
+                  <div class="practice-continent-img-wrap">
+                    <img src="images/buttons/europe.png" draggable="false" oncontextmenu="return false">
+                    <img class="practice-continent-x" src="images/buttons/X.png" draggable="false" oncontextmenu="return false">
+                  </div>
+                  <span data-i18n="practice.europa">Europa</span>
+                </div>
+                <div class="practice-continent-btn active" data-continent="asia">
+                  <div class="practice-continent-img-wrap">
+                    <img src="images/buttons/asia.png" draggable="false" oncontextmenu="return false">
+                    <img class="practice-continent-x" src="images/buttons/X.png" draggable="false" oncontextmenu="return false">
+                  </div>
+                  <span data-i18n="practice.asia">Asia</span>
+                </div>
+                <div class="practice-continent-btn active" data-continent="africa">
+                  <div class="practice-continent-img-wrap">
+                    <img src="images/buttons/africa.png" draggable="false" oncontextmenu="return false">
+                    <img class="practice-continent-x" src="images/buttons/X.png" draggable="false" oncontextmenu="return false">
+                  </div>
+                  <span data-i18n="practice.africa">África</span>
+                </div>
+                <div class="practice-continent-btn active" data-continent="oceania">
+                  <div class="practice-continent-img-wrap">
+                    <img src="images/buttons/oceania.png" draggable="false" oncontextmenu="return false">
+                    <img class="practice-continent-x" src="images/buttons/X.png" draggable="false" oncontextmenu="return false">
+                  </div>
+                  <span data-i18n="practice.oceania">Oceanía</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Dificultad (solo monumentos) -->
+            <div class="practice-difficulty" id="practice-difficulty" style="display:none">
+              <div class="practice-diff-grid">
+                <div class="practice-diff-btn active" data-diff="facil">
+                  <div class="practice-continent-img-wrap">
+                    <img src="images/buttons/easy.png" draggable="false" oncontextmenu="return false">
+                    <img class="practice-continent-x" src="images/buttons/X.png" draggable="false" oncontextmenu="return false">
+                  </div>
+                  <span data-i18n="practice.easy">Fácil</span>
+                </div>
+                <div class="practice-diff-btn" data-diff="medio">
+                  <div class="practice-continent-img-wrap">
+                    <img src="images/buttons/medium.png" draggable="false" oncontextmenu="return false">
+                    <img class="practice-continent-x" src="images/buttons/X.png" draggable="false" oncontextmenu="return false">
+                  </div>
+                  <span data-i18n="practice.medium">Medio</span>
+                </div>
+                <div class="practice-diff-btn" data-diff="dificil">
+                  <div class="practice-continent-img-wrap">
+                    <img src="images/buttons/hard.png" draggable="false" oncontextmenu="return false">
+                    <img class="practice-continent-x" src="images/buttons/X.png" draggable="false" oncontextmenu="return false">
+                  </div>
+                  <span data-i18n="practice.hard">Difícil</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Selector de tiempo -->
+            <div class="practice-timer-section">
+              <div class="practice-timer-with-img">
+                <div class="practice-timer-imgs">
+                  <img src="images/buttons/time1.png" class="practice-time-img" data-timeidx="1">
+                  <img src="images/buttons/time2.png" class="practice-time-img" data-timeidx="2">
+                  <img src="images/buttons/time3.png" class="practice-time-img" data-timeidx="3">
+                  <img src="images/buttons/time4.png" class="practice-time-img" data-timeidx="4">
+                  <img src="images/buttons/time5.png" class="practice-time-img" data-timeidx="5">
+                </div>
+                <div class="practice-timeline-wrap">
+                  <input type="range" class="practice-timeline-range" id="practice-timeline-range" min="1" max="5" step="1" value="2">
+                  <div class="practice-timeline-labels">
+                    <span>30s</span>
+                    <span>1min</span>
+                    <span>2min</span>
+                    <span>3min</span>
+                    <span style="font-family:Arial,sans-serif">∞</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Inicio -->
+            <div class="practice-start-wrap" id="practice-start-btn">
+              <img class="practice-confirm1" src="images/confirm1.png" draggable="false" oncontextmenu="return false">
+              <img class="practice-confirm2" src="images/confirm2.png" draggable="false" oncontextmenu="return false">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Popup score de práctica -->
+    <div class="practice-score-popup" id="practice-score-popup" style="display:none">
+      <div class="practice-score-inner">
+        <div class="practice-score-title" data-i18n="practice.sessionOver">Sesión terminada</div>
+        <div class="practice-score-val-wrap">
+          <img class="practice-score-points-img" src="images/points.png" draggable="false" oncontextmenu="return false">
+          <div class="practice-score-val" id="practice-score-val">0</div>
+        </div>
+        <div class="practice-score-time-row">
+          <span class="practice-score-time-icon">⏱</span>
+          <span class="practice-score-time" id="practice-score-time">00:00</span>
+        </div>
+        <div class="practice-score-cw-row">
+          <div class="practice-score-cw-line">
+            <div class="practice-score-imgs-row" id="practice-score-checks-row"></div>
+            <span class="practice-score-cw-count" id="practice-score-correct">x0</span>
+          </div>
+          <div class="practice-score-cw-line">
+            <div class="practice-score-imgs-row" id="practice-score-wrongs-row"></div>
+            <span class="practice-score-cw-count" id="practice-score-wrong">x0</span>
+          </div>
+        </div>
+        <div class="practice-score-ok-wrap" id="practice-score-btn">
+          <img class="practice-confirm1" src="images/confirm1.png" draggable="false" oncontextmenu="return false">
+          <img class="practice-confirm2" src="images/confirm2.png" draggable="false" oncontextmenu="return false">
+        </div>
+      </div>
+    </div>
+
+    <!-- Popup: link expirado -->
+    <div class="account-modal" id="expired-popup">
+      <div class="account-modal-box">
+        <div class="account-view" style="display:flex">
+          <span class="account-modal-title" data-i18n="account.expiredTitle">Link expirado</span>
+          <div class="account-verify-icon">⏰</div>
+          <p class="account-modal-desc" data-i18n="account.expiredDesc">El enlace ha expirado. Pide uno nuevo desde la pantalla de inicio de sesión.</p>
+          <button class="account-modal-opt account-modal-login" id="expired-ok-btn" type="button" data-i18n="account.expiredBtn">Entendido</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Popup: correo verificado -->
+    <div class="account-modal" id="verified-popup">
+      <div class="account-modal-box">
+        <div class="account-view" style="display:flex">
+          <span class="account-modal-title" data-i18n="account.verifiedTitle">¡Correo verificado!</span>
+          <div class="account-verify-icon">✅</div>
+          <p class="account-modal-desc" data-i18n="account.verifiedDesc">Tu cuenta ha sido confirmada. Ya puedes iniciar sesión.</p>
+          <button class="account-modal-opt account-modal-login" id="verified-login-btn" type="button" data-i18n="account.verifiedBtn">Iniciar sesión</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Popup: requiere sesión -->
+    <div class="account-modal" id="social-lock-popup">
+      <div class="account-modal-box">
+        <button class="account-modal-close" id="social-lock-close" type="button">✕</button>
+        <div class="account-view" style="display:flex">
+          <span class="account-modal-title" data-i18n="account.socialLockTitle">Función bloqueada</span>
+          <div class="account-verify-icon">🔒</div>
+          <p class="account-modal-desc" data-i18n="account.socialLockDesc">Inicia sesión para ver y competir contra tus amigos, comparar rankings y añadir nuevos contactos.</p>
+          <button class="account-modal-opt account-modal-login" id="social-lock-login" type="button" data-i18n="account.login">Iniciar sesión</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal cuenta -->
+    <div class="account-modal" id="account-modal">
+      <div class="account-modal-box">
+        <button class="account-modal-close" id="account-modal-close" type="button">✕</button>
+
+        <!-- Vista principal -->
+        <div class="account-view" id="account-view-main">
+          <span class="account-modal-title" data-i18n="account.title">Mi Cuenta</span>
+          <p class="account-modal-desc" data-i18n="account.desc">Conecta tu cuenta para guardar tu progreso y competir con amigos online.</p>
+          <button class="account-modal-opt account-modal-login" id="account-modal-login" type="button" data-i18n="account.login">Iniciar sesión</button>
+          <button class="account-modal-opt account-modal-register" id="account-modal-register" type="button" data-i18n="account.register">Crear cuenta</button>
+        </div>
+
+        <!-- Vista iniciar sesión -->
+        <div class="account-view" id="account-view-login" style="display:none">
+          <span class="account-modal-title" data-i18n="account.loginTitle">Iniciar sesión</span>
+          <div class="account-form">
+            <label class="account-label" data-i18n="account.username">Nombre de usuario</label>
+            <input class="account-input" id="login-user" type="text" placeholder="johndoe321" maxlength="12" autocomplete="off" spellcheck="false">
+            <span class="account-error" id="login-err-user"></span>
+            <label class="account-label" data-i18n="account.password">Contraseña</label>
+            <input class="account-input" id="login-pass" type="password" placeholder="••••••••" maxlength="64">
+            <span class="account-error" id="login-err-pass"></span>
+            <button class="account-modal-opt account-modal-login" id="login-submit" type="button" data-i18n="account.enter">Entrar</button>
+            <button class="account-modal-link" id="login-forgot-btn" type="button" data-i18n="account.forgotLink">Olvidé mi contraseña</button>
+          </div>
+        </div>
+
+        <!-- Vista bienvenida -->
+        <div class="account-view" id="account-view-welcome" style="display:none">
+          <span class="account-modal-title"><span id="account-welcome-prefix"></span><span class="account-welcome-name" id="account-welcome-name"></span>!</span>
+          <div class="account-verify-icon">🌍</div>
+          <p class="account-modal-desc" id="account-welcome-desc"></p>
+          <button class="account-modal-opt account-modal-login" id="login-welcome-ok" type="button" data-i18n="account.play">¡Jugar!</button>
+        </div>
+
+        <!-- Vista crear cuenta -->
+        <div class="account-view" id="account-view-register" style="display:none">
+          <span class="account-modal-title" data-i18n="account.registerTitle">Crear cuenta</span>
+          <div class="account-form">
+            <label class="account-label" data-i18n="account.username">Nombre de usuario</label>
+            <input class="account-input" id="reg-username" type="text" placeholder="johndoe321" maxlength="12" autocomplete="off" spellcheck="false">
+            <span class="account-error" id="reg-err-username"></span>
+            <label class="account-label" data-i18n="account.email">Correo electrónico</label>
+            <input class="account-input" id="reg-email" type="email" data-i18n-ph="account.emailPh" placeholder="ej. correo@email.com" maxlength="60" autocomplete="off">
+            <span class="account-error" id="reg-err-email"></span>
+            <label class="account-label" data-i18n="account.password">Contraseña</label>
+            <input class="account-input" id="reg-pass" type="password" placeholder="••••••••" maxlength="64">
+            <div class="pass-strength-wrap" id="pass-strength-wrap" style="display:none">
+              <div class="pass-strength-bar">
+                <div class="pass-strength-fill" id="pass-strength-fill"></div>
+              </div>
+              <span class="pass-strength-label" id="pass-strength-label"></span>
+            </div>
+            <span class="account-error" id="reg-err-pass"></span>
+            <label class="account-label" data-i18n="account.confirmPass">Confirmar contraseña</label>
+            <input class="account-input" id="reg-pass2" type="password" placeholder="••••••••" maxlength="64">
+            <span class="account-error" id="reg-err-pass2"></span>
+            <button class="account-modal-opt account-modal-register" id="reg-submit" type="button" data-i18n="account.registerBtn">Registrarme</button>
+          </div>
+        </div>
+        <!-- Vista cargando -->
+        <div class="account-view" id="account-view-loading" style="display:none">
+          <div class="account-spinner"></div>
+        </div>
+
+        <!-- Vista verificación / cuenta creada -->
+        <div class="account-view" id="account-view-verify" style="display:none">
+          <span class="account-modal-title" data-i18n="account.verifyTitle">¡Cuenta creada!</span>
+          <div class="account-verify-icon">🌍</div>
+          <p class="account-modal-desc" data-i18n="account.verifyDesc">Tu cuenta fue creada exitosamente.<br>Ya puedes iniciar sesión.</p>
+          <button class="account-modal-opt account-modal-login" id="reg-verify-ok" type="button" data-i18n="account.verifyBtn">Iniciar sesión</button>
+        </div>
+
+        <!-- Vista olvidé mi contraseña -->
+        <div class="account-view" id="account-view-forgot" style="display:none">
+          <span class="account-modal-title" data-i18n="account.forgotTitle">Recuperar contraseña</span>
+          <div class="account-form">
+            <label class="account-label" data-i18n="account.username">Nombre de usuario</label>
+            <input class="account-input" id="forgot-user" type="text" placeholder="johndoe321" maxlength="12" autocomplete="off" spellcheck="false">
+            <span class="account-error" id="forgot-err-user"></span>
+            <button class="account-modal-opt account-modal-login" id="forgot-submit" type="button" data-i18n="account.forgotBtn">Enviar enlace</button>
+            <button class="account-modal-back" id="forgot-back" type="button" data-i18n="account.back">Volver</button>
+          </div>
+        </div>
+
+        <!-- Vista enlace enviado -->
+        <div class="account-view" id="account-view-forgot-sent" style="display:none">
+          <span class="account-modal-title" data-i18n="account.forgotSentTitle">Revisa tu correo</span>
+          <div class="account-verify-icon">✉️</div>
+          <p class="account-modal-desc" data-i18n="account.forgotSentDesc">Te enviamos un enlace para restablecer tu contraseña.</p>
+          <button class="account-modal-opt account-modal-login" id="forgot-sent-ok" type="button" data-i18n="account.understood">Entendido</button>
+        </div>
+
+        <!-- Vista cuenta vinculada (logueado) -->
+        <div class="account-view" id="account-view-loggedin" style="display:none">
+          <span class="account-modal-title" data-i18n="account.linkedTitle">Cuenta vinculada</span>
+          <div class="account-modal-pic-wrap" id="account-modal-pic-wrap">
+            <img class="account-modal-pic loading-profile-pic" id="account-modal-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
+            <div class="account-modal-pic-overlay" id="account-modal-pic-overlay">
+              <span id="account-modal-pic-pencil">✎</span>
+              <div class="pic-upload-spinner" id="account-modal-pic-spinner" style="display:none"></div>
+            </div>
+          </div>
+          <span class="account-linked-name" id="account-linked-name"></span>
+          <div class="account-action-list">
+            <button class="account-action-btn" id="account-go-change-pass" type="button">
+              <span class="account-action-icon">🔑</span>
+              <span data-i18n="account.changePass">Cambiar contraseña</span>
+              <span class="account-action-arrow">›</span>
+            </button>
+            <button class="account-action-btn" id="account-go-change-email" type="button">
+              <span class="account-action-icon">📧</span>
+              <span data-i18n="account.changeEmail">Cambiar correo</span>
+              <span class="account-action-arrow">›</span>
+            </button>
+            <button class="account-action-btn danger" id="account-logout-btn" type="button">
+              <span class="account-action-icon">🚪</span>
+              <span data-i18n="account.logout">Cerrar sesión</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Vista cambiar contraseña -->
+        <div class="account-view" id="account-view-change-pass" style="display:none">
+          <span class="account-modal-title" data-i18n="account.changePassTitle">Cambiar contraseña</span>
+          <div class="account-form">
+            <div id="chpass-current-wrap">
+            <label class="account-label" data-i18n="account.currentPass">Contraseña actual</label>
+            <input class="account-input" id="chpass-current" type="password" placeholder="••••••••" maxlength="64">
+            <span class="account-error" id="chpass-err-current"></span>
+            </div>
+            <label class="account-label" data-i18n="account.newPass">Nueva contraseña</label>
+            <input class="account-input" id="chpass-new" type="password" placeholder="••••••••" maxlength="64">
+            <div class="pass-strength-wrap" id="chpass-strength-wrap" style="display:none">
+              <div class="pass-strength-bar"><div class="pass-strength-fill" id="chpass-strength-fill"></div></div>
+              <span class="pass-strength-label" id="chpass-strength-label"></span>
+            </div>
+            <span class="account-error" id="chpass-err-new"></span>
+            <label class="account-label" data-i18n="account.confirmNewPass">Confirmar nueva contraseña</label>
+            <input class="account-input" id="chpass-confirm" type="password" placeholder="••••••••" maxlength="64">
+            <span class="account-error" id="chpass-err-confirm"></span>
+            <button class="account-modal-opt account-modal-login" id="chpass-submit" type="button" data-i18n="account.saveChanges">Guardar</button>
+          </div>
+        </div>
+
+        <!-- Vista contraseña cambiada OK -->
+        <div class="account-view" id="account-view-change-pass-ok" style="display:none">
+          <span class="account-modal-title" data-i18n="account.passChangedTitle">¡Contraseña actualizada!</span>
+          <div class="account-ok-icon">✅</div>
+          <p class="account-modal-desc" data-i18n="account.passChangedDesc">Tu contraseña fue cambiada exitosamente.</p>
+          <button class="account-modal-opt account-modal-login" id="chpass-ok-close" type="button" data-i18n="account.understood">Entendido</button>
+        </div>
+
+        <!-- Vista cambiar correo -->
+        <div class="account-view" id="account-view-change-email" style="display:none">
+          <span class="account-modal-title" data-i18n="account.changeEmailTitle">Cambiar correo</span>
+          <div class="account-form">
+            <label class="account-label" data-i18n="account.newEmail">Nuevo correo electrónico</label>
+            <input class="account-input" id="chemail-new" type="email" placeholder="nuevo@correo.com" maxlength="60" autocomplete="off">
+            <span class="account-error" id="chemail-err"></span>
+            <button class="account-modal-opt account-modal-login" id="chemail-submit" type="button" data-i18n="account.changeEmailBtn">Enviar verificación</button>
+          </div>
+        </div>
+
+        <!-- Vista confirmar cierre de sesión -->
+        <div class="account-view" id="account-view-logout-confirm" style="display:none">
+          <span class="account-modal-title" data-i18n="account.logoutConfirmTitle">¿Cerrar sesión?</span>
+          <div class="account-verify-icon">🚪</div>
+          <p class="account-modal-desc" data-i18n="account.logoutConfirmDesc">Se cerrará tu sesión en este dispositivo.</p>
+          <button class="account-modal-opt account-modal-register" id="account-logout-confirm" type="button" data-i18n="account.logoutYes">Cerrar sesión</button>
+          <button class="account-modal-opt account-modal-login" id="account-logout-cancel" type="button" data-i18n="account.logoutNo">Cancelar</button>
+        </div>
+
+        <!-- Vista correo - revisa tu correo nuevo -->
+        <div class="account-view" id="account-view-change-email-sent" style="display:none">
+          <span class="account-modal-title" data-i18n="account.changeEmailSentTitle">Revisa tu correo</span>
+          <div class="account-verify-icon">✉️</div>
+          <p class="account-modal-desc" data-i18n="account.changeEmailSentDesc">Te enviamos un enlace al nuevo correo. Confirma el cambio desde ahí.</p>
+          <button class="account-modal-opt account-modal-login" id="chemail-sent-ok" type="button" data-i18n="account.understood">Entendido</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="loading-social-group" class="table-gone">
+      <img class="loading-howtotable" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
+      <img class="loading-social-logo" src="images/logo.png" alt="City Blitz" draggable="false" oncontextmenu="return false">
+      <div class="loading-social-titlebar">
+        <img class="loading-social-planet" src="images/planet2.png" alt="" draggable="false" oncontextmenu="return false">
+        <span class="loading-social-title" data-i18n="social.title">Panel de Amigos</span>
+        <img class="loading-social-planet" src="images/planet2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+      <div class="loading-social-search">
+        <svg class="loading-social-search-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="10.5" cy="10.5" r="6.5" stroke="#8b6a00" stroke-width="2.4"/>
+          <line x1="15.6" y1="15.6" x2="21" y2="21" stroke="#8b6a00" stroke-width="2.8" stroke-linecap="round"/>
+        </svg>
+        <input class="loading-social-search-input" id="loading-social-search-input" type="text" placeholder="Buscar Amigos..." data-i18n-ph="social.searchFriends" maxlength="12" autocomplete="off" spellcheck="false">
+      </div>
+      <button class="loading-social-sort" id="loading-social-sort" type="button" title="Ordenar">Conexión</button>
+      <div class="loading-social-panel">
+        <div class="loading-social-tabs">
+          <button class="loading-social-tab active" id="loading-social-tab-friends" type="button">Mis Amigos</button>
+          <button class="loading-social-tab" id="loading-social-tab-requests" type="button">Solicitudes (3)</button>
+        </div>
+        <div class="loading-social-list" id="loading-social-list"></div>
+        <div class="loading-social-footer">
+          <button class="loading-social-action" id="loading-social-invite" type="button" data-i18n="social.addFriend">Añadir Amigo</button>
+          <button class="loading-social-blockbtn" id="loading-social-sentbtn" type="button" title="Solicitudes enviadas" aria-label="Solicitudes enviadas">
+            <img src="images/friendsent.png" alt="Enviadas" draggable="false" oncontextmenu="return false">
+          </button>
+          <button class="loading-social-blockbtn" id="loading-social-blockbtn" type="button" title="Bloqueados" aria-label="Bloqueados">
+            <img src="images/friendblock.png" alt="Bloqueados" draggable="false" oncontextmenu="return false">
+          </button>
+        </div>
+      </div>
+      <div class="loading-social-back-wrap" id="loading-social-back-wrap">
+        <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+        <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+    </div>
+    <div id="loading-friend-group" class="table-gone">
+    <img class="loading-howtotable" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
+    <img class="loading-profile-pic" id="loading-friend-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
+    <span class="loading-friend-status" id="loading-friend-status"></span>
+    <div class="loading-name-wrap">
+      <span class="loading-player-name" id="loading-friend-name"></span>
+    </div>
+    <div class="loading-play-confirm-wrap" id="loading-friend-back-wrap">
+      <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+      <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+    </div>
+    <span class="loading-play-count" id="loading-friend-play-count"></span>
+    <span class="loading-vs-record" id="loading-friend-vs-record"></span>
+    <div class="loading-games-col">
+      <span class="loading-games-title" data-i18n="common.average">Promedio</span>
+      <div class="loading-games-row">
+        <img class="loading-games-game" src="images/game1.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark1.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs1" id="loading-friend-hs1">0</span>
+        </div>
+      </div>
+      <div class="loading-games-row">
+        <img class="loading-games-game" src="images/game2.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark2.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs2" id="loading-friend-hs2">0</span>
+        </div>
+      </div>
+      <div class="loading-games-row">
+        <img class="loading-games-game" src="images/game3.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark3.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs3" id="loading-friend-hs3">0</span>
+        </div>
+      </div>
+      <div class="loading-games-row">
+        <img class="loading-games-game" src="images/game4.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark4.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs4" id="loading-friend-hs4">0</span>
+        </div>
+      </div>
+    </div>
+    <div class="loading-games-col loading-games-col2">
+      <span class="loading-games-title" data-i18n="common.highscore">Highscore</span>
+      <div class="loading-games-row">
+        <img class="loading-games-game loading-games-spacer" src="images/game1.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark1.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs1" id="loading-friend-avg1">0</span>
+          <span class="loading-games-crown">👑</span>
+        </div>
+      </div>
+      <div class="loading-games-row">
+        <img class="loading-games-game loading-games-spacer" src="images/game2.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark2.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs2" id="loading-friend-avg2">0</span>
+          <span class="loading-games-crown">👑</span>
+        </div>
+      </div>
+      <div class="loading-games-row">
+        <img class="loading-games-game loading-games-spacer" src="images/game3.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark3.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs3" id="loading-friend-avg3">0</span>
+          <span class="loading-games-crown">👑</span>
+        </div>
+      </div>
+      <div class="loading-games-row">
+        <img class="loading-games-game loading-games-spacer" src="images/game4.png" alt="" draggable="false" oncontextmenu="return false">
+        <div class="loading-games-mark-wrap">
+          <img class="loading-games-mark" src="images/mark4.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="loading-games-hs loading-games-hs4" id="loading-friend-avg4">0</span>
+          <span class="loading-games-crown">👑</span>
+        </div>
+      </div>
+    </div>
+    <img class="loading-games-rank" id="loading-friend-rank" src="images/ranks/1.png" alt="" draggable="false" oncontextmenu="return false">
+    <span class="loading-games-rank-label" id="loading-friend-rank-label"></span>
+    <span class="loading-games-hs-label" data-i18n="common.highscore">Highscore</span>
+    <img class="loading-games-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">
+    <span class="loading-games-total" id="loading-friend-total">0</span>
+    <div class="loading-friend-actions" id="loading-friend-actions">
+      <img class="loading-friend-act loading-friend-fav"   id="loading-friend-fav"   src="images/bestfriend.png" alt="Mejor amigo" draggable="false" oncontextmenu="return false">
+      <img class="loading-friend-act loading-friend-rel"   id="loading-friend-rel"   src="images/friendadd.png"  alt="" draggable="false" oncontextmenu="return false">
+      <img class="loading-friend-act loading-friend-block" id="loading-friend-block" src="images/friendblock.png" alt="Bloquear" draggable="false" oncontextmenu="return false">
+    </div>
+    </div>
+    <div id="loading-addfriend-group" class="table-gone">
+      <img class="loading-howtotable" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
+      <div class="loading-addfriend-titlebar">
+        <img class="loading-social-planet" src="images/planet2.png" alt="" draggable="false" oncontextmenu="return false">
+        <span class="loading-social-title" data-i18n="social.addFriend">Añadir Amigo</span>
+        <img class="loading-social-planet" src="images/planet2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+      <span class="loading-addfriend-label" data-i18n="social.typeUsername">Escribe el nombre de usuario</span>
+      <div class="loading-addfriend-search">
+        <svg class="loading-social-search-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="10.5" cy="10.5" r="6.5" stroke="#8b6a00" stroke-width="2.4"/>
+          <line x1="15.6" y1="15.6" x2="21" y2="21" stroke="#8b6a00" stroke-width="2.8" stroke-linecap="round"/>
+        </svg>
+        <input class="loading-social-search-input" id="loading-addfriend-input" type="text" placeholder="Nombre de usuario..." data-i18n-ph="social.usernamePh" maxlength="12" autocomplete="off" spellcheck="false">
+      </div>
+      <button class="loading-social-action loading-addfriend-send" id="loading-addfriend-send" type="button" data-i18n="social.sendRequest">Enviar Solicitud</button>
+      <span class="loading-addfriend-feedback" id="loading-addfriend-feedback"></span>
+      <div class="loading-social-back-wrap" id="loading-addfriend-back-wrap">
+        <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+        <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+    </div>
+
+    <div id="loading-blocked-group" class="table-gone">
+      <img class="loading-howtotable" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
+      <div class="loading-addfriend-titlebar loading-blocked-titlebar">
+        <img class="loading-social-planet" src="images/planet2.png" alt="" draggable="false" oncontextmenu="return false">
+        <span class="loading-social-title" data-i18n="social.blocked">Bloqueados</span>
+        <img class="loading-social-planet" src="images/planet2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+      <div class="loading-social-panel loading-blocked-panel">
+        <div class="loading-blocked-toolbar">
+          <div class="loading-social-search loading-blocked-search">
+            <svg class="loading-social-search-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="10.5" cy="10.5" r="6.5" stroke="#8b6a00" stroke-width="2.4"/>
+              <line x1="15.6" y1="15.6" x2="21" y2="21" stroke="#8b6a00" stroke-width="2.8" stroke-linecap="round"/>
+            </svg>
+            <input class="loading-social-search-input" id="loading-blocked-search-input" type="text" placeholder="Buscar Bloqueados..." data-i18n-ph="social.searchBlocked" maxlength="12" autocomplete="off" spellcheck="false">
+          </div>
+          <button class="loading-social-sort loading-blocked-sort" id="loading-blocked-sort" type="button" title="Ordenar">A-Z</button>
+        </div>
+        <div class="loading-social-list" id="loading-blocked-list"></div>
+      </div>
+      <div class="loading-social-back-wrap" id="loading-blocked-back-wrap">
+        <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+        <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+    </div>
+
+    <div id="loading-sent-group" class="table-gone">
+      <img class="loading-howtotable" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
+      <div class="loading-addfriend-titlebar loading-blocked-titlebar">
+        <img class="loading-social-planet" src="images/planet2.png" alt="" draggable="false" oncontextmenu="return false">
+        <span class="loading-social-title" data-i18n="social.sentRequests">Solicitudes Enviadas</span>
+        <img class="loading-social-planet" src="images/planet2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+      <div class="loading-social-panel loading-blocked-panel">
+        <div class="loading-blocked-toolbar">
+          <div class="loading-social-search loading-blocked-search">
+            <svg class="loading-social-search-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="10.5" cy="10.5" r="6.5" stroke="#8b6a00" stroke-width="2.4"/>
+              <line x1="15.6" y1="15.6" x2="21" y2="21" stroke="#8b6a00" stroke-width="2.8" stroke-linecap="round"/>
+            </svg>
+            <input class="loading-social-search-input" id="loading-sent-search-input" type="text" placeholder="Buscar Enviadas..." data-i18n-ph="social.searchSent" maxlength="12" autocomplete="off" spellcheck="false">
+          </div>
+          <button class="loading-social-sort loading-blocked-sort" id="loading-sent-sort" type="button" title="Ordenar">A-Z</button>
+        </div>
+        <div class="loading-social-list" id="loading-sent-list"></div>
+      </div>
+      <div class="loading-social-back-wrap" id="loading-sent-back-wrap">
+        <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+        <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+    </div>
+    <div id="loading-version">Ver. 2.6.67</div>
+  </div>
+
+  <!-- Pantalla de resultado versus (W/L) — fuera del loading-screen para verse tras la partida -->
+  <div id="vs-result-screen" class="vs-popup-overlay" style="display:none">
+    <div class="vs-popup-box">
+      <span class="vs-result-title" id="vs-result-title"></span>
+      <span class="vs-popup-sub" id="vs-result-sub" style="display:none"></span>
+      <div class="vs-result-scores">
+        <div class="vs-result-side">
+          <img class="vs-result-pic" id="vs-result-me-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="vs-result-name" id="vs-result-me-name">Tú</span>
+          <span class="vs-result-score" id="vs-result-me-score">0</span>
+        </div>
+        <span class="vs-result-vs">VS</span>
+        <div class="vs-result-side">
+          <img class="vs-result-pic" id="vs-result-opp-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="vs-result-name" id="vs-result-opp-name"></span>
+          <span class="vs-result-score" id="vs-result-opp-score">0</span>
+        </div>
+      </div>
+      <div class="vs-popup-confirm" id="vs-result-back">
+        <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+        <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+    </div>
+  </div>
+
+  <!-- Esperando a que terminen todos los miembros del lobby -->
+  <div id="lobby-waiting-overlay" style="display:none">
+    <span id="lobby-waiting-text"></span>
+  </div>
+
+  <!-- Ranking de resultado del lobby (grupal) -->
+  <div id="lobby-result-screen" class="vs-popup-overlay" style="display:none">
+    <div class="vs-popup-box">
+      <span class="vs-result-title" id="lobby-result-title"></span>
+      <div id="lobby-result-list" class="lobby-result-list"></div>
+      <div class="vs-popup-confirm" id="lobby-result-back">
+        <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+        <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirmación genérica del versus (p. ej. crear sala teniendo una activa) -->
+  <div id="versus-confirm-popup" class="vs-popup-overlay" style="display:none">
+    <div class="vs-popup-box">
+      <span class="vs-popup-sub" id="versus-confirm-msg"></span>
+      <div class="vs-incoming-btns">
+        <div class="vs-popup-confirm vs-accept-btn" id="versus-confirm-yes">
+          <img src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
+          <img src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
+        </div>
+        <div class="vs-popup-confirm vs-decline-btn" id="versus-confirm-no">
+          <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+          <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notificación (no bloqueante) de invitación a sala: baja desde arriba con barra de 10s -->
+  <div id="lobby-invite-notif" class="lobby-invite-notif" style="display:none">
+    <div class="lobby-notif-row">
+      <div class="lobby-notif-text">
+        <span class="lobby-notif-name" id="lobby-notif-name"></span>
+        <span class="lobby-notif-sub" id="lobby-notif-sub" data-i18n="lobby.invitedYou">te invitó a su sala</span>
+      </div>
+      <button class="lobby-notif-btn accept" id="lobby-notif-accept" type="button" aria-label="Aceptar">✓</button>
+      <button class="lobby-notif-btn decline" id="lobby-notif-decline" type="button" aria-label="Rechazar">✕</button>
+    </div>
+    <div class="lobby-notif-bar"><div class="lobby-notif-bar-fill" id="lobby-notif-bar"></div></div>
+  </div>
+
+  <!-- Popup: invitar amigos a la sala -->
+  <div id="lobby-invite-popup" class="vs-popup-overlay" style="display:none">
+    <div class="vs-popup-box lobby-invite-box">
+      <span class="vs-popup-name" data-i18n="lobby.inviteTitle">Invitar amigos</span>
+      <button class="versus-start-btn lobby-copylink-btn" id="lobby-copylink-btn" type="button" data-i18n="lobby.copyLink">Copiar link</button>
+      <div id="lobby-invite-list" class="versus-list-box lobby-invite-list"></div>
+      <div id="lobby-invite-empty" class="versus-empty-inline" data-i18n="versus.noneOnline" style="display:none">No hay amigos conectados ahora.</div>
+      <div class="vs-popup-confirm" id="lobby-invite-close">
+        <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+        <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+    </div>
+  </div>
+
+  <div id="splash-screen" class="game-bg-screen" style="display:none">
+    <img class="game-bg-table" src="images/checkerrortable.png" alt="">
+    <img class="game-bg-check3" src="images/check3.png" alt="">
+    <span class="grade-count-total"><span class="grade-count-x">x</span><span id="splash-count-total">0</span></span>
+    <img class="game-bg-wrong3" src="images/wrong3.png" alt="">
+    <span class="wrong-count-total"><span class="wrong-count-x">x</span><span id="splash-wrong-total">0</span></span>
+    <img class="flightatt-splash" src="images/characters/flightattpost2/1.png" alt="">
+    <img class="game-bg-sky" src="images/bg/sky.png" alt="">
+    <img class="game-bg-sky game-bg-sky-monuments" src="images/bg/sky2.png" alt="">
+    <img class="game-bg-plane7" src="images/bg/plane7.png" alt="">
+    <img class="game-bg-cloud game-bg-cloud1" src="images/bg/cloud1.png" alt="">
+    <img class="game-bg-cloud game-bg-cloud2" src="images/bg/cloud2.png" alt="">
+    <img class="game-bg-clouds-monuments" src="images/clouds.png" alt="">
+    <img class="game-bg-clouds-monuments game-bg-clouds-monuments2" src="images/clouds.png" alt="">
+    <img class="game-bg-clouds-monuments game-bg-clouds-monuments3" src="images/clouds.png" alt="">
+    <img class="game-bg-city" src="images/bg/level3complete.png" alt="">
+    <img class="game-bg-city game-bg-city-flags" src="images/bg/level1complete.png" alt="">
+    <img class="game-bg-city game-bg-city-monuments" src="images/bg/level4complete.png" alt="">
+    <img class="game-bg-city game-bg-city-monuments2" src="images/bg/level4complete2.png" alt="">
+    <img class="game-bg-bus" src="images/bg/bus.png" alt="">
+    <img class="game-bg-people" src="images/characters/people.png" alt="">
+    <img class="game-bg-men game-bg-men2" src="images/characters/men2.png" alt="">
+    <img class="game-bg-men game-bg-men1" src="images/characters/men1.png" alt="">
+    <img class="game-bg-women game-bg-women2" src="images/characters/women1.png" alt="">
+    <img class="game-bg-women game-bg-women1" src="images/characters/women1.png" alt="">
+    <img class="game-bg-girl game-bg-girl2" src="images/characters/girl2.png" alt="">
+    <img class="game-bg-girl game-bg-girl1" src="images/characters/girl1.png" alt="">
+    <img class="game-bg-plane game-bg-plane1" src="images/bg/plane.png" alt="">
+    <img class="game-bg-plane game-bg-plane2" src="images/bg/plane2.png" alt="">
+    <img class="game-bg-plane game-bg-plane3" src="images/bg/plane3.png" alt="">
+    <img class="game-bg-plane game-bg-plane4" src="images/bg/plane4.png" alt="">
+    <img class="game-bg-plane game-bg-plane5" src="images/bg/plane5.png" alt="">
+    <img class="game-bg-plane game-bg-plane6" src="images/bg/plane6.png" alt="">
+    <div id="splash-highscore-wrap" style="display:none">
+      <span id="splash-highscore-label" data-i18n="common.bestscore">Mejor puntaje</span>
+      <span id="splash-highscore-value">—</span>
+    </div>
+    <img class="game-bg-stairs" src="images/bg/stairs.png" alt="">
+    <div class="splash-howtoplay-wrap">
+      <img class="splash-howtoplaytable" src="images/howtoplaytable.png" alt="">
+      <div class="splash-howtoplay-title">City Blitz</div>
+      <video class="splash-howtoplay-video" src="images/howtoplay/howtoplay3.mp4" loop muted playsinline preload="none"></video>
+    </div>
+<div class="splash-confirm-wrap">
+      <img class="splash-confirm1" src="images/confirm1.png" alt="">
+      <img class="splash-confirm2" src="images/confirm2.png" alt="">
+    </div><button id="btn-start" style="display:none">Jugar</button>
+<div class="splash-text2-wrap">
+      <img class="splash-text2" src="images/text2.png" alt="">
+      <p class="splash-text2-label">¡Veamos a qué ciudad va cada uno! Aquí es donde tú entras a formar parte.</p>
+    </div>
+  </div>
+
+  <div id="gameover-screen" class="game-bg-screen">
+    <img class="game-bg-table" src="images/checkerrortable.png" alt="">
+    <img class="game-bg-check3" src="images/check3.png" alt="">
+    <span class="grade-count-total"><span class="grade-count-x">x</span><span id="gameover-count-total">0</span></span>
+    <div id="gameover-checks-row" class="checks-row"></div>
+    <img class="game-bg-wrong3" src="images/wrong3.png" alt="">
+    <span class="wrong-count-total"><span class="wrong-count-x">x</span><span id="gameover-wrong-total">0</span></span>
+    <div id="gameover-wrongs-row" class="wrongs-row"></div>
+    <img class="flightatt" src="images/characters/flightattpost/1.png" alt="">
+    <img class="game-bg-sky" src="images/bg/sky.png" alt="">
+    <img class="game-bg-sky game-bg-sky-monuments" src="images/bg/sky2.png" alt="">
+    <img class="game-bg-plane7" src="images/bg/plane7.png" alt="">
+    <img class="game-bg-cloud game-bg-cloud1" src="images/bg/cloud1.png" alt="">
+    <img class="game-bg-cloud game-bg-cloud2" src="images/bg/cloud2.png" alt="">
+    <img class="game-bg-clouds-monuments" src="images/clouds.png" alt="">
+    <img class="game-bg-clouds-monuments game-bg-clouds-monuments2" src="images/clouds.png" alt="">
+    <img class="game-bg-clouds-monuments game-bg-clouds-monuments3" src="images/clouds.png" alt="">
+    <img class="game-bg-city" src="images/bg/level3complete.png" alt="">
+    <img class="game-bg-city game-bg-city-flags" src="images/bg/level1complete.png" alt="">
+    <img class="game-bg-city game-bg-city-monuments" src="images/bg/level4complete.png" alt="">
+    <img class="game-bg-city game-bg-city-monuments2" src="images/bg/level4complete2.png" alt="">
+    <img class="game-bg-bus" src="images/bg/bus.png" alt="">
+    <img class="game-bg-people" src="images/characters/people.png" alt="">
+    <img class="game-bg-men game-bg-men2" src="images/characters/men2.png" alt="">
+    <img class="game-bg-men game-bg-men1" src="images/characters/men1.png" alt="">
+    <img class="game-bg-women game-bg-women2" src="images/characters/women1.png" alt="">
+    <img class="game-bg-women game-bg-women1" src="images/characters/women1.png" alt="">
+    <img class="game-bg-girl game-bg-girl2" src="images/characters/girl2.png" alt="">
+    <img class="game-bg-girl game-bg-girl1" src="images/characters/girl1.png" alt="">
+    <img class="game-bg-plane game-bg-plane1" src="images/bg/plane.png" alt="">
+    <img class="game-bg-plane game-bg-plane2" src="images/bg/plane2.png" alt="">
+    <img class="game-bg-plane game-bg-plane3" src="images/bg/plane3.png" alt="">
+    <img class="game-bg-plane game-bg-plane4" src="images/bg/plane4.png" alt="">
+    <img class="game-bg-plane game-bg-plane5" src="images/bg/plane5.png" alt="">
+    <img class="game-bg-plane game-bg-plane6" src="images/bg/plane6.png" alt="">
+    <img class="game-bg-stairs" src="images/bg/stairs.png" alt="">
+    <h2 data-i18n="splash.timeUp">¡Tiempo!</h2>
+    <div id="final-score-label" data-i18n="results.finalScore">Puntaje final</div>
+    <div id="final-score-value">0</div>
+    <div id="new-highscore-banner" style="display:none">
+      <span id="new-highscore-text" data-i18n="results.newRecord">¡Nuevo récord!</span>
+      <span id="new-highscore-score"></span>
+    </div>
+    <div class="gameover-text1-wrap">
+      <img class="gameover-text1" src="images/text1.png" alt="">
+      <p class="gameover-text1-label">¡Buen intento! ¡Todos llegaron a sus ciudades de destino!</p>
+    </div>
+    <div class="gameover-confirm-wrap">
+      <img class="gameover-confirm1" src="images/confirm1.png" alt="">
+      <img class="gameover-confirm2" src="images/confirm2.png" alt="">
+    </div>
+  </div>
+
+  <div id="final-screen" style="display:none;position:absolute;inset:0;z-index:160;">
+    <img class="results-sky" src="images/bg/sky3.png" alt="" draggable="false" oncontextmenu="return false">
+    <img class="final-cloud4" src="images/bg/cloud4.png" alt="" draggable="false" oncontextmenu="return false">
+    <img class="final-cloud4 final-cloud4b" src="images/bg/cloud4.png" alt="" draggable="false" oncontextmenu="return false">
+    <img class="final-cloud4 final-cloud4c" src="images/bg/cloud4.png" alt="" draggable="false" oncontextmenu="return false">
+    <div id="final-clouds5"></div>
+    <div id="final-group">
+      <div class="final-plane-wrap">
+        <img class="final-plane" src="images/plane.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+      <span class="final-position" id="final-position"></span>
+      <span class="final-player-name" id="final-player-name"></span>
+      <span class="final-rank-label" id="final-rank-label"></span>
+      <img class="final-cloud3-fg" src="images/bg/cloud3.png" alt="" draggable="false" oncontextmenu="return false">
+      <div class="final-avatar"><img class="final-avatar-img" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false"></div>
+      <div class="final-points-wrap">
+        <img class="final-points-img" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">
+        <span class="final-points-score" id="final-points-score">0</span>
+      </div>
+    </div>
+    <div class="final-confirm-back-wrap" id="final-confirm-back-wrap">
+      <img class="final-confirm-back1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
+      <img class="final-confirm-back2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
+    </div>
+  </div>
+
+  <div id="results-screen" style="display:none;position:fixed;inset:0;z-index:150;">
+    <img class="results-sky" src="images/bg/sky3.png" alt="" draggable="false" oncontextmenu="return false">
+    <img class="loading-clouds" src="images/clouds.png" alt="">
+    <img class="loading-clouds loading-clouds2" src="images/clouds.png" alt="">
+    <img class="loading-clouds loading-clouds3" src="images/clouds.png" alt="">
+    <img class="loading-clouds-b" src="images/clouds.png" alt="">
+    <img class="loading-clouds-b loading-clouds-b2" src="images/clouds.png" alt="">
+    <img class="loading-clouds-b loading-clouds-b3" src="images/clouds.png" alt="">
+    <img class="loading-clouds-c" src="images/clouds.png" alt="">
+    <img class="loading-clouds-c loading-clouds-c2" src="images/clouds.png" alt="">
+    <img class="loading-clouds-c loading-clouds-c3" src="images/clouds.png" alt="">
+    <div class="loading-clouds-fade"></div>
+    <div class="loading-clouds-fade loading-clouds-fade2"></div>
+    <div class="loading-clouds-fade loading-clouds-fade3"></div>
+    <img class="results-table" src="images/howtoplaytable.png" alt="">
+    <div class="results-text3-wrap">
+      <img class="results-text3" src="images/text3.png" alt="" draggable="false" oncontextmenu="return false">
+      <p class="results-rank-desc" id="results-rank-desc"></p>
+    </div>
+    <img class="results-flightatt" src="images/characters/flightattpost/1.png" alt="" draggable="false">
+    <div id="results-reveal">
+    <img class="results-rank" id="results-rank" src="images/ranks/1.png" alt="" draggable="false" oncontextmenu="return false" style="display:none;">
+    <span class="results-rank-label" id="results-rank-label">Agorafóbico</span>
+    <div class="results-points-wrap" id="results-points-wrap">
+      <span class="results-points-label" data-i18n="common.total">Puntuación total</span>
+      <img class="results-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">
+      <span class="results-total-score" id="results-total-score">0</span>
+    </div>
+    </div><!-- #results-reveal -->
+    <div class="results-back-wrap" id="results-back-wrap">
+      <img class="results-back1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
+      <img class="results-back2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
+    </div>
+    <div class="results-confirm-wrap">
+      <img class="results-confirm1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
+      <img class="results-confirm2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
+    </div>
+    <div class="results-content">
+      <span class="results-title" data-i18n="final.worldTour">Gira mundial</span>
+      <img class="results-planet" src="images/planet2.png" alt="">
+      <img class="results-game results-game1" src="images/game1.png" alt="" draggable="false" oncontextmenu="return false">
+      <span class="results-mark-label results-mark-label1">Suitcase Shuffle</span>
+      <span class="results-hs results-hs1" id="results-hs1">0</span>
+      <img class="results-mark results-mark1" src="images/mark1.png" alt="">
+      <img class="results-game results-game2" src="images/game2.png" alt="" draggable="false" oncontextmenu="return false">
+      <span class="results-mark-label results-mark-label2">Map Mayhem</span>
+      <span class="results-hs results-hs2" id="results-hs2">0</span>
+      <img class="results-mark results-mark2" src="images/mark2.png" alt="">
+      <img class="results-game results-game3" src="images/game3.png" alt="" draggable="false" oncontextmenu="return false">
+      <span class="results-mark-label results-mark-label3">City Blitz</span>
+      <span class="results-hs results-hs3" id="results-hs3">0</span>
+      <img class="results-mark results-mark3" src="images/mark3.png" alt="">
+      <img class="results-game results-game4" src="images/game4.png" alt="" draggable="false" oncontextmenu="return false">
+      <span class="results-mark-label results-mark-label4">Landmark Loco</span>
+      <span class="results-hs results-hs4" id="results-hs4">0</span>
+      <img class="results-mark results-mark4" src="images/mark4.png" alt="">
+    </div>
+  </div>
+
+  <div id="game-wrapper">
+
+    <canvas id="game-canvas" oncontextmenu="return false"></canvas>
+
+    <div id="city-tag">
+      <img src="images/tag3.png" alt="">
+      <span id="city-tag-text" data-i18n="common.city">Ciudad</span>
+      <img id="monument-img" src="" alt="" style="display:none; width:282px; height:180px; object-fit:cover; position:absolute; top:51px; left:87px; pointer-events:none;">
+      <div id="monument-name"></div>
+    </div>
+
+    <div id="result-label"></div>
+    <div id="coord-tooltip"></div>
+
+  </div>
+
+  <div id="countdown-widget">
+    <img src="images/countdown.png" alt="">
+    <div id="timer-number">60</div>
+    <div id="progress-dots">
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+      <div class="dot"></div>
+    </div>
+    <div id="time-bonus" class="time-bonus" aria-hidden="true"><span class="tb-plus">+</span><span class="tb-num">5s</span></div>
+  </div>
+
+  <div id="speed-bonus-text" data-i18n="common.speedBonus">¡Bonus velocidad!</div>
+
+  <div id="score-display">
+    <img src="images/points.png" alt="">
+    <div id="score-value">0</div>
+  </div>
+
+  <!-- Barra celeste pegada al borde derecho visible, detrás del panel de amigos -->
+  <div id="right-edge-bar"></div>
+
+  <div id="right-panel">
+    <div id="leaderboard"></div>
+    <div id="highscore-value" style="display:none">0</div>
+  </div>
+
+  <div id="pregame-countdown" style="display:none">
+    <img id="pregame-countdown-img" src="" alt="">
+  </div>
+
+  <div id="timeup-overlay" style="display:none">
+    <img src="images/countdown/timeup.png" alt="Time Up">
+  </div>
+  <div id="powerquit-overlay" style="display:none">
+    <img src="images/countdown/gameover.png" alt="Game Over">
+  </div>
+
+  <div id="vol-btn">
+    <img id="vol-img" src="images/vol1.png" alt="">
+  </div>
+  <div id="fs-btn">⛶</div>
+
+  <img id="ingame-power" src="images/power.png" alt="" draggable="false" oncontextmenu="return false" style="display:none">
+
+  <div id="ingame-quit-popup" style="display:none">
+    <div class="ingame-quit-box">
+      <span class="ingame-quit-text" data-i18n="quit.text">¿Quieres terminar la partida y volver al menú principal?</span>
+      <div class="ingame-quit-actions">
+        <button class="ingame-quit-btn confirm" id="ingame-quit-confirm" type="button" aria-label="Sí">✓</button>
+        <button class="ingame-quit-btn cancel" id="ingame-quit-cancel" type="button" aria-label="No">✕</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="friend-confirm-popup" style="display:none">
+    <div class="ingame-quit-box friend-confirm-box">
+      <button class="friend-confirm-close" id="friend-confirm-close" type="button" aria-label="Cerrar">✕</button>
+      <span class="ingame-quit-text" id="friend-confirm-text"></span>
+      <div class="ingame-quit-actions">
+        <button class="ingame-quit-btn confirm" id="friend-confirm-yes" type="button" aria-label="Sí">✓</button>
+        <button class="ingame-quit-btn cancel" id="friend-confirm-no" type="button" aria-label="No">✕</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MODO BANDERAS ──────────────────────────────────── -->
+  <div id="flags-wrapper" style="display:none">
+
+    <div id="flags-result-label"></div>
+
+  </div>
+
+
+  <div id="flags-countdown-widget">
+    <img src="images/countdown2.png" alt="">
+    <div id="flags-timer-number">60</div>
+    <div id="flags-progress-dots">
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+      <div class="dot"></div>
+    </div>
+    <div id="flags-time-bonus" class="time-bonus" aria-hidden="true"><span class="tb-plus">+</span><span class="tb-num">5s</span></div>
+  </div>
+
+  <div id="flags-speed-bonus-text" data-i18n="common.speedBonus">¡Bonus velocidad!</div>
+
+  <div id="flags-score-display" style="display:none">
+    <img src="images/points.png" alt="">
+    <div id="flags-score-value">0</div>
+  </div>
+
+  <div id="flags-right-panel" style="display:none">
+    <div id="flags-leaderboard"></div>
+    <div id="flags-highscore-value" style="display:none">0</div>
+  </div>
+
+  <div id="flags-pregame-countdown" style="display:none">
+    <img id="flags-pregame-countdown-img" src="" alt="">
+  </div>
+
+  <div id="flags-timeup-overlay" style="display:none">
+    <img src="images/countdown/timeup.png" alt="Time Up">
+  </div>
+
+  <img id="flags-machine" src="images/machine1.png" alt="" style="display:none">
+  <img id="flags-findluggage" src="images/findluggage.png" alt="" draggable="false" ondragstart="return false" style="display:none">
+  <img id="flags-machine2" src="images/machine2.png" alt="" style="display:none">
+  <img id="flags-machine3" src="images/machine3.png" alt="" style="display:none">
+  <img id="flags-machine3b" src="images/machine3.png" alt="" style="display:none">
+  <img id="flags-check-overlay" src="images/check.png" alt="">
+  <img id="flags-wrong-overlay" src="images/wrong.png" alt="">
+  <canvas id="flags-badge-canvas"></canvas>
+  <div id="flags-luggage-wrap" style="display:none">
+    <div id="flags-luggage-left-group">
+      <div id="flags-flag-container-left">
+        <img id="flags-flag-img-left" src="" alt="">
+      </div>
+      <img class="flags-luggage-side" src="images/luggage.png" alt="">
+    </div>
+    <div id="flags-luggage-group">
+      <div id="flags-flag-container">
+        <img id="flags-flag-img" src="" alt="">
+      </div>
+      <img id="flags-luggage" src="images/luggage.png" alt="">
+    </div>
+    <div id="flags-luggage-right-group">
+      <div id="flags-flag-container-right">
+        <img id="flags-flag-img-right" src="" alt="">
+      </div>
+      <img class="flags-luggage-side" src="images/luggage.png" alt="">
+    </div>
+    <div id="flags-luggage-bl-group" style="display:none">
+      <div id="flags-flag-container-bl">
+        <img id="flags-flag-img-bl" src="" alt="">
+      </div>
+      <img class="flags-luggage-side" src="images/luggage.png" alt="">
+    </div>
+    <div id="flags-luggage-bc-group" style="display:none">
+      <div id="flags-flag-container-bc">
+        <img id="flags-flag-img-bc" src="" alt="">
+      </div>
+      <img class="flags-luggage-side" src="images/luggage.png" alt="">
+    </div>
+    <div id="flags-luggage-br-group" style="display:none">
+      <div id="flags-flag-container-br">
+        <img id="flags-flag-img-br" src="" alt="">
+      </div>
+      <img class="flags-luggage-side" src="images/luggage.png" alt="">
+    </div>
+  </div>
+  <div id="flags-flagid-wrap" style="display:none">
+    <img id="flags-flagid" src="images/flagid.png" alt="">
+    <div id="flags-flagid-label"></div>
+  </div>
+  <!-- ── FIN MODO BANDERAS ───────────────────────────────── -->
+
+  <!-- Modal de primer ingreso: pide el nombre, no se puede saltar -->
+  <div id="name-prompt">
+    <div class="name-prompt-box">
+      <div class="name-prompt-lang" id="name-prompt-lang">
+        <button class="loading-lang-toggle" id="name-prompt-lang-toggle" type="button">
+          <span class="loading-lang-current" id="name-prompt-lang-current">Español</span>
+          <span class="loading-lang-caret">▾</span>
+        </button>
+        <div class="loading-lang-menu" id="name-prompt-lang-menu">
+          <button class="loading-lang-option" type="button" data-lang="en">English</button>
+          <button class="loading-lang-option" type="button" data-lang="es">Español</button>
+        </div>
+      </div>
+      <div class="name-prompt-inner">
+        <div class="name-prompt-form">
+          <span class="name-prompt-welcome" data-i18n="name.welcome">¡Bienvenido!</span>
+          <span class="name-prompt-title" data-i18n="name.askName">¿Cómo te llamas?</span>
+          <input class="name-prompt-input" id="name-prompt-input" type="text" maxlength="12" autocomplete="off" spellcheck="false" data-i18n-ph="name.ph" placeholder="Tu nombre...">
+          <button class="name-prompt-btn" id="name-prompt-btn" type="button" disabled data-i18n="name.confirm">Confirmar</button>
+          <div class="name-prompt-divider"><span data-i18n="name.orDivider">o</span></div>
+          <button class="name-prompt-account-btn" id="name-prompt-account-btn" type="button" data-i18n="name.hasAccount">¿Tienes cuenta? Inicia sesión o regístrate</button>
+        </div>
+        <div class="name-prompt-pic-wrap" id="name-prompt-pic-wrap">
+          <img class="name-prompt-pic" id="name-prompt-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
+          <div class="name-prompt-pic-overlay" id="name-prompt-pic-overlay">✎</div>
+          <input type="file" id="name-prompt-pic-input" accept="image/*" style="display:none">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Popup de bienvenida tras confirmar nombre -->
+  <div id="welcome-popup">
+    <div class="welcome-popup-box">
+      <img class="welcome-popup-pic" id="welcome-popup-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
+      <span class="welcome-popup-name" id="welcome-popup-name"></span>
+      <span class="welcome-popup-sub" id="welcome-popup-sub"></span>
+      <div class="welcome-popup-confirm" id="welcome-popup-confirm">
+        <img class="welcome-popup-confirm1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
+        <img class="welcome-popup-confirm2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+    </div>
+  </div>
+
+  <div id="init-cover"></div>
+
+  <div id="screen-warning">
+    <div id="screen-warning-box">
+      <div id="screen-warning-icon">⚠️</div>
+      <p id="screen-warning-msg">La pantalla no es suficiente para mostrar el juego.</p>
+      <p id="screen-warning-sub">Resize the window for the best experience.</p>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="js/sb.js"></script>
+  <script src="js/letterbox.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/i18n-data.js"></script>
+  <script src="js/manifest.js"></script>
+  <script src="js/practice-data.js"></script>
+  <script src="js/cities.js"></script>
+  <script src="js/countries.js"></script>
+  <script src="js/places.js"></script>
+  <script src="js/friends.js"></script>
+  <script src="js/vs.js"></script>
+  <script src="js/lobby.js"></script>
+  <script src="js/monuments.js"></script>
+  <script src="js/flags.js"></script>
+  <script src="js/shapes.js"></script>
+  <script src="js/ranks.js"></script>
+  <script src="js/results.js"></script>
+  <script src="js/final.js"></script>
+  <script src="js/memdebug.js"></script>
+
+  <button id="recording-toggle" style="display:none" onclick="document.body.classList.toggle('recording-mode');this.classList.toggle('active')">⏺</button>
+
+
+</body>
+</html>

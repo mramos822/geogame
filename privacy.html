@@ -3,76 +3,424 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Privacy Policy – GeoChallenge</title>
+  <title>Privacy Policy – myGeoChallenge</title>
+  <meta name="description" content="Privacy Policy for myGeoChallenge. Learn how we collect, use, and protect your information.">
+  <link rel="icon" type="image/png" href="images/planet3.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <style>
-    body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #333; line-height: 1.7; }
-    h1 { color: #1a1a2e; }
-    h2 { color: #16213e; margin-top: 32px; }
-    a { color: #0066cc; }
-    footer { margin-top: 48px; font-size: 0.85em; color: #888; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Nunito', Arial, sans-serif;
+      background: #0f1e2d;
+      color: #cdd8e8;
+      line-height: 1.75;
+      min-height: 100vh;
+    }
+
+    /* ── NAV ── */
+    nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 48px;
+      background: rgba(10,30,55,.6);
+      border-bottom: 1px solid rgba(255,255,255,.1);
+      position: sticky; top: 0; z-index: 100;
+      backdrop-filter: blur(10px);
+    }
+    .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .nav-logo img { width: 34px; filter: drop-shadow(0 2px 6px rgba(0,0,0,.4)); }
+    .nav-logo span { font-size: 1.15rem; font-weight: 900; color: #fff; }
+    .nav-right { display: flex; align-items: center; gap: 12px; }
+    .lang-btn {
+      display: flex; align-items: center; gap: 5px;
+      background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2);
+      color: #fff; font-family: inherit; font-size: .82rem; font-weight: 800;
+      padding: 6px 13px; border-radius: 50px; cursor: pointer;
+      transition: background .2s; letter-spacing: .5px;
+    }
+    .lang-btn:hover { background: rgba(255,255,255,.2); }
+    .nav-back {
+      background: rgba(245,200,66,.15); color: #f5c842;
+      font-weight: 800; font-size: .9rem;
+      padding: 8px 20px; border-radius: 50px;
+      text-decoration: none;
+      border: 1px solid rgba(245,200,66,.3);
+      transition: background .2s;
+      white-space: nowrap;
+    }
+    .nav-back:hover { background: rgba(245,200,66,.25); }
+
+    /* ── CONTENT ── */
+    .content {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 60px 24px 80px;
+    }
+    .doc-header { margin-bottom: 38px; }
+    h1 {
+      font-size: clamp(1.8rem, 4vw, 2.4rem);
+      font-weight: 900; color: #fff;
+      margin-bottom: 8px;
+    }
+    .effective {
+      font-size: .85rem; font-weight: 700;
+      color: rgba(255,255,255,.4);
+    }
+    h2 {
+      font-size: 1.08rem; font-weight: 800; color: #f5c842;
+      margin-top: 38px; margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(245,200,66,.2);
+    }
+    p { margin-bottom: 14px; font-size: .97rem; }
+    ul { margin: 10px 0 14px 22px; }
+    li { margin-bottom: 6px; font-size: .97rem; }
+    a { color: #5bb8ee; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .highlight-box {
+      background: rgba(245,200,66,.07);
+      border: 1px solid rgba(245,200,66,.18);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin: 20px 0;
+      font-size: .93rem;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      background: rgba(0,0,0,.3);
+      border-top: 1px solid rgba(255,255,255,.07);
+      text-align: center;
+      padding: 24px;
+      font-size: .85rem; font-weight: 600;
+      color: rgba(255,255,255,.35);
+    }
+    footer a { color: #f5c842; }
+
+    @media(max-width:600px) { nav { padding: 12px 18px; } }
   </style>
 </head>
 <body>
 
-  <h1>Privacy Policy</h1>
-  <p><strong>Effective date:</strong> June 12, 2025</p>
-  <p>This Privacy Policy describes how <strong>GeoChallenge</strong> ("we", "us", or "our"), operated at <a href="https://mygeochallenge.com">mygeochallenge.com</a>, collects, uses, and shares information when you use our website and game.</p>
+  <nav>
+    <a class="nav-logo" href="/">
+      <img src="images/planet3.png" alt="myGeoChallenge">
+      <span>myGeoChallenge</span>
+    </a>
+    <div class="nav-right">
+      <button class="lang-btn" id="lang-btn" type="button" aria-label="Change language">🌐 <span id="lang-label">ES</span></button>
+      <a class="nav-back" id="nav-back" href="/">← Back to Home</a>
+    </div>
+  </nav>
 
-  <h2>1. Information We Collect</h2>
-  <p>We may collect the following types of information:</p>
-  <ul>
-    <li><strong>Account information:</strong> If you create an account, we collect your username and email address.</li>
-    <li><strong>Usage data:</strong> Game scores, play counts, and session activity stored to provide leaderboard and profile features.</li>
-    <li><strong>Profile photo:</strong> If you upload a profile picture, it is stored securely on our servers.</li>
-    <li><strong>Technical data:</strong> Browser type, device type, and IP address collected automatically when you visit the site.</li>
-  </ul>
+  <div class="content">
+    <div class="doc-header">
+      <h1 id="pp-title">Privacy Policy</h1>
+      <p class="effective" id="pp-effective">Effective date: June 12, 2025 &nbsp;·&nbsp; Last updated: June 2026</p>
+    </div>
 
-  <h2>2. How We Use Your Information</h2>
-  <ul>
-    <li>To operate and improve the game and its features.</li>
-    <li>To display leaderboards and social features among friends.</li>
-    <li>To serve relevant advertisements through Google AdSense.</li>
-    <li>To comply with legal obligations.</li>
-  </ul>
+    <div class="highlight-box" id="pp-intro-box">
+      This Privacy Policy explains how <strong>myGeoChallenge</strong> ("we", "us", or "our"), operated at <a href="https://mygeochallenge.com">mygeochallenge.com</a>, collects, uses, and protects your information when you use our website and game. By using myGeoChallenge you agree to the practices described in this policy.
+    </div>
 
-  <h2>3. Advertising</h2>
-  <p>We use <strong>Google AdSense</strong> to display advertisements on our site. Google may use cookies and similar technologies to serve ads based on your prior visits to our site or other websites. You can opt out of personalized advertising by visiting <a href="https://www.google.com/settings/ads" target="_blank">Google Ads Settings</a>.</p>
-  <p>For users in the European Economic Area (EEA), United Kingdom, and Switzerland, we use Google's Consent Management Platform to request your consent before serving personalized ads.</p>
+    <!-- 1 -->
+    <h2 id="h1" data-en="1. Information We Collect" data-es="1. Información que Recopilamos">1. Information We Collect</h2>
+    <p id="p1a">We may collect the following types of information depending on how you use the game:</p>
+    <ul id="ul1">
+      <li id="li1a"><strong id="li1a-s">Account information:</strong> <span id="li1a-t">If you create an account, we collect your username and email address. A profile photo is optional.</span></li>
+      <li id="li1b"><strong id="li1b-s">Game data:</strong> <span id="li1b-t">Scores, high scores, play counts, rank titles, and session activity stored to provide leaderboard and profile features.</span></li>
+      <li id="li1c"><strong id="li1c-s">Social data:</strong> <span id="li1c-t">Friend lists, friend requests sent/received, and in-game emotes exchanged during Versus matches. This data is stored to power the social features of the game.</span></li>
+      <li id="li1d"><strong id="li1d-s">Technical data:</strong> <span id="li1d-t">Browser type, device type, operating system, and IP address collected automatically when you visit the site.</span></li>
+      <li id="li1e"><strong id="li1e-s">Guest usage:</strong> <span id="li1e-t">If you play as a guest (without an account), no personal information is collected. Your session data is temporary and not stored on our servers.</span></li>
+    </ul>
 
-  <h2>4. Cookies</h2>
-  <p>We use cookies and similar tracking technologies to:</p>
-  <ul>
-    <li>Keep you logged in to your account.</li>
-    <li>Remember your language and game preferences.</li>
-    <li>Enable advertising features via Google AdSense.</li>
-  </ul>
-  <p>You can control cookies through your browser settings. Disabling cookies may affect some features of the game.</p>
+    <!-- 2 -->
+    <h2 id="h2" data-en="2. How We Use Your Information" data-es="2. Cómo Usamos tu Información">2. How We Use Your Information</h2>
+    <ul id="ul2">
+      <li id="li2a">To operate and continuously improve the game and its features.</li>
+      <li id="li2b">To display global leaderboards and track player rankings.</li>
+      <li id="li2c">To enable social features such as friend lists, Versus match invitations, and in-game notifications.</li>
+      <li id="li2d">To serve relevant advertisements through Google AdSense.</li>
+      <li id="li2e">To remember your language preference (English or Spanish) across sessions.</li>
+      <li id="li2f">To detect and prevent fraud, abuse, or violations of our terms.</li>
+      <li id="li2g">To comply with applicable legal obligations.</li>
+    </ul>
 
-  <h2>5. Third-Party Services</h2>
-  <p>We use the following third-party services:</p>
-  <ul>
-    <li><strong>Supabase</strong> — for authentication, database, and file storage. <a href="https://supabase.com/privacy" target="_blank">Supabase Privacy Policy</a>.</li>
-    <li><strong>Google AdSense</strong> — for advertising. <a href="https://policies.google.com/privacy" target="_blank">Google Privacy Policy</a>.</li>
-  </ul>
+    <!-- 3 -->
+    <h2 id="h3" data-en="3. Advertising" data-es="3. Publicidad">3. Advertising</h2>
+    <p id="p3a">We use <strong>Google AdSense</strong> to display advertisements on our site. Google may use cookies and similar technologies to serve ads based on your prior visits to our site or other websites.</p>
+    <p id="p3b">Ads are displayed outside the game interface and are never placed inside game screens or panels. You can opt out of personalized advertising by visiting <a href="https://www.google.com/settings/ads" target="_blank" rel="noopener">Google Ads Settings</a> or <a href="https://optout.aboutads.info/" target="_blank" rel="noopener">aboutads.info</a>.</p>
+    <p id="p3c">For users in the European Economic Area (EEA), United Kingdom, and Switzerland, we use Google's Consent Management Platform to request your consent before serving personalized ads. You can change your consent preferences at any time.</p>
 
-  <h2>6. Data Retention</h2>
-  <p>We retain your account data for as long as your account is active. You may request deletion of your account and associated data at any time by contacting us.</p>
+    <!-- 4 -->
+    <h2 id="h4" data-en="4. Cookies and Local Storage" data-es="4. Cookies y Almacenamiento Local">4. Cookies and Local Storage</h2>
+    <p id="p4a">We use cookies and browser local storage for the following purposes:</p>
+    <ul id="ul4">
+      <li id="li4a"><strong id="li4a-s">Authentication:</strong> <span id="li4a-t">To keep you logged in to your account across sessions (via Supabase session tokens).</span></li>
+      <li id="li4b"><strong id="li4b-s">Preferences:</strong> <span id="li4b-t">To remember your language choice (EN/ES), mute settings, and other in-game preferences.</span></li>
+      <li id="li4c"><strong id="li4c-s">Advertising:</strong> <span id="li4c-t">Google AdSense uses cookies to measure ad performance and serve personalized or non-personalized ads depending on your consent.</span></li>
+      <li id="li4d"><strong id="li4d-s">Analytics:</strong> <span id="li4d-t">Basic usage data may be collected to understand how players interact with the game (e.g., which modes are most played).</span></li>
+    </ul>
+    <p id="p4b">You can control or delete cookies at any time through your browser settings. Disabling cookies may affect authentication and some game features.</p>
 
-  <h2>7. Children's Privacy</h2>
-  <p>GeoChallenge is intended for general audiences. We do not knowingly collect personal information from children under the age of 13. If you believe a child has provided us with personal information, please contact us and we will delete it.</p>
+    <!-- 5 -->
+    <h2 id="h5" data-en="5. Third-Party Services" data-es="5. Servicios de Terceros">5. Third-Party Services</h2>
+    <p id="p5a">We use the following third-party services, each governed by their own privacy policy:</p>
+    <ul id="ul5">
+      <li id="li5a"><strong>Supabase</strong> — <span id="li5a-t">Authentication, database, real-time updates, and file storage (profile photos). </span><a href="https://supabase.com/privacy" target="_blank" rel="noopener">Supabase Privacy Policy</a>.</li>
+      <li id="li5b"><strong>Google AdSense</strong> — <span id="li5b-t">Advertising platform. </span><a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google Privacy Policy</a>.</li>
+      <li id="li5c"><strong>Google Fonts</strong> — <span id="li5c-t">Web fonts served from Google's CDN. Google may log requests. </span><a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google Privacy Policy</a>.</li>
+    </ul>
 
-  <h2>8. Your Rights</h2>
-  <p>Depending on your location, you may have the right to access, correct, or delete your personal data. To exercise these rights, contact us at the email below.</p>
+    <!-- 6 -->
+    <h2 id="h6" data-en="6. Public Data and Leaderboards" data-es="6. Datos Públicos y Tablas de Clasificación">6. Public Data and Leaderboards</h2>
+    <p id="p6a">If you create an account, your <strong id="p6a-s">username, profile photo, rank title, and high scores</strong> <span id="p6a-t">are visible to other players on global leaderboards and in Versus match lobbies. This is an inherent part of the competitive features of the game.</span></p>
+    <p id="p6b">You can control your display name at any time from your in-game profile panel. If you wish to remove your public data entirely, you may request account deletion (see Section 8).</p>
 
-  <h2>9. Changes to This Policy</h2>
-  <p>We may update this Privacy Policy from time to time. We will notify users of significant changes by updating the effective date at the top of this page.</p>
+    <!-- 7 -->
+    <h2 id="h7" data-en="7. Data Retention" data-es="7. Retención de Datos">7. Data Retention</h2>
+    <p id="p7a">We retain your account data for as long as your account remains active. Game scores and leaderboard entries associated with your account are stored indefinitely to maintain ranking integrity.</p>
+    <p id="p7b">If you delete your account, your personal information (email, username, profile photo) will be permanently removed within 30 days. Anonymized aggregate data (e.g., total play counts) may be retained for analytical purposes.</p>
+    <p id="p7c">Guest session data is not stored on our servers and is discarded when the browser session ends.</p>
 
-  <h2>10. Contact</h2>
-  <p>If you have any questions about this Privacy Policy, please contact us at: <a href="mailto:mr822@njit.edu">mr822@njit.edu</a></p>
+    <!-- 8 -->
+    <h2 id="h8" data-en="8. Your Rights" data-es="8. Tus Derechos">8. Your Rights</h2>
+    <p id="p8a">Depending on your location, you may have the following rights regarding your personal data:</p>
+    <ul id="ul8">
+      <li id="li8a"><strong id="li8a-s">Access:</strong> <span id="li8a-t">Request a copy of the personal data we hold about you.</span></li>
+      <li id="li8b"><strong id="li8b-s">Correction:</strong> <span id="li8b-t">Update or correct your username and profile photo at any time from within the game.</span></li>
+      <li id="li8c"><strong id="li8c-s">Deletion:</strong> <span id="li8c-t">Request permanent deletion of your account and associated personal data.</span></li>
+      <li id="li8d"><strong id="li8d-s">Portability:</strong> <span id="li8d-t">Request an export of your personal data in a machine-readable format.</span></li>
+      <li id="li8e"><strong id="li8e-s">Opt-out of personalized ads:</strong> <span id="li8e-t">Withdraw your advertising consent at any time via Google Ads Settings or your browser's cookie controls.</span></li>
+    </ul>
+    <p id="p8b">To exercise any of these rights, contact us at <a href="mailto:mygeochallengeapp@gmail.com">mygeochallengeapp@gmail.com</a>. We will respond within 30 days.</p>
+    <p id="p8c"><strong id="p8c-s">California residents (CCPA):</strong> <span id="p8c-t">You have the right to know what personal data we collect, the right to delete it, and the right to opt out of the sale of your data. We do not sell personal data to third parties.</span></p>
+    <p id="p8d"><strong id="p8d-s">EEA/UK residents (GDPR):</strong> <span id="p8d-t">You have the right to object to processing, restrict processing, and lodge a complaint with your local data protection authority.</span></p>
+
+    <!-- 9 -->
+    <h2 id="h9" data-en="9. Children's Privacy" data-es="9. Privacidad de Menores">9. Children's Privacy</h2>
+    <p id="p9a">myGeoChallenge is intended for general audiences. We do not knowingly collect personal information from children under the age of 13 (or under 16 in the EEA). The game can be played as a guest without providing any personal information.</p>
+    <p id="p9b">If you are a parent or guardian and believe your child has provided personal information to us, please contact us at <a href="mailto:mygeochallengeapp@gmail.com">mygeochallengeapp@gmail.com</a> and we will delete it promptly.</p>
+
+    <!-- 10 -->
+    <h2 id="h10" data-en="10. Data Security" data-es="10. Seguridad de los Datos">10. Data Security</h2>
+    <p id="p10a">We take reasonable technical and organizational measures to protect your personal data against unauthorized access, loss, or misuse. All data is stored and transmitted via secure, encrypted connections (HTTPS/TLS).</p>
+    <p id="p10b">Authentication is handled by Supabase, which uses industry-standard security practices including hashed password storage and secure session tokens. However, no system is completely immune to security risks, and we encourage you to use a strong, unique password for your account.</p>
+
+    <!-- 11 -->
+    <h2 id="h11" data-en="11. International Data Transfers" data-es="11. Transferencias Internacionales de Datos">11. International Data Transfers</h2>
+    <p id="p11a">myGeoChallenge is operated from the United States. If you are accessing the game from outside the U.S., your data may be transferred to and processed in the U.S. or other countries where our service providers (such as Supabase) operate.</p>
+    <p id="p11b">These transfers are protected by appropriate safeguards, including Supabase's compliance with applicable data protection frameworks. By using myGeoChallenge, you consent to this transfer.</p>
+
+    <!-- 12 -->
+    <h2 id="h12" data-en="12. Changes to This Policy" data-es="12. Cambios en Esta Política">12. Changes to This Policy</h2>
+    <p id="p12a">We may update this Privacy Policy from time to time to reflect changes in our practices or applicable law. We will notify users of material changes by updating the "Last updated" date at the top of this page. We encourage you to review this policy periodically.</p>
+    <p id="p12b">Continued use of myGeoChallenge after a policy update constitutes your acceptance of the revised policy.</p>
+
+    <!-- 13 -->
+    <h2 id="h13" data-en="13. Contact" data-es="13. Contacto">13. Contact</h2>
+    <p id="p13a">If you have any questions, concerns, or requests regarding this Privacy Policy or your personal data, please contact us:</p>
+    <ul id="ul13">
+      <li id="li13a"><strong>Email:</strong> <a href="mailto:mygeochallengeapp@gmail.com">mygeochallengeapp@gmail.com</a></li>
+      <li id="li13b"><strong>Website:</strong> <a href="https://mygeochallenge.com">mygeochallenge.com</a></li>
+    </ul>
+  </div>
 
   <footer>
-    <p>&copy; 2025 GeoChallenge. All rights reserved. | <a href="/">Back to game</a></p>
+    <p>&copy; 2026 myGeoChallenge &nbsp;·&nbsp; mygeochallenge.com &nbsp;·&nbsp; <span id="footer-rights">All rights reserved</span> &nbsp;·&nbsp; <a href="/" id="footer-back">Back to Home</a></p>
   </footer>
+
+  <script>
+  // ── TRANSLATIONS ─────────────────────────────────────────────
+  const T = {
+    en: {
+      title:     'Privacy Policy',
+      effective: 'Effective date: June 12, 2025  ·  Last updated: June 2026',
+      'nav-back': '← Back to Home',
+      'footer-rights': 'All rights reserved',
+      'footer-back':   'Back to Home',
+      introBox: 'This Privacy Policy explains how <strong>myGeoChallenge</strong> ("we", "us", or "our"), operated at <a href="https://mygeochallenge.com">mygeochallenge.com</a>, collects, uses, and protects your information when you use our website and game. By using myGeoChallenge you agree to the practices described in this policy.',
+      // Section headings (via data-en on the h2)
+      // list items & paragraphs
+      p1a: 'We may collect the following types of information depending on how you use the game:',
+      'li1a-s': 'Account information:', 'li1a-t': 'If you create an account, we collect your username and email address. A profile photo is optional.',
+      'li1b-s': 'Game data:',            'li1b-t': 'Scores, high scores, play counts, rank titles, and session activity stored to provide leaderboard and profile features.',
+      'li1c-s': 'Social data:',          'li1c-t': 'Friend lists, friend requests sent/received, and in-game emotes exchanged during Versus matches. This data is stored to power the social features of the game.',
+      'li1d-s': 'Technical data:',       'li1d-t': 'Browser type, device type, operating system, and IP address collected automatically when you visit the site.',
+      'li1e-s': 'Guest usage:',          'li1e-t': 'If you play as a guest (without an account), no personal information is collected. Your session data is temporary and not stored on our servers.',
+      li2a: 'To operate and continuously improve the game and its features.',
+      li2b: 'To display global leaderboards and track player rankings.',
+      li2c: 'To enable social features such as friend lists, Versus match invitations, and in-game notifications.',
+      li2d: 'To serve relevant advertisements through Google AdSense.',
+      li2e: 'To remember your language preference (English or Spanish) across sessions.',
+      li2f: 'To detect and prevent fraud, abuse, or violations of our terms.',
+      li2g: 'To comply with applicable legal obligations.',
+      p3a: 'We use <strong>Google AdSense</strong> to display advertisements on our site. Google may use cookies and similar technologies to serve ads based on your prior visits to our site or other websites.',
+      p3b: 'Ads are displayed outside the game interface and are never placed inside game screens or panels. You can opt out of personalized advertising by visiting <a href="https://www.google.com/settings/ads" target="_blank" rel="noopener">Google Ads Settings</a> or <a href="https://optout.aboutads.info/" target="_blank" rel="noopener">aboutads.info</a>.',
+      p3c: 'For users in the European Economic Area (EEA), United Kingdom, and Switzerland, we use Google\'s Consent Management Platform to request your consent before serving personalized ads. You can change your consent preferences at any time.',
+      p4a: 'We use cookies and browser local storage for the following purposes:',
+      'li4a-s': 'Authentication:', 'li4a-t': 'To keep you logged in to your account across sessions (via Supabase session tokens).',
+      'li4b-s': 'Preferences:',    'li4b-t': 'To remember your language choice (EN/ES), mute settings, and other in-game preferences.',
+      'li4c-s': 'Advertising:',    'li4c-t': 'Google AdSense uses cookies to measure ad performance and serve personalized or non-personalized ads depending on your consent.',
+      'li4d-s': 'Analytics:',      'li4d-t': 'Basic usage data may be collected to understand how players interact with the game (e.g., which modes are most played).',
+      p4b: 'You can control or delete cookies at any time through your browser settings. Disabling cookies may affect authentication and some game features.',
+      p5a: 'We use the following third-party services, each governed by their own privacy policy:',
+      'li5a-t': 'Authentication, database, real-time updates, and file storage (profile photos). ',
+      'li5b-t': 'Advertising platform. ',
+      'li5c-t': 'Web fonts served from Google\'s CDN. Google may log requests. ',
+      'p6a-s': 'username, profile photo, rank title, and high scores',
+      'p6a-t': ' are visible to other players on global leaderboards and in Versus match lobbies. This is an inherent part of the competitive features of the game.',
+      p6b: 'You can control your display name at any time from your in-game profile panel. If you wish to remove your public data entirely, you may request account deletion (see Section 8).',
+      p7a: 'We retain your account data for as long as your account remains active. Game scores and leaderboard entries associated with your account are stored indefinitely to maintain ranking integrity.',
+      p7b: 'If you delete your account, your personal information (email, username, profile photo) will be permanently removed within 30 days. Anonymized aggregate data (e.g., total play counts) may be retained for analytical purposes.',
+      p7c: 'Guest session data is not stored on our servers and is discarded when the browser session ends.',
+      p8a: 'Depending on your location, you may have the following rights regarding your personal data:',
+      'li8a-s': 'Access:',                    'li8a-t': 'Request a copy of the personal data we hold about you.',
+      'li8b-s': 'Correction:',                'li8b-t': 'Update or correct your username and profile photo at any time from within the game.',
+      'li8c-s': 'Deletion:',                  'li8c-t': 'Request permanent deletion of your account and associated personal data.',
+      'li8d-s': 'Portability:',               'li8d-t': 'Request an export of your personal data in a machine-readable format.',
+      'li8e-s': 'Opt-out of personalized ads:', 'li8e-t': 'Withdraw your advertising consent at any time via Google Ads Settings or your browser\'s cookie controls.',
+      p8b: 'To exercise any of these rights, contact us at <a href="mailto:mygeochallengeapp@gmail.com">mygeochallengeapp@gmail.com</a>. We will respond within 30 days.',
+      'p8c-s': 'California residents (CCPA):',  'p8c-t': ' You have the right to know what personal data we collect, the right to delete it, and the right to opt out of the sale of your data. We do not sell personal data to third parties.',
+      'p8d-s': 'EEA/UK residents (GDPR):',      'p8d-t': ' You have the right to object to processing, restrict processing, and lodge a complaint with your local data protection authority.',
+      p9a: 'myGeoChallenge is intended for general audiences. We do not knowingly collect personal information from children under the age of 13 (or under 16 in the EEA). The game can be played as a guest without providing any personal information.',
+      p9b: 'If you are a parent or guardian and believe your child has provided personal information to us, please contact us at <a href="mailto:mygeochallengeapp@gmail.com">mygeochallengeapp@gmail.com</a> and we will delete it promptly.',
+      p10a: 'We take reasonable technical and organizational measures to protect your personal data against unauthorized access, loss, or misuse. All data is stored and transmitted via secure, encrypted connections (HTTPS/TLS).',
+      p10b: 'Authentication is handled by Supabase, which uses industry-standard security practices including hashed password storage and secure session tokens. However, no system is completely immune to security risks, and we encourage you to use a strong, unique password for your account.',
+      p11a: 'myGeoChallenge is operated from the United States. If you are accessing the game from outside the U.S., your data may be transferred to and processed in the U.S. or other countries where our service providers (such as Supabase) operate.',
+      p11b: 'These transfers are protected by appropriate safeguards, including Supabase\'s compliance with applicable data protection frameworks. By using myGeoChallenge, you consent to this transfer.',
+      p12a: 'We may update this Privacy Policy from time to time to reflect changes in our practices or applicable law. We will notify users of material changes by updating the "Last updated" date at the top of this page. We encourage you to review this policy periodically.',
+      p12b: 'Continued use of myGeoChallenge after a policy update constitutes your acceptance of the revised policy.',
+      p13a: 'If you have any questions, concerns, or requests regarding this Privacy Policy or your personal data, please contact us:',
+    },
+    es: {
+      title:     'Política de Privacidad',
+      effective: 'Fecha de vigencia: 12 de junio de 2025  ·  Última actualización: junio 2026',
+      'nav-back': '← Volver al Inicio',
+      'footer-rights': 'Todos los derechos reservados',
+      'footer-back':   'Volver al Inicio',
+      introBox: 'Esta Política de Privacidad explica cómo <strong>myGeoChallenge</strong> ("nosotros" o "nuestro"), operado en <a href="https://mygeochallenge.com">mygeochallenge.com</a>, recopila, usa y protege tu información cuando usas nuestro sitio web y juego. Al usar myGeoChallenge, aceptas las prácticas descritas en esta política.',
+      p1a: 'Podemos recopilar los siguientes tipos de información según cómo utilices el juego:',
+      'li1a-s': 'Información de cuenta:', 'li1a-t': 'Si creas una cuenta, recopilamos tu nombre de usuario y dirección de correo electrónico. La foto de perfil es opcional.',
+      'li1b-s': 'Datos del juego:',        'li1b-t': 'Puntajes, récords, veces jugadas, títulos de rango y actividad de sesión almacenados para proporcionar funciones de tabla de clasificación y perfil.',
+      'li1c-s': 'Datos sociales:',         'li1c-t': 'Listas de amigos, solicitudes de amistad enviadas/recibidas y emotes intercambiados durante partidas Versus. Estos datos se almacenan para potenciar las funciones sociales del juego.',
+      'li1d-s': 'Datos técnicos:',         'li1d-t': 'Tipo de navegador, tipo de dispositivo, sistema operativo y dirección IP recopilados automáticamente al visitar el sitio.',
+      'li1e-s': 'Uso como invitado:',      'li1e-t': 'Si juegas como invitado (sin cuenta), no se recopila información personal. Los datos de tu sesión son temporales y no se almacenan en nuestros servidores.',
+      li2a: 'Para operar y mejorar continuamente el juego y sus funciones.',
+      li2b: 'Para mostrar tablas de clasificación globales y hacer seguimiento de los rankings.',
+      li2c: 'Para habilitar funciones sociales como listas de amigos, invitaciones a partidas Versus y notificaciones en el juego.',
+      li2d: 'Para mostrar anuncios relevantes a través de Google AdSense.',
+      li2e: 'Para recordar tu preferencia de idioma (inglés o español) entre sesiones.',
+      li2f: 'Para detectar y prevenir fraude, abuso o violaciones de nuestros términos.',
+      li2g: 'Para cumplir con las obligaciones legales aplicables.',
+      p3a: 'Usamos <strong>Google AdSense</strong> para mostrar anuncios en nuestro sitio. Google puede usar cookies y tecnologías similares para mostrar anuncios basados en tus visitas anteriores a nuestro sitio u otros sitios web.',
+      p3b: 'Los anuncios se muestran fuera de la interfaz del juego y nunca se colocan dentro de las pantallas de juego. Puedes cancelar la suscripción a los anuncios personalizados visitando <a href="https://www.google.com/settings/ads" target="_blank" rel="noopener">Configuración de Anuncios de Google</a> o <a href="https://optout.aboutads.info/" target="_blank" rel="noopener">aboutads.info</a>.',
+      p3c: 'Para usuarios en el Espacio Económico Europeo (EEE), el Reino Unido y Suiza, utilizamos la Plataforma de Gestión de Consentimiento de Google para solicitar tu consentimiento antes de mostrar anuncios personalizados.',
+      p4a: 'Usamos cookies y almacenamiento local del navegador para los siguientes fines:',
+      'li4a-s': 'Autenticación:', 'li4a-t': 'Para mantenerte conectado a tu cuenta entre sesiones (mediante tokens de sesión de Supabase).',
+      'li4b-s': 'Preferencias:',  'li4b-t': 'Para recordar tu elección de idioma (EN/ES), configuración de sonido y otras preferencias del juego.',
+      'li4c-s': 'Publicidad:',    'li4c-t': 'Google AdSense usa cookies para medir el rendimiento de los anuncios y mostrar anuncios personalizados o no personalizados según tu consentimiento.',
+      'li4d-s': 'Analítica:',     'li4d-t': 'Pueden recopilarse datos básicos de uso para entender cómo los jugadores interactúan con el juego (p. ej., qué modos se juegan más).',
+      p4b: 'Puedes controlar o eliminar las cookies en cualquier momento a través de la configuración de tu navegador. Desactivar las cookies puede afectar la autenticación y algunas funciones del juego.',
+      p5a: 'Utilizamos los siguientes servicios de terceros, cada uno regido por su propia política de privacidad:',
+      'li5a-t': 'Autenticación, base de datos, actualizaciones en tiempo real y almacenamiento de archivos (fotos de perfil). ',
+      'li5b-t': 'Plataforma publicitaria. ',
+      'li5c-t': 'Fuentes web servidas desde la CDN de Google. Google puede registrar las solicitudes. ',
+      'p6a-s': 'nombre de usuario, foto de perfil, título de rango y récords',
+      'p6a-t': ' son visibles para otros jugadores en las tablas de clasificación globales y en los lobbies de partidas Versus. Esto es una parte inherente de las funciones competitivas del juego.',
+      p6b: 'Puedes cambiar tu nombre de usuario en cualquier momento desde el panel de perfil del juego. Si deseas eliminar tus datos públicos por completo, puedes solicitar la eliminación de tu cuenta (ver Sección 8).',
+      p7a: 'Conservamos los datos de tu cuenta mientras esta permanezca activa. Los puntajes y entradas en la tabla de clasificación asociados a tu cuenta se almacenan indefinidamente para mantener la integridad del ranking.',
+      p7b: 'Si eliminas tu cuenta, tu información personal (correo electrónico, nombre de usuario, foto de perfil) será eliminada permanentemente en un plazo de 30 días. Los datos agregados y anonimizados pueden conservarse con fines analíticos.',
+      p7c: 'Los datos de sesión de invitado no se almacenan en nuestros servidores y se descartan al cerrar el navegador.',
+      p8a: 'Dependiendo de tu ubicación, puedes tener los siguientes derechos sobre tus datos personales:',
+      'li8a-s': 'Acceso:',                        'li8a-t': 'Solicitar una copia de los datos personales que tenemos sobre ti.',
+      'li8b-s': 'Corrección:',                    'li8b-t': 'Actualizar o corregir tu nombre de usuario y foto de perfil en cualquier momento desde el juego.',
+      'li8c-s': 'Eliminación:',                   'li8c-t': 'Solicitar la eliminación permanente de tu cuenta y datos personales asociados.',
+      'li8d-s': 'Portabilidad:',                  'li8d-t': 'Solicitar una exportación de tus datos personales en un formato legible por máquina.',
+      'li8e-s': 'Cancelar anuncios personalizados:', 'li8e-t': 'Retirar tu consentimiento publicitario en cualquier momento a través de la Configuración de Anuncios de Google o los controles de cookies de tu navegador.',
+      p8b: 'Para ejercer cualquiera de estos derechos, contáctanos en <a href="mailto:mygeochallengeapp@gmail.com">mygeochallengeapp@gmail.com</a>. Responderemos en un plazo de 30 días.',
+      'p8c-s': 'Residentes de California (CCPA):',  'p8c-t': ' Tienes derecho a saber qué datos personales recopilamos, el derecho a eliminarlos y el derecho a optar por no participar en la venta de tus datos. No vendemos datos personales a terceros.',
+      'p8d-s': 'Residentes del EEE/UK (RGPD):',     'p8d-t': ' Tienes derecho a oponerte al tratamiento, restringirlo y presentar una reclamación ante tu autoridad local de protección de datos.',
+      p9a: 'myGeoChallenge está destinado al público en general. No recopilamos conscientemente información personal de menores de 13 años (o de 16 en el EEE). El juego puede jugarse como invitado sin proporcionar ninguna información personal.',
+      p9b: 'Si eres padre o tutor y crees que tu hijo/a nos ha proporcionado información personal, contáctanos en <a href="mailto:mygeochallengeapp@gmail.com">mygeochallengeapp@gmail.com</a> y la eliminaremos de inmediato.',
+      p10a: 'Tomamos medidas técnicas y organizativas razonables para proteger tus datos personales contra el acceso no autorizado, la pérdida o el uso indebido. Todos los datos se almacenan y transmiten mediante conexiones cifradas seguras (HTTPS/TLS).',
+      p10b: 'La autenticación está gestionada por Supabase, que utiliza prácticas de seguridad estándar de la industria, incluyendo el almacenamiento de contraseñas con hash y tokens de sesión seguros. Sin embargo, ningún sistema es completamente inmune a riesgos de seguridad, y te recomendamos usar una contraseña fuerte y única para tu cuenta.',
+      p11a: 'myGeoChallenge opera desde los Estados Unidos. Si accedes al juego desde fuera de EE.UU., tus datos pueden ser transferidos y procesados en EE.UU. u otros países donde operan nuestros proveedores de servicios (como Supabase).',
+      p11b: 'Estas transferencias están protegidas por las salvaguardias adecuadas, incluido el cumplimiento de Supabase con los marcos de protección de datos aplicables. Al usar myGeoChallenge, consientes esta transferencia.',
+      p12a: 'Podemos actualizar esta Política de Privacidad de vez en cuando para reflejar cambios en nuestras prácticas o en la ley aplicable. Notificaremos a los usuarios sobre cambios importantes actualizando la fecha de "Última actualización" en la parte superior de esta página.',
+      p12b: 'El uso continuado de myGeoChallenge tras una actualización de la política constituye tu aceptación de la política revisada.',
+      p13a: 'Si tienes alguna pregunta, inquietud o solicitud sobre esta Política de Privacidad o tus datos personales, contáctanos:',
+    }
+  };
+
+  // ── ELEMENTS THAT HAVE PLAIN textContent ─────────────────────
+  const TEXT_IDS = [
+    'pp-effective','nav-back','footer-rights','footer-back',
+    'p1a',
+    'li1a-t','li1b-t','li1c-t','li1d-t','li1e-t',
+    'li1a-s','li1b-s','li1c-s','li1d-s','li1e-s',
+    'li2a','li2b','li2c','li2d','li2e','li2f','li2g',
+    'p4a','p4b','p5a',
+    'li4a-s','li4a-t','li4b-s','li4b-t','li4c-s','li4c-t','li4d-s','li4d-t',
+    'li5a-t','li5b-t','li5c-t',
+    'p6a-s','p6a-t','p6b',
+    'p7a','p7b','p7c',
+    'p8a',
+    'li8a-s','li8a-t','li8b-s','li8b-t','li8c-s','li8c-t','li8d-s','li8d-t','li8e-s','li8e-t',
+    'p8c-s','p8c-t','p8d-s','p8d-t',
+    'p9a','p9b',
+    'p10a','p10b',
+    'p11a','p11b',
+    'p12a','p12b',
+    'p13a',
+  ];
+
+  // ── ELEMENTS THAT NEED innerHTML (contain links/tags) ─────────
+  const HTML_IDS = ['pp-intro-box','p3a','p3b','p3c','p8b','p9b'];
+
+  // ── SECTION HEADINGS (use data-en / data-es) ─────────────────
+  const H2_IDS = ['h1','h2','h3','h4','h5','h6','h7','h8','h9','h10','h11','h12','h13'];
+
+  let lang = localStorage.getItem('mgc-privacy-lang')
+    || localStorage.getItem('mgc-landing-lang')
+    || 'en';
+
+  function applyLang(l) {
+    lang = l;
+    localStorage.setItem('mgc-privacy-lang', l);
+    localStorage.setItem('mgc-landing-lang', l);   // keep in sync with landing page
+    document.documentElement.lang = l;
+    document.getElementById('lang-label').textContent = l === 'en' ? 'ES' : 'EN';
+
+    // title
+    document.getElementById('pp-title').textContent = T[l].title;
+
+    // plain text nodes
+    TEXT_IDS.forEach(id => {
+      const el = document.getElementById(id);
+      if (el && T[l][id] !== undefined) el.textContent = T[l][id];
+    });
+
+    // innerHTML nodes
+    HTML_IDS.forEach(id => {
+      const el = document.getElementById(id);
+      if (el && T[l][id] !== undefined) el.innerHTML = T[l][id];
+    });
+
+    // h2 headings via data-en / data-es
+    H2_IDS.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = el.dataset[l] || el.textContent;
+    });
+  }
+
+  document.getElementById('lang-btn').addEventListener('click', () => {
+    applyLang(lang === 'en' ? 'es' : 'en');
+  });
+
+  applyLang(lang);
+  </script>
 
 </body>
 </html>

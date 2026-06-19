@@ -1,1512 +1,730 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
-  <meta name="color-scheme" content="light dark">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>myGeoChallenge — Free Online Geography Quiz Game</title>
+  <meta name="description" content="Play myGeoChallenge, the free online geography quiz game! Identify cities on maps, recognize country flags, match country shapes, and name famous world landmarks. Compete with friends online.">
+  <meta name="keywords" content="geography game, geography quiz, country flags quiz, world map game, city quiz, landmarks quiz, free online game, mygeochallenge">
   <link rel="icon" type="image/png" href="images/planet3.png">
-  <title>GeoChallenge</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6238929099865050" crossorigin="anonymous"></script>
-  <link rel="stylesheet" href="css/style.css">
-  <link rel="preload" href="images/characters/men3.png" as="image">
-  <link rel="preload" href="images/characters/men4.png" as="image">
-  <link rel="preload" href="images/characters/girl3.png" as="image">
-  <link rel="preload" href="images/characters/girl4.png" as="image">
-  <link rel="preload" href="images/characters/men5.png" as="image">
-  <link rel="preload" href="images/characters/men6.png" as="image">
-  <link rel="preload" href="images/characters/women4.png" as="image">
-  <link rel="preload" href="images/characters/women5.png" as="image">
-  <link rel="preload" href="images/characters/girl5.png" as="image">
-  <link rel="preload" href="images/characters/girl6.png" as="image">
-  <link rel="preload" href="images/bg/level2complete.png" as="image">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --sky:      #5b9fd4;
+      --sky-dark: #2e6fa3;
+      --gold:     #f5c842;
+      --gold-dark:#c8920a;
+      --dark:     #0f1e2d;
+    }
+
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Nunito', 'Segoe UI', sans-serif; background: var(--sky); color: #1a2a3a; overflow-x: hidden; }
+
+    /* ── KEYFRAMES ── */
+    @keyframes cloudFly {
+      from { transform: translateX(0); }
+      to   { transform: translateX(calc(100vw + 500px)); }
+    }
+    @keyframes planeFly {
+      0%   { left: -280px; opacity: 0; }
+      4%   { opacity: 1; }
+      92%  { opacity: 1; }
+      100% { left: calc(100% + 280px); opacity: 0; }
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-12px); }
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0   rgba(245,200,66,.55); }
+      50%       { box-shadow: 0 0 0 18px rgba(245,200,66,0); }
+    }
+    @keyframes marqueeL { from { transform: translateX(0);    } to { transform: translateX(-50%); } }
+    @keyframes marqueeR { from { transform: translateX(-50%); } to { transform: translateX(0);    } }
+    @keyframes ticker   { from { transform: translateX(0);    } to { transform: translateX(-50%); } }
+
+    /* ── NAV ── */
+    nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 13px 48px;
+      background: rgba(10,30,55,.45); backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(255,255,255,.12);
+      position: sticky; top: 0; z-index: 200;
+    }
+    .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .nav-logo img { width: 34px; filter: drop-shadow(0 2px 6px rgba(0,0,0,.4)); }
+    .nav-logo span { font-size: 1.15rem; font-weight: 900; color: #fff; }
+    .nav-right { display: flex; align-items: center; gap: 14px; }
+    .nav-link { color: rgba(255,255,255,.8); text-decoration: none; font-size: .88rem; font-weight: 700; transition: color .2s; }
+    .nav-link:hover { color: #fff; }
+    .lang-btn {
+      display: flex; align-items: center; gap: 5px;
+      background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.22);
+      color: #fff; font-family: inherit; font-size: .82rem; font-weight: 800;
+      padding: 6px 13px; border-radius: 50px; cursor: pointer;
+      transition: background .2s; letter-spacing: .5px;
+    }
+    .lang-btn:hover { background: rgba(255,255,255,.22); }
+    .nav-play {
+      background: var(--gold); color: var(--dark);
+      font-weight: 900; font-size: .92rem;
+      padding: 9px 22px; border-radius: 50px; text-decoration: none;
+      box-shadow: 0 3px 12px rgba(0,0,0,.25);
+      transition: transform .15s, background .2s;
+    }
+    .nav-play:hover { background: var(--gold-dark); color: #fff; transform: scale(1.05); }
+
+    /* ── HERO ── */
+    .hero {
+      position: relative; min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center; overflow: hidden; padding: 100px 24px;
+      background-color: #3a8acb;
+      background-image:
+        linear-gradient(180deg, rgba(20,58,100,.88) 0%, rgba(36,96,152,.72) 40%, rgba(74,148,196,.58) 100%),
+        url('images/background.png');
+      background-size: cover, 1540px auto;
+      background-position: center top, center center;
+    }
+    .hcloud { position: absolute; pointer-events: none; user-select: none; }
+    .hcloud-1 { top:  8%; left: -340px; width: clamp(220px,28vw,380px); animation: cloudFly 48s linear infinite 0s;   opacity: .75; }
+    .hcloud-2 { top: 24%; left: -220px; width: clamp(160px,20vw,280px); animation: cloudFly 66s linear infinite -18s; opacity: .55; }
+    .hcloud-3 { top: 42%; left: -280px; width: clamp(130px,16vw,220px); animation: cloudFly 84s linear infinite -36s; opacity: .40; }
+    .hcloud-4 { top: 62%; left: -200px; width: clamp(180px,22vw,300px); animation: cloudFly 55s linear infinite -8s;  opacity: .28; }
+    .hero-plane {
+      position: absolute; bottom: 18%; width: clamp(180px,20vw,280px);
+      filter: drop-shadow(0 6px 18px rgba(0,0,0,.3));
+      animation: planeFly 20s linear infinite 3s; pointer-events: none;
+    }
+
+    .hero-content {
+      position: relative; z-index: 10;
+      display: flex; flex-direction: column; align-items: center;
+      width: 100%; max-width: 820px;
+    }
+    .hero-logo {
+      display: block; width: clamp(260px,38vw,460px);
+      filter: drop-shadow(0 6px 28px rgba(0,0,0,.55));
+      animation: float 5s ease-in-out infinite; margin-bottom: 22px;
+    }
+    .hero-tagline {
+      font-size: clamp(.83rem,1.8vw,1rem); color: rgba(255,255,255,.88);
+      font-weight: 800; letter-spacing: .8px; text-transform: uppercase;
+      background: rgba(0,0,0,.22); padding: 6px 20px; border-radius: 50px; margin-bottom: 18px;
+    }
+    .hero-title {
+      font-size: clamp(2rem,5vw,3.6rem); color: #fff; font-weight: 900;
+      text-shadow: 0 3px 18px rgba(0,0,0,.5); line-height: 1.15; margin-bottom: 18px;
+    }
+    .hero-title span { color: var(--gold); }
+    .hero-desc {
+      font-size: clamp(.93rem,2vw,1.12rem); color: rgba(255,255,255,.82);
+      max-width: 620px; line-height: 1.7; margin-bottom: 34px; font-weight: 600;
+    }
+    .hero-btns { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-bottom: 14px; }
+    .btn-primary {
+      background: var(--gold); color: var(--dark);
+      font-size: 1.12rem; font-weight: 900; padding: 16px 50px; border-radius: 60px;
+      text-decoration: none; box-shadow: 0 8px 28px rgba(0,0,0,.28);
+      animation: pulse 2.2s ease-in-out infinite; transition: transform .15s, background .2s;
+    }
+    .btn-primary:hover { transform: scale(1.07); background: var(--gold-dark); color: #fff; animation: none; }
+    .btn-secondary {
+      background: rgba(255,255,255,.15); color: #fff; font-size: .96rem; font-weight: 800;
+      padding: 16px 32px; border-radius: 60px; text-decoration: none;
+      border: 2px solid rgba(255,255,255,.35); backdrop-filter: blur(6px);
+      transition: background .2s, transform .15s;
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,.25); transform: scale(1.04); }
+    .hero-note { color: rgba(255,255,255,.5); font-size: .8rem; font-weight: 700; }
+    .scroll-hint {
+      position: absolute; bottom: 26px; left: 50%; transform: translateX(-50%);
+      display: flex; flex-direction: column; align-items: center; gap: 5px;
+      color: rgba(255,255,255,.42); font-size: .7rem; font-weight: 800;
+      text-transform: uppercase; letter-spacing: 1.2px; z-index: 10;
+    }
+    .scroll-arrow {
+      width: 18px; height: 18px;
+      border-right: 2.5px solid rgba(255,255,255,.42);
+      border-bottom: 2.5px solid rgba(255,255,255,.42);
+      transform: rotate(45deg); animation: float 1.4s ease-in-out infinite;
+    }
+
+    /* ── TICKER ── */
+    .ticker-wrap { background: var(--dark); overflow: hidden; padding: 12px 0; border-top: 2px solid rgba(245,200,66,.22); border-bottom: 2px solid rgba(245,200,66,.22); }
+    .ticker-inner { display: flex; width: max-content; animation: ticker 40s linear infinite; }
+    .ticker-item { white-space: nowrap; padding: 0 28px; font-size: .86rem; font-weight: 800; color: rgba(255,255,255,.68); display: flex; align-items: center; gap: 10px; }
+    .ticker-item .dot { color: var(--gold); }
+
+    /* ── STATS ── */
+    .stats { background: linear-gradient(135deg, var(--dark) 0%, #162a40 100%); padding: 56px 24px; }
+    .stats-inner { max-width: 900px; margin: 0 auto; }
+    .stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 2px; }
+    @media(max-width:580px) { .stats-grid { grid-template-columns: repeat(2,1fr); } }
+    .stat-item { text-align: center; padding: 30px 14px; background: rgba(255,255,255,.04); transition: background .2s; }
+    .stat-item:hover { background: rgba(255,255,255,.08); }
+    .stat-icon  { font-size: 2rem; margin-bottom: 10px; display: block; }
+    .stat-num   { font-size: clamp(2rem,4vw,2.8rem); font-weight: 900; color: var(--gold); display: block; line-height: 1; }
+    .stat-label { font-size: .8rem; font-weight: 700; color: rgba(255,255,255,.48); text-transform: uppercase; letter-spacing: .8px; margin-top: 6px; }
+
+    /* ── FLAGS ── */
+    .flags-section { background: rgba(0,0,0,.18); padding: 26px 0; overflow: hidden; }
+    .flags-row { overflow: hidden; margin-bottom: 10px; }
+    .flags-row:last-child { margin-bottom: 0; }
+    .flags-strip { display: flex; width: max-content; gap: 12px; align-items: center; }
+    .flags-strip.go-left  { animation: marqueeL 35s linear infinite; }
+    .flags-strip.go-right { animation: marqueeR 42s linear infinite; }
+    .flag-item { width: 72px; height: 48px; border-radius: 6px; overflow: hidden; box-shadow: 0 3px 12px rgba(0,0,0,.3); flex-shrink: 0; transition: transform .15s; }
+    .flag-item:hover { transform: scale(1.12); }
+    .flag-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    /* ── SECTION SHARED ── */
+    .section-inner { max-width: 1140px; margin: 0 auto; }
+    .section-head  { text-align: center; margin-bottom: 48px; }
+    .section-eyebrow { display: inline-block; font-size: .73rem; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; color: var(--gold); background: rgba(245,200,66,.1); padding: 5px 16px; border-radius: 50px; margin-bottom: 13px; border: 1px solid rgba(245,200,66,.25); }
+    .section-title { font-size: clamp(1.65rem,4vw,2.4rem); font-weight: 900; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,.35); line-height: 1.2; margin-bottom: 11px; }
+    .section-sub   { font-size: .98rem; font-weight: 600; color: rgba(255,255,255,.68); max-width: 540px; margin: 0 auto; line-height: 1.65; }
+
+    /* ── MODES ── */
+    .modes { padding: 78px 24px; background: linear-gradient(180deg, rgba(0,0,0,.1) 0%, rgba(0,0,0,.2) 100%); }
+    .modes-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 22px; }
+    @media(max-width:660px) { .modes-grid { grid-template-columns: 1fr; } }
+    .mode-card { position: relative; border-radius: 22px; overflow: hidden; cursor: pointer; min-height: 275px; display: flex; align-items: flex-end; box-shadow: 0 8px 32px rgba(0,0,0,.38); transition: transform .22s, box-shadow .22s; }
+    .mode-card:hover { transform: translateY(-6px) scale(1.015); box-shadow: 0 18px 48px rgba(0,0,0,.48); }
+    .mode-card-bg { position: absolute; inset: 0; background-size: cover; background-position: center; transition: transform .38s; }
+    .mode-card:hover .mode-card-bg { transform: scale(1.07); }
+    .mode-card-overlay { position: absolute; inset: 0; background: linear-gradient(0deg, rgba(0,8,20,.88) 0%, rgba(0,8,20,.28) 55%, transparent 100%); }
+    .mode-card-icon { position: absolute; top: 18px; right: 18px; width: 66px; height: 66px; border-radius: 50%; box-shadow: 0 4px 18px rgba(0,0,0,.5); animation: float 5s ease-in-out infinite; transition: transform .2s; }
+    .mode-card:hover .mode-card-icon { transform: scale(1.12); }
+    .mode-card-body { position: relative; z-index: 2; padding: 24px 24px 22px; width: 100%; }
+    .mode-num  { font-size: .68rem; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; color: var(--gold); margin-bottom: 5px; }
+    .mode-name { font-size: 1.4rem; font-weight: 900; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,.4); margin-bottom: 7px; }
+    .mode-desc { font-size: .86rem; font-weight: 600; color: rgba(255,255,255,.7); line-height: 1.55; }
+    .mode-tag  { display: inline-block; margin-top: 11px; background: rgba(245,200,66,.16); color: var(--gold); border: 1px solid rgba(245,200,66,.35); font-size: .68rem; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; padding: 3px 11px; border-radius: 50px; }
+
+    /* ── ABOUT ── */
+    .about { padding: 78px 24px; background: linear-gradient(135deg, #1a3a5a 0%, #0f2035 100%); overflow: hidden; }
+    .about-grid { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: 1fr 370px; gap: 58px; align-items: center; }
+    @media(max-width:860px) { .about-grid { grid-template-columns: 1fr; } .about-char { display: none; } }
+    .about-text h2 { font-size: clamp(1.55rem,3.5vw,2.1rem); font-weight: 900; color: #fff; margin-bottom: 20px; line-height: 1.2; }
+    .about-text h2 span { color: var(--gold); }
+    .about-text p  { font-size: .95rem; font-weight: 600; color: rgba(255,255,255,.68); line-height: 1.8; margin-bottom: 15px; }
+    .about-text p:last-child { margin-bottom: 0; }
+    .about-char { position: relative; text-align: center; }
+    .about-char-glow { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 260px; height: 260px; border-radius: 50%; background: radial-gradient(circle, rgba(91,159,212,.32) 0%, transparent 70%); pointer-events: none; }
+    .about-char img { position: relative; z-index: 2; height: clamp(290px,37vw,430px); width: auto; filter: drop-shadow(0 10px 32px rgba(0,0,0,.5)); }
+
+    /* ── FEATURES ── */
+    .features { padding: 78px 24px; background: linear-gradient(180deg, rgba(0,0,0,.12) 0%, rgba(0,0,0,.22) 100%); }
+    .features-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 17px; }
+    @media(max-width:760px) { .features-grid { grid-template-columns: repeat(2,1fr); } }
+    @media(max-width:460px) { .features-grid { grid-template-columns: 1fr; } }
+    .feat { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.11); border-radius: 18px; padding: 24px 20px; backdrop-filter: blur(4px); transition: background .2s, transform .2s; }
+    .feat:hover { background: rgba(255,255,255,.16); transform: translateY(-4px); }
+    .feat-icon { font-size: 2rem; margin-bottom: 11px; display: block; }
+    .feat h4   { font-size: .95rem; font-weight: 800; color: #fff; margin-bottom: 7px; }
+    .feat p    { font-size: .83rem; font-weight: 600; color: rgba(255,255,255,.6); line-height: 1.6; }
+
+    /* ── CTA BOTTOM ── */
+    .cta-bottom { position: relative; padding: 96px 24px; text-align: center; background: linear-gradient(180deg, #1e5a9a 0%, #3a8acb 55%, #5bb8ee 100%); overflow: hidden; }
+    .cta-cloud-1 { position: absolute; top: 10%; left: -280px; width: 28%; animation: cloudFly 52s linear infinite; opacity: .26; pointer-events: none; }
+    .cta-cloud-2 { position: absolute; top: 55%; left: -200px; width: 20%; animation: cloudFly 70s linear infinite -20s; opacity: .18; pointer-events: none; }
+    .cta-plane   { position: absolute; bottom: 22%; left: -280px; width: clamp(140px,16vw,220px); filter: drop-shadow(0 4px 14px rgba(0,0,0,.28)); animation: planeFly 26s linear infinite 8s; pointer-events: none; }
+    .cta-content { position: relative; z-index: 2; }
+    .cta-bottom h2 { font-size: clamp(1.65rem,4vw,2.7rem); font-weight: 900; color: #fff; text-shadow: 0 3px 16px rgba(0,0,0,.4); margin-bottom: 15px; line-height: 1.2; }
+    .cta-bottom p  { font-size: clamp(.93rem,2vw,1.12rem); font-weight: 600; color: rgba(255,255,255,.78); margin-bottom: 32px; max-width: 510px; margin-left: auto; margin-right: auto; line-height: 1.65; }
+
+    /* ── FOOTER ── */
+    footer { background: var(--dark); color: rgba(255,255,255,.44); padding: 28px 24px; text-align: center; font-size: .84rem; font-weight: 600; border-top: 1px solid rgba(255,255,255,.06); }
+    .footer-links { margin-bottom: 10px; display: flex; justify-content: center; flex-wrap: wrap; gap: 5px 18px; }
+    footer a { color: var(--gold); text-decoration: none; transition: opacity .2s; }
+    footer a:hover { opacity: .75; }
+
+    /* ── REVEAL ── */
+    .reveal { opacity: 0; transform: translateY(26px); transition: opacity .65s ease, transform .65s ease; }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+
+    @media(max-width:660px) { nav { padding: 12px 16px; } .nav-link { display: none; } }
+  </style>
 </head>
 <body>
 
-  <div id="loading-screen">
-<div class="loading-planet-wrap">
-      <img class="loading-planet" src="images/planet.png" alt="">
+  <!-- ── NAV ── -->
+  <nav>
+    <a class="nav-logo" href="/">
+      <img src="images/planet3.png" alt="myGeoChallenge">
+      <span>myGeoChallenge</span>
+    </a>
+    <div class="nav-right">
+      <a class="nav-link" href="#modes" data-i18n="nav.modes">Game Modes</a>
+      <a class="nav-link" href="#about" data-i18n="nav.about">About</a>
+      <button class="lang-btn" id="lang-btn" type="button" aria-label="Change language">🌐 <span id="lang-label">ES</span></button>
+      <a class="nav-play" href="play.html" data-i18n="nav.play">Play Free</a>
     </div>
-    <img class="loading-clouds" src="images/clouds.png" alt="">
-    <img class="loading-clouds loading-clouds2" src="images/clouds.png" alt="">
-    <img class="loading-clouds loading-clouds3" src="images/clouds.png" alt="">
-    <img class="loading-clouds-b" src="images/clouds.png" alt="">
-    <img class="loading-clouds-b loading-clouds-b2" src="images/clouds.png" alt="">
-    <img class="loading-clouds-b loading-clouds-b3" src="images/clouds.png" alt="">
-    <img class="loading-clouds-c" src="images/clouds.png" alt="">
-    <img class="loading-clouds-c loading-clouds-c2" src="images/clouds.png" alt="">
-    <img class="loading-clouds-c loading-clouds-c3" src="images/clouds.png" alt="">
-    <div class="loading-clouds-fade"></div>
-    <div class="loading-clouds-fade loading-clouds-fade2"></div>
-    <div class="loading-clouds-fade loading-clouds-fade3"></div>
-    <img class="flightatt-loading" src="images/characters/flightattpost2/1.png" alt="">
-    <div class="flightatt-loading-shadow"></div>
-    <div class="loading-panel2-text2-wrap" id="loading-panel2-text2" style="display:none">
-      <img class="loading-panel2-text2-img" src="images/text2.png" alt="" draggable="false" oncontextmenu="return false">
-      <div class="loading-panel2-text2-label"><span data-i18n="panel2.welcome1">¡Bienvenido/a a GeoChallenge!</span><br><span data-i18n="panel2.welcome2">¿Qué modo quieres jugar?</span></div>
+  </nav>
+
+  <!-- ── HERO ── -->
+  <section class="hero">
+    <img class="hcloud hcloud-1" src="images/bg/cloud1.png" alt="">
+    <img class="hcloud hcloud-2" src="images/bg/cloud2.png" alt="">
+    <img class="hcloud hcloud-3" src="images/bg/cloud1.png" alt="">
+    <img class="hcloud hcloud-4" src="images/bg/cloud2.png" alt="">
+    <img class="hero-plane"  src="images/plane.png"   alt="">
+
+
+    <div class="hero-content">
+      <img class="hero-logo" src="images/logo.png" alt="myGeoChallenge">
+      <div class="hero-tagline" data-i18n="hero.tagline">Free &nbsp;·&nbsp; No Download &nbsp;·&nbsp; Multiplayer</div>
+      <h1 class="hero-title" data-i18n-html="hero.title">The <span>Geography Quiz</span><br>Game You'll Get Addicted To</h1>
+      <p class="hero-desc" data-i18n="hero.desc">Race the clock to identify cities, flags, country shapes, and world landmarks. Challenge friends in real-time, climb 35 unique ranks, and prove your geography mastery.</p>
+      <div class="hero-btns">
+        <a class="btn-primary"   href="play.html" data-i18n="hero.cta1">Play Now — It's Free!</a>
+        <a class="btn-secondary" href="#modes"    data-i18n="hero.cta2">See All Modes</a>
+      </div>
+      <span class="hero-note" data-i18n="hero.note">No sign-up required &nbsp;·&nbsp; Works in browser &nbsp;·&nbsp; EN / ES</span>
     </div>
-    <div class="loading-btn-row" style="display:none">
-      <div class="loading-btn-wrap" style="display:none" id="loading-shapes-wrap">
-        <span class="loading-btn-label" data-i18n="mode.shapes">Países</span>
-        <img id="loading-shapes-btn" src="images/buttons/es-play.png" alt="Modo Siluetas" draggable="false" oncontextmenu="return false">
-        <span class="loading-btn-hs" id="loading-shapes-hs"></span>
-      </div>
-      <div class="loading-btn-wrap loading-play-wrap" style="display:none" id="loading-play-wrap">
-        <span class="loading-btn-label" data-i18n="mode.cities">Ciudades</span>
-        <img id="loading-play-btn" src="images/buttons/es-play.png" alt="Jugar" draggable="false" oncontextmenu="return false">
-        <span class="loading-btn-hs" id="loading-play-hs"></span>
-      </div>
-      <div class="loading-btn-wrap" style="display:none" id="loading-flags-wrap">
-        <span class="loading-btn-label" data-i18n="mode.flags">Banderas</span>
-        <img id="loading-flags-btn" src="images/buttons/es-play.png" alt="Modo Banderas" draggable="false" oncontextmenu="return false">
-        <span class="loading-btn-hs" id="loading-flags-hs"></span>
-      </div>
-      <div class="loading-btn-wrap" style="display:none" id="loading-mode4-wrap">
-        <span class="loading-btn-label" data-i18n="mode.monuments">Monumentos</span>
-        <img id="loading-mode4-btn" src="images/buttons/es-play.png" alt="Modo Monumentos" draggable="false" oncontextmenu="return false">
-        <span class="loading-btn-hs" id="loading-mode4-hs"></span>
-      </div>
+
+    <div class="scroll-hint" aria-hidden="true">
+      <span data-i18n="hero.scroll">Scroll</span>
+      <div class="scroll-arrow"></div>
     </div>
-    <img class="loading-logo" src="images/logo.png" alt="City Blitz" draggable="false" oncontextmenu="return false">
-    <div class="loading-lang" id="loading-lang">
-      <button class="loading-lang-toggle" id="loading-lang-toggle" type="button">
-        <span class="loading-lang-current" id="loading-lang-current">Español</span>
-        <span class="loading-lang-caret">▾</span>
-      </button>
-      <div class="loading-lang-menu" id="loading-lang-menu">
-        <button class="loading-lang-option" type="button" data-lang="en">English</button>
-        <button class="loading-lang-option" type="button" data-lang="es">Español</button>
-      </div>
-    </div>
-    <div class="loading-bar-track">
-      <div class="loading-bar-fill" id="loading-bar-fill"></div>
-    </div>
-    <div class="loading-pct" id="loading-pct">0%</div>
-    <div class="loading-plane-wrap">
-      <img class="loading-plane" src="images/plane.png" alt="" draggable="false" oncontextmenu="return false">
-    </div>
-<div class="loading-actions" id="loading-actions">
-      <div class="loading-play-single" id="loading-play-single">
-        <img src="images/buttons/es-play.png" alt="Jugar" draggable="false" oncontextmenu="return false">
-        <div class="social-notif-badge" id="play-invite-badge" style="display:none">!</div>
-      </div>
-      <div class="loading-secondary-btns">
-        <div class="loading-secondary-btn" id="loading-social-btn">
-          <img src="images/buttons/es-social.png" alt="Social" draggable="false" oncontextmenu="return false">
-          <div class="social-notif-badge" id="social-notif-badge" style="display:none">!</div>
+  </section>
+
+  <!-- ── TICKER ── -->
+  <div class="ticker-wrap" aria-hidden="true">
+    <div class="ticker-inner" id="ticker-inner"></div>
+  </div>
+
+  <!-- ── STATS ── -->
+  <section class="stats">
+    <div class="stats-inner">
+      <div class="stats-grid">
+        <div class="stat-item reveal">
+          <span class="stat-icon">🌍</span>
+          <span class="stat-num" data-target="195">0</span>
+          <span class="stat-label" data-i18n="stats.countries">Countries</span>
         </div>
-        <div class="loading-secondary-btn" id="loading-profile-btn">
-          <img src="images/buttons/es-profile.png" alt="Perfil" draggable="false" oncontextmenu="return false">
+        <div class="stat-item reveal" style="transition-delay:.1s">
+          <span class="stat-icon">🎮</span>
+          <span class="stat-num" data-target="4">0</span>
+          <span class="stat-label" data-i18n="stats.modes">Game Modes</span>
+        </div>
+        <div class="stat-item reveal" style="transition-delay:.2s">
+          <span class="stat-icon">🏆</span>
+          <span class="stat-num" data-target="35">0</span>
+          <span class="stat-label" data-i18n="stats.ranks">Rank Titles</span>
+        </div>
+        <div class="stat-item reveal" style="transition-delay:.3s">
+          <span class="stat-icon">⚔️</span>
+          <span class="stat-num">10</span>
+          <span class="stat-label" data-i18n="stats.players">Players Per Room</span>
         </div>
       </div>
     </div>
-    <div id="loading-table-group" class="table-gone">
-    <img class="loading-howtotable" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
-    <div class="loading-profile-pic-wrap" id="loading-profile-pic-wrap">
-      <img class="loading-profile-pic" id="loading-profile-pic-main" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
-      <div class="loading-profile-pic-overlay" id="loading-profile-pic-overlay">
-        <span id="loading-profile-pic-pencil">✎</span>
-        <div class="pic-upload-spinner" id="loading-profile-pic-spinner" style="display:none"></div>
-      </div>
-      <input type="file" id="loading-profile-pic-input" accept="image/*" style="display:none">
-    </div>
-    <div class="loading-name-wrap" id="loading-name-wrap">
-      <span class="loading-player-name" id="loading-player-name"></span>
-      <button class="loading-name-edit" id="loading-name-edit" type="button" aria-label="Cambiar nombre">✎</button>
-      <input class="loading-name-input" id="loading-name-input" type="text" maxlength="12" autocomplete="off" spellcheck="false">
-      <div class="loading-name-confirm" id="loading-name-confirm" role="button" aria-label="Confirmar nombre">
-        <img class="loading-name-confirm1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
-        <img class="loading-name-confirm2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
-      </div>
-    </div>
-    <div class="loading-play-confirm-wrap" id="loading-play-confirm-wrap">
-      <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
-      <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
-    </div>
+  </section>
 
-    <span class="loading-play-count" id="loading-play-count"></span>
-    <span class="loading-vs-record" id="loading-vs-record"></span>
-    <div class="loading-games-col">
-      <span class="loading-games-title" data-i18n="common.average">Promedio</span>
-      <div class="loading-games-row">
-        <img class="loading-games-game" src="images/game1.png" alt="" draggable="false" oncontextmenu="return false">
-        <div class="loading-games-mark-wrap">
-          <img class="loading-games-mark" src="images/mark1.png" alt="" draggable="false" oncontextmenu="return false">
-          <span class="loading-games-hs loading-games-hs1" id="loading-games-hs1">0</span>
-        </div>
-      </div>
-      <div class="loading-games-row">
-        <img class="loading-games-game" src="images/game2.png" alt="" draggable="false" oncontextmenu="return false">
-        <div class="loading-games-mark-wrap">
-          <img class="loading-games-mark" src="images/mark2.png" alt="" draggable="false" oncontextmenu="return false">
-          <span class="loading-games-hs loading-games-hs2" id="loading-games-hs2">0</span>
-        </div>
-      </div>
-      <div class="loading-games-row">
-        <img class="loading-games-game" src="images/game3.png" alt="" draggable="false" oncontextmenu="return false">
-        <div class="loading-games-mark-wrap">
-          <img class="loading-games-mark" src="images/mark3.png" alt="" draggable="false" oncontextmenu="return false">
-          <span class="loading-games-hs loading-games-hs3" id="loading-games-hs3">0</span>
-        </div>
-      </div>
-      <div class="loading-games-row">
-        <img class="loading-games-game" src="images/game4.png" alt="" draggable="false" oncontextmenu="return false">
-        <div class="loading-games-mark-wrap">
-          <img class="loading-games-mark" src="images/mark4.png" alt="" draggable="false" oncontextmenu="return false">
-          <span class="loading-games-hs loading-games-hs4" id="loading-games-hs4">0</span>
-        </div>
+  <!-- ── FLAGS MARQUEE ── -->
+  <div class="flags-section" aria-hidden="true">
+    <div class="flags-row">
+      <div class="flags-strip go-left">
+        <div class="flag-item"><img src="images/flags/unitedstates.png" alt="USA"></div>
+        <div class="flag-item"><img src="images/flags/brazil.png"       alt="Brazil"></div>
+        <div class="flag-item"><img src="images/flags/japan.png"        alt="Japan"></div>
+        <div class="flag-item"><img src="images/flags/france.png"       alt="France"></div>
+        <div class="flag-item"><img src="images/flags/germany.png"      alt="Germany"></div>
+        <div class="flag-item"><img src="images/flags/india.png"        alt="India"></div>
+        <div class="flag-item"><img src="images/flags/italy.png"        alt="Italy"></div>
+        <div class="flag-item"><img src="images/flags/canada.png"       alt="Canada"></div>
+        <div class="flag-item"><img src="images/flags/china.png"        alt="China"></div>
+        <div class="flag-item"><img src="images/flags/australia.png"    alt="Australia"></div>
+        <div class="flag-item"><img src="images/flags/russia.png"       alt="Russia"></div>
+        <div class="flag-item"><img src="images/flags/spain.png"        alt="Spain"></div>
+        <div class="flag-item"><img src="images/flags/mexico.png"       alt="Mexico"></div>
+        <div class="flag-item"><img src="images/flags/unitedkingdom.png" alt="UK"></div>
+        <div class="flag-item"><img src="images/flags/argentina.png"    alt="Argentina"></div>
+        <div class="flag-item"><img src="images/flags/southkorea.png"   alt="S. Korea"></div>
+        <div class="flag-item"><img src="images/flags/netherlands.png"  alt="Netherlands"></div>
+        <div class="flag-item"><img src="images/flags/norway.png"       alt="Norway"></div>
+        <div class="flag-item"><img src="images/flags/sweden.png"       alt="Sweden"></div>
+        <div class="flag-item"><img src="images/flags/portugal.png"     alt="Portugal"></div>
+        <div class="flag-item"><img src="images/flags/unitedstates.png" alt="USA"></div>
+        <div class="flag-item"><img src="images/flags/brazil.png"       alt="Brazil"></div>
+        <div class="flag-item"><img src="images/flags/japan.png"        alt="Japan"></div>
+        <div class="flag-item"><img src="images/flags/france.png"       alt="France"></div>
+        <div class="flag-item"><img src="images/flags/germany.png"      alt="Germany"></div>
+        <div class="flag-item"><img src="images/flags/india.png"        alt="India"></div>
+        <div class="flag-item"><img src="images/flags/italy.png"        alt="Italy"></div>
+        <div class="flag-item"><img src="images/flags/canada.png"       alt="Canada"></div>
+        <div class="flag-item"><img src="images/flags/china.png"        alt="China"></div>
+        <div class="flag-item"><img src="images/flags/australia.png"    alt="Australia"></div>
+        <div class="flag-item"><img src="images/flags/russia.png"       alt="Russia"></div>
+        <div class="flag-item"><img src="images/flags/spain.png"        alt="Spain"></div>
+        <div class="flag-item"><img src="images/flags/mexico.png"       alt="Mexico"></div>
+        <div class="flag-item"><img src="images/flags/unitedkingdom.png" alt="UK"></div>
+        <div class="flag-item"><img src="images/flags/argentina.png"    alt="Argentina"></div>
+        <div class="flag-item"><img src="images/flags/southkorea.png"   alt="S. Korea"></div>
+        <div class="flag-item"><img src="images/flags/netherlands.png"  alt="Netherlands"></div>
+        <div class="flag-item"><img src="images/flags/norway.png"       alt="Norway"></div>
+        <div class="flag-item"><img src="images/flags/sweden.png"       alt="Sweden"></div>
+        <div class="flag-item"><img src="images/flags/portugal.png"     alt="Portugal"></div>
       </div>
     </div>
-    <div class="loading-games-col loading-games-col2">
-      <span class="loading-games-title" data-i18n="common.highscore">Highscore</span>
-      <div class="loading-games-row">
-        <img class="loading-games-game loading-games-spacer" src="images/game1.png" alt="" draggable="false" oncontextmenu="return false">
-        <div class="loading-games-mark-wrap">
-          <img class="loading-games-mark" src="images/mark1.png" alt="" draggable="false" oncontextmenu="return false">
-          <span class="loading-games-hs loading-games-hs1" id="loading-games-avg1">0</span>
-          <span class="loading-games-crown">👑</span>
-        </div>
-      </div>
-      <div class="loading-games-row">
-        <img class="loading-games-game loading-games-spacer" src="images/game2.png" alt="" draggable="false" oncontextmenu="return false">
-        <div class="loading-games-mark-wrap">
-          <img class="loading-games-mark" src="images/mark2.png" alt="" draggable="false" oncontextmenu="return false">
-          <span class="loading-games-hs loading-games-hs2" id="loading-games-avg2">0</span>
-          <span class="loading-games-crown">👑</span>
-        </div>
-      </div>
-      <div class="loading-games-row">
-        <img class="loading-games-game loading-games-spacer" src="images/game3.png" alt="" draggable="false" oncontextmenu="return false">
-        <div class="loading-games-mark-wrap">
-          <img class="loading-games-mark" src="images/mark3.png" alt="" draggable="false" oncontextmenu="return false">
-          <span class="loading-games-hs loading-games-hs3" id="loading-games-avg3">0</span>
-          <span class="loading-games-crown">👑</span>
-        </div>
-      </div>
-      <div class="loading-games-row">
-        <img class="loading-games-game loading-games-spacer" src="images/game4.png" alt="" draggable="false" oncontextmenu="return false">
-        <div class="loading-games-mark-wrap">
-          <img class="loading-games-mark" src="images/mark4.png" alt="" draggable="false" oncontextmenu="return false">
-          <span class="loading-games-hs loading-games-hs4" id="loading-games-avg4">0</span>
-          <span class="loading-games-crown">👑</span>
-        </div>
-      </div>
-    </div>
-    <img class="loading-games-rank" id="loading-games-rank" src="images/ranks/1.png" alt="" draggable="false" oncontextmenu="return false">
-    <span class="loading-games-rank-label" id="loading-games-rank-label"></span>
-    <span class="loading-games-hs-label" data-i18n="common.highscore">Highscore</span>
-    <img class="loading-games-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">
-    <span class="loading-games-total" id="loading-games-total">0</span>
-    </div>
-
-    <div class="profile-account-wrap" id="profile-account-btn">
-      <span class="profile-btn-label" id="profile-btn-label"></span>
-      <img class="profile-account1" src="images/account1.png" alt="" draggable="false" oncontextmenu="return false">
-      <img class="profile-account2" src="images/account2.png" alt="" draggable="false" oncontextmenu="return false">
-    </div>
-    <div class="loading-panel2-worldtour" id="loading-panel2-worldtour" style="display:none">
-      <img src="images/buttons/es-worldtour.png" alt="World Tour" draggable="false" oncontextmenu="return false">
-    </div>
-    <div class="loading-panel2-versus" id="loading-panel2-versus" style="display:none">
-      <img src="images/buttons/es-versus.png" alt="Versus" draggable="false" oncontextmenu="return false">
-      <div class="social-notif-badge" id="versus-invite-badge" style="display:none">!</div>
-    </div>
-    <div class="loading-panel2-practice" id="loading-panel2-practice" style="display:none">
-      <img src="images/buttons/es-practice.png" alt="Practice" draggable="false" oncontextmenu="return false">
-    </div>
-    <div class="loading-panel2-back" id="loading-panel2-back" style="display:none">
-      <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
-      <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
-    </div>
-    <!-- ── PANEL 4: VERSUS ───────────────────────────────────────────────── -->
-    <div id="loading-versus-group" class="table-gone">
-      <img class="practice-table-img" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
-      <div class="practice-titlebar">
-        <span class="loading-social-title">Gira Competitiva</span>
-        <button id="versus-notif-bell" class="versus-notif-bell" type="button" title="Invitaciones pendientes">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6V11c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
-          <span id="versus-notif-badge" class="versus-notif-badge" style="display:none">0</span>
-        </button>
-      </div>
-      <!-- Inbox de invitaciones pendientes -->
-      <div id="versus-notif-panel" class="versus-notif-panel" style="display:none">
-        <div class="versus-notif-panel-head" data-i18n="notif.inbox">Invitaciones</div>
-        <div id="versus-notif-list" class="versus-notif-list"></div>
-        <div id="versus-notif-empty" class="versus-notif-empty" style="display:none" data-i18n="notif.empty">Sin invitaciones pendientes</div>
-      </div>
-      <span class="versus-subtitle" id="versus-subtitle"></span>
-      <div class="practice-back-wrap" id="versus-back-wrap">
-        <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
-        <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
-      </div>
-
-      <!-- ROOT: Amistoso / Competitivo -->
-      <div class="versus-screen" id="versus-screen-root">
-        <button class="versus-menu-btn" id="versus-btn-amistoso" type="button">
-          <span class="versus-menu-title" data-i18n="versus.friendly">Versus Amistoso</span>
-          <span class="versus-menu-desc" data-i18n="versus.friendlyDesc">Juega con amigos o gente al azar</span>
-        </button>
-        <button class="versus-menu-btn versus-menu-disabled" id="versus-btn-competitivo" type="button" disabled>
-          <span class="versus-menu-title" data-i18n="versus.competitive">Versus Competitivo</span>
-          <span class="versus-menu-soon" data-i18n="versus.soon">Próximamente</span>
-        </button>
-      </div>
-
-      <!-- AMISTOSO: Amigos / Grupo / Aleatorio -->
-      <div class="versus-screen" id="versus-screen-amistoso" style="display:none">
-        <button class="versus-menu-btn" id="versus-btn-amigos" type="button">
-          <span class="versus-menu-title" data-i18n="versus.friends">Amigos</span>
-          <span class="versus-menu-desc" data-i18n="versus.friendsDesc">Reta a un amigo conectado (1v1)</span>
-        </button>
-        <button class="versus-menu-btn" id="versus-btn-grupo" type="button">
-          <span class="versus-menu-title" data-i18n="versus.group">Grupo</span>
-          <span class="versus-menu-desc" data-i18n="versus.groupDesc">Sala privada de hasta 10</span>
-        </button>
-        <button class="versus-menu-btn" id="versus-btn-aleatorio" type="button">
-          <span class="versus-menu-title" data-i18n="versus.random">Aleatorio</span>
-          <span class="versus-menu-desc" data-i18n="versus.randomDesc">Únete a salas públicas</span>
-        </button>
-      </div>
-
-      <!-- AMIGOS: reto 1v1 directo -->
-      <div class="versus-screen" id="versus-screen-amigos" style="display:none">
-        <div id="versus-friends-list"></div>
-        <div id="versus-empty-msg" class="versus-empty-msg" data-i18n="versus.noneOnline">No hay amigos conectados ahora.</div>
-      </div>
-
-      <!-- GRUPO: crear/unirse privado -->
-      <div class="versus-screen" id="versus-screen-grupo" style="display:none">
-        <button class="versus-menu-btn" id="versus-btn-create-private" type="button">
-          <span class="versus-menu-title" data-i18n="lobby.createRoom">Crear sala</span>
-          <span class="versus-menu-desc" data-i18n="lobby.createRoomDesc">Pública por defecto · podés privatizarla adentro</span>
-        </button>
-        <div class="versus-join-box">
-          <span class="versus-join-label" data-i18n="lobby.joinByCode">Unirse con un código</span>
-          <div class="versus-join-row">
-            <input id="versus-join-code" class="versus-code-input" type="text" maxlength="6" placeholder="ABC123" autocomplete="off" spellcheck="false">
-            <button id="versus-btn-join-code" class="versus-challenge-btn" type="button" data-i18n="lobby.join">Unirse</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ALEATORIO: lista de salas públicas -->
-      <div class="versus-screen" id="versus-screen-aleatorio" style="display:none">
-        <button class="versus-menu-btn versus-menu-btn-sm" id="versus-btn-create-public" type="button">
-          <span class="versus-menu-title" data-i18n="lobby.createPublic">Crear sala pública</span>
-        </button>
-        <div id="versus-public-list" class="versus-list-box"></div>
-        <div id="versus-public-empty" class="versus-empty-msg" data-i18n="lobby.noRooms">No hay salas abiertas ahora.</div>
-      </div>
-
-      <!-- LOBBY -->
-      <div class="versus-screen" id="versus-screen-lobby" style="display:none">
-        <div class="lobby-name-row" id="lobby-name-row">
-          <span class="lobby-name-text" id="lobby-name-text"></span>
-          <button class="lobby-name-edit-btn" id="lobby-name-edit-btn" type="button" style="display:none" aria-label="Editar nombre">✎</button>
-          <input id="lobby-name-input" class="lobby-name-input" type="text" maxlength="22" autocomplete="off" spellcheck="false" placeholder="Nombre de la sala" style="display:none">
-          <button class="lobby-name-confirm-btn" id="lobby-name-confirm-btn" type="button" style="display:none" aria-label="Confirmar nombre">✓</button>
-        </div>
-        <div class="lobby-topbar">
-          <div class="lobby-code-wrap" id="lobby-code-copy" title="Copiar código">
-            <span class="lobby-code-label" data-i18n="lobby.code">Código:</span>
-            <span class="lobby-code" id="lobby-code">------</span>
-            <span class="lobby-code-copy-icon">⧉</span>
-          </div>
-          <span class="lobby-count" id="lobby-count">0/10</span>
-          <button class="lobby-visibility-btn" id="lobby-visibility-btn" type="button" style="display:none"></button>
-          <button class="versus-challenge-btn lobby-invite-btn" id="lobby-invite-btn" type="button" data-i18n="lobby.invite">+ Invitar</button>
-        </div>
-        <div id="lobby-members" class="versus-list-box"></div>
-        <div class="lobby-footer">
-          <span class="lobby-wait-msg" id="lobby-wait-msg" data-i18n="lobby.waitingHost">Esperando que el host empiece…</span>
-          <span class="lobby-countdown" id="lobby-countdown" style="display:none"></span>
-          <button class="versus-start-btn" id="lobby-start-btn" type="button" data-i18n="lobby.start">Empezar</button>
-          <button class="versus-start-btn lobby-cancel-btn" id="lobby-cancel-btn" type="button" style="display:none" data-i18n="lobby.cancel">Cancelar</button>
-          <button class="versus-challenge-btn lobby-notready-btn" id="lobby-notready-btn" type="button" style="display:none" data-i18n="lobby.notReady">No estoy listo</button>
-          <button class="versus-challenge-btn lobby-leave-btn" id="lobby-leave-btn" type="button" data-i18n="lobby.leave">Salir</button>
-        </div>
-      </div>
-
-      <button class="versus-return-lobby" id="versus-return-lobby" type="button" style="display:none">
-        <span>↩</span><span data-i18n="lobby.myRoom">Mi sala</span>
-      </button>
-
-      <div id="versus-toast-stack" class="versus-toast-stack"></div>
-    </div>
-
-    <!-- Popup: invitación saliente (host espera) -->
-    <div id="vs-outgoing-popup" class="vs-popup-overlay" style="display:none">
-      <div class="vs-popup-box">
-        <img class="vs-popup-pic" id="vs-out-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
-        <span class="vs-popup-name" id="vs-out-name"></span>
-        <span class="vs-popup-sub">Esperando respuesta…</span>
-        <div class="vs-popup-timer-wrap"><div class="vs-popup-timer-bar" id="vs-out-bar"></div></div>
-        <div class="vs-popup-confirm" id="vs-out-cancel">
-          <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
-          <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
-        </div>
+    <div class="flags-row">
+      <div class="flags-strip go-right">
+        <div class="flag-item"><img src="images/flags/egypt.png"        alt="Egypt"></div>
+        <div class="flag-item"><img src="images/flags/nigeria.png"      alt="Nigeria"></div>
+        <div class="flag-item"><img src="images/flags/turkey.png"       alt="Turkey"></div>
+        <div class="flag-item"><img src="images/flags/greece.png"       alt="Greece"></div>
+        <div class="flag-item"><img src="images/flags/poland.png"       alt="Poland"></div>
+        <div class="flag-item"><img src="images/flags/belgium.png"      alt="Belgium"></div>
+        <div class="flag-item"><img src="images/flags/switzerland.png"  alt="Switzerland"></div>
+        <div class="flag-item"><img src="images/flags/indonesia.png"    alt="Indonesia"></div>
+        <div class="flag-item"><img src="images/flags/newzealand.png"   alt="New Zealand"></div>
+        <div class="flag-item"><img src="images/flags/southafrica.png"  alt="S. Africa"></div>
+        <div class="flag-item"><img src="images/flags/ukraine.png"      alt="Ukraine"></div>
+        <div class="flag-item"><img src="images/flags/unitedstates.png" alt="USA"></div>
+        <div class="flag-item"><img src="images/flags/brazil.png"       alt="Brazil"></div>
+        <div class="flag-item"><img src="images/flags/japan.png"        alt="Japan"></div>
+        <div class="flag-item"><img src="images/flags/france.png"       alt="France"></div>
+        <div class="flag-item"><img src="images/flags/germany.png"      alt="Germany"></div>
+        <div class="flag-item"><img src="images/flags/india.png"        alt="India"></div>
+        <div class="flag-item"><img src="images/flags/italy.png"        alt="Italy"></div>
+        <div class="flag-item"><img src="images/flags/canada.png"       alt="Canada"></div>
+        <div class="flag-item"><img src="images/flags/australia.png"    alt="Australia"></div>
+        <div class="flag-item"><img src="images/flags/egypt.png"        alt="Egypt"></div>
+        <div class="flag-item"><img src="images/flags/nigeria.png"      alt="Nigeria"></div>
+        <div class="flag-item"><img src="images/flags/turkey.png"       alt="Turkey"></div>
+        <div class="flag-item"><img src="images/flags/greece.png"       alt="Greece"></div>
+        <div class="flag-item"><img src="images/flags/poland.png"       alt="Poland"></div>
+        <div class="flag-item"><img src="images/flags/belgium.png"      alt="Belgium"></div>
+        <div class="flag-item"><img src="images/flags/switzerland.png"  alt="Switzerland"></div>
+        <div class="flag-item"><img src="images/flags/indonesia.png"    alt="Indonesia"></div>
+        <div class="flag-item"><img src="images/flags/newzealand.png"   alt="New Zealand"></div>
+        <div class="flag-item"><img src="images/flags/southafrica.png"  alt="S. Africa"></div>
+        <div class="flag-item"><img src="images/flags/ukraine.png"      alt="Ukraine"></div>
+        <div class="flag-item"><img src="images/flags/unitedstates.png" alt="USA"></div>
+        <div class="flag-item"><img src="images/flags/brazil.png"       alt="Brazil"></div>
+        <div class="flag-item"><img src="images/flags/japan.png"        alt="Japan"></div>
+        <div class="flag-item"><img src="images/flags/france.png"       alt="France"></div>
+        <div class="flag-item"><img src="images/flags/germany.png"      alt="Germany"></div>
+        <div class="flag-item"><img src="images/flags/india.png"        alt="India"></div>
+        <div class="flag-item"><img src="images/flags/italy.png"        alt="Italy"></div>
+        <div class="flag-item"><img src="images/flags/canada.png"       alt="Canada"></div>
+        <div class="flag-item"><img src="images/flags/australia.png"    alt="Australia"></div>
       </div>
     </div>
+  </div>
 
-    <!-- Popup: invitación entrante (guest acepta/rechaza) -->
-    <div id="vs-incoming-popup" class="vs-popup-overlay" style="display:none">
-      <div class="vs-popup-box">
-        <img class="vs-popup-pic" id="vs-in-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
-        <span class="vs-popup-name" id="vs-in-name"></span>
-        <span class="vs-popup-sub">¡Te retó a Gira Competitiva!</span>
-        <div class="vs-popup-timer-wrap"><div class="vs-popup-timer-bar" id="vs-in-bar"></div></div>
-        <div class="vs-incoming-btns">
-          <div class="vs-popup-confirm vs-accept-btn" id="vs-in-accept">
-            <img src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
-            <img src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
-          </div>
-          <div class="vs-popup-confirm vs-decline-btn" id="vs-in-decline">
-            <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
-            <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
-          </div>
+  <main>
+
+    <!-- ── MODES ── -->
+    <section class="modes" id="modes">
+      <div class="section-inner">
+        <div class="section-head reveal">
+          <div class="section-eyebrow" data-i18n="modes.eyebrow">Game Modes</div>
+          <h2 class="section-title" data-i18n="modes.title">4 Ways to Test Your Geography</h2>
+          <p class="section-sub" data-i18n="modes.sub">Each mode challenges a different skill. Master all four and become a true myGeoChallenge champion.</p>
         </div>
-      </div>
-    </div>
+        <div class="modes-grid">
 
-    <!-- ── PANEL 3: PRACTICE TOUR ─────────────────────────────────────────── -->
-    <div id="loading-practice-group" style="display:none">
-      <!-- Mesa (igual posición/tamaño que el panel de perfil) -->
-      <img class="practice-table-img" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
-
-      <!-- Título -->
-      <div class="practice-titlebar">
-        <img class="loading-social-planet" src="images/practice.png" alt="" draggable="false" oncontextmenu="return false">
-        <span class="loading-social-title" data-i18n="practice.title">Gira de Práctica</span>
-        <img class="loading-social-planet" src="images/practice.png" alt="" draggable="false" oncontextmenu="return false">
-      </div>
-
-      <!-- Back button -->
-      <div class="practice-back-wrap" id="practice-back-wrap">
-        <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
-        <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
-      </div>
-
-      <!-- "Elige un modo" — misma fuente y posición que "Has jugado X veces" del perfil -->
-      <span class="loading-play-count practice-choose-label" data-i18n="practice.chooseMode">Elige un modo</span>
-
-      <!-- Selección de modo -->
-      <div class="practice-section" id="practice-mode-section">
-        <div class="practice-mode-grid">
-          <div class="practice-mode-item" data-mode="flags">
-            <img class="practice-mode-img" src="images/buttons/map1.png" draggable="false" oncontextmenu="return false">
-            <span class="practice-mode-name">Suitcase Shuffle</span>
-          </div>
-          <div class="practice-mode-item" data-mode="shapes">
-            <img class="practice-mode-img" src="images/buttons/map2.png" draggable="false" oncontextmenu="return false">
-            <span class="practice-mode-name">Map Mayhem</span>
-          </div>
-          <div class="practice-mode-item" data-mode="game">
-            <img class="practice-mode-img" src="images/buttons/map3.png" draggable="false" oncontextmenu="return false">
-            <span class="practice-mode-name">City Blitz</span>
-          </div>
-          <div class="practice-mode-item" data-mode="monuments">
-            <img class="practice-mode-img" src="images/buttons/map4.png" draggable="false" oncontextmenu="return false">
-            <span class="practice-mode-name">Landmark Loco</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Configuración (aparece al elegir modo) -->
-      <div class="practice-section" id="practice-config-section" style="display:none">
-
-        <!-- Columna izquierda: título + video howtoplay (fuera del flujo) -->
-        <div class="practice-config-left">
-          <span class="practice-config-modename" id="practice-config-title"></span>
-          <video class="practice-config-video" id="practice-config-video" autoplay loop muted playsinline></video>
-        </div>
-
-        <div class="practice-config-inner">
-          <!-- Columna derecha: opciones -->
-          <div class="practice-config-right">
-            <!-- Filtro continentes -->
-            <div class="practice-continents" id="practice-continents">
-              <div class="practice-continent-grid">
-                <div class="practice-continent-btn active" data-continent="america">
-                  <div class="practice-continent-img-wrap">
-                    <img src="images/buttons/america.png" draggable="false" oncontextmenu="return false">
-                    <img class="practice-continent-x" src="images/buttons/X.png" draggable="false" oncontextmenu="return false">
-                  </div>
-                  <span data-i18n="practice.america">América</span>
-                </div>
-                <div class="practice-continent-btn active" data-continent="europa">
-                  <div class="practice-continent-img-wrap">
-                    <img src="images/buttons/europe.png" draggable="false" oncontextmenu="return false">
-                    <img class="practice-continent-x" src="images/buttons/X.png" draggable="false" oncontextmenu="return false">
-                  </div>
-                  <span data-i18n="practice.europa">Europa</span>
-                </div>
-                <div class="practice-continent-btn active" data-continent="asia">
-                  <div class="practice-continent-img-wrap">
-                    <img src="images/buttons/asia.png" draggable="false" oncontextmenu="return false">
-                    <img class="practice-continent-x" src="images/buttons/X.png" draggable="false" oncontextmenu="return false">
-                  </div>
-                  <span data-i18n="practice.asia">Asia</span>
-                </div>
-                <div class="practice-continent-btn active" data-continent="africa">
-                  <div class="practice-continent-img-wrap">
-                    <img src="images/buttons/africa.png" draggable="false" oncontextmenu="return false">
-                    <img class="practice-continent-x" src="images/buttons/X.png" draggable="false" oncontextmenu="return false">
-                  </div>
-                  <span data-i18n="practice.africa">África</span>
-                </div>
-                <div class="practice-continent-btn active" data-continent="oceania">
-                  <div class="practice-continent-img-wrap">
-                    <img src="images/buttons/oceania.png" draggable="false" oncontextmenu="return false">
-                    <img class="practice-continent-x" src="images/buttons/X.png" draggable="false" oncontextmenu="return false">
-                  </div>
-                  <span data-i18n="practice.oceania">Oceanía</span>
-                </div>
-              </div>
+          <article class="mode-card reveal" style="transition-delay:.05s">
+            <div class="mode-card-bg" style="background-image:url('images/bg/level1complete.png')"></div>
+            <div class="mode-card-overlay"></div>
+            <img class="mode-card-icon" src="images/game1.png" alt="Suitcase Shuffle">
+            <div class="mode-card-body">
+              <div class="mode-num" data-i18n="mode.num1">Mode 01</div>
+              <div class="mode-name">Suitcase Shuffle</div>
+              <p class="mode-desc" data-i18n="mode1.desc">Bags roll down the carousel — each belongs to a different country. Match the right flag to the right suitcase before the clock runs out.</p>
+              <span class="mode-tag" data-i18n="mode1.tag">Flags &amp; Countries</span>
             </div>
+          </article>
 
-            <!-- Dificultad (solo monumentos) -->
-            <div class="practice-difficulty" id="practice-difficulty" style="display:none">
-              <div class="practice-diff-grid">
-                <div class="practice-diff-btn active" data-diff="facil">
-                  <div class="practice-continent-img-wrap">
-                    <img src="images/buttons/easy.png" draggable="false" oncontextmenu="return false">
-                    <img class="practice-continent-x" src="images/buttons/X.png" draggable="false" oncontextmenu="return false">
-                  </div>
-                  <span data-i18n="practice.easy">Fácil</span>
-                </div>
-                <div class="practice-diff-btn" data-diff="medio">
-                  <div class="practice-continent-img-wrap">
-                    <img src="images/buttons/medium.png" draggable="false" oncontextmenu="return false">
-                    <img class="practice-continent-x" src="images/buttons/X.png" draggable="false" oncontextmenu="return false">
-                  </div>
-                  <span data-i18n="practice.medium">Medio</span>
-                </div>
-                <div class="practice-diff-btn" data-diff="dificil">
-                  <div class="practice-continent-img-wrap">
-                    <img src="images/buttons/hard.png" draggable="false" oncontextmenu="return false">
-                    <img class="practice-continent-x" src="images/buttons/X.png" draggable="false" oncontextmenu="return false">
-                  </div>
-                  <span data-i18n="practice.hard">Difícil</span>
-                </div>
-              </div>
+          <article class="mode-card reveal" style="transition-delay:.1s">
+            <div class="mode-card-bg" style="background-image:url('images/bg/level2complete.png')"></div>
+            <div class="mode-card-overlay"></div>
+            <img class="mode-card-icon" src="images/game2.png" alt="Map Mayhem">
+            <div class="mode-card-body">
+              <div class="mode-num" data-i18n="mode.num2">Mode 02</div>
+              <div class="mode-name">Map Mayhem</div>
+              <p class="mode-desc" data-i18n="mode2.desc">A country silhouette appears — can you name it? Identify shapes from all continents in this fast-paced visual recognition challenge.</p>
+              <span class="mode-tag" data-i18n="mode2.tag">Country Shapes</span>
             </div>
+          </article>
 
-            <!-- Selector de tiempo -->
-            <div class="practice-timer-section">
-              <div class="practice-timer-with-img">
-                <div class="practice-timer-imgs">
-                  <img src="images/buttons/time1.png" class="practice-time-img" data-timeidx="1">
-                  <img src="images/buttons/time2.png" class="practice-time-img" data-timeidx="2">
-                  <img src="images/buttons/time3.png" class="practice-time-img" data-timeidx="3">
-                  <img src="images/buttons/time4.png" class="practice-time-img" data-timeidx="4">
-                  <img src="images/buttons/time5.png" class="practice-time-img" data-timeidx="5">
-                </div>
-                <div class="practice-timeline-wrap">
-                  <input type="range" class="practice-timeline-range" id="practice-timeline-range" min="1" max="5" step="1" value="2">
-                  <div class="practice-timeline-labels">
-                    <span>30s</span>
-                    <span>1min</span>
-                    <span>2min</span>
-                    <span>3min</span>
-                    <span style="font-family:Arial,sans-serif">∞</span>
-                  </div>
-                </div>
-              </div>
+          <article class="mode-card reveal" style="transition-delay:.15s">
+            <div class="mode-card-bg" style="background-image:url('images/bg/level3complete.png')"></div>
+            <div class="mode-card-overlay"></div>
+            <img class="mode-card-icon" src="images/game3.png" alt="City Blitz">
+            <div class="mode-card-body">
+              <div class="mode-num" data-i18n="mode.num3">Mode 03</div>
+              <div class="mode-name">City Blitz</div>
+              <p class="mode-desc" data-i18n="mode3.desc">A city name flashes on screen — click it on the world map. The faster you click, the bigger your bonus. From mega capitals to hidden gems.</p>
+              <span class="mode-tag" data-i18n="mode3.tag">World Cities</span>
             </div>
+          </article>
 
-            <!-- Inicio -->
-            <div class="practice-start-wrap" id="practice-start-btn">
-              <img class="practice-confirm1" src="images/confirm1.png" draggable="false" oncontextmenu="return false">
-              <img class="practice-confirm2" src="images/confirm2.png" draggable="false" oncontextmenu="return false">
+          <article class="mode-card reveal" style="transition-delay:.2s">
+            <div class="mode-card-bg" style="background-image:url('images/bg/level4complete.png')"></div>
+            <div class="mode-card-overlay"></div>
+            <img class="mode-card-icon" src="images/game4.png" alt="Landmark Loco">
+            <div class="mode-card-body">
+              <div class="mode-num" data-i18n="mode.num4">Mode 04</div>
+              <div class="mode-name">Landmark Loco</div>
+              <p class="mode-desc" data-i18n="mode4.desc">Famous monuments and world wonders flash on screen. Identify them and their country — from the Eiffel Tower to Angkor Wat.</p>
+              <span class="mode-tag" data-i18n="mode4.tag">Landmarks</span>
             </div>
+          </article>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ── ABOUT ── -->
+    <section class="about" id="about">
+      <div class="about-grid">
+        <div class="about-text reveal">
+          <h2 data-i18n-html="about.title">Geography made <span>addictively fun</span></h2>
+          <p data-i18n="about.p1">myGeoChallenge is a free browser-based geography quiz game designed for players of all ages. Whether you're a student studying for a geography exam, a trivia fan, or just someone who loves exploring the world from your couch — there's a mode for you.</p>
+          <p data-i18n="about.p2">Every correct answer earns points, and every fast answer earns even more with our speed bonus system. Scores are tracked globally so you can always see exactly where you rank compared to players worldwide.</p>
+          <p data-i18n="about.p3">Create a free account to track your high scores across all four modes, challenge friends in real-time Versus matches, and earn one of 35 unique rank titles — starting from "Agoraphobic" and climbing all the way to globe-trotting legend.</p>
+          <p data-i18n="about.p4">Play the full World Tour campaign to face all four modes back-to-back, or use Practice Tour to study a specific continent or difficulty at your own pace. Fully bilingual — English and Spanish — with no downloads required.</p>
+        </div>
+        <div class="about-char reveal" style="transition-delay:.2s">
+          <div class="about-char-glow"></div>
+          <img id="flightatt-anim" src="images/characters/flightattpost2/1.png" alt="myGeoChallenge character">
+        </div>
+      </div>
+    </section>
+
+    <!-- ── FEATURES ── -->
+    <section class="features">
+      <div class="section-inner">
+        <div class="section-head reveal">
+          <div class="section-eyebrow" data-i18n="feat.eyebrow">Features</div>
+          <h2 class="section-title" data-i18n="feat.title">Everything You Need to Master Geography</h2>
+        </div>
+        <div class="features-grid">
+          <div class="feat reveal" style="transition-delay:.05s">
+            <span class="feat-icon">🌍</span>
+            <h4 data-i18n="feat1.h">World Tour Campaign</h4>
+            <p  data-i18n="feat1.p">Play all 4 modes back-to-back for a combined score and a final world ranking reveal.</p>
+          </div>
+          <div class="feat reveal" style="transition-delay:.1s">
+            <span class="feat-icon">⚔️</span>
+            <h4 data-i18n="feat2.h">Real-Time Versus</h4>
+            <p  data-i18n="feat2.p">Challenge friends or join public rooms with up to 10 players and race simultaneously.</p>
+          </div>
+          <div class="feat reveal" style="transition-delay:.15s">
+            <span class="feat-icon">📚</span>
+            <h4 data-i18n="feat3.h">Practice Tour</h4>
+            <p  data-i18n="feat3.p">Study by continent and difficulty at your own pace. Timer optional.</p>
+          </div>
+          <div class="feat reveal" style="transition-delay:.2s">
+            <span class="feat-icon">🏆</span>
+            <h4 data-i18n="feat4.h">Global Leaderboards</h4>
+            <p  data-i18n="feat4.p">High scores for all modes tracked globally. See exactly where you rank worldwide.</p>
+          </div>
+          <div class="feat reveal" style="transition-delay:.25s">
+            <span class="feat-icon">🎖️</span>
+            <h4 data-i18n="feat5.h">35 Unique Ranks</h4>
+            <p  data-i18n="feat5.p">Earn rank titles that grow with your score — satisfying progression for every level.</p>
+          </div>
+          <div class="feat reveal" style="transition-delay:.3s">
+            <span class="feat-icon">🌐</span>
+            <h4 data-i18n="feat6.h">English &amp; Spanish</h4>
+            <p  data-i18n="feat6.p">Full bilingual support. Switch languages anytime from the main menu.</p>
           </div>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- Popup score de práctica -->
-    <div class="practice-score-popup" id="practice-score-popup" style="display:none">
-      <div class="practice-score-inner">
-        <div class="practice-score-title" data-i18n="practice.sessionOver">Sesión terminada</div>
-        <div class="practice-score-val-wrap">
-          <img class="practice-score-points-img" src="images/points.png" draggable="false" oncontextmenu="return false">
-          <div class="practice-score-val" id="practice-score-val">0</div>
-        </div>
-        <div class="practice-score-time-row">
-          <span class="practice-score-time-icon">⏱</span>
-          <span class="practice-score-time" id="practice-score-time">00:00</span>
-        </div>
-        <div class="practice-score-cw-row">
-          <div class="practice-score-cw-line">
-            <div class="practice-score-imgs-row" id="practice-score-checks-row"></div>
-            <span class="practice-score-cw-count" id="practice-score-correct">x0</span>
-          </div>
-          <div class="practice-score-cw-line">
-            <div class="practice-score-imgs-row" id="practice-score-wrongs-row"></div>
-            <span class="practice-score-cw-count" id="practice-score-wrong">x0</span>
-          </div>
-        </div>
-        <div class="practice-score-ok-wrap" id="practice-score-btn">
-          <img class="practice-confirm1" src="images/confirm1.png" draggable="false" oncontextmenu="return false">
-          <img class="practice-confirm2" src="images/confirm2.png" draggable="false" oncontextmenu="return false">
-        </div>
+    <!-- ── CTA BOTTOM ── -->
+    <section class="cta-bottom">
+      <img class="cta-cloud-1" src="images/bg/cloud1.png" alt="">
+      <img class="cta-cloud-2" src="images/bg/cloud2.png" alt="">
+      <img class="cta-plane"   src="images/plane.png"     alt="">
+      <div class="cta-content reveal">
+        <h2 data-i18n="cta.title">Ready to Explore the World?</h2>
+        <p  data-i18n="cta.desc">Join thousands of players. Jump in as a guest or create a free account to save your scores and challenge friends.</p>
+        <a class="btn-primary" href="play.html" data-i18n="cta.btn">Start Playing — It's Free!</a>
       </div>
+    </section>
+
+  </main>
+
+  <!-- ── FOOTER ── -->
+  <footer>
+    <div class="footer-links">
+      <a href="privacy.html" data-i18n="footer.privacy">Privacy Policy</a>
+      <a href="play.html"    data-i18n="footer.play">Play Game</a>
+      <a href="#modes"       data-i18n="footer.modes">Game Modes</a>
     </div>
-
-    <!-- Popup: link expirado -->
-    <div class="account-modal" id="expired-popup">
-      <div class="account-modal-box">
-        <div class="account-view" style="display:flex">
-          <span class="account-modal-title" data-i18n="account.expiredTitle">Link expirado</span>
-          <div class="account-verify-icon">⏰</div>
-          <p class="account-modal-desc" data-i18n="account.expiredDesc">El enlace ha expirado. Pide uno nuevo desde la pantalla de inicio de sesión.</p>
-          <button class="account-modal-opt account-modal-login" id="expired-ok-btn" type="button" data-i18n="account.expiredBtn">Entendido</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Popup: correo verificado -->
-    <div class="account-modal" id="verified-popup">
-      <div class="account-modal-box">
-        <div class="account-view" style="display:flex">
-          <span class="account-modal-title" data-i18n="account.verifiedTitle">¡Correo verificado!</span>
-          <div class="account-verify-icon">✅</div>
-          <p class="account-modal-desc" data-i18n="account.verifiedDesc">Tu cuenta ha sido confirmada. Ya puedes iniciar sesión.</p>
-          <button class="account-modal-opt account-modal-login" id="verified-login-btn" type="button" data-i18n="account.verifiedBtn">Iniciar sesión</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Popup: requiere sesión -->
-    <div class="account-modal" id="social-lock-popup">
-      <div class="account-modal-box">
-        <button class="account-modal-close" id="social-lock-close" type="button">✕</button>
-        <div class="account-view" style="display:flex">
-          <span class="account-modal-title" data-i18n="account.socialLockTitle">Función bloqueada</span>
-          <div class="account-verify-icon">🔒</div>
-          <p class="account-modal-desc" data-i18n="account.socialLockDesc">Inicia sesión para ver y competir contra tus amigos, comparar rankings y añadir nuevos contactos.</p>
-          <button class="account-modal-opt account-modal-login" id="social-lock-login" type="button" data-i18n="account.login">Iniciar sesión</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Modal cuenta -->
-    <div class="account-modal" id="account-modal">
-      <div class="account-modal-box">
-        <button class="account-modal-close" id="account-modal-close" type="button">✕</button>
-
-        <!-- Vista principal -->
-        <div class="account-view" id="account-view-main">
-          <span class="account-modal-title" data-i18n="account.title">Mi Cuenta</span>
-          <p class="account-modal-desc" data-i18n="account.desc">Conecta tu cuenta para guardar tu progreso y competir con amigos online.</p>
-          <button class="account-modal-opt account-modal-login" id="account-modal-login" type="button" data-i18n="account.login">Iniciar sesión</button>
-          <button class="account-modal-opt account-modal-register" id="account-modal-register" type="button" data-i18n="account.register">Crear cuenta</button>
-        </div>
-
-        <!-- Vista iniciar sesión -->
-        <div class="account-view" id="account-view-login" style="display:none">
-          <span class="account-modal-title" data-i18n="account.loginTitle">Iniciar sesión</span>
-          <div class="account-form">
-            <label class="account-label" data-i18n="account.username">Nombre de usuario</label>
-            <input class="account-input" id="login-user" type="text" placeholder="johndoe321" maxlength="12" autocomplete="off" spellcheck="false">
-            <span class="account-error" id="login-err-user"></span>
-            <label class="account-label" data-i18n="account.password">Contraseña</label>
-            <input class="account-input" id="login-pass" type="password" placeholder="••••••••" maxlength="64">
-            <span class="account-error" id="login-err-pass"></span>
-            <button class="account-modal-opt account-modal-login" id="login-submit" type="button" data-i18n="account.enter">Entrar</button>
-            <button class="account-modal-link" id="login-forgot-btn" type="button" data-i18n="account.forgotLink">Olvidé mi contraseña</button>
-          </div>
-        </div>
-
-        <!-- Vista bienvenida -->
-        <div class="account-view" id="account-view-welcome" style="display:none">
-          <span class="account-modal-title"><span id="account-welcome-prefix"></span><span class="account-welcome-name" id="account-welcome-name"></span>!</span>
-          <div class="account-verify-icon">🌍</div>
-          <p class="account-modal-desc" id="account-welcome-desc"></p>
-          <button class="account-modal-opt account-modal-login" id="login-welcome-ok" type="button" data-i18n="account.play">¡Jugar!</button>
-        </div>
-
-        <!-- Vista crear cuenta -->
-        <div class="account-view" id="account-view-register" style="display:none">
-          <span class="account-modal-title" data-i18n="account.registerTitle">Crear cuenta</span>
-          <div class="account-form">
-            <label class="account-label" data-i18n="account.username">Nombre de usuario</label>
-            <input class="account-input" id="reg-username" type="text" placeholder="johndoe321" maxlength="12" autocomplete="off" spellcheck="false">
-            <span class="account-error" id="reg-err-username"></span>
-            <label class="account-label" data-i18n="account.email">Correo electrónico</label>
-            <input class="account-input" id="reg-email" type="email" data-i18n-ph="account.emailPh" placeholder="ej. correo@email.com" maxlength="60" autocomplete="off">
-            <span class="account-error" id="reg-err-email"></span>
-            <label class="account-label" data-i18n="account.password">Contraseña</label>
-            <input class="account-input" id="reg-pass" type="password" placeholder="••••••••" maxlength="64">
-            <div class="pass-strength-wrap" id="pass-strength-wrap" style="display:none">
-              <div class="pass-strength-bar">
-                <div class="pass-strength-fill" id="pass-strength-fill"></div>
-              </div>
-              <span class="pass-strength-label" id="pass-strength-label"></span>
-            </div>
-            <span class="account-error" id="reg-err-pass"></span>
-            <label class="account-label" data-i18n="account.confirmPass">Confirmar contraseña</label>
-            <input class="account-input" id="reg-pass2" type="password" placeholder="••••••••" maxlength="64">
-            <span class="account-error" id="reg-err-pass2"></span>
-            <button class="account-modal-opt account-modal-register" id="reg-submit" type="button" data-i18n="account.registerBtn">Registrarme</button>
-          </div>
-        </div>
-        <!-- Vista cargando -->
-        <div class="account-view" id="account-view-loading" style="display:none">
-          <div class="account-spinner"></div>
-        </div>
-
-        <!-- Vista verificación / cuenta creada -->
-        <div class="account-view" id="account-view-verify" style="display:none">
-          <span class="account-modal-title" data-i18n="account.verifyTitle">¡Cuenta creada!</span>
-          <div class="account-verify-icon">🌍</div>
-          <p class="account-modal-desc" data-i18n="account.verifyDesc">Tu cuenta fue creada exitosamente.<br>Ya puedes iniciar sesión.</p>
-          <button class="account-modal-opt account-modal-login" id="reg-verify-ok" type="button" data-i18n="account.verifyBtn">Iniciar sesión</button>
-        </div>
-
-        <!-- Vista olvidé mi contraseña -->
-        <div class="account-view" id="account-view-forgot" style="display:none">
-          <span class="account-modal-title" data-i18n="account.forgotTitle">Recuperar contraseña</span>
-          <div class="account-form">
-            <label class="account-label" data-i18n="account.username">Nombre de usuario</label>
-            <input class="account-input" id="forgot-user" type="text" placeholder="johndoe321" maxlength="12" autocomplete="off" spellcheck="false">
-            <span class="account-error" id="forgot-err-user"></span>
-            <button class="account-modal-opt account-modal-login" id="forgot-submit" type="button" data-i18n="account.forgotBtn">Enviar enlace</button>
-            <button class="account-modal-back" id="forgot-back" type="button" data-i18n="account.back">Volver</button>
-          </div>
-        </div>
-
-        <!-- Vista enlace enviado -->
-        <div class="account-view" id="account-view-forgot-sent" style="display:none">
-          <span class="account-modal-title" data-i18n="account.forgotSentTitle">Revisa tu correo</span>
-          <div class="account-verify-icon">✉️</div>
-          <p class="account-modal-desc" data-i18n="account.forgotSentDesc">Te enviamos un enlace para restablecer tu contraseña.</p>
-          <button class="account-modal-opt account-modal-login" id="forgot-sent-ok" type="button" data-i18n="account.understood">Entendido</button>
-        </div>
-
-        <!-- Vista cuenta vinculada (logueado) -->
-        <div class="account-view" id="account-view-loggedin" style="display:none">
-          <span class="account-modal-title" data-i18n="account.linkedTitle">Cuenta vinculada</span>
-          <div class="account-modal-pic-wrap" id="account-modal-pic-wrap">
-            <img class="account-modal-pic loading-profile-pic" id="account-modal-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
-            <div class="account-modal-pic-overlay" id="account-modal-pic-overlay">
-              <span id="account-modal-pic-pencil">✎</span>
-              <div class="pic-upload-spinner" id="account-modal-pic-spinner" style="display:none"></div>
-            </div>
-          </div>
-          <span class="account-linked-name" id="account-linked-name"></span>
-          <div class="account-action-list">
-            <button class="account-action-btn" id="account-go-change-pass" type="button">
-              <span class="account-action-icon">🔑</span>
-              <span data-i18n="account.changePass">Cambiar contraseña</span>
-              <span class="account-action-arrow">›</span>
-            </button>
-            <button class="account-action-btn" id="account-go-change-email" type="button">
-              <span class="account-action-icon">📧</span>
-              <span data-i18n="account.changeEmail">Cambiar correo</span>
-              <span class="account-action-arrow">›</span>
-            </button>
-            <button class="account-action-btn danger" id="account-logout-btn" type="button">
-              <span class="account-action-icon">🚪</span>
-              <span data-i18n="account.logout">Cerrar sesión</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Vista cambiar contraseña -->
-        <div class="account-view" id="account-view-change-pass" style="display:none">
-          <span class="account-modal-title" data-i18n="account.changePassTitle">Cambiar contraseña</span>
-          <div class="account-form">
-            <div id="chpass-current-wrap">
-            <label class="account-label" data-i18n="account.currentPass">Contraseña actual</label>
-            <input class="account-input" id="chpass-current" type="password" placeholder="••••••••" maxlength="64">
-            <span class="account-error" id="chpass-err-current"></span>
-            </div>
-            <label class="account-label" data-i18n="account.newPass">Nueva contraseña</label>
-            <input class="account-input" id="chpass-new" type="password" placeholder="••••••••" maxlength="64">
-            <div class="pass-strength-wrap" id="chpass-strength-wrap" style="display:none">
-              <div class="pass-strength-bar"><div class="pass-strength-fill" id="chpass-strength-fill"></div></div>
-              <span class="pass-strength-label" id="chpass-strength-label"></span>
-            </div>
-            <span class="account-error" id="chpass-err-new"></span>
-            <label class="account-label" data-i18n="account.confirmNewPass">Confirmar nueva contraseña</label>
-            <input class="account-input" id="chpass-confirm" type="password" placeholder="••••••••" maxlength="64">
-            <span class="account-error" id="chpass-err-confirm"></span>
-            <button class="account-modal-opt account-modal-login" id="chpass-submit" type="button" data-i18n="account.saveChanges">Guardar</button>
-          </div>
-        </div>
-
-        <!-- Vista contraseña cambiada OK -->
-        <div class="account-view" id="account-view-change-pass-ok" style="display:none">
-          <span class="account-modal-title" data-i18n="account.passChangedTitle">¡Contraseña actualizada!</span>
-          <div class="account-ok-icon">✅</div>
-          <p class="account-modal-desc" data-i18n="account.passChangedDesc">Tu contraseña fue cambiada exitosamente.</p>
-          <button class="account-modal-opt account-modal-login" id="chpass-ok-close" type="button" data-i18n="account.understood">Entendido</button>
-        </div>
-
-        <!-- Vista cambiar correo -->
-        <div class="account-view" id="account-view-change-email" style="display:none">
-          <span class="account-modal-title" data-i18n="account.changeEmailTitle">Cambiar correo</span>
-          <div class="account-form">
-            <label class="account-label" data-i18n="account.newEmail">Nuevo correo electrónico</label>
-            <input class="account-input" id="chemail-new" type="email" placeholder="nuevo@correo.com" maxlength="60" autocomplete="off">
-            <span class="account-error" id="chemail-err"></span>
-            <button class="account-modal-opt account-modal-login" id="chemail-submit" type="button" data-i18n="account.changeEmailBtn">Enviar verificación</button>
-          </div>
-        </div>
-
-        <!-- Vista confirmar cierre de sesión -->
-        <div class="account-view" id="account-view-logout-confirm" style="display:none">
-          <span class="account-modal-title" data-i18n="account.logoutConfirmTitle">¿Cerrar sesión?</span>
-          <div class="account-verify-icon">🚪</div>
-          <p class="account-modal-desc" data-i18n="account.logoutConfirmDesc">Se cerrará tu sesión en este dispositivo.</p>
-          <button class="account-modal-opt account-modal-register" id="account-logout-confirm" type="button" data-i18n="account.logoutYes">Cerrar sesión</button>
-          <button class="account-modal-opt account-modal-login" id="account-logout-cancel" type="button" data-i18n="account.logoutNo">Cancelar</button>
-        </div>
-
-        <!-- Vista correo - revisa tu correo nuevo -->
-        <div class="account-view" id="account-view-change-email-sent" style="display:none">
-          <span class="account-modal-title" data-i18n="account.changeEmailSentTitle">Revisa tu correo</span>
-          <div class="account-verify-icon">✉️</div>
-          <p class="account-modal-desc" data-i18n="account.changeEmailSentDesc">Te enviamos un enlace al nuevo correo. Confirma el cambio desde ahí.</p>
-          <button class="account-modal-opt account-modal-login" id="chemail-sent-ok" type="button" data-i18n="account.understood">Entendido</button>
-        </div>
-      </div>
-    </div>
-
-    <div id="loading-social-group" class="table-gone">
-      <img class="loading-howtotable" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
-      <img class="loading-social-logo" src="images/logo.png" alt="City Blitz" draggable="false" oncontextmenu="return false">
-      <div class="loading-social-titlebar">
-        <img class="loading-social-planet" src="images/planet2.png" alt="" draggable="false" oncontextmenu="return false">
-        <span class="loading-social-title" data-i18n="social.title">Panel de Amigos</span>
-        <img class="loading-social-planet" src="images/planet2.png" alt="" draggable="false" oncontextmenu="return false">
-      </div>
-      <div class="loading-social-search">
-        <svg class="loading-social-search-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="10.5" cy="10.5" r="6.5" stroke="#8b6a00" stroke-width="2.4"/>
-          <line x1="15.6" y1="15.6" x2="21" y2="21" stroke="#8b6a00" stroke-width="2.8" stroke-linecap="round"/>
-        </svg>
-        <input class="loading-social-search-input" id="loading-social-search-input" type="text" placeholder="Buscar Amigos..." data-i18n-ph="social.searchFriends" maxlength="12" autocomplete="off" spellcheck="false">
-      </div>
-      <button class="loading-social-sort" id="loading-social-sort" type="button" title="Ordenar">Conexión</button>
-      <div class="loading-social-panel">
-        <div class="loading-social-tabs">
-          <button class="loading-social-tab active" id="loading-social-tab-friends" type="button">Mis Amigos</button>
-          <button class="loading-social-tab" id="loading-social-tab-requests" type="button">Solicitudes (3)</button>
-        </div>
-        <div class="loading-social-list" id="loading-social-list"></div>
-        <div class="loading-social-footer">
-          <button class="loading-social-action" id="loading-social-invite" type="button" data-i18n="social.addFriend">Añadir Amigo</button>
-          <button class="loading-social-blockbtn" id="loading-social-sentbtn" type="button" title="Solicitudes enviadas" aria-label="Solicitudes enviadas">
-            <img src="images/friendsent.png" alt="Enviadas" draggable="false" oncontextmenu="return false">
-          </button>
-          <button class="loading-social-blockbtn" id="loading-social-blockbtn" type="button" title="Bloqueados" aria-label="Bloqueados">
-            <img src="images/friendblock.png" alt="Bloqueados" draggable="false" oncontextmenu="return false">
-          </button>
-        </div>
-      </div>
-      <div class="loading-social-back-wrap" id="loading-social-back-wrap">
-        <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
-        <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
-      </div>
-    </div>
-    <div id="loading-friend-group" class="table-gone">
-    <img class="loading-howtotable" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
-    <img class="loading-profile-pic" id="loading-friend-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
-    <span class="loading-friend-status" id="loading-friend-status"></span>
-    <div class="loading-name-wrap">
-      <span class="loading-player-name" id="loading-friend-name"></span>
-    </div>
-    <div class="loading-play-confirm-wrap" id="loading-friend-back-wrap">
-      <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
-      <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
-    </div>
-    <span class="loading-play-count" id="loading-friend-play-count"></span>
-    <span class="loading-vs-record" id="loading-friend-vs-record"></span>
-    <div class="loading-games-col">
-      <span class="loading-games-title" data-i18n="common.average">Promedio</span>
-      <div class="loading-games-row">
-        <img class="loading-games-game" src="images/game1.png" alt="" draggable="false" oncontextmenu="return false">
-        <div class="loading-games-mark-wrap">
-          <img class="loading-games-mark" src="images/mark1.png" alt="" draggable="false" oncontextmenu="return false">
-          <span class="loading-games-hs loading-games-hs1" id="loading-friend-hs1">0</span>
-        </div>
-      </div>
-      <div class="loading-games-row">
-        <img class="loading-games-game" src="images/game2.png" alt="" draggable="false" oncontextmenu="return false">
-        <div class="loading-games-mark-wrap">
-          <img class="loading-games-mark" src="images/mark2.png" alt="" draggable="false" oncontextmenu="return false">
-          <span class="loading-games-hs loading-games-hs2" id="loading-friend-hs2">0</span>
-        </div>
-      </div>
-      <div class="loading-games-row">
-        <img class="loading-games-game" src="images/game3.png" alt="" draggable="false" oncontextmenu="return false">
-        <div class="loading-games-mark-wrap">
-          <img class="loading-games-mark" src="images/mark3.png" alt="" draggable="false" oncontextmenu="return false">
-          <span class="loading-games-hs loading-games-hs3" id="loading-friend-hs3">0</span>
-        </div>
-      </div>
-      <div class="loading-games-row">
-        <img class="loading-games-game" src="images/game4.png" alt="" draggable="false" oncontextmenu="return false">
-        <div class="loading-games-mark-wrap">
-          <img class="loading-games-mark" src="images/mark4.png" alt="" draggable="false" oncontextmenu="return false">
-          <span class="loading-games-hs loading-games-hs4" id="loading-friend-hs4">0</span>
-        </div>
-      </div>
-    </div>
-    <div class="loading-games-col loading-games-col2">
-      <span class="loading-games-title" data-i18n="common.highscore">Highscore</span>
-      <div class="loading-games-row">
-        <img class="loading-games-game loading-games-spacer" src="images/game1.png" alt="" draggable="false" oncontextmenu="return false">
-        <div class="loading-games-mark-wrap">
-          <img class="loading-games-mark" src="images/mark1.png" alt="" draggable="false" oncontextmenu="return false">
-          <span class="loading-games-hs loading-games-hs1" id="loading-friend-avg1">0</span>
-          <span class="loading-games-crown">👑</span>
-        </div>
-      </div>
-      <div class="loading-games-row">
-        <img class="loading-games-game loading-games-spacer" src="images/game2.png" alt="" draggable="false" oncontextmenu="return false">
-        <div class="loading-games-mark-wrap">
-          <img class="loading-games-mark" src="images/mark2.png" alt="" draggable="false" oncontextmenu="return false">
-          <span class="loading-games-hs loading-games-hs2" id="loading-friend-avg2">0</span>
-          <span class="loading-games-crown">👑</span>
-        </div>
-      </div>
-      <div class="loading-games-row">
-        <img class="loading-games-game loading-games-spacer" src="images/game3.png" alt="" draggable="false" oncontextmenu="return false">
-        <div class="loading-games-mark-wrap">
-          <img class="loading-games-mark" src="images/mark3.png" alt="" draggable="false" oncontextmenu="return false">
-          <span class="loading-games-hs loading-games-hs3" id="loading-friend-avg3">0</span>
-          <span class="loading-games-crown">👑</span>
-        </div>
-      </div>
-      <div class="loading-games-row">
-        <img class="loading-games-game loading-games-spacer" src="images/game4.png" alt="" draggable="false" oncontextmenu="return false">
-        <div class="loading-games-mark-wrap">
-          <img class="loading-games-mark" src="images/mark4.png" alt="" draggable="false" oncontextmenu="return false">
-          <span class="loading-games-hs loading-games-hs4" id="loading-friend-avg4">0</span>
-          <span class="loading-games-crown">👑</span>
-        </div>
-      </div>
-    </div>
-    <img class="loading-games-rank" id="loading-friend-rank" src="images/ranks/1.png" alt="" draggable="false" oncontextmenu="return false">
-    <span class="loading-games-rank-label" id="loading-friend-rank-label"></span>
-    <span class="loading-games-hs-label" data-i18n="common.highscore">Highscore</span>
-    <img class="loading-games-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">
-    <span class="loading-games-total" id="loading-friend-total">0</span>
-    <div class="loading-friend-actions" id="loading-friend-actions">
-      <img class="loading-friend-act loading-friend-fav"   id="loading-friend-fav"   src="images/bestfriend.png" alt="Mejor amigo" draggable="false" oncontextmenu="return false">
-      <img class="loading-friend-act loading-friend-rel"   id="loading-friend-rel"   src="images/friendadd.png"  alt="" draggable="false" oncontextmenu="return false">
-      <img class="loading-friend-act loading-friend-block" id="loading-friend-block" src="images/friendblock.png" alt="Bloquear" draggable="false" oncontextmenu="return false">
-    </div>
-    </div>
-    <div id="loading-addfriend-group" class="table-gone">
-      <img class="loading-howtotable" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
-      <div class="loading-addfriend-titlebar">
-        <img class="loading-social-planet" src="images/planet2.png" alt="" draggable="false" oncontextmenu="return false">
-        <span class="loading-social-title" data-i18n="social.addFriend">Añadir Amigo</span>
-        <img class="loading-social-planet" src="images/planet2.png" alt="" draggable="false" oncontextmenu="return false">
-      </div>
-      <span class="loading-addfriend-label" data-i18n="social.typeUsername">Escribe el nombre de usuario</span>
-      <div class="loading-addfriend-search">
-        <svg class="loading-social-search-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="10.5" cy="10.5" r="6.5" stroke="#8b6a00" stroke-width="2.4"/>
-          <line x1="15.6" y1="15.6" x2="21" y2="21" stroke="#8b6a00" stroke-width="2.8" stroke-linecap="round"/>
-        </svg>
-        <input class="loading-social-search-input" id="loading-addfriend-input" type="text" placeholder="Nombre de usuario..." data-i18n-ph="social.usernamePh" maxlength="12" autocomplete="off" spellcheck="false">
-      </div>
-      <button class="loading-social-action loading-addfriend-send" id="loading-addfriend-send" type="button" data-i18n="social.sendRequest">Enviar Solicitud</button>
-      <span class="loading-addfriend-feedback" id="loading-addfriend-feedback"></span>
-      <div class="loading-social-back-wrap" id="loading-addfriend-back-wrap">
-        <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
-        <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
-      </div>
-    </div>
-
-    <div id="loading-blocked-group" class="table-gone">
-      <img class="loading-howtotable" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
-      <div class="loading-addfriend-titlebar loading-blocked-titlebar">
-        <img class="loading-social-planet" src="images/planet2.png" alt="" draggable="false" oncontextmenu="return false">
-        <span class="loading-social-title" data-i18n="social.blocked">Bloqueados</span>
-        <img class="loading-social-planet" src="images/planet2.png" alt="" draggable="false" oncontextmenu="return false">
-      </div>
-      <div class="loading-social-panel loading-blocked-panel">
-        <div class="loading-blocked-toolbar">
-          <div class="loading-social-search loading-blocked-search">
-            <svg class="loading-social-search-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="10.5" cy="10.5" r="6.5" stroke="#8b6a00" stroke-width="2.4"/>
-              <line x1="15.6" y1="15.6" x2="21" y2="21" stroke="#8b6a00" stroke-width="2.8" stroke-linecap="round"/>
-            </svg>
-            <input class="loading-social-search-input" id="loading-blocked-search-input" type="text" placeholder="Buscar Bloqueados..." data-i18n-ph="social.searchBlocked" maxlength="12" autocomplete="off" spellcheck="false">
-          </div>
-          <button class="loading-social-sort loading-blocked-sort" id="loading-blocked-sort" type="button" title="Ordenar">A-Z</button>
-        </div>
-        <div class="loading-social-list" id="loading-blocked-list"></div>
-      </div>
-      <div class="loading-social-back-wrap" id="loading-blocked-back-wrap">
-        <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
-        <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
-      </div>
-    </div>
-
-    <div id="loading-sent-group" class="table-gone">
-      <img class="loading-howtotable" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
-      <div class="loading-addfriend-titlebar loading-blocked-titlebar">
-        <img class="loading-social-planet" src="images/planet2.png" alt="" draggable="false" oncontextmenu="return false">
-        <span class="loading-social-title" data-i18n="social.sentRequests">Solicitudes Enviadas</span>
-        <img class="loading-social-planet" src="images/planet2.png" alt="" draggable="false" oncontextmenu="return false">
-      </div>
-      <div class="loading-social-panel loading-blocked-panel">
-        <div class="loading-blocked-toolbar">
-          <div class="loading-social-search loading-blocked-search">
-            <svg class="loading-social-search-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="10.5" cy="10.5" r="6.5" stroke="#8b6a00" stroke-width="2.4"/>
-              <line x1="15.6" y1="15.6" x2="21" y2="21" stroke="#8b6a00" stroke-width="2.8" stroke-linecap="round"/>
-            </svg>
-            <input class="loading-social-search-input" id="loading-sent-search-input" type="text" placeholder="Buscar Enviadas..." data-i18n-ph="social.searchSent" maxlength="12" autocomplete="off" spellcheck="false">
-          </div>
-          <button class="loading-social-sort loading-blocked-sort" id="loading-sent-sort" type="button" title="Ordenar">A-Z</button>
-        </div>
-        <div class="loading-social-list" id="loading-sent-list"></div>
-      </div>
-      <div class="loading-social-back-wrap" id="loading-sent-back-wrap">
-        <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
-        <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
-      </div>
-    </div>
-    <div id="loading-version">Ver. 2.6.66</div>
-  </div>
-
-  <!-- Pantalla de resultado versus (W/L) — fuera del loading-screen para verse tras la partida -->
-  <div id="vs-result-screen" class="vs-popup-overlay" style="display:none">
-    <div class="vs-popup-box">
-      <span class="vs-result-title" id="vs-result-title"></span>
-      <span class="vs-popup-sub" id="vs-result-sub" style="display:none"></span>
-      <div class="vs-result-scores">
-        <div class="vs-result-side">
-          <img class="vs-result-pic" id="vs-result-me-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
-          <span class="vs-result-name" id="vs-result-me-name">Tú</span>
-          <span class="vs-result-score" id="vs-result-me-score">0</span>
-        </div>
-        <span class="vs-result-vs">VS</span>
-        <div class="vs-result-side">
-          <img class="vs-result-pic" id="vs-result-opp-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
-          <span class="vs-result-name" id="vs-result-opp-name"></span>
-          <span class="vs-result-score" id="vs-result-opp-score">0</span>
-        </div>
-      </div>
-      <div class="vs-popup-confirm" id="vs-result-back">
-        <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
-        <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
-      </div>
-    </div>
-  </div>
-
-  <!-- Esperando a que terminen todos los miembros del lobby -->
-  <div id="lobby-waiting-overlay" style="display:none">
-    <span id="lobby-waiting-text"></span>
-  </div>
-
-  <!-- Ranking de resultado del lobby (grupal) -->
-  <div id="lobby-result-screen" class="vs-popup-overlay" style="display:none">
-    <div class="vs-popup-box">
-      <span class="vs-result-title" id="lobby-result-title"></span>
-      <div id="lobby-result-list" class="lobby-result-list"></div>
-      <div class="vs-popup-confirm" id="lobby-result-back">
-        <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
-        <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
-      </div>
-    </div>
-  </div>
-
-  <!-- Confirmación genérica del versus (p. ej. crear sala teniendo una activa) -->
-  <div id="versus-confirm-popup" class="vs-popup-overlay" style="display:none">
-    <div class="vs-popup-box">
-      <span class="vs-popup-sub" id="versus-confirm-msg"></span>
-      <div class="vs-incoming-btns">
-        <div class="vs-popup-confirm vs-accept-btn" id="versus-confirm-yes">
-          <img src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
-          <img src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
-        </div>
-        <div class="vs-popup-confirm vs-decline-btn" id="versus-confirm-no">
-          <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
-          <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Notificación (no bloqueante) de invitación a sala: baja desde arriba con barra de 10s -->
-  <div id="lobby-invite-notif" class="lobby-invite-notif" style="display:none">
-    <div class="lobby-notif-row">
-      <div class="lobby-notif-text">
-        <span class="lobby-notif-name" id="lobby-notif-name"></span>
-        <span class="lobby-notif-sub" id="lobby-notif-sub" data-i18n="lobby.invitedYou">te invitó a su sala</span>
-      </div>
-      <button class="lobby-notif-btn accept" id="lobby-notif-accept" type="button" aria-label="Aceptar">✓</button>
-      <button class="lobby-notif-btn decline" id="lobby-notif-decline" type="button" aria-label="Rechazar">✕</button>
-    </div>
-    <div class="lobby-notif-bar"><div class="lobby-notif-bar-fill" id="lobby-notif-bar"></div></div>
-  </div>
-
-  <!-- Popup: invitar amigos a la sala -->
-  <div id="lobby-invite-popup" class="vs-popup-overlay" style="display:none">
-    <div class="vs-popup-box lobby-invite-box">
-      <span class="vs-popup-name" data-i18n="lobby.inviteTitle">Invitar amigos</span>
-      <button class="versus-start-btn lobby-copylink-btn" id="lobby-copylink-btn" type="button" data-i18n="lobby.copyLink">Copiar link</button>
-      <div id="lobby-invite-list" class="versus-list-box lobby-invite-list"></div>
-      <div id="lobby-invite-empty" class="versus-empty-inline" data-i18n="versus.noneOnline" style="display:none">No hay amigos conectados ahora.</div>
-      <div class="vs-popup-confirm" id="lobby-invite-close">
-        <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
-        <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
-      </div>
-    </div>
-  </div>
-
-  <div id="splash-screen" class="game-bg-screen" style="display:none">
-    <img class="game-bg-table" src="images/checkerrortable.png" alt="">
-    <img class="game-bg-check3" src="images/check3.png" alt="">
-    <span class="grade-count-total"><span class="grade-count-x">x</span><span id="splash-count-total">0</span></span>
-    <img class="game-bg-wrong3" src="images/wrong3.png" alt="">
-    <span class="wrong-count-total"><span class="wrong-count-x">x</span><span id="splash-wrong-total">0</span></span>
-    <img class="flightatt-splash" src="images/characters/flightattpost2/1.png" alt="">
-    <img class="game-bg-sky" src="images/bg/sky.png" alt="">
-    <img class="game-bg-sky game-bg-sky-monuments" src="images/bg/sky2.png" alt="">
-    <img class="game-bg-plane7" src="images/bg/plane7.png" alt="">
-    <img class="game-bg-cloud game-bg-cloud1" src="images/bg/cloud1.png" alt="">
-    <img class="game-bg-cloud game-bg-cloud2" src="images/bg/cloud2.png" alt="">
-    <img class="game-bg-clouds-monuments" src="images/clouds.png" alt="">
-    <img class="game-bg-clouds-monuments game-bg-clouds-monuments2" src="images/clouds.png" alt="">
-    <img class="game-bg-clouds-monuments game-bg-clouds-monuments3" src="images/clouds.png" alt="">
-    <img class="game-bg-city" src="images/bg/level3complete.png" alt="">
-    <img class="game-bg-city game-bg-city-flags" src="images/bg/level1complete.png" alt="">
-    <img class="game-bg-city game-bg-city-monuments" src="images/bg/level4complete.png" alt="">
-    <img class="game-bg-city game-bg-city-monuments2" src="images/bg/level4complete2.png" alt="">
-    <img class="game-bg-bus" src="images/bg/bus.png" alt="">
-    <img class="game-bg-people" src="images/characters/people.png" alt="">
-    <img class="game-bg-men game-bg-men2" src="images/characters/men2.png" alt="">
-    <img class="game-bg-men game-bg-men1" src="images/characters/men1.png" alt="">
-    <img class="game-bg-women game-bg-women2" src="images/characters/women1.png" alt="">
-    <img class="game-bg-women game-bg-women1" src="images/characters/women1.png" alt="">
-    <img class="game-bg-girl game-bg-girl2" src="images/characters/girl2.png" alt="">
-    <img class="game-bg-girl game-bg-girl1" src="images/characters/girl1.png" alt="">
-    <img class="game-bg-plane game-bg-plane1" src="images/bg/plane.png" alt="">
-    <img class="game-bg-plane game-bg-plane2" src="images/bg/plane2.png" alt="">
-    <img class="game-bg-plane game-bg-plane3" src="images/bg/plane3.png" alt="">
-    <img class="game-bg-plane game-bg-plane4" src="images/bg/plane4.png" alt="">
-    <img class="game-bg-plane game-bg-plane5" src="images/bg/plane5.png" alt="">
-    <img class="game-bg-plane game-bg-plane6" src="images/bg/plane6.png" alt="">
-    <div id="splash-highscore-wrap" style="display:none">
-      <span id="splash-highscore-label" data-i18n="common.bestscore">Mejor puntaje</span>
-      <span id="splash-highscore-value">—</span>
-    </div>
-    <img class="game-bg-stairs" src="images/bg/stairs.png" alt="">
-    <div class="splash-howtoplay-wrap">
-      <img class="splash-howtoplaytable" src="images/howtoplaytable.png" alt="">
-      <div class="splash-howtoplay-title">City Blitz</div>
-      <video class="splash-howtoplay-video" src="images/howtoplay/howtoplay3.mp4" loop muted playsinline preload="none"></video>
-    </div>
-<div class="splash-confirm-wrap">
-      <img class="splash-confirm1" src="images/confirm1.png" alt="">
-      <img class="splash-confirm2" src="images/confirm2.png" alt="">
-    </div><button id="btn-start" style="display:none">Jugar</button>
-<div class="splash-text2-wrap">
-      <img class="splash-text2" src="images/text2.png" alt="">
-      <p class="splash-text2-label">¡Veamos a qué ciudad va cada uno! Aquí es donde tú entras a formar parte.</p>
-    </div>
-  </div>
-
-  <div id="gameover-screen" class="game-bg-screen">
-    <img class="game-bg-table" src="images/checkerrortable.png" alt="">
-    <img class="game-bg-check3" src="images/check3.png" alt="">
-    <span class="grade-count-total"><span class="grade-count-x">x</span><span id="gameover-count-total">0</span></span>
-    <div id="gameover-checks-row" class="checks-row"></div>
-    <img class="game-bg-wrong3" src="images/wrong3.png" alt="">
-    <span class="wrong-count-total"><span class="wrong-count-x">x</span><span id="gameover-wrong-total">0</span></span>
-    <div id="gameover-wrongs-row" class="wrongs-row"></div>
-    <img class="flightatt" src="images/characters/flightattpost/1.png" alt="">
-    <img class="game-bg-sky" src="images/bg/sky.png" alt="">
-    <img class="game-bg-sky game-bg-sky-monuments" src="images/bg/sky2.png" alt="">
-    <img class="game-bg-plane7" src="images/bg/plane7.png" alt="">
-    <img class="game-bg-cloud game-bg-cloud1" src="images/bg/cloud1.png" alt="">
-    <img class="game-bg-cloud game-bg-cloud2" src="images/bg/cloud2.png" alt="">
-    <img class="game-bg-clouds-monuments" src="images/clouds.png" alt="">
-    <img class="game-bg-clouds-monuments game-bg-clouds-monuments2" src="images/clouds.png" alt="">
-    <img class="game-bg-clouds-monuments game-bg-clouds-monuments3" src="images/clouds.png" alt="">
-    <img class="game-bg-city" src="images/bg/level3complete.png" alt="">
-    <img class="game-bg-city game-bg-city-flags" src="images/bg/level1complete.png" alt="">
-    <img class="game-bg-city game-bg-city-monuments" src="images/bg/level4complete.png" alt="">
-    <img class="game-bg-city game-bg-city-monuments2" src="images/bg/level4complete2.png" alt="">
-    <img class="game-bg-bus" src="images/bg/bus.png" alt="">
-    <img class="game-bg-people" src="images/characters/people.png" alt="">
-    <img class="game-bg-men game-bg-men2" src="images/characters/men2.png" alt="">
-    <img class="game-bg-men game-bg-men1" src="images/characters/men1.png" alt="">
-    <img class="game-bg-women game-bg-women2" src="images/characters/women1.png" alt="">
-    <img class="game-bg-women game-bg-women1" src="images/characters/women1.png" alt="">
-    <img class="game-bg-girl game-bg-girl2" src="images/characters/girl2.png" alt="">
-    <img class="game-bg-girl game-bg-girl1" src="images/characters/girl1.png" alt="">
-    <img class="game-bg-plane game-bg-plane1" src="images/bg/plane.png" alt="">
-    <img class="game-bg-plane game-bg-plane2" src="images/bg/plane2.png" alt="">
-    <img class="game-bg-plane game-bg-plane3" src="images/bg/plane3.png" alt="">
-    <img class="game-bg-plane game-bg-plane4" src="images/bg/plane4.png" alt="">
-    <img class="game-bg-plane game-bg-plane5" src="images/bg/plane5.png" alt="">
-    <img class="game-bg-plane game-bg-plane6" src="images/bg/plane6.png" alt="">
-    <img class="game-bg-stairs" src="images/bg/stairs.png" alt="">
-    <h2 data-i18n="splash.timeUp">¡Tiempo!</h2>
-    <div id="final-score-label" data-i18n="results.finalScore">Puntaje final</div>
-    <div id="final-score-value">0</div>
-    <div id="new-highscore-banner" style="display:none">
-      <span id="new-highscore-text" data-i18n="results.newRecord">¡Nuevo récord!</span>
-      <span id="new-highscore-score"></span>
-    </div>
-    <div class="gameover-text1-wrap">
-      <img class="gameover-text1" src="images/text1.png" alt="">
-      <p class="gameover-text1-label">¡Buen intento! ¡Todos llegaron a sus ciudades de destino!</p>
-    </div>
-    <div class="gameover-confirm-wrap">
-      <img class="gameover-confirm1" src="images/confirm1.png" alt="">
-      <img class="gameover-confirm2" src="images/confirm2.png" alt="">
-    </div>
-  </div>
-
-  <div id="final-screen" style="display:none;position:absolute;inset:0;z-index:160;">
-    <img class="results-sky" src="images/bg/sky3.png" alt="" draggable="false" oncontextmenu="return false">
-    <img class="final-cloud4" src="images/bg/cloud4.png" alt="" draggable="false" oncontextmenu="return false">
-    <img class="final-cloud4 final-cloud4b" src="images/bg/cloud4.png" alt="" draggable="false" oncontextmenu="return false">
-    <img class="final-cloud4 final-cloud4c" src="images/bg/cloud4.png" alt="" draggable="false" oncontextmenu="return false">
-    <div id="final-clouds5"></div>
-    <div id="final-group">
-      <div class="final-plane-wrap">
-        <img class="final-plane" src="images/plane.png" alt="" draggable="false" oncontextmenu="return false">
-      </div>
-      <span class="final-position" id="final-position"></span>
-      <span class="final-player-name" id="final-player-name"></span>
-      <span class="final-rank-label" id="final-rank-label"></span>
-      <img class="final-cloud3-fg" src="images/bg/cloud3.png" alt="" draggable="false" oncontextmenu="return false">
-      <div class="final-avatar"><img class="final-avatar-img" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false"></div>
-      <div class="final-points-wrap">
-        <img class="final-points-img" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">
-        <span class="final-points-score" id="final-points-score">0</span>
-      </div>
-    </div>
-    <div class="final-confirm-back-wrap" id="final-confirm-back-wrap">
-      <img class="final-confirm-back1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
-      <img class="final-confirm-back2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
-    </div>
-  </div>
-
-  <div id="results-screen" style="display:none;position:fixed;inset:0;z-index:150;">
-    <img class="results-sky" src="images/bg/sky3.png" alt="" draggable="false" oncontextmenu="return false">
-    <img class="loading-clouds" src="images/clouds.png" alt="">
-    <img class="loading-clouds loading-clouds2" src="images/clouds.png" alt="">
-    <img class="loading-clouds loading-clouds3" src="images/clouds.png" alt="">
-    <img class="loading-clouds-b" src="images/clouds.png" alt="">
-    <img class="loading-clouds-b loading-clouds-b2" src="images/clouds.png" alt="">
-    <img class="loading-clouds-b loading-clouds-b3" src="images/clouds.png" alt="">
-    <img class="loading-clouds-c" src="images/clouds.png" alt="">
-    <img class="loading-clouds-c loading-clouds-c2" src="images/clouds.png" alt="">
-    <img class="loading-clouds-c loading-clouds-c3" src="images/clouds.png" alt="">
-    <div class="loading-clouds-fade"></div>
-    <div class="loading-clouds-fade loading-clouds-fade2"></div>
-    <div class="loading-clouds-fade loading-clouds-fade3"></div>
-    <img class="results-table" src="images/howtoplaytable.png" alt="">
-    <div class="results-text3-wrap">
-      <img class="results-text3" src="images/text3.png" alt="" draggable="false" oncontextmenu="return false">
-      <p class="results-rank-desc" id="results-rank-desc"></p>
-    </div>
-    <img class="results-flightatt" src="images/characters/flightattpost/1.png" alt="" draggable="false">
-    <div id="results-reveal">
-    <img class="results-rank" id="results-rank" src="images/ranks/1.png" alt="" draggable="false" oncontextmenu="return false" style="display:none;">
-    <span class="results-rank-label" id="results-rank-label">Agorafóbico</span>
-    <div class="results-points-wrap" id="results-points-wrap">
-      <span class="results-points-label" data-i18n="common.total">Puntuación total</span>
-      <img class="results-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">
-      <span class="results-total-score" id="results-total-score">0</span>
-    </div>
-    </div><!-- #results-reveal -->
-    <div class="results-back-wrap" id="results-back-wrap">
-      <img class="results-back1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
-      <img class="results-back2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
-    </div>
-    <div class="results-confirm-wrap">
-      <img class="results-confirm1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
-      <img class="results-confirm2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
-    </div>
-    <div class="results-content">
-      <span class="results-title" data-i18n="final.worldTour">Gira mundial</span>
-      <img class="results-planet" src="images/planet2.png" alt="">
-      <img class="results-game results-game1" src="images/game1.png" alt="" draggable="false" oncontextmenu="return false">
-      <span class="results-mark-label results-mark-label1">Suitcase Shuffle</span>
-      <span class="results-hs results-hs1" id="results-hs1">0</span>
-      <img class="results-mark results-mark1" src="images/mark1.png" alt="">
-      <img class="results-game results-game2" src="images/game2.png" alt="" draggable="false" oncontextmenu="return false">
-      <span class="results-mark-label results-mark-label2">Map Mayhem</span>
-      <span class="results-hs results-hs2" id="results-hs2">0</span>
-      <img class="results-mark results-mark2" src="images/mark2.png" alt="">
-      <img class="results-game results-game3" src="images/game3.png" alt="" draggable="false" oncontextmenu="return false">
-      <span class="results-mark-label results-mark-label3">City Blitz</span>
-      <span class="results-hs results-hs3" id="results-hs3">0</span>
-      <img class="results-mark results-mark3" src="images/mark3.png" alt="">
-      <img class="results-game results-game4" src="images/game4.png" alt="" draggable="false" oncontextmenu="return false">
-      <span class="results-mark-label results-mark-label4">Landmark Loco</span>
-      <span class="results-hs results-hs4" id="results-hs4">0</span>
-      <img class="results-mark results-mark4" src="images/mark4.png" alt="">
-    </div>
-  </div>
-
-  <div id="game-wrapper">
-
-    <canvas id="game-canvas" oncontextmenu="return false"></canvas>
-
-    <div id="city-tag">
-      <img src="images/tag3.png" alt="">
-      <span id="city-tag-text" data-i18n="common.city">Ciudad</span>
-      <img id="monument-img" src="" alt="" style="display:none; width:282px; height:180px; object-fit:cover; position:absolute; top:51px; left:87px; pointer-events:none;">
-      <div id="monument-name"></div>
-    </div>
-
-    <div id="result-label"></div>
-    <div id="coord-tooltip"></div>
-
-  </div>
-
-  <div id="countdown-widget">
-    <img src="images/countdown.png" alt="">
-    <div id="timer-number">60</div>
-    <div id="progress-dots">
-      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
-      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
-      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
-      <div class="dot"></div>
-    </div>
-    <div id="time-bonus" class="time-bonus" aria-hidden="true"><span class="tb-plus">+</span><span class="tb-num">5s</span></div>
-  </div>
-
-  <div id="speed-bonus-text" data-i18n="common.speedBonus">¡Bonus velocidad!</div>
-
-  <div id="score-display">
-    <img src="images/points.png" alt="">
-    <div id="score-value">0</div>
-  </div>
-
-  <!-- Barra celeste pegada al borde derecho visible, detrás del panel de amigos -->
-  <div id="right-edge-bar"></div>
-
-  <div id="right-panel">
-    <div id="leaderboard"></div>
-    <div id="highscore-value" style="display:none">0</div>
-  </div>
-
-  <div id="pregame-countdown" style="display:none">
-    <img id="pregame-countdown-img" src="" alt="">
-  </div>
-
-  <div id="timeup-overlay" style="display:none">
-    <img src="images/countdown/timeup.png" alt="Time Up">
-  </div>
-  <div id="powerquit-overlay" style="display:none">
-    <img src="images/countdown/gameover.png" alt="Game Over">
-  </div>
-
-  <div id="vol-btn">
-    <img id="vol-img" src="images/vol1.png" alt="">
-  </div>
-  <div id="fs-btn">⛶</div>
-
-  <img id="ingame-power" src="images/power.png" alt="" draggable="false" oncontextmenu="return false" style="display:none">
-
-  <div id="ingame-quit-popup" style="display:none">
-    <div class="ingame-quit-box">
-      <span class="ingame-quit-text" data-i18n="quit.text">¿Quieres terminar la partida y volver al menú principal?</span>
-      <div class="ingame-quit-actions">
-        <button class="ingame-quit-btn confirm" id="ingame-quit-confirm" type="button" aria-label="Sí">✓</button>
-        <button class="ingame-quit-btn cancel" id="ingame-quit-cancel" type="button" aria-label="No">✕</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="friend-confirm-popup" style="display:none">
-    <div class="ingame-quit-box friend-confirm-box">
-      <button class="friend-confirm-close" id="friend-confirm-close" type="button" aria-label="Cerrar">✕</button>
-      <span class="ingame-quit-text" id="friend-confirm-text"></span>
-      <div class="ingame-quit-actions">
-        <button class="ingame-quit-btn confirm" id="friend-confirm-yes" type="button" aria-label="Sí">✓</button>
-        <button class="ingame-quit-btn cancel" id="friend-confirm-no" type="button" aria-label="No">✕</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── MODO BANDERAS ──────────────────────────────────── -->
-  <div id="flags-wrapper" style="display:none">
-
-    <div id="flags-result-label"></div>
-
-  </div>
-
-
-  <div id="flags-countdown-widget">
-    <img src="images/countdown2.png" alt="">
-    <div id="flags-timer-number">60</div>
-    <div id="flags-progress-dots">
-      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
-      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
-      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
-      <div class="dot"></div>
-    </div>
-    <div id="flags-time-bonus" class="time-bonus" aria-hidden="true"><span class="tb-plus">+</span><span class="tb-num">5s</span></div>
-  </div>
-
-  <div id="flags-speed-bonus-text" data-i18n="common.speedBonus">¡Bonus velocidad!</div>
-
-  <div id="flags-score-display" style="display:none">
-    <img src="images/points.png" alt="">
-    <div id="flags-score-value">0</div>
-  </div>
-
-  <div id="flags-right-panel" style="display:none">
-    <div id="flags-leaderboard"></div>
-    <div id="flags-highscore-value" style="display:none">0</div>
-  </div>
-
-  <div id="flags-pregame-countdown" style="display:none">
-    <img id="flags-pregame-countdown-img" src="" alt="">
-  </div>
-
-  <div id="flags-timeup-overlay" style="display:none">
-    <img src="images/countdown/timeup.png" alt="Time Up">
-  </div>
-
-  <img id="flags-machine" src="images/machine1.png" alt="" style="display:none">
-  <img id="flags-findluggage" src="images/findluggage.png" alt="" draggable="false" ondragstart="return false" style="display:none">
-  <img id="flags-machine2" src="images/machine2.png" alt="" style="display:none">
-  <img id="flags-machine3" src="images/machine3.png" alt="" style="display:none">
-  <img id="flags-machine3b" src="images/machine3.png" alt="" style="display:none">
-  <img id="flags-check-overlay" src="images/check.png" alt="">
-  <img id="flags-wrong-overlay" src="images/wrong.png" alt="">
-  <canvas id="flags-badge-canvas"></canvas>
-  <div id="flags-luggage-wrap" style="display:none">
-    <div id="flags-luggage-left-group">
-      <div id="flags-flag-container-left">
-        <img id="flags-flag-img-left" src="" alt="">
-      </div>
-      <img class="flags-luggage-side" src="images/luggage.png" alt="">
-    </div>
-    <div id="flags-luggage-group">
-      <div id="flags-flag-container">
-        <img id="flags-flag-img" src="" alt="">
-      </div>
-      <img id="flags-luggage" src="images/luggage.png" alt="">
-    </div>
-    <div id="flags-luggage-right-group">
-      <div id="flags-flag-container-right">
-        <img id="flags-flag-img-right" src="" alt="">
-      </div>
-      <img class="flags-luggage-side" src="images/luggage.png" alt="">
-    </div>
-    <div id="flags-luggage-bl-group" style="display:none">
-      <div id="flags-flag-container-bl">
-        <img id="flags-flag-img-bl" src="" alt="">
-      </div>
-      <img class="flags-luggage-side" src="images/luggage.png" alt="">
-    </div>
-    <div id="flags-luggage-bc-group" style="display:none">
-      <div id="flags-flag-container-bc">
-        <img id="flags-flag-img-bc" src="" alt="">
-      </div>
-      <img class="flags-luggage-side" src="images/luggage.png" alt="">
-    </div>
-    <div id="flags-luggage-br-group" style="display:none">
-      <div id="flags-flag-container-br">
-        <img id="flags-flag-img-br" src="" alt="">
-      </div>
-      <img class="flags-luggage-side" src="images/luggage.png" alt="">
-    </div>
-  </div>
-  <div id="flags-flagid-wrap" style="display:none">
-    <img id="flags-flagid" src="images/flagid.png" alt="">
-    <div id="flags-flagid-label"></div>
-  </div>
-  <!-- ── FIN MODO BANDERAS ───────────────────────────────── -->
-
-  <!-- Modal de primer ingreso: pide el nombre, no se puede saltar -->
-  <div id="name-prompt">
-    <div class="name-prompt-box">
-      <div class="name-prompt-lang" id="name-prompt-lang">
-        <button class="loading-lang-toggle" id="name-prompt-lang-toggle" type="button">
-          <span class="loading-lang-current" id="name-prompt-lang-current">Español</span>
-          <span class="loading-lang-caret">▾</span>
-        </button>
-        <div class="loading-lang-menu" id="name-prompt-lang-menu">
-          <button class="loading-lang-option" type="button" data-lang="en">English</button>
-          <button class="loading-lang-option" type="button" data-lang="es">Español</button>
-        </div>
-      </div>
-      <div class="name-prompt-inner">
-        <div class="name-prompt-form">
-          <span class="name-prompt-welcome" data-i18n="name.welcome">¡Bienvenido!</span>
-          <span class="name-prompt-title" data-i18n="name.askName">¿Cómo te llamas?</span>
-          <input class="name-prompt-input" id="name-prompt-input" type="text" maxlength="12" autocomplete="off" spellcheck="false" data-i18n-ph="name.ph" placeholder="Tu nombre...">
-          <button class="name-prompt-btn" id="name-prompt-btn" type="button" disabled data-i18n="name.confirm">Confirmar</button>
-          <div class="name-prompt-divider"><span data-i18n="name.orDivider">o</span></div>
-          <button class="name-prompt-account-btn" id="name-prompt-account-btn" type="button" data-i18n="name.hasAccount">¿Tienes cuenta? Inicia sesión o regístrate</button>
-        </div>
-        <div class="name-prompt-pic-wrap" id="name-prompt-pic-wrap">
-          <img class="name-prompt-pic" id="name-prompt-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
-          <div class="name-prompt-pic-overlay" id="name-prompt-pic-overlay">✎</div>
-          <input type="file" id="name-prompt-pic-input" accept="image/*" style="display:none">
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Popup de bienvenida tras confirmar nombre -->
-  <div id="welcome-popup">
-    <div class="welcome-popup-box">
-      <img class="welcome-popup-pic" id="welcome-popup-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
-      <span class="welcome-popup-name" id="welcome-popup-name"></span>
-      <span class="welcome-popup-sub" id="welcome-popup-sub"></span>
-      <div class="welcome-popup-confirm" id="welcome-popup-confirm">
-        <img class="welcome-popup-confirm1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
-        <img class="welcome-popup-confirm2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
-      </div>
-    </div>
-  </div>
-
-  <div id="init-cover"></div>
-
-  <div id="screen-warning">
-    <div id="screen-warning-box">
-      <div id="screen-warning-icon">⚠️</div>
-      <p id="screen-warning-msg">La pantalla no es suficiente para mostrar el juego.</p>
-      <p id="screen-warning-sub">Resize the window for the best experience.</p>
-    </div>
-  </div>
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-  <script src="js/sb.js"></script>
-  <script src="js/letterbox.js"></script>
-  <script src="js/i18n.js"></script>
-  <script src="js/i18n-data.js"></script>
-  <script src="js/manifest.js"></script>
-  <script src="js/practice-data.js"></script>
-  <script src="js/cities.js"></script>
-  <script src="js/countries.js"></script>
-  <script src="js/places.js"></script>
-  <script src="js/friends.js"></script>
-  <script src="js/vs.js"></script>
-  <script src="js/lobby.js"></script>
-  <script src="js/monuments.js"></script>
-  <script src="js/flags.js"></script>
-  <script src="js/shapes.js"></script>
-  <script src="js/ranks.js"></script>
-  <script src="js/results.js"></script>
-  <script src="js/final.js"></script>
-  <script src="js/memdebug.js"></script>
-
-  <button id="recording-toggle" style="display:none" onclick="document.body.classList.toggle('recording-mode');this.classList.toggle('active')">⏺</button>
-
+    <p>&copy; 2026 myGeoChallenge &nbsp;·&nbsp; mygeochallenge.com &nbsp;·&nbsp; <span data-i18n="footer.rights">All rights reserved</span></p>
+  </footer>
+
+  <script>
+  // ── TRANSLATIONS ────────────────────────────────────────────
+  const T = {
+    en: {
+      'nav.modes': 'Game Modes',  'nav.about': 'About',  'nav.play': 'Play Free',
+      'hero.tagline': 'Free &nbsp;·&nbsp; No Download &nbsp;·&nbsp; Multiplayer',
+      'hero.title':   'The <span>Geography Quiz</span><br>Game You\'ll Get Addicted To',
+      'hero.desc':    'Race the clock to identify cities, flags, country shapes, and world landmarks. Challenge friends in real-time, climb 35 unique ranks, and prove your geography mastery.',
+      'hero.cta1': "Play Now — It's Free!", 'hero.cta2': 'See All Modes',
+      'hero.note': 'No sign-up required &nbsp;·&nbsp; Works in browser &nbsp;·&nbsp; EN / ES',
+      'hero.scroll': 'Scroll',
+      'stats.countries': 'Countries', 'stats.modes': 'Game Modes', 'stats.ranks': 'Rank Titles', 'stats.players': 'Players Per Room',
+      'modes.eyebrow': 'Game Modes', 'modes.title': '4 Ways to Test Your Geography',
+      'modes.sub': 'Each mode challenges a different skill. Master all four and become a true myGeoChallenge champion.',
+      'mode.num1': 'Mode 01', 'mode.num2': 'Mode 02', 'mode.num3': 'Mode 03', 'mode.num4': 'Mode 04',
+      'mode1.desc': 'Bags roll down the carousel — each belongs to a different country. Match the right flag to the right suitcase before the clock runs out.',
+      'mode2.desc': 'A country silhouette appears — can you name it? Identify shapes from all continents in this fast-paced visual recognition challenge.',
+      'mode3.desc': 'A city name flashes on screen — click it on the world map. The faster you click, the bigger your bonus. From mega capitals to hidden gems.',
+      'mode4.desc': 'Famous monuments and world wonders flash on screen. Identify them and their country — from the Eiffel Tower to Angkor Wat.',
+      'mode1.tag': 'Flags & Countries', 'mode2.tag': 'Country Shapes', 'mode3.tag': 'World Cities', 'mode4.tag': 'Landmarks',
+      'about.title': 'Geography made <span>addictively fun</span>',
+      'about.p1': 'myGeoChallenge is a free browser-based geography quiz game designed for players of all ages. Whether you\'re a student studying for a geography exam, a trivia fan, or just someone who loves exploring the world from your couch — there\'s a mode for you.',
+      'about.p2': 'Every correct answer earns points, and every fast answer earns even more with our speed bonus system. Scores are tracked globally so you can always see exactly where you rank compared to players worldwide.',
+      'about.p3': 'Create a free account to track your high scores across all four modes, challenge friends in real-time Versus matches, and earn one of 35 unique rank titles — starting from "Agoraphobic" and climbing all the way to globe-trotting legend.',
+      'about.p4': 'Play the full World Tour campaign to face all four modes back-to-back, or use Practice Tour to study a specific continent or difficulty at your own pace. Fully bilingual — English and Spanish — with no downloads required.',
+      'feat.eyebrow': 'Features', 'feat.title': 'Everything You Need to Master Geography',
+      'feat1.h': 'World Tour Campaign',   'feat1.p': 'Play all 4 modes back-to-back for a combined score and a final world ranking reveal.',
+      'feat2.h': 'Real-Time Versus',      'feat2.p': 'Challenge friends or join public rooms with up to 10 players and race simultaneously.',
+      'feat3.h': 'Practice Tour',         'feat3.p': 'Study by continent and difficulty at your own pace. Timer optional.',
+      'feat4.h': 'Global Leaderboards',   'feat4.p': 'High scores for all modes tracked globally. See exactly where you rank worldwide.',
+      'feat5.h': '35 Unique Ranks',       'feat5.p': 'Earn rank titles that grow with your score — satisfying progression for every level.',
+      'feat6.h': 'English & Spanish',     'feat6.p': 'Full bilingual support. Switch languages anytime from the main menu.',
+      'cta.title': 'Ready to Explore the World?',
+      'cta.desc':  'Join thousands of players. Jump in as a guest or create a free account to save your scores and challenge friends.',
+      'cta.btn':   "Start Playing — It's Free!",
+      'footer.privacy': 'Privacy Policy', 'footer.play': 'Play Game', 'footer.modes': 'Game Modes', 'footer.rights': 'All rights reserved',
+      'ticker': ['195 Countries to Learn','4 Unique Game Modes','Real-Time Multiplayer Versus','35 Rank Titles to Unlock','Free to Play','Global Leaderboards','English & Spanish','No Downloads Required'],
+    },
+    es: {
+      'nav.modes': 'Modos',  'nav.about': 'Acerca',  'nav.play': 'Jugar Gratis',
+      'hero.tagline': 'Gratis &nbsp;·&nbsp; Sin descarga &nbsp;·&nbsp; Multijugador',
+      'hero.title':   'El juego de <span>Geografía</span><br>del que no podrás despegarte',
+      'hero.desc':    'Compite contra el reloj para identificar ciudades, banderas, siluetas de países y monumentos del mundo. Reta a tus amigos en tiempo real, sube 35 rangos únicos y demuestra tu dominio de la geografía.',
+      'hero.cta1': '¡Jugar Ahora — Es Gratis!', 'hero.cta2': 'Ver Modos',
+      'hero.note': 'Sin registro &nbsp;·&nbsp; Funciona en el navegador &nbsp;·&nbsp; EN / ES',
+      'hero.scroll': 'Bajar',
+      'stats.countries': 'Países', 'stats.modes': 'Modos de Juego', 'stats.ranks': 'Títulos de Rango', 'stats.players': 'Jugadores por Sala',
+      'modes.eyebrow': 'Modos de Juego', 'modes.title': '4 Formas de Poner a Prueba tu Geografía',
+      'modes.sub': 'Cada modo desafía una habilidad distinta. Domina los cuatro y conviértete en el campeón de myGeoChallenge.',
+      'mode.num1': 'Modo 01', 'mode.num2': 'Modo 02', 'mode.num3': 'Modo 03', 'mode.num4': 'Modo 04',
+      'mode1.desc': 'Las maletas bajan por la cinta — cada una pertenece a un país diferente. Asigna la bandera correcta a cada maleta antes de que se acabe el tiempo.',
+      'mode2.desc': 'Aparece la silueta de un país — ¿puedes nombrarlo? Identifica formas de todos los continentes en este desafío de reconocimiento visual.',
+      'mode3.desc': 'Aparece el nombre de una ciudad — haz clic en ella sobre el mapa del mundo. Cuanto más rápido hagas clic, mayor será tu bonus. Desde grandes capitales hasta destinos ocultos.',
+      'mode4.desc': 'Monumentos y maravillas del mundo aparecen en pantalla. Identifícalos y su país — desde la Torre Eiffel hasta Angkor Wat.',
+      'mode1.tag': 'Banderas y Países', 'mode2.tag': 'Siluetas de Países', 'mode3.tag': 'Ciudades del Mundo', 'mode4.tag': 'Monumentos',
+      'about.title': 'Geografía <span>adictivamente divertida</span>',
+      'about.p1': 'myGeoChallenge es un juego de geografía gratuito basado en el navegador, diseñado para jugadores de todas las edades. Ya seas estudiante preparando un examen de geografía, un fanático de los trivias o simplemente alguien que ama explorar el mundo desde su sofá — hay un modo para ti.',
+      'about.p2': 'Cada respuesta correcta suma puntos, y cada respuesta rápida suma aún más gracias a nuestro sistema de bonus por velocidad. Los puntajes se registran globalmente para que siempre sepas exactamente en qué posición te encuentras frente a jugadores de todo el mundo.',
+      'about.p3': 'Crea una cuenta gratuita para registrar tus highscores en los cuatro modos, retar a amigos en partidas Versus en tiempo real y ganar uno de los 35 títulos de rango únicos — comenzando como "Agorafóbico" y escalando hasta convertirte en leyenda viajera.',
+      'about.p4': 'Juega la campaña World Tour completa para enfrentar los cuatro modos seguidos, o usa el Practice Tour para estudiar un continente o nivel de dificultad específico a tu ritmo. Totalmente bilingüe — inglés y español — sin descargas.',
+      'feat.eyebrow': 'Características', 'feat.title': 'Todo lo que Necesitas para Dominar la Geografía',
+      'feat1.h': 'Campaña World Tour',    'feat1.p': 'Juega los 4 modos seguidos para obtener un puntaje combinado y un ranking final mundial.',
+      'feat2.h': 'Versus en Tiempo Real', 'feat2.p': 'Reta a amigos o únete a salas públicas con hasta 10 jugadores y compite simultáneamente.',
+      'feat3.h': 'Gira de Práctica',      'feat3.p': 'Estudia por continente y dificultad a tu ritmo. Timer opcional.',
+      'feat4.h': 'Tabla de Clasificación','feat4.p': 'Highscores de todos los modos registrados globalmente. Ve exactamente tu posición en el mundo.',
+      'feat5.h': '35 Rangos Únicos',      'feat5.p': 'Gana títulos de rango que crecen con tu puntaje — una progresión satisfactoria para cada nivel.',
+      'feat6.h': 'Inglés y Español',      'feat6.p': 'Soporte bilingüe completo. Cambia el idioma en cualquier momento desde el menú principal.',
+      'cta.title': '¿Listo para Explorar el Mundo?',
+      'cta.desc':  'Únete a miles de jugadores. Entra como invitado o crea una cuenta gratuita para guardar tus puntajes y retar amigos.',
+      'cta.btn':   '¡Empieza a Jugar — Es Gratis!',
+      'footer.privacy': 'Política de Privacidad', 'footer.play': 'Jugar', 'footer.modes': 'Modos de Juego', 'footer.rights': 'Todos los derechos reservados',
+      'ticker': ['195 Países por Aprender','4 Modos de Juego','Versus Multijugador en Tiempo Real','35 Títulos de Rango','Gratis para Jugar','Tabla de Clasificación Global','Inglés y Español','Sin Descargas'],
+    }
+  };
+
+  // ── LANG ENGINE ─────────────────────────────────────────────
+  let lang = localStorage.getItem('mgc-landing-lang') || 'en';
+
+  function buildTicker(l) {
+    const items = T[l].ticker;
+    let html = '';
+    // duplicate for seamless loop
+    for (let r = 0; r < 2; r++)
+      items.forEach(t => { html += `<span class="ticker-item"><span class="dot">★</span> ${t}</span>`; });
+    document.getElementById('ticker-inner').innerHTML = html;
+  }
+
+  function applyLang(l) {
+    lang = l;
+    localStorage.setItem('mgc-landing-lang', l);
+    document.getElementById('lang-label').textContent = l === 'en' ? 'ES' : 'EN';
+    document.documentElement.lang = l;
+
+    // i18n nodes — use innerHTML so &nbsp; and other entities render correctly
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const v = T[l][el.dataset.i18n];
+      if (v !== undefined) el.innerHTML = v;
+    });
+    // innerHTML nodes (contain HTML like <span> / &nbsp;)
+    document.querySelectorAll('[data-i18n-html]').forEach(el => {
+      const v = T[l][el.dataset.i18nHtml];
+      if (v !== undefined) el.innerHTML = v;
+    });
+
+    buildTicker(l);
+  }
+
+  document.getElementById('lang-btn').addEventListener('click', () => {
+    applyLang(lang === 'en' ? 'es' : 'en');
+  });
+
+  // Apply saved/detected language on load
+  applyLang(lang);
+
+  // ── SCROLL REVEAL ────────────────────────────────────────────
+  const revealObs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.reveal').forEach(el => revealObs.observe(el));
+
+  // ── ANIMATED COUNTERS ────────────────────────────────────────
+  const counterObs = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      const el = entry.target;
+      const target = +el.dataset.target;
+      if (!target) return;
+      let v = 0; const step = target / 55;
+      const tick = () => { v = Math.min(v + step, target); el.textContent = Math.round(v); if (v < target) requestAnimationFrame(tick); };
+      requestAnimationFrame(tick);
+      counterObs.unobserve(el);
+    });
+  }, { threshold: 0.5 });
+  document.querySelectorAll('.stat-num[data-target]').forEach(el => counterObs.observe(el));
+
+  // ── FLIGHT ATTENDANT ANIMATION ───────────────────────────────
+  (function () {
+    const img = document.getElementById('flightatt-anim');
+    if (!img) return;
+    const BASE = 'images/characters/flightattpost2/';
+    const seq = [
+      [0,    '1'], [150,  '2'], [250,  '3'], [400,  '4'],
+      [550,  '5'], [700,  '6'], [750,  '7'], [900,  '8'],
+      [1100, '7'], [1300, '8'], [1500, '11'],[1700, '5'],
+      [1900, '6'], [2100, '9'], [2150, '8'], [2350, '11'],
+      [2500, '10'],[2600, '7'], [2750, '8'], [2900, '3'],
+      [3050, '2'], [3200, '1'],
+    ];
+    const LOOP_MS = 4300;
+    let timers = [];
+    function play() {
+      timers.forEach(clearTimeout); timers = [];
+      seq.forEach(([t, f]) => { timers.push(setTimeout(() => { img.src = BASE + f + '.png'; }, t)); });
+      timers.push(setTimeout(play, LOOP_MS));
+    }
+    play();
+  })();
+  </script>
 
 </body>
 </html>
