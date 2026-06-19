@@ -4136,20 +4136,20 @@ body.is-mobile #screen-warning-icon {
 
 .lb-rank {
   position: absolute;
-  top: 0.15cqmin;
-  left: 0.25cqmin;
+  top: 0.1cqmin;
+  left: 0.2cqmin;
   font-family: 'Arial Black', Impact, sans-serif;
-  font-size: 2.2cqmin;
+  font-size: 4cqmin;
   color: #fff;
   line-height: 1;
   z-index: 5;
   pointer-events: none;
   user-select: none;
 }
-.lb-rank.rank-1     { -webkit-text-stroke: 0.22cqmin #d4af37; }
-.lb-rank.rank-2     { -webkit-text-stroke: 0.22cqmin #a8a9ad; }
-.lb-rank.rank-3     { -webkit-text-stroke: 0.22cqmin #cd7f32; }
-.lb-rank.rank-other { -webkit-text-stroke: 0.22cqmin #1a3a6b; }
+.lb-rank.rank-1     { -webkit-text-stroke: 0.38cqmin #d4af37; }
+.lb-rank.rank-2     { -webkit-text-stroke: 0.38cqmin #a8a9ad; }
+.lb-rank.rank-3     { -webkit-text-stroke: 0.38cqmin #cd7f32; }
+.lb-rank.rank-other { -webkit-text-stroke: 0.38cqmin #1a3a6b; }
 
 
 #highscore-value {
@@ -4906,22 +4906,49 @@ body.is-mobile #screen-warning-icon {
   100% { transform: translate(-50%, -50%) scale(0); }
 }
 
-/* Flash rojo en el panel de leaderboard cuando alguien falla en versus/lobby */
-@keyframes vs-wrong-flash {
+/* Vibración lateral de la tarjeta que falla */
+@keyframes lb-shake {
+  0%,100% { transform: translateX(0); }
+  15%     { transform: translateX(-7px); }
+  35%     { transform: translateX(7px); }
+  55%     { transform: translateX(-5px); }
+  75%     { transform: translateX(5px); }
+  90%     { transform: translateX(-2px); }
+}
+.lb-entry.lb-shake {
+  animation: lb-shake 0.45s ease-in-out;
+}
+
+/* Glow exterior + tinte rojo interior (inset) en la tarjeta que falla en versus/lobby */
+@keyframes lb-wrong-flash {
   0%   { box-shadow: 0 0 0 0 rgba(220,0,0,0); }
-  20%  { box-shadow: 0 0 28px 10px rgba(220,0,0,0.8); }
+  20%  { box-shadow: 0 0 18px 7px rgba(220,0,0,0.9), inset 0 0 25px 8px rgba(200,0,0,0.5); }
   100% { box-shadow: 0 0 0 0 rgba(220,0,0,0); }
 }
-#flags-right-panel.vs-wrong-flash {
-  animation: vs-wrong-flash 0.75s ease-out forwards;
-}
-@keyframes lb-wrong-flash {
-  0%   { background: rgba(200,0,0,0); }
-  20%  { background: rgba(200,0,0,0.45); }
-  100% { background: rgba(200,0,0,0); }
-}
 .lb-entry.lb-wrong-flash {
-  animation: lb-wrong-flash 0.75s ease-out forwards;
+  animation: lb-wrong-flash 0.75s ease-out;
+}
+
+/* Desconectado durante partida grupal */
+.lb-entry.is-disconnected {
+  filter: grayscale(1);
+  opacity: 0.55;
+  transition: filter 0.4s, opacity 0.4s;
+}
+.lb-disconnected-icon {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.lb-disconnected-icon svg {
+  width: 55%;
+  height: 55%;
+  color: #fff;
+  opacity: 0.9;
+  filter: drop-shadow(0 0 2px rgba(0,0,0,0.7));
 }
 
 #flags-badge-canvas {
@@ -6100,6 +6127,149 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   color: #ffe14a;
   -webkit-text-stroke-color: #b3261a;
 }
+/* ── Bell de notificaciones ─────────────────────────────────────────────── */
+.versus-notif-bell {
+  position: relative;
+  flex: none;
+  pointer-events: auto;
+  background: rgba(0,0,0,0.28);
+  border: 0.35cqmin solid rgba(255,255,255,0.35);
+  border-radius: 50%;
+  width: 5.5cqmin;
+  height: 5.5cqmin;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #fff;
+  transition: background 0.15s;
+  padding: 0;
+}
+.versus-notif-bell:hover  { background: rgba(0,0,0,0.5); }
+.versus-notif-bell:active { transform: scale(0.92); }
+.versus-notif-bell svg { width: 3cqmin; height: 3cqmin; display: block; }
+.versus-notif-badge {
+  position: absolute;
+  top: -0.8cqmin;
+  right: -0.8cqmin;
+  min-width: 2.2cqmin;
+  height: 2.2cqmin;
+  background: #e63030;
+  color: #fff;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 1.4cqmin;
+  border-radius: 1.1cqmin;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.4cqmin;
+  line-height: 1;
+  pointer-events: none;
+}
+/* Panel dropdown del inbox */
+.versus-notif-panel {
+  position: absolute;
+  top: calc(50% - 22.5cqmin);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 68cqmin;
+  max-height: 38cqmin;
+  background: #fdf8ef;
+  border: 0.4cqmin solid #b8942a;
+  border-radius: 2cqmin;
+  box-shadow: 0 1.5cqmin 4cqmin rgba(0,0,0,0.35);
+  z-index: 230;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+}
+.versus-notif-panel-head {
+  padding: 1.4cqmin 2cqmin 1cqmin;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2.4cqmin;
+  color: #5a3c00;
+  border-bottom: 0.3cqmin solid #ddd0a8;
+  flex: none;
+}
+.versus-notif-list {
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.versus-notif-list::-webkit-scrollbar { width: 1cqmin; }
+.versus-notif-list::-webkit-scrollbar-thumb { background: #c4ad5e; border-radius: 1cqmin; }
+.versus-notif-empty {
+  padding: 2.5cqmin;
+  text-align: center;
+  color: #8a7a3a;
+  font-size: 2.2cqmin;
+}
+.versus-notif-item {
+  display: flex;
+  align-items: center;
+  gap: 1.5cqmin;
+  padding: 1.2cqmin 1.8cqmin;
+  border-bottom: 0.2cqmin solid #ede5c8;
+}
+.versus-notif-item:last-child { border-bottom: none; }
+.versus-notif-avatar {
+  width: 5.5cqmin;
+  height: 5.5cqmin;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
+  border: 0.3cqmin solid #c4ad5e;
+}
+.versus-notif-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2cqmin;
+  min-width: 0;
+}
+.versus-notif-name {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2.2cqmin;
+  color: #3a2a00;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.versus-notif-type {
+  font-size: 1.8cqmin;
+  color: #c0702a;
+  font-weight: bold;
+}
+.versus-notif-time {
+  font-size: 1.6cqmin;
+  color: #9a8a5a;
+}
+.versus-notif-btns {
+  display: flex;
+  gap: 1cqmin;
+  flex: none;
+}
+.versus-notif-btn {
+  width: 4.5cqmin;
+  height: 4.5cqmin;
+  border-radius: 50%;
+  border: none;
+  font-size: 2cqmin;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  transition: transform 0.1s;
+}
+.versus-notif-btn:active { transform: scale(0.88); }
+.versus-notif-btn.accept { background: #2a9d4e; color: #fff; }
+.versus-notif-btn.accept:hover { background: #23883f; }
+.versus-notif-btn.decline { background: #c0392b; color: #fff; }
+.versus-notif-btn.decline:hover { background: #a52d21; }
+
 /* Subtítulo bajo el título */
 .versus-subtitle {
   position: absolute;
@@ -6301,6 +6471,8 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   border-radius: 1cqmin;
 }
 .lobby-member-row.is-host { border-color: #f0b800; box-shadow: 0 0 0 0.2cqmin #f0b80055; }
+.lobby-member-row.clickable { cursor: pointer; }
+.lobby-member-row.clickable:hover { background: rgba(255,255,255,0.12); }
 .lobby-member-avatar {
   flex: none;
   width: 6cqmin; height: 6cqmin;
@@ -6473,25 +6645,61 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
 .lobby-notif-bar { margin-top: 1cqmin; height: 0.8cqmin; background: rgba(255,255,255,0.18); border-radius: 0.6cqmin; overflow: hidden; }
 .lobby-notif-bar-fill { height: 100%; width: 100%; background: #fde20e; border-radius: 0.6cqmin; }
 
-/* Toast efímero del versus */
-.versus-toast {
+/* Toast stack del versus */
+.versus-toast-stack {
   position: absolute;
   bottom: 8cqmin;
   left: 50%;
   transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5cqmin;
+  z-index: 240;
+  pointer-events: none !important;
+}
+.versus-toast-item {
   background: rgba(8,30,55,0.92);
   color: #fffbe6;
   font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
   font-size: 2.4cqmin;
   padding: 1.2cqmin 3cqmin;
   border-radius: 1.4cqmin;
-  z-index: 240;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s;
   white-space: nowrap;
+  transition: opacity 0.3s;
+  pointer-events: none !important;
 }
-.versus-toast.show { opacity: 1; }
+
+/* Overlay "Esperando a los otros miembros" */
+#lobby-waiting-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 7cqmin;
+  z-index: 390;
+  pointer-events: none;
+}
+#lobby-waiting-text {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2.6cqmin;
+  color: #fff;
+  background: rgba(0,0,0,0.6);
+  padding: 1cqmin 2.8cqmin;
+  border-radius: 2cqmin;
+  text-shadow: 0 1px 4px #000;
+  animation: waiting-pulse 1.4s ease-in-out infinite;
+}
+@keyframes waiting-pulse {
+  0%,100% { opacity: 0.65; }
+  50%      { opacity: 1; }
+}
+
+#lobby-result-screen {
+  position: fixed !important;
+  background: rgba(4,18,45,0.82);
+}
 
 /* Ranking de resultado del lobby */
 .lobby-result-list {
@@ -6597,6 +6805,15 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
 }
 .versus-challenge-btn.disabled:hover,
 .versus-challenge-btn:disabled:hover { background: #9a9183; transform: none; }
+.versus-challenge-btn.joined,
+.versus-challenge-btn.joined:hover {
+  background: #2a9d4e;
+  border-color: #1e7a3a;
+  box-shadow: none;
+  cursor: default;
+  transform: none;
+  opacity: 1;
+}
 
 .versus-empty-msg {
   position: absolute;

@@ -522,7 +522,8 @@ function flagsPositionLeaderboard(playerScore, animate) {
 
   const playerRank = all.findIndex(p => p.id === 'player');
 
-  if (animate && flagsLastPlayerRank !== -1 && playerRank < flagsLastPlayerRank) {
+  // Emote automático de adelantamiento solo en modo normal (no en versus/lobby)
+  if (!_flagsSyncedVersus() && animate && flagsLastPlayerRank !== -1 && playerRank < flagsLastPlayerRank) {
     let bubbleIndex = 0;
     for (let r = flagsLastPlayerRank; r >= playerRank + 1; r--) {
       const overtaken = all[r];
@@ -592,21 +593,38 @@ function flagsSetVsOpponentScore(score) {
 }
 window.flagsSetVsOpponentScore = flagsSetVsOpponentScore;
 
-// Flash rojo en el panel derecho y en la fila del oponente cuando alguien falla en versus/lobby.
+// Aplica glow + vibración + emote aleatorio a la tarjeta del jugador que falló.
+// Ambas animaciones van en un solo style.animation inline; de lo contrario la cascada
+// CSS deja correr solo la última, ignorando la otra.
+function _applyWrongEffects(el) {
+  if (!el) return;
+  el.style.animation = 'none';
+  void el.offsetWidth;
+  el.style.animation = 'lb-wrong-flash 0.75s ease-out, lb-shake 0.45s ease-in-out';
+  setTimeout(() => { el.style.animation = ''; }, 820);
+  // Emote aleatorio de los 6 disponibles
+  const srcs = ['images/emotes/1.png','images/emotes/2.png','images/emotes/3.png',
+                 'images/emotes/4.png','images/emotes/5.png','images/emotes/6.png'];
+  const bubble = document.createElement('div');
+  bubble.className = 'emote-bubble';
+  const img = document.createElement('img');
+  img.src = srcs[Math.floor(Math.random() * srcs.length)];
+  img.className = 'emote-img';
+  bubble.appendChild(img);
+  el.appendChild(bubble);
+  bubble.addEventListener('animationend', () => bubble.remove(), { once: true });
+}
+
+// Glow rojo solo en la tarjeta del rival (1v1).
 window.flagsTriggerOpponentWrong = function() {
-  const panel = document.getElementById('flags-right-panel');
-  if (panel) {
-    panel.classList.remove('vs-wrong-flash');
-    void panel.offsetWidth;
-    panel.classList.add('vs-wrong-flash');
-  }
-  // En 1v1 también parpadea la fila del rival
-  const oppEl = flagsLbElements['flags-lb-vsopp'];
-  if (oppEl) {
-    oppEl.classList.remove('lb-wrong-flash');
-    void oppEl.offsetWidth;
-    oppEl.classList.add('lb-wrong-flash');
-  }
+  _applyWrongEffects(flagsLbElements['flags-lb-vsopp']);
+};
+
+// Glow rojo en la tarjeta correcta para lobby: uid del que falló.
+window.flagsTriggerLobbyWrongFor = function(uid) {
+  const myId = window._sbUserId;
+  const key = (!uid || uid === myId) ? 'flags-lb-player' : ('flags-lb-lob' + uid);
+  _applyWrongEffects(flagsLbElements[key]);
 };
 
 // Lobby: refrescar el score en vivo de TODOS los rivales y reordenar con animación.
@@ -623,6 +641,24 @@ function flagsSetLobbyScores(members) {
   flagsPositionLeaderboard(flagsLastLbScore >= 0 ? flagsLastLbScore : 0, true);
 }
 window.flagsSetLobbyScores = flagsSetLobbyScores;
+
+function flagsSetLobbyDisconnected(uid, disconnected) {
+  const el = flagsLbElements['flags-lb-lob' + uid];
+  if (!el) return;
+  if (disconnected) {
+    el.classList.add('is-disconnected');
+    if (!el.querySelector('.lb-disconnected-icon')) {
+      const icon = document.createElement('div');
+      icon.className = 'lb-disconnected-icon';
+      icon.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.5 2.5 5.09 3.91l2.59 2.59-2.09 2.09A3.003 3.003 0 0 0 6 14.83V17H4v2h2v2h2v-2h2v-2h.17c.93 0 1.76-.37 2.37-.96l-.01-.01 2.06 2.06 1.41-1.41-9.5-9.5zm1.59 9.09A1.003 1.003 0 0 1 8 10.83V9.41l1.5 1.5-.41.68H8.09zm5.72 1.64-.01-.01c.13-.29.2-.61.2-.93V9.17c0-.93-.37-1.76-.96-2.37L11.66 5h2.59L19 9.75l-3.17 3.17.02.01zM19.07 4.93l-1.41 1.42L19 7.68l1.5-1.5-1.43-1.25z"/></svg>';
+      el.appendChild(icon);
+    }
+  } else {
+    el.classList.remove('is-disconnected');
+    el.querySelector('.lb-disconnected-icon')?.remove();
+  }
+}
+window.flagsSetLobbyDisconnected = flagsSetLobbyDisconnected;
 
 const flagsProgressContainer = document.getElementById('flags-progress-dots');
 const flagsProgressDots      = flagsProgressContainer ? flagsProgressContainer.querySelectorAll('.dot') : [];
@@ -1294,6 +1330,8 @@ function startFlagsRound() {
         if (typeof sfxError !== 'undefined') { sfxError.currentTime = 0; sfxPlay(sfxError); }
         if (typeof window._vsReportAnswer === 'function') window._vsReportAnswer(false, Math.round(flagsScore));
         if (typeof window._lobbyReportAnswer === 'function' && window._lobbyActive) window._lobbyReportAnswer(false, Math.round(flagsScore));
+        // En 1v1: efectos en mi propia tarjeta (lobby lo maneja por broadcast self:true)
+        if (window._vsActive) _applyWrongEffects(flagsLbElements['flags-lb-player']);
       }
       const overlay = document.getElementById(correct ? 'flags-check-overlay' : 'flags-wrong-overlay');
       if (overlay) {

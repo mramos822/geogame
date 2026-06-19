@@ -224,6 +224,16 @@
       <img class="practice-table-img" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
       <div class="practice-titlebar">
         <span class="loading-social-title">Gira Competitiva</span>
+        <button id="versus-notif-bell" class="versus-notif-bell" type="button" title="Invitaciones pendientes">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6V11c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+          <span id="versus-notif-badge" class="versus-notif-badge" style="display:none">0</span>
+        </button>
+      </div>
+      <!-- Inbox de invitaciones pendientes -->
+      <div id="versus-notif-panel" class="versus-notif-panel" style="display:none">
+        <div class="versus-notif-panel-head" data-i18n="notif.inbox">Invitaciones</div>
+        <div id="versus-notif-list" class="versus-notif-list"></div>
+        <div id="versus-notif-empty" class="versus-notif-empty" style="display:none" data-i18n="notif.empty">Sin invitaciones pendientes</div>
       </div>
       <span class="versus-subtitle" id="versus-subtitle"></span>
       <div class="practice-back-wrap" id="versus-back-wrap">
@@ -322,7 +332,7 @@
         <span>↩</span><span data-i18n="lobby.myRoom">Mi sala</span>
       </button>
 
-      <div id="versus-toast" class="versus-toast"></div>
+      <div id="versus-toast-stack" class="versus-toast-stack"></div>
     </div>
 
     <!-- Popup: invitación saliente (host espera) -->
@@ -992,6 +1002,11 @@
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
     </div>
+  </div>
+
+  <!-- Esperando a que terminen todos los miembros del lobby -->
+  <div id="lobby-waiting-overlay" style="display:none">
+    <span id="lobby-waiting-text"></span>
   </div>
 
   <!-- Ranking de resultado del lobby (grupal) -->

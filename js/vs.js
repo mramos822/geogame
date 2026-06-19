@@ -142,13 +142,21 @@ window.VS = (() => {
   // ── Aceptar invitación (guest) ─────────────────────────────────────────────
 
   async function accept(matchId) {
-    _matchId = matchId;
-    _role    = 'guest';
-    _match   = await _getMatch(matchId);
-    _subscribe(matchId);
-    const { error } = await window.sb
-      .from('matches').update({ status: 'active' }).eq('id', matchId);
-    if (error) throw error;
+    try {
+      _matchId = matchId;
+      _role    = 'guest';
+      _match   = await _getMatch(matchId);
+      if (!_match || _match.status !== 'pending') throw new Error('match_not_available');
+      _subscribe(matchId);
+      // Solo actualiza si todavía está pending; expirado/cancelado devuelve 0 filas
+      const { data: updated, error } = await window.sb
+        .from('matches').update({ status: 'active' }).eq('id', matchId).eq('status', 'pending').select();
+      if (error) throw error;
+      if (!updated || !updated.length) throw new Error('match_not_available');
+    } catch (e) {
+      cleanup(); // limpiar estado sucio si falló a mitad
+      throw e;
+    }
   }
 
   // ── Rechazar invitación (guest) ────────────────────────────────────────────
@@ -284,6 +292,10 @@ window.VS = (() => {
       const el = document.getElementById('versus-screen-' + s);
       if (el) el.style.display = (s === name) ? 'flex' : 'none';
     });
+    if (window.Lobby) {
+      if (name === 'aleatorio') window.Lobby.startPublicRealtime?.();
+      else                      window.Lobby.stopPublicRealtime?.();
+    }
     const sub = document.getElementById('versus-subtitle');
     if (sub) sub.textContent = (VERSUS_SUBTITLES[name] || (() => ''))();
     // Botón "volver a mi sala": visible si tengo una sala activa y no estoy viéndola
@@ -325,6 +337,7 @@ window.VS = (() => {
     if (!panel) return;
     panel.classList.remove('table-gone');
     panel.classList.add('panel-visible');
+    document.getElementById('loading-screen')?.classList.add('table-shown');
     versusGoTo('root', true);
   }
 
@@ -333,18 +346,47 @@ window.VS = (() => {
     if (!panel) return;
     panel.classList.remove('panel-visible');
     panel.classList.add('table-gone');
+    document.getElementById('loading-screen')?.classList.remove('table-shown');
     _versusStack = ['root'];
+    window.Lobby?.stopPublicRealtime?.();
   }
 
-  // Toast efímero reutilizable por lobby.js
-  let _toastTimer = null;
+  // Toast stack reutilizable por lobby.js — máximo 6 mensajes, opacidad escalonada
+  const _TOAST_MAX = 6;
+  const _TOAST_DURATION = 2800;
+  let _toastEntries = [];
+
+  function _updateToastOpacities() {
+    const n = _toastEntries.length;
+    _toastEntries.forEach((e, i) => { e.el.style.opacity = ((i + 1) / n).toFixed(4); });
+  }
+
   window.showVersusToast = function(msg) {
-    const el = document.getElementById('versus-toast');
-    if (!el) return;
-    el.textContent = msg;
-    el.classList.add('show');
-    clearTimeout(_toastTimer);
-    _toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+    const stack = document.getElementById('versus-toast-stack');
+    if (!stack) return;
+    const item = document.createElement('div');
+    item.className = 'versus-toast-item';
+    item.textContent = msg;
+    item.style.opacity = '0';
+    stack.appendChild(item);
+    const entry = { el: item, fadeTimer: null, removeTimer: null };
+    _toastEntries.push(entry);
+    // quitar excedente por arriba
+    while (_toastEntries.length > _TOAST_MAX) {
+      const old = _toastEntries.shift();
+      clearTimeout(old.fadeTimer); clearTimeout(old.removeTimer);
+      old.el.remove();
+    }
+    _updateToastOpacities();
+    // auto-eliminar
+    entry.fadeTimer = setTimeout(() => {
+      item.style.opacity = '0';
+      entry.removeTimer = setTimeout(() => {
+        item.remove();
+        _toastEntries = _toastEntries.filter(e => e !== entry);
+        _updateToastOpacities();
+      }, 320);
+    }, _TOAST_DURATION);
   };
 
   // Confirmación modal genérica (Sí/No)
@@ -359,19 +401,39 @@ window.VS = (() => {
   };
   function _hideConfirm() { const p = document.getElementById('versus-confirm-popup'); if (p) p.style.display = 'none'; _confirmYes = null; }
 
+  function _setBtnLoading(btn, loading) {
+    if (!btn) return;
+    const titleEl = btn.querySelector('.versus-menu-title');
+    if (loading) {
+      btn.disabled = true;
+      btn.style.opacity = '0.65';
+      btn.style.cursor = 'not-allowed';
+      btn._origTitle = titleEl ? titleEl.textContent : null;
+      if (titleEl) titleEl.textContent = T('lobby.creating', 'Creando sala…');
+    } else {
+      btn.disabled = false;
+      btn.style.opacity = '';
+      btn.style.cursor = '';
+      if (titleEl && btn._origTitle != null) titleEl.textContent = btn._origTitle;
+      delete btn._origTitle;
+    }
+  }
+
   // Crear sala: si ya tengo una activa, pedir confirmación para abandonarla
-  async function _doCreateRoom(isPublic) {
+  async function _doCreateRoom(isPublic, btn) {
+    _setBtnLoading(btn, true);
     try { await window.LB.create(isPublic); versusGoTo('lobby'); window.Lobby.enterLobby(); }
     catch (e) { window.showVersusToast(T('lobby.createError', 'No se pudo crear la sala')); }
+    finally { _setBtnLoading(btn, false); }
   }
-  function _createRoomGuarded(isPublic) {
+  function _createRoomGuarded(isPublic, btn) {
     if (window.LB && window.LB.getId()) {
       window.versusConfirm(T('lobby.alreadyHave', 'Ya tenés una sala creada. ¿Abandonarla y crear una nueva?'), async () => {
         await window.LB.leave();
-        _doCreateRoom(isPublic);
+        _doCreateRoom(isPublic, null);
       });
     } else {
-      _doCreateRoom(isPublic);
+      _doCreateRoom(isPublic, btn);
     }
   }
 
@@ -494,12 +556,18 @@ window.VS = (() => {
     _pendingOppName   = name;
     _pendingOppAvatar = avatar;
 
+    // Guardar en inbox para que el usuario pueda recuperar la invitación si perdió el banner
+    if (typeof window.addVersusNotif === 'function') {
+      window.addVersusNotif({ type: 'vs', id: match.id, matchId: match.id, fromName: name, fromAvatar: avatar, ts: Date.now() });
+    }
+
     // Reto 1v1 → misma notificación NO bloqueante que las invitaciones a sala
     if (typeof window.showInviteNotif === 'function') {
       window.showInviteNotif({
         name,
         sub: T('vs.challengedYou', 'te retó a un 1v1'),
         onAccept: async () => {
+          if (typeof window.removeVersusNotif === 'function') window.removeVersusNotif(match.id);
           try {
             await window.VS.accept(match.id);
             const m = window.VS.getMatch();
@@ -510,7 +578,10 @@ window.VS = (() => {
             window.showVersusToast(T('lobby.joinFailed', 'No pudiste unirte, intentá de nuevo'));
           }
         },
-        onDecline: () => { window.VS.decline(match.id); },
+        onDecline: () => {
+          if (typeof window.removeVersusNotif === 'function') window.removeVersusNotif(match.id);
+          window.VS.decline(match.id);
+        },
       });
     }
   }
@@ -541,8 +612,8 @@ window.VS = (() => {
     document.getElementById('versus-btn-aleatorio')?.addEventListener('click', () => { _sfx(); versusGoTo('aleatorio'); });
 
     // ── GRUPO ──
-    document.getElementById('versus-btn-create-private')?.addEventListener('click', () => {
-      _sfx(); _createRoomGuarded(true); // pública por defecto
+    document.getElementById('versus-btn-create-private')?.addEventListener('click', function() {
+      _sfx(); _createRoomGuarded(true, this);
     });
 
     // Confirmación (Sí/No)
@@ -566,8 +637,8 @@ window.VS = (() => {
     });
 
     // ── ALEATORIO ──
-    document.getElementById('versus-btn-create-public')?.addEventListener('click', () => {
-      _sfx(); _createRoomGuarded(true);
+    document.getElementById('versus-btn-create-public')?.addEventListener('click', function() {
+      _sfx(); _createRoomGuarded(true, this);
     });
 
     // Volver a mi sala (cuando navegué fuera del lobby sin abandonarlo)
@@ -593,7 +664,12 @@ window.VS = (() => {
         // El guest arranca directamente con los datos del match ya conocidos
         const match = window.VS.getMatch();
         if (match) _launchVersusFlags(match);
-      } catch(e) { console.warn('[VS] accept error:', e); }
+        else throw new Error('no match');
+      } catch(e) {
+        console.warn('[VS] accept error:', e);
+        if (typeof window.showVersusToast === 'function')
+          window.showVersusToast(T('lobby.joinFailed', 'No pudiste unirte, intentá de nuevo'));
+      }
     });
 
     // Rechazar invitación
@@ -741,6 +817,14 @@ window.VS = (() => {
     // abandono (if window._vsActive) no se dispare (la partida ya terminó normal).
     _teardownVsOpponent();
     _restoreRandom();
+    // Si el lobby del host quedó en 'active' por la cuenta regresiva que corrió mientras
+    // estaba en el versus, resetearlo a 'waiting' para que otros puedan unirse de nuevo.
+    try {
+      const lid = window.LB?.getId?.();
+      if (lid && window.LB?.isHost?.() && window.LB?.getLobby?.()?.status === 'active') {
+        window.sb?.from('lobbies').update({ status: 'waiting', seed: null }).eq('id', lid).catch(() => {});
+      }
+    } catch (e) {}
     // Volver al MENÚ PRINCIPAL (panel 1) con el flujo probado de quitToMenu, que resetea
     // todos los paneles del loading. Antes usábamos showEntranceElementsStatic (panel 2),
     // que dejaba el panel 1 y el 2 mezclados.
@@ -758,6 +842,11 @@ window.VS = (() => {
 
   function _launchVersusFlags(match) {
     const seed = match.seed;
+    // Cancelar la cuenta regresiva del lobby si estaba corriendo
+    // (evita que LB.start() se dispare mientras el host está en el versus)
+    if (window.Lobby?.cancelCountdown) window.Lobby.cancelCountdown();
+    if (window.LB?.isHost?.() && window.LB.getId()) window.LB.sendCancel?.();
+
     // Configurar entorno igual que si el jugador hubiera clickeado flags-btn
     window.practiceConfig = window.practiceConfig || {};
     window.practiceConfig.active = false;
@@ -814,7 +903,8 @@ window.VS = (() => {
       match => _showIncomingPopup(match),
       () => { if (typeof window.dismissInviteNotif === 'function') window.dismissInviteNotif(); } // host canceló
     );
-    // Consulta inmediata de invitaciones pendientes que llegaron antes de conectar
+    // Consulta inmediata de invitaciones pendientes que llegaron antes de conectar.
+    // Solo se muestra una vez por match (localStorage evita que reaparezca al recargar).
     const uid = window._sbUserId;
     if (uid && window.sb) {
       window.sb.from('matches')
@@ -822,8 +912,29 @@ window.VS = (() => {
         .eq('guest_id', uid).eq('status', 'pending')
         .order('created_at', { ascending: false }).limit(1)
         .then(({ data }) => {
-          if (data && data[0]) _showIncomingPopup(data[0]);
+          if (!data || !data[0]) return;
+          const match = data[0];
+          const seenKey = '_seenMatchInvite_' + uid;
+          const seen = JSON.parse(localStorage.getItem(seenKey) || '[]');
+          if (seen.includes(match.id)) return; // ya se mostró antes
+          seen.unshift(match.id);
+          localStorage.setItem(seenKey, JSON.stringify(seen.slice(0, 10)));
+          _showIncomingPopup(match);
         }).catch(() => {});
+    }
+  };
+
+  // Aceptar una invitación 1v1 directamente desde el inbox (sin pasar por el banner)
+  window._vsAcceptFromInbox = async function(matchId) {
+    try {
+      await window.VS.accept(matchId);
+      const m = window.VS.getMatch();
+      if (m) _launchVersusFlags(m);
+      else throw new Error('no match');
+    } catch(e) {
+      console.warn('[VS] inbox accept error:', e);
+      if (typeof window.showVersusToast === 'function')
+        window.showVersusToast(T('lobby.joinFailed', 'No pudiste unirte, intentá de nuevo'));
     }
   };
 

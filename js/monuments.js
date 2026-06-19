@@ -941,6 +941,10 @@ window.startCampaign = function () {
             if (typeof window.sbUpdateLastActive === 'function') window.sbUpdateLastActive(data.user.id).catch(() => {});
             // Escuchar invitaciones versus en tiempo real
             if (typeof window._vsStartListening === 'function') window._vsStartListening();
+            if (window.LB && typeof window.LB.listenForInvites === 'function') {
+              window.LB.listenForInvites(p => { if (typeof window.showLobbyIncomingInvite === 'function') window.showLobbyIncomingInvite(p); });
+            }
+            setTimeout(() => { if (typeof window.refreshVersusBell === 'function') window.refreshVersusBell(); }, 600);
             // Heartbeat: actualiza last_active cada 45s mientras el usuario esté logueado
             clearInterval(window._presenceHeartbeat);
             window._presenceHeartbeat = setInterval(() => {
@@ -1315,6 +1319,7 @@ async function _onSessionReady(userId) {
     _updateProfileBtnLabel();
   } catch(e) {}
   _subscribeFriendshipChanges(userId);
+  _startSocialListPoll();
   if (typeof window._vsStartListening === 'function') window._vsStartListening();
   // Escuchar invitaciones a salas (push de amigos)
   if (window.LB && typeof window.LB.listenForInvites === 'function') {
@@ -1324,6 +1329,7 @@ async function _onSessionReady(userId) {
   // (refresh = salir de la sala), y si entré por link de invitación, unirme.
   if (window.LB && typeof window.LB.cleanupMine === 'function') window.LB.cleanupMine();
   if (typeof window.tryPendingLobbyJoin === 'function') window.tryPendingLobbyJoin();
+  setTimeout(() => { if (typeof window.refreshVersusBell === 'function') window.refreshVersusBell(); }, 600);
 }
 document.addEventListener('sbSessionReady', (e) => _onSessionReady(e.detail?.userId));
 // Si el evento ya fue disparado antes de que este listener se registrara, ejecutar ahora
@@ -1653,24 +1659,34 @@ function _subscribeFriendshipChanges(userId) {
   if (!userId) return;
   _friendshipsChannel = window.sb
     .channel('friendship-changes')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, (payload) => {
-      // En DELETE events, payload.old puede ser {} si REPLICA IDENTITY no es FULL.
-      // Disparar reload en cualquier DELETE ya que estamos suscritos a la tabla completa.
-      const evType = payload.eventType || payload.event || '';
-      if (evType === 'DELETE') { _debouncedLoadSocial(); return; }
-      const row = (payload.new && payload.new.user_a) ? payload.new : (payload.old || {});
-      if (row.user_a === userId || row.user_b === userId) _debouncedLoadSocial();
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, () => {
+      // Supabase no garantiza el payload completo sin REPLICA IDENTITY FULL,
+      // así que recargamos siempre que llegue cualquier evento de la tabla.
+      _debouncedLoadSocial();
     })
     .subscribe();
 }
 
-// Poll cada 10s para detectar desconexiones y actualizar textos de tiempo
-// (last_active deja de actualizarse al desconectarse — no hay evento Realtime)
+// Chequeo ligero del badge cuando el panel está cerrado (solo cuenta pendientes).
+async function _checkRequestsBadge() {
+  if (!window._accountLoggedIn || !window._sbUserId) return;
+  const panelOpen = !document.getElementById('loading-social-group')?.classList.contains('table-gone');
+  if (panelOpen) return;
+  try {
+    const { data } = await window.sb.from('friendships')
+      .select('id').eq('user_b', window._sbUserId).eq('status', 'pending');
+    const hasRequests = (data || []).length > 0;
+    const badge = document.getElementById('social-notif-badge');
+    if (badge) badge.style.display = hasRequests ? 'flex' : 'none';
+  } catch (e) {}
+}
+
+// Poll: re-renderiza si panel abierto; actualiza badge si cerrado.
 function _startSocialListPoll() {
   clearInterval(_socialListPollInterval);
   _socialListPollInterval = setInterval(() => {
     const panelOpen = !document.getElementById('loading-social-group')?.classList.contains('table-gone');
-    if (!panelOpen) return;
+    if (!panelOpen) { _checkRequestsBadge(); return; }
     const friendDetailOpen = !document.getElementById('loading-friend-group')?.classList.contains('table-gone');
     // Resync completo cada 5s: captura cambios de friendships que Realtime perdió
     // y re-ordena la lista si el sort es por conexión.
@@ -2035,6 +2051,7 @@ function openFriendProfile(friend) {
   }
   if (friend.id) _startFriendStatusPoll(friend.id);
 }
+window.openFriendProfile = openFriendProfile;
 
 function _showFriendPanelError() {
   const panel = document.getElementById('loading-friend-group');
