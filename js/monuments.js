@@ -1491,7 +1491,7 @@ function showWelcomePopup(nombre) {
   const src = localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png';
   if (picEl)  picEl.src = src;
   if (nameEl) nameEl.textContent = (typeof t === 'function') ? t('name.greet', { name: nombre }) : `¡Hola, ${nombre}!`;
-  if (subEl)  subEl.textContent  = (typeof t === 'function') ? t('name.greetSub') : 'Bienvenido a GeoChallenge.';
+  if (subEl)  subEl.textContent  = (typeof t === 'function') ? t('name.greetSub') : 'Bienvenido a myGeoChallenge.';
   popup.classList.add('visible');
   if (confirmW) {
     const onClick = () => {
@@ -2847,7 +2847,8 @@ window.quitToMenu = quitToMenu;
     // En pregame (splash visible) o fuera de práctica: salir directo sin overlay
     const inPregame = isVisible('splash-screen') ||
                       isVisible('flags-pregame-countdown') ||
-                      isVisible('pregame-countdown');
+                      isVisible('pregame-countdown') ||
+                      ((isVisible('score-display') || isVisible('flags-score-display')) && sfxGameMusic.paused);
     const inPractice = window.practiceConfig && window.practiceConfig.active;
     const goOverlay = document.getElementById('powerquit-overlay');
     if (!goOverlay || inPregame || !inPractice) { quitToMenu(); return; }
@@ -3405,13 +3406,16 @@ function positionLeaderboard(playerScore, animate) {
   let windowEnd   = Math.min(all.length, windowStart + LB_WINDOW);
   windowStart     = Math.max(0, windowEnd - LB_WINDOW);
 
+  const visibleRows  = windowEnd - windowStart;
+  const bottomOffset = Math.max(0, LB_WINDOW - visibleRows) * rowH;
+
   if (!animate) {
     Object.values(lbElements).forEach(el => { el.style.transition = 'none'; });
   }
 
   all.forEach((p, rank) => {
     const el = lbElements[`lb-${p.id}`];
-    if (el) el.style.top = ((rank - windowStart) * rowH) + 'px';
+    if (el) el.style.top = ((rank - windowStart) * rowH + bottomOffset) + 'px';
   });
 
   const scoreEl = lbElements['lb-player'].querySelector('.lb-score');
@@ -4551,7 +4555,7 @@ function startGame() {
   const cwEl = document.getElementById('countdown-widget');
   if (cwEl) cwEl.style.display = 'block';
   const rpEl = document.getElementById('right-panel');
-  if (rpEl) rpEl.style.display = 'flex';
+  if (rpEl) { rpEl.style.display = 'flex'; rpEl.style.visibility = ''; }
 
   redimensionarJuego();
 
@@ -5240,6 +5244,26 @@ if (practiceRange) {
     window.practiceConfig.timer = TIMER_IDX_TO_SEC[idx];
     updateTimerUI(idx);
   });
+
+  // En móvil (iOS/Android) el range dentro de un padre con transform:scale pierde
+  // la relación entre touch y posición del thumb. getBoundingClientRect devuelve
+  // coords visuales correctas, así que calculamos el valor manualmente.
+  ['touchstart', 'touchmove'].forEach(evt => {
+    practiceRange.addEventListener(evt, e => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const rect  = practiceRange.getBoundingClientRect();
+      const min   = parseInt(practiceRange.min,  10);
+      const max   = parseInt(practiceRange.max,  10);
+      const step  = parseInt(practiceRange.step, 10) || 1;
+      const ratio = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
+      const val   = Math.round((min + ratio * (max - min)) / step) * step;
+      if (parseInt(practiceRange.value, 10) !== val) {
+        practiceRange.value = val;
+        practiceRange.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    }, { passive: false });
+  });
 }
 // init con el default (idx 2 → 60s)
 updateTimerUI(2);
@@ -5293,7 +5317,7 @@ document.getElementById('practice-start-btn')?.addEventListener('click', functio
   window.practiceConfig.continents  = continents;
   // difficulty solo aplica a monuments; los demás modos usan 'dificil' (sin restricción)
   window.practiceConfig.difficulty  = mode === 'monuments' ? (activeD ? activeD.dataset.diff : 'facil') : 'dificil';
-  window._practiceStats = { correct: 0, wrong: 0, startTime: Date.now() };
+  window._practiceStats = { correct: 0, wrong: 0, startTime: null };
   document.body.classList.add('practice-mode');
 
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);

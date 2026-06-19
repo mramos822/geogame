@@ -18,7 +18,7 @@ const I18N = {
     'common.play': 'Jugar', 'common.total': 'Puntuación total', 'common.city': 'Ciudad',
     'common.speedBonus': '¡Bonus velocidad!', 'common.continue': 'Continuar',
     // Primer ingreso (nombre)
-    'panel2.welcome1': '¡Bienvenido/a a GeoChallenge!', 'panel2.welcome2': '¿Qué modo quieres jugar?',
+    'panel2.welcome1': '¡Bienvenido/a a myGeoChallenge!', 'panel2.welcome2': '¿Qué modo quieres jugar?',
     'practice.title': 'Gira de Práctica', 'practice.chooseMode': 'Elige un modo', 'practice.continents': 'Continentes',
     'practice.america': 'América', 'practice.europa': 'Europa', 'practice.africa': 'África',
     'practice.asia': 'Asia', 'practice.oceania': 'Oceanía',
@@ -178,7 +178,7 @@ const I18N = {
     'common.average': 'Average', 'common.highscore': 'Highscore', 'common.bestscore': 'Best score',
     'common.play': 'Play', 'common.total': 'Total score', 'common.city': 'City',
     'common.speedBonus': 'Speed bonus!', 'common.continue': 'Continue',
-    'panel2.welcome1': 'Welcome to GeoChallenge!', 'panel2.welcome2': 'Which mode do you want to play?',
+    'panel2.welcome1': 'Welcome to myGeoChallenge!', 'panel2.welcome2': 'Which mode do you want to play?',
     'practice.title': 'Practice Tour', 'practice.chooseMode': 'Choose a mode', 'practice.continents': 'Continents',
     'practice.america': 'America', 'practice.europa': 'Europe', 'practice.africa': 'Africa',
     'practice.asia': 'Asia', 'practice.oceania': 'Oceania',
