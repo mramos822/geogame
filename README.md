@@ -1,75 +1,90 @@
-  # GeoChallenge 🌍
+# myGeoChallenge 🌍
 
-A fast-paced geography trivia game where you race against the clock to identify countries, flags, and capitals from around the world.
-
----
-
-## How to Download and Play
-
-### Option 1 — Download as ZIP (easiest, no account needed)
-
-1. Go to the top of this page on GitHub.
-2. Click the green **Code** button.
-3. Click **Download ZIP**.
-4. Once downloaded, find the ZIP file in your Downloads folder and **extract** it (right-click → "Extract All" on Windows, or double-click on Mac).
-5. Open the extracted folder.
-6. Double-click the file called **`index.html`**.
-7. The game will open in your web browser. That's it — no installation required!
+A free browser-based geography quiz game with 4 game modes, real-time multiplayer Versus, global leaderboards, and 35 unique rank titles. Play at **[mygeochallenge.com](https://mygeochallenge.com)** — no download or sign-up required.
 
 ---
 
-### Option 2 — Clone with Git (for developers)
+## Play Online
 
-If you have Git installed, open a terminal and run:
+👉 **[mygeochallenge.com](https://mygeochallenge.com)**
 
-```
-git clone https://github.com/mramos822/geogame.git
-```
-
-Then open the `geogame` folder and double-click `index.html`.
-
----
-
-## Requirements
-
-- A modern web browser (Chrome, Firefox, Edge, or Safari).
-- No internet connection needed after downloading — the game runs entirely offline.
-- No installs, no accounts, no setup.
+The game runs entirely in your browser. Guest play is available with no account needed.
 
 ---
 
 ## Game Modes
 
-### 🏙️ City Blitz
-Identify cities and countries as fast as you can. Answer correctly to earn points, build streaks for bigger bonuses, and collect time with every 10 correct answers.
+### 🧳 Suitcase Shuffle
+Bags roll down the carousel — each one belongs to a different country. Match the correct flag to the right suitcase before time runs out. Flags are progressively unlocked as you answer correctly.
 
-### 🏳️ Flag Blitz
-Choose the correct country flag from a set of luggage-style options. Flags get progressively harder as you go:
-- **Rounds 1–7:** Common, widely recognized flags (USA, Japan, Brazil...)
-- **Round 8+:** Regional and medium-difficulty flags added
-- **Round 17+:** Harder, lesser-known flags start appearing
-- **Round 30+:** Extreme difficulty — territories, micro-states, and visually similar flags
+### 🗺️ Map Mayhem
+A country silhouette appears on screen — identify it from the options given. Tests your visual recognition of country shapes from all continents.
+
+### 🏙️ City Blitz
+A city name flashes on screen — click it on the interactive world map. The faster you click, the bigger your speed bonus. Cities range from major capitals to lesser-known hidden gems, with difficulty unlocking progressively.
+
+### 🏛️ Landmark Loco
+Famous monuments and world wonders flash on screen. Identify the landmark and its country — from the Eiffel Tower to Angkor Wat.
+
+---
+
+## Features
+
+- **World Tour Campaign** — Play all 4 modes back-to-back for a combined score and final rank reveal
+- **Real-Time Versus** — Challenge friends or join public rooms with up to 10 players
+- **Practice Tour** — Study by continent and difficulty at your own pace
+- **Global Leaderboards** — High scores tracked per mode and overall
+- **35 Rank Titles** — Progress from "Agoraphobic" to globe-trotting legend
+- **Bilingual** — Full English and Spanish support, switchable at any time
+- **Friend System** — Add friends, see their status, send match invitations
+- **Profile & Stats** — Track play count, averages, and high scores per mode
 
 ---
 
 ## Scoring
 
-- Each correct answer earns base points depending on your total correct answers.
-- Answer quickly for a **Speed Bonus** (within 2 seconds).
-- Build a streak without mistakes for an **In-a-Row Bonus**.
-- Every 10 correct answers adds **+5 seconds** to the clock.
+- Each correct answer earns base points
+- **Speed Bonus** — Answer quickly for extra points
+- **Streak Bonus** — Consecutive correct answers multiply rewards
+- Scores are saved to global leaderboards when signed in
 
 ---
 
-## Controls
+## Tech Stack
 
-- **Click** on an answer to select it.
-- Use the **mute button** (top right) to toggle sound.
+- Vanilla HTML / CSS / JavaScript (no frameworks)
+- [Supabase](https://supabase.com) — Auth, database, real-time, and file storage
+- Hosted on GitHub Pages with custom domain via Namecheap
+- Google AdSense monetization (pending approval)
 
 ---
 
-## Tips
+## Structure
 
-- Speed matters — the faster you answer, the bigger your bonus.
-- Don't panic on wrong answers — your streak resets but your score doesn't drop.
-- The leaderboard on the right shows how you rank against others in real time.
+```
+/
+├── index.html          # Landing page (mygeochallenge.com)
+├── play.html           # The game
+├── privacy.html        # Privacy policy
+├── ads.txt             # AdSense verification
+├── css/
+│   └── style.css
+├── js/
+│   ├── game.js         # Mode 1 — Suitcase Shuffle (flags)
+│   ├── shapes.js       # Mode 2 — Map Mayhem
+│   ├── cities.js       # Mode 3 — City Blitz
+│   ├── monuments.js    # Mode 4 — Landmark Loco
+│   ├── i18n.js         # EN/ES translations
+│   ├── friends.js      # Social / friends data layer
+│   └── ...
+└── images/
+    ├── flags/
+    ├── bg/
+    └── characters/
+```
+
+---
+
+## License
+
+© 2026 myGeoChallenge — All rights reserved.
