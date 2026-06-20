@@ -2880,6 +2880,50 @@ window.quitToMenu = quitToMenu;
     if (el) obs.observe(el, { attributes: true, attributeFilter: ['style'] });
   });
   refreshIngamePower();
+
+  // Escape = back/power. Orden de prioridad: quit popup → paneles anidados → power.
+  const _hasClass = (id, cls) => { const el = document.getElementById(id); return el && el.classList.contains(cls); };
+  const _clickBack = (id) => { document.getElementById(id)?.click(); };
+  const _panelVisible = (id) => !_hasClass(id, 'table-gone');
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const active = document.activeElement;
+    const tag = active && active.tagName;
+    if (tag === 'TEXTAREA') return;
+    if (tag === 'INPUT' && active.type !== 'range') return;
+    if (tag === 'INPUT' && active.type === 'range') active.blur();
+    const _closeOpenModal = () => {
+      const acct = document.getElementById('account-modal');
+      if (acct && acct.classList.contains('open')) {
+        const closeBtn = document.getElementById('account-modal-close');
+        if (closeBtn && getComputedStyle(closeBtn).display !== 'none') { closeBtn.click(); return true; }
+        // Si el botón está oculto (noCloseViews) no hacer nada
+        return true;
+      }
+      const lock = document.getElementById('social-lock-popup');
+      if (lock && lock.classList.contains('open')) { document.getElementById('social-lock-close')?.click(); return true; }
+      return false;
+    };
+    if (quitPopup && quitPopup.style.display === 'flex') {
+      sfxSelect.currentTime = 0; sfxPlay(sfxSelect);
+      quitPopup.style.display = 'none';
+      document.body.classList.remove('quit-open');
+    } else if (_closeOpenModal()) {
+      // modal de cuenta cerrado
+    } else if (_panelVisible('loading-friend-group'))    { _clickBack('loading-friend-back-wrap'); }
+    else if (_panelVisible('loading-addfriend-group'))   { _clickBack('loading-addfriend-back-wrap'); }
+    else if (_panelVisible('loading-blocked-group'))     { _clickBack('loading-blocked-back-wrap'); }
+    else if (_panelVisible('loading-sent-group'))        { _clickBack('loading-sent-back-wrap'); }
+    else if (_panelVisible('loading-social-group'))      { _clickBack('loading-social-back-wrap'); }
+    else if (_panelVisible('loading-table-group')) {
+      const sub = document.getElementById('loading-panel2-back');
+      if (sub && sub.style.display !== 'none') _clickBack('loading-panel2-back');
+      else _clickBack('loading-play-confirm-wrap');
+    }
+    else if (_panelVisible('loading-versus-group'))      { _clickBack('versus-back-wrap'); }
+    else if (document.getElementById('loading-practice-group')?.style.display !== 'none') { _clickBack('practice-back-wrap'); }
+    else if (powerEl.style.display !== 'none')           { powerEl.click(); }
+  });
 })();
 
 // ranks.js se carga después de este archivo; esperamos a que todo esté listo

@@ -25,6 +25,13 @@
   box-sizing: border-box;
 }
 
+/* Desactiva el toolbar de Edge/IE en imágenes (IA, copiar, guardar, etc.) */
+#app-stage img {
+  -webkit-user-drag: none;
+  -khtml-user-drag: none;
+  user-drag: none;
+}
+
 /* ── iOS: NO promover capas GPU permanentes dentro del #app-stage ──────────────
    REGRESIÓN del crash cities→monuments en campaña: apareció al meter el
    fixed-aspect-stage (#app-stage con transform:scale). Bajo ese ancestro
