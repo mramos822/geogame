@@ -337,6 +337,8 @@ window.refreshProfileStats = function () {
   }
   const elName = document.getElementById('loading-player-name');
   if (elName) elName.textContent = localStorage.getItem('playerName') || 'John';
+  const badgeEl = document.getElementById('loading-supporter-badge');
+  if (badgeEl) badgeEl.style.display = (p && p.is_supporter) ? '' : 'none';
   const elPlays = document.getElementById('loading-play-count');
   if (elPlays) elPlays.textContent = tn('profile.playedTimes', plays);
   // Record de versus (solo con cuenta; oculto si nunca jugó versus)
@@ -2010,6 +2012,8 @@ function openFriendProfile(friend) {
 
   const pic = document.getElementById('loading-friend-pic');
   if (pic) pic.src = friend.avatar;
+  const fBadge = document.getElementById('loading-friend-supporter-badge');
+  if (fBadge) fBadge.style.display = friend.is_supporter ? '' : 'none';
   setText('loading-friend-name', friend.name);
   setText('loading-friend-total', friend.score.toLocaleString());
   setText('loading-friend-play-count', tn('profile.friendPlayed', friend.play_count || 0));

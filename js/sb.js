@@ -201,8 +201,8 @@ window.sbUploadAvatar = async function(userId, blob) {
 window.sbLoadSocialData = async function(userId) {
   const { data, error } = await sb.from('friendships')
     .select(`id, status, initiated_by, user_a, user_b,
-      pa:user_a(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing,vs_wins,vs_losses),
-      pb:user_b(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing,vs_wins,vs_losses)`)
+      pa:user_a(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing,vs_wins,vs_losses,is_supporter),
+      pb:user_b(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing,vs_wins,vs_losses,is_supporter)`)
     .or(`user_a.eq.${userId},user_b.eq.${userId}`);
   if (error) throw error;
   function toEntry(row) {
@@ -218,6 +218,7 @@ window.sbLoadSocialData = async function(userId) {
       last_active: p.last_active || null,
       is_playing: p.is_playing || false,
       vs_wins: p.vs_wins||0, vs_losses: p.vs_losses||0,
+      is_supporter: p.is_supporter || false,
     };
   }
   const rows = data || [];
