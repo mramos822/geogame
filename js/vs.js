@@ -268,6 +268,7 @@ window.VS = (() => {
   const TIMEOUT_MS = 30000;
   let _resultShown = false;    // evita mostrar la pantalla de resultado dos veces
   let _endedByAbandon = false; // el match terminó por abandono del rival
+  let _vsLaunching = false;    // evita doble lanzamiento de la partida versus
   let _outTimer = null;
   let _inTimer  = null;
   let _pendingOppName   = null; // nombre del oponente guardado para ambos lados
@@ -812,6 +813,7 @@ window.VS = (() => {
     }
     _resultShown = false;
     _endedByAbandon = false;
+    _vsLaunching = false;
     if (window.VS && typeof window.VS.cleanup === 'function') window.VS.cleanup();
     // Importante: limpiar el estado versus ANTES de quitToMenu, para que su guard de
     // abandono (if window._vsActive) no se dispare (la partida ya terminó normal).
@@ -841,6 +843,10 @@ window.VS = (() => {
   // ── Arrancar partida versus ───────────────────────────────────────────────
 
   function _launchVersusFlags(match) {
+    if (_vsLaunching) return;
+    _vsLaunching = true;
+    // Garantiza que quitToMenu no llame a _lobbyAbandon (que haría LB.leave()) al volver
+    window._lobbyActive = false;
     const seed = match.seed;
     // Cancelar la cuenta regresiva del lobby si estaba corriendo
     // (evita que LB.start() se dispare mientras el host está en el versus)

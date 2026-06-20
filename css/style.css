@@ -4145,6 +4145,10 @@ body.is-mobile #screen-warning-icon {
   z-index: 5;
   pointer-events: none;
   user-select: none;
+  display: none;
+}
+#flags-leaderboard.vs-active .lb-rank {
+  display: block;
 }
 .lb-rank.rank-1     { -webkit-text-stroke: 0.38cqmin #d4af37; }
 .lb-rank.rank-2     { -webkit-text-stroke: 0.38cqmin #a8a9ad; }
@@ -6359,7 +6363,7 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
 #versus-friends-list { height: 38cqmin; overflow-y: auto; display: flex; flex-direction: column; gap: 1cqmin; padding: 1.2cqmin; background: #eee9e3; border: 0.4cqmin solid #8b6a00; border-radius: 1.4cqmin; }
 #versus-friends-list::-webkit-scrollbar { width: 1.2cqmin; }
 #versus-friends-list::-webkit-scrollbar-thumb { background: #c4ad5e; border-radius: 1cqmin; }
-.versus-empty-inline { text-align: center; color: #8a7a3a; font-size: 2.4cqmin; padding: 3cqmin; }
+.versus-empty-inline { text-align: center; color: #8a7a3a; font-size: 2.4cqmin; padding: 3cqmin; margin: auto; font-family: 'VAGRoundBold', 'Arial Black', sans-serif; }
 
 /* Caja de "unirse con código" */
 .versus-join-box {
@@ -6399,8 +6403,20 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 1cqmin;
+  gap: 1.4cqmin;
   align-self: center;
+}
+.lobby-mode-icons {
+  display: flex;
+  align-items: center;
+  gap: .4cqmin;
+  flex-shrink: 0;
+}
+.lobby-mode-icons img {
+  width: 4.8cqmin;
+  height: 4.8cqmin;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,.25));
 }
 .lobby-name-text {
   font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
@@ -6655,7 +6671,7 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   flex-direction: column;
   align-items: center;
   gap: 0.5cqmin;
-  z-index: 240;
+  z-index: 450;
   pointer-events: none !important;
 }
 .versus-toast-item {
@@ -6744,6 +6760,23 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   object-fit: cover;
   background: #d6ecff;
   border: 0.4cqmin solid #8b6a00;
+}
+.public-room-name-row {
+  display: flex;
+  align-items: center;
+  gap: .5cqmin;
+}
+.public-room-mode-icons {
+  display: flex;
+  align-items: center;
+  gap: .3cqmin;
+  flex-shrink: 0;
+}
+.public-room-mode-icon {
+  width: 3.6cqmin;
+  height: 3.6cqmin;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,.2));
 }
 .versus-friend-info {
   display: flex;

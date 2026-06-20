@@ -2,7 +2,7 @@ const CITIES = [
   // ── América del Sur ─────────────────────────────────────────────────────────
   { name: "Buenos Aires",          country: "ARG", lat: -34.61, lon:  -58.38, diff: "inicio" },
   { name: "Rosario",               country: "ARG", lat: -32.95, lon:  -60.66, diff: "medio"  },
-  { name: "Ushuaia",               country: "ARG", lat: -54.80, lon:  -68.30, diff: "medio"  },
+  { name: "Ushuaia",               country: "ARG", lat: -54.00, lon:  -68.30, diff: "medio"  },
   { name: "Corrientes",            country: "ARG", lat: -27.47, lon:  -58.83, diff: "dificil"},
 
   { name: "São Paulo",             country: "BRA", lat: -23.55, lon:  -46.63, diff: "inicio" },

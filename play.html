@@ -302,6 +302,7 @@
       <!-- LOBBY -->
       <div class="versus-screen" id="versus-screen-lobby" style="display:none">
         <div class="lobby-name-row" id="lobby-name-row">
+          <div id="lobby-mode-icons" class="lobby-mode-icons"></div>
           <span class="lobby-name-text" id="lobby-name-text"></span>
           <button class="lobby-name-edit-btn" id="lobby-name-edit-btn" type="button" style="display:none" aria-label="Editar nombre">✎</button>
           <input id="lobby-name-input" class="lobby-name-input" type="text" maxlength="22" autocomplete="off" spellcheck="false" placeholder="Nombre de la sala" style="display:none">
@@ -976,7 +977,7 @@
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
     </div>
-    <div id="loading-version">Ver. 2.6.67</div>
+    <div id="loading-version">Ver. 2.6.71</div>
   </div>
 
   <!-- Pantalla de resultado versus (W/L) — fuera del loading-screen para verse tras la partida -->
@@ -1056,8 +1057,9 @@
     <div class="vs-popup-box lobby-invite-box">
       <span class="vs-popup-name" data-i18n="lobby.inviteTitle">Invitar amigos</span>
       <button class="versus-start-btn lobby-copylink-btn" id="lobby-copylink-btn" type="button" data-i18n="lobby.copyLink">Copiar link</button>
-      <div id="lobby-invite-list" class="versus-list-box lobby-invite-list"></div>
-      <div id="lobby-invite-empty" class="versus-empty-inline" data-i18n="versus.noneOnline" style="display:none">No hay amigos conectados ahora.</div>
+      <div id="lobby-invite-list" class="versus-list-box lobby-invite-list">
+        <div id="lobby-invite-empty" class="versus-empty-inline" data-i18n="versus.noneOnline" style="display:none">No hay amigos conectados ahora.</div>
+      </div>
       <div class="vs-popup-confirm" id="lobby-invite-close">
         <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
@@ -1507,6 +1509,7 @@
 
   <button id="recording-toggle" style="display:none" onclick="document.body.classList.toggle('recording-mode');this.classList.toggle('active')">⏺</button>
 
-
+<!-- DEV ONLY – ignorado por git, sin efecto si el archivo no existe -->
+<script src="js/devstats.js" onerror=""></script>
 </body>
 </html>

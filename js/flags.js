@@ -460,6 +460,7 @@ function getFlagsLbRowHeight() {
 function initFlagsLeaderboard() {
   const lb = document.getElementById('flags-leaderboard');
   lb.innerHTML = '';
+  lb.classList.toggle('vs-active', _flagsSyncedVersus());
   flagsLbElements = {};
   flagsLastLbScore = -1;
   flagsLastPlayerRank = -1;
@@ -1570,6 +1571,7 @@ window.flagsHardReset = flagsHardReset;
 
 // ── TIMER ─────────────────────────────────────────────────────────────────────
 function startFlagsTimer() {
+  clearInterval(flagsTimerIntervalId); // defensivo: evita timer doble si se llama dos veces
   const _flagsInfinite = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
   flagsTimeLeft = _flagsInfinite ? 0 : (window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer > 0)
     ? window.practiceConfig.timer

@@ -1412,6 +1412,7 @@ function startGame() {
   // Cuenta regresiva antes de arrancar el timer y la primera ciudad
   runPregameCountdown(() => {
     playMusic(sfxGameMusic);
+    if (window._practiceStats) window._practiceStats.startTime = Date.now();
     startTimer();
     setTimeout(nextCity, 100);
   });

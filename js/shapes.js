@@ -331,8 +331,6 @@ function showCountryShape(country, ext1, ext2, startDelay) {
 
   shapesTagsTimeout = setTimeout(() => {
   if (shapesAborted) return; // se abandonó durante el 3-2-1
-  const tImgStart = document.getElementById('shapes-timer-img');
-  if (tImgStart) tImgStart.style.animationPlayState = 'running';
 
   const whiteBg = document.createElement('div');
   whiteBg.className = 'shapes-clip-overlay';
@@ -1043,6 +1041,9 @@ function showShapesMode() {
     c = initSrc[Math.floor(Math.random() * initSrc.length)];
   }
   showCountryShape(c.name, c.ext1, c.ext2, PREGAME_DURATION);
+  // Ocultar el widget del cronómetro durante el 3-2-1-GO
+  const _cwPre = document.getElementById('shapes-countdown-widget');
+  if (_cwPre) _cwPre.style.visibility = 'hidden';
 
   runShapesPregame(() => {
     if (typeof playMusic !== 'undefined') playMusic(sfxGameMusic);
@@ -1055,6 +1056,11 @@ function showShapesMode() {
     shapesGameOver = false;
     const tElInit = document.getElementById('shapes-timer-number');
     if (_shapesInfinite && tElInit) { tElInit.textContent = '∞'; tElInit.classList.add('timer-number-infinity'); }
+    const _tImgInit = document.getElementById('shapes-timer-img');
+    if (_tImgInit) _tImgInit.style.animationPlayState = 'running';
+    // Revelar el cronómetro justo cuando empieza el juego
+    const _cwPost = document.getElementById('shapes-countdown-widget');
+    if (_cwPost) _cwPost.style.visibility = '';
 
     clearInterval(shapesTimerIntervalId);
     shapesTimerIntervalId = setInterval(() => {
@@ -1133,7 +1139,7 @@ function hideShapesMode() {
   const scoreDisplay = document.getElementById('score-display');
   if (scoreDisplay) scoreDisplay.style.display = 'none';
   const rightPanel = document.getElementById('right-panel');
-  if (rightPanel) rightPanel.style.display = 'none';
+  if (rightPanel) { rightPanel.style.display = 'none'; rightPanel.style.visibility = ''; }
   if (shapesScoreRafId) { cancelAnimationFrame(shapesScoreRafId); shapesScoreRafId = null; }
   clearTimeout(shapesSpeedBonusHideId);
   const sbt = document.getElementById('speed-bonus-text');

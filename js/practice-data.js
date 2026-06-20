@@ -82,7 +82,7 @@ const FLAG_COUNTRY_CONTINENT = {
   'Ruanda':'africa','Surinam':'america','Tayikistán':'asia','Turkmenistán':'asia',
   'Uzbekistán':'asia','Haití':'america','República Dominicana':'america',
   'Trinidad y Tobago':'america','Somalia':'africa','Sudán del Sur':'africa',
-  'Eritrea':'africa','Yibuti':'asia','Baréin':'asia','Kuwait':'asia',
+  'Eritrea':'africa','Yibuti':'africa','Baréin':'asia','Kuwait':'asia',
   // insane
   'Mali':'africa','Burkina Faso':'africa','Níger':'africa','Chad':'africa',
   'Guinea':'africa','Liberia':'africa','Sierra Leona':'africa',
@@ -143,7 +143,7 @@ const SHAPE_COUNTRY_CONTINENT = {
   'GuineaBisau':'africa','Gambia':'africa','BurkinaFaso':'africa',
   'Benin':'africa','Togo':'africa','Angola':'africa','Esuatini':'africa',
   'Lesoto':'africa','Malaui':'africa','Seychelles':'africa',
-  'CaboVerde':'africa','IslasCanarias':'africa','Yibuti':'asia',
+  'CaboVerde':'africa','IslasCanarias':'africa','Yibuti':'africa',
   'Eritrea':'africa','Somalia':'africa',
   'PapGuinea':'oceania','IslasSalomon':'oceania','NuevaCaledonia':'oceania',
   'Samoa':'oceania','Vanuatu':'oceania','Fiji':'oceania',

@@ -16,7 +16,7 @@ const TOTAL_HS_KEY = 'totalHighscore';
 
 function buildResultsMessage(total) {
   const playerName = localStorage.getItem('playerName') || 'John';
-  const prevBest   = parseInt(localStorage.getItem(TOTAL_HS_KEY)) || 0;
+  const prevBest   = (resultsScreen._prevBest !== undefined) ? resultsScreen._prevBest : (parseInt(localStorage.getItem(TOTAL_HS_KEY)) || 0);
   const isNewBest  = total > prevBest;
   if (isNewBest) localStorage.setItem(TOTAL_HS_KEY, total);
 
@@ -279,6 +279,7 @@ function updateHighscores() {
     if (el) el.textContent = hs[i].toLocaleString();
   });
   const total = hs[1] + hs[2] + hs[3] + hs[4];
+  resultsScreen._prevBest = parseInt(localStorage.getItem(TOTAL_HS_KEY)) || 0;
   resultsScreen._total = total;
   const totalEl = document.getElementById('results-total-score');
   if (totalEl) renderDigits(totalEl, 0);
