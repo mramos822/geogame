@@ -401,7 +401,9 @@ if (localStorage.getItem('muted') === 'true') { sfxCheck.volume = 0; sfxPostgame
 // el buffer una vez y lo reproducimos con AudioBufferSourceNode.loop (gapless).
 const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) ||
   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-if (IS_IOS) document.body.classList.add('is-ios');
+const IS_MOBILE = IS_IOS || navigator.maxTouchPoints > 1;
+if (IS_IOS)    document.body.classList.add('is-ios');
+if (IS_MOBILE) document.body.classList.add('is-mobile');
 
 // Muestra/oculta el confirm del gameover (se revela tras cargar assets del siguiente modo).
 window.showGameoverConfirm = function () {
@@ -640,10 +642,10 @@ window.preloadNextModeAssets = function (nextMode) {
   // en RAM mientras el modo anterior todavía no liberó su memoria → OOM en iOS.
   const images = list.filter(url => !url.endsWith('.mp4'));
   if (!images.length) return Promise.resolve();
-  // En iOS: fetch() para calentar el HTTP cache sin decodificar el bitmap en RAM.
+  // En mobile: fetch() para calentar el HTTP cache sin decodificar el bitmap en RAM.
   // Así no se acumula memoria decodificada mientras el modo anterior todavía no liberó la suya.
   // En PC: new Image() para decodificar proactivamente (más rápido al renderizar).
-  if (IS_IOS) {
+  if (IS_MOBILE) {
     return Promise.all(
       images.map(url => fetch(url, { cache: 'force-cache' }).catch(() => {}))
     ).then(() => {});
@@ -4361,7 +4363,7 @@ function endGame() {
 
       cancelAnimationFrame(animFrameId);
       animFrameId = null;
-      if (IS_IOS) {
+      if (IS_MOBILE) {
         canvas.width = 1; canvas.height = 1;
         badgeOverlay.width = 1; badgeOverlay.height = 1;
       }
@@ -4530,9 +4532,9 @@ function runPregameCountdown(onDone) {
 function startGame() {
   loadBadges();
   loadGameSFX();
-  // Pre-autorizar sfxCountdown en iOS mientras estamos en el contexto del gesto del usuario,
-  // antes del canvas resize (que puede tardar en iOS y expirar la ventana de gesto).
-  if (IS_IOS && sfxCountdown) {
+  // Pre-autorizar sfxCountdown en mobile mientras estamos en el contexto del gesto del usuario,
+  // antes del canvas resize (que puede tardar y expirar la ventana de gesto).
+  if (IS_MOBILE && sfxCountdown) {
     const _pa = sfxPlay(sfxCountdown);
     if (_pa) _pa.catch(() => {});
     sfxCountdown.pause();

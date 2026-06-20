@@ -21,6 +21,7 @@
 
   // Largest dimensions seen — used so keyboard-open events don't shrink the stage.
   var baseW = 0, baseH = 0;
+  var isMobileLB = navigator.maxTouchPoints > 1;
 
   function buildStage() {
     stage = document.getElementById('app-stage');
@@ -58,9 +59,9 @@
     var w = vp ? vp.width  : window.innerWidth;
     var h = vp ? vp.height : window.innerHeight;
     var fitW = w, fitH = h;
-    // On iOS, track the largest dimensions seen so the keyboard-open event
-    // (which shrinks visualViewport.height) doesn't rescale the stage.
-    if (document.body.classList.contains('is-ios')) {
+    // On mobile (iOS & Android), track the largest dimensions seen so the
+    // keyboard-open event (which shrinks visualViewport.height) doesn't rescale the stage.
+    if (isMobileLB) {
       if (w > baseW || h > baseH) { baseW = w; baseH = h; }
       fitW = baseW; fitH = baseH;
     }

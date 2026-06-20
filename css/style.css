@@ -33,9 +33,9 @@
    (1920px). En 1.15 (sin el stage) esos mismos hints no costaban nada. Acumuladas
    entre los 4 modos agotan la GPU de iOS y reinician WebContent. En iOS no hay
    hover ni se necesita la promoción: se anulan. (PC sigue igual.) */
-body.is-ios * { will-change: auto !important; }
-body.is-ios .loading-play-single,
-body.is-ios .loading-secondary-btn {
+body.is-mobile * { will-change: auto !important; }
+body.is-mobile .loading-play-single,
+body.is-mobile .loading-secondary-btn {
   transform: none !important;
   backface-visibility: visible !important;
 }
@@ -328,10 +328,10 @@ body {
 /* iOS: Safari renderiza el check/conteo ~2cqmin más arriba que PC (métricas de
    fuente/imagen), las filas no. Bajamos solo el check/wrong + conteo en iOS para
    nivelarlos con sus filas, sin tocar PC. */
-body.is-ios .game-bg-check3    { top: 16.4cqmin; }
-body.is-ios .game-bg-wrong3    { top: 29.5cqmin; }
-body.is-ios .grade-count-total { top: 16.4cqmin; }
-body.is-ios .wrong-count-total { top: 29.5cqmin; }
+body.is-mobile .game-bg-check3    { top: 16.4cqmin; }
+body.is-mobile .game-bg-wrong3    { top: 29.5cqmin; }
+body.is-mobile .grade-count-total { top: 16.4cqmin; }
+body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 
 .game-bg-check3-mid {
   left: 31%;
