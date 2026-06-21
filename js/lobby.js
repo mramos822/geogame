@@ -281,18 +281,29 @@ window.LB = (() => {
     const cutoff30m = new Date(Date.now() - 30 * 60 * 1000).toISOString();
     const cutoff45m = new Date(Date.now() - 45 * 60 * 1000).toISOString();
     try {
-      // Borrar salas propias viejas (waiting + closed) — el RLS siempre lo permite
+      // Borrar salas propias viejas — el RLS siempre lo permite
       if (uid) {
         let q = window.sb.from('lobbies').delete().eq('host_id', uid).in('status', ['waiting', 'closed', 'active']);
         if (_lobbyId) q = q.neq('id', _lobbyId);
         await q;
+        // Borrar matches propios terminales
+        await window.sb.from('matches').delete().eq('player1_id', uid)
+          .in('status', ['abandoned', 'declined', 'expired', 'finished', 'cancelled']);
+        await window.sb.from('matches').delete().eq('player2_id', uid)
+          .in('status', ['abandoned', 'declined', 'expired', 'finished', 'cancelled']);
       }
       // Intentar borrado global vía RPC (SECURITY DEFINER, bypasea RLS)
       try { await window.sb.rpc('cleanup_stale_lobbies'); } catch (_) {}
-      // Fallback directo (puede fallar por RLS en salas ajenas, se ignora)
+      // Fallback directo lobbies (puede fallar por RLS en salas ajenas)
       await window.sb.from('lobbies').delete().in('status', ['waiting', 'closed']).lt('created_at', cutoff30m);
-      // Salas active muy viejas → cerrar (luego la siguiente pasada las borra)
+      // Salas active muy viejas → cerrar
       await window.sb.from('lobbies').update({ status: 'closed' }).eq('status', 'active').lt('created_at', cutoff45m);
+      // Matches terminales o active muy viejos (global, puede fallar por RLS)
+      await window.sb.from('matches').delete()
+        .in('status', ['abandoned', 'declined', 'expired', 'finished', 'cancelled'])
+        .lt('created_at', cutoff30m);
+      await window.sb.from('matches').update({ status: 'abandoned' })
+        .eq('status', 'active').lt('created_at', cutoff45m);
     } catch (e) {}
   }
 
@@ -916,7 +927,7 @@ window.Lobby = (() => {
       row.dataset.lobbyId = r.id;
       const roomModes = _getActiveModes(r);
       const modeIconsHtml = _modeIconsHtml(roomModes, 'public-room-mode-icon');
-      const displayName = _roomNameCache.get(String(r.id)) || r.name || (typeof t === 'function' ? t('lobby.roomName', { name: r.hostName }) : ('Sala de ' + r.hostName));
+      const displayName = r.name || _roomNameCache.get(String(r.id)) || (typeof t === 'function' ? t('lobby.roomName', { name: r.hostName }) : ('Sala de ' + r.hostName));
       row.innerHTML =
         `<div class="versus-friend-info">` +
           `<div class="public-room-name-row">` +
@@ -2182,7 +2193,7 @@ window.Lobby = (() => {
     if (_publicSignalReceiveCh) { try { _publicSignalReceiveCh.unsubscribe(); } catch (e) {} _publicSignalReceiveCh = null; }
     clearInterval(_publicPollTimer);
     _publicPollTimer = null;
-    _roomNameCache.clear();
+    // No limpiar _roomNameCache: sobrevive entre aperturas del panel para que el nombre persista
   }
 
   return { enterLobby, loadPublicList, startPublicRealtime, stopPublicRealtime, tryPendingJoin, tryRestore, showIncomingInvite, showInviteNotif, cancelCountdown: _stopCountdown };
