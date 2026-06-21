@@ -1046,10 +1046,10 @@ window.Lobby = (() => {
       if (!window._lobbyActive) return;
       _stopCountdown();
       _teardownCurrentMode();
-      // Ocultar HUD del juego que hardReset no limpia
+      // Ocultar HUD del juego que hardReset no limpia + popup de confirmación de salida
       ['score-display','flags-score-display','countdown-widget',
        'flags-countdown-widget','pregame-countdown','flags-pregame-countdown',
-       'timeup-overlay','flags-timeup-overlay'].forEach(id => {
+       'timeup-overlay','flags-timeup-overlay','ingame-quit-popup'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
       });
