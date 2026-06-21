@@ -7514,7 +7514,7 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   transition: filter 0.15s, transform 0.12s;
 }
 .practice-diff-btn.active .practice-continent-img-wrap > img:first-child { filter: grayscale(0%); }
-.practice-diff-btn.active .practice-continent-x { opacity: 1; }
+.practice-diff-btn.active .practice-continent-x { opacity: 0; }
 .practice-diff-btn .practice-continent-img-wrap { transition: transform 0.12s; }
 .practice-diff-btn:hover .practice-continent-img-wrap { transform: scale(1.08); }
 .practice-diff-btn:active .practice-continent-img-wrap { transform: scale(0.95); }
