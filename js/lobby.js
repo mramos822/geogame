@@ -765,6 +765,13 @@ window.Lobby = (() => {
     if (cancelB) cancelB.style.display = (active && host)   ? '' : 'none';
     if (nrB)     nrB.style.display     = (active && !host)  ? '' : 'none';
     if (wait)    wait.style.display    = (!active && !host) ? '' : 'none';
+    // Bloquear controles del host durante el countdown
+    const modeEditBtn  = document.getElementById('lobby-mode-edit-btn');
+    const inviteBtn    = document.getElementById('lobby-invite-btn');
+    const visibilityBtn = document.getElementById('lobby-visibility-btn');
+    if (modeEditBtn)   modeEditBtn.disabled   = active;
+    if (inviteBtn)     inviteBtn.disabled     = active;
+    if (visibilityBtn) visibilityBtn.disabled = active;
   }
 
   // ── Barra global de cuenta regresiva (visible fuera del panel de grupo) ────────
