@@ -838,14 +838,15 @@ window.Lobby = (() => {
   }
 
   function enterLobby() {
-    _savedLobbyModes = []; // reset al entrar a sala nueva
+    if (!window.LB.getId()) _savedLobbyModes = []; // reset solo si no hay sala activa
     const codeEl = document.getElementById('lobby-code');
     if (codeEl) codeEl.textContent = window.LB.getCode() || '------';
     _updateInviteBtn();
     _updateVisibilityBtn();
     _refreshLobbyName();
 
-    _counting = false;
+    // No resetear _counting: si el host vuelve al panel con countdown activo debe verse el estado correcto
+    _applyCountdownButtons(_counting);
     window.LB.onMembers(_renderMembers);
     window.LB.onStart(lobby => _launchLobbyGame(lobby.seed));
     window.LB.onClosed(reason => {
