@@ -25,9 +25,11 @@ window.sbLogin = async function(username, password) {
   return data;
 };
 
+const _AUTH_REDIRECT = 'https://mygeochallenge.com/play/';
+
 window.sbResetPassword = async function(email) {
   const { error } = await sb.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.origin + window.location.pathname,
+    redirectTo: _AUTH_REDIRECT,
   });
   if (error) throw error;
 };
@@ -38,7 +40,7 @@ window.sbChangePassword = async function(newPassword) {
 };
 
 window.sbChangeEmail = async function(newEmail) {
-  const { error } = await sb.auth.updateUser({ email: newEmail });
+  const { error } = await sb.auth.updateUser({ email: newEmail }, { emailRedirectTo: _AUTH_REDIRECT });
   if (error) throw error;
 };
 

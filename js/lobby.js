@@ -13,7 +13,22 @@ window.LB = (() => {
   let _channel  = null;
   let _members  = [];     // [{id, name, avatar, score, isHost, is_playing}]
   let _memberProfilesChannel = null;
-  let _publicSignalCh = null; // canal para ENVIAR señales a viewers del panel público (host)
+  let _publicSignalCh = null;      // canal para ENVIAR señales a viewers del panel público (host)
+  let _publicSignalChReady = false; // true cuando el canal está en estado SUBSCRIBED
+
+  // Envía un room-update al canal público; si el canal aún no está listo, reintenta hasta 3s
+  function _sendRoomUpdate(payload) {
+    if (!_publicSignalCh) return;
+    if (_publicSignalChReady) { _publicSignalCh.send({ type: 'broadcast', event: 'room-update', payload }); return; }
+    let attempts = 0;
+    const iv = setInterval(() => {
+      attempts++;
+      if (_publicSignalChReady && _publicSignalCh) {
+        _publicSignalCh.send({ type: 'broadcast', event: 'room-update', payload });
+        clearInterval(iv);
+      } else if (attempts >= 6) clearInterval(iv); // 6 × 500ms = 3s máximo
+    }, 500);
+  }
   let _lobby    = null;   // fila de la tabla lobbies
   let _seed     = null;
   let _onMembers   = null;
@@ -107,7 +122,9 @@ window.LB = (() => {
     // Suscribirse al canal público para poder emitir señales de actualización a los viewers
     if (_publicSignalCh) { try { _publicSignalCh.unsubscribe(); } catch(e) {} }
     // Nombre diferente a 'public-lobbies-watch' para no interferir con _publicChannel del viewer
-    _publicSignalCh = window.sb.channel('pub-room-signals', { config: { broadcast: { self: false } } }).subscribe();
+    _publicSignalCh = window.sb.channel('pub-room-signals', { config: { broadcast: { self: false } } })
+      .subscribe((status) => { if (status === 'SUBSCRIBED') _publicSignalChReady = true; });
+    _publicSignalChReady = false;
     _resubTime = Date.now();
     const lid = _lobbyId;
     const uid = _myId();
@@ -264,12 +281,17 @@ window.LB = (() => {
     const cutoff30m = new Date(Date.now() - 30 * 60 * 1000).toISOString();
     const cutoff45m = new Date(Date.now() - 45 * 60 * 1000).toISOString();
     try {
+      // Borrar salas propias viejas (waiting + closed) — el RLS siempre lo permite
       if (uid) {
-        let q = window.sb.from('lobbies').delete().eq('host_id', uid).eq('status', 'waiting');
-        if (_lobbyId) q = q.neq('id', _lobbyId); // no borrar la sala propia activa
+        let q = window.sb.from('lobbies').delete().eq('host_id', uid).in('status', ['waiting', 'closed', 'active']);
+        if (_lobbyId) q = q.neq('id', _lobbyId);
         await q;
       }
-      await window.sb.from('lobbies').delete().eq('status', 'waiting').lt('created_at', cutoff30m);
+      // Intentar borrado global vía RPC (SECURITY DEFINER, bypasea RLS)
+      try { await window.sb.rpc('cleanup_stale_lobbies'); } catch (_) {}
+      // Fallback directo (puede fallar por RLS en salas ajenas, se ignora)
+      await window.sb.from('lobbies').delete().in('status', ['waiting', 'closed']).lt('created_at', cutoff30m);
+      // Salas active muy viejas → cerrar (luego la siguiente pasada las borra)
       await window.sb.from('lobbies').update({ status: 'closed' }).eq('status', 'active').lt('created_at', cutoff45m);
     } catch (e) {}
   }
@@ -331,7 +353,7 @@ window.LB = (() => {
       await window.sb.from('lobbies').update({ is_public: !!isPublic }).eq('id', _lobbyId);
       if (_lobby) _lobby.is_public = !!isPublic;
       sendVisibility(!!isPublic);
-      _publicSignalCh?.send({ type: 'broadcast', event: 'room-update', payload: { id: _lobbyId } });
+      _sendRoomUpdate({ id: _lobbyId });
     } catch (e) {}
   }
   function isPublic() { return !!(_lobby && _lobby.is_public); }
@@ -342,7 +364,7 @@ window.LB = (() => {
       await window.sb.from('lobbies').update({ name: name }).eq('id', _lobbyId);
       if (_lobby) _lobby.name = name;
       sendName(name);
-      _publicSignalCh?.send({ type: 'broadcast', event: 'room-update', payload: { id: _lobbyId, name } });
+      _sendRoomUpdate({ id: _lobbyId, name });
     } catch (e) {}
   }
   function getName() { return (_lobby && _lobby.name) || ''; }
@@ -414,7 +436,7 @@ window.LB = (() => {
     if (_members.length < 2) return; // hace falta al menos 2
     const seed = Math.floor(Math.random() * 1_000_000);
     await window.sb.from('lobbies').update({ status: 'active', seed }).eq('id', _lobbyId);
-    _publicSignalCh?.send({ type: 'broadcast', event: 'room-update', payload: { id: _lobbyId, started: true } });
+    _sendRoomUpdate({ id: _lobbyId, started: true });
     // El propio host arranca por el realtime UPDATE, igual que el resto.
   }
 
@@ -451,7 +473,7 @@ window.LB = (() => {
     // Estado local y broadcast siempre, aunque el DB falle
     if (_lobby) { _lobby.mode = modeEncoded; _lobby.modes = modes; }
     sendModes(modes);
-    _publicSignalCh?.send({ type: 'broadcast', event: 'room-update', payload: { id: _lobbyId } });
+    _sendRoomUpdate({ id: _lobbyId });
   }
 
   function getModes() {
@@ -532,7 +554,7 @@ window.LB = (() => {
     window._lobbyCountingDown = false;
     if (_memberProfilesChannel) { try { window.sb.removeChannel(_memberProfilesChannel); } catch (e) {} _memberProfilesChannel = null; }
     if (_channel) { _channel.unsubscribe(); _channel = null; }
-    if (_publicSignalCh) { try { _publicSignalCh.unsubscribe(); } catch(e) {} _publicSignalCh = null; }
+    if (_publicSignalCh) { try { _publicSignalCh.unsubscribe(); } catch(e) {} _publicSignalCh = null; _publicSignalChReady = false; }
     Object.values(_graceTimers).forEach(clearTimeout);
     for (const k in _graceTimers) delete _graceTimers[k];
     _pendingKicks.clear();
@@ -894,7 +916,7 @@ window.Lobby = (() => {
       row.dataset.lobbyId = r.id;
       const roomModes = _getActiveModes(r);
       const modeIconsHtml = _modeIconsHtml(roomModes, 'public-room-mode-icon');
-      const displayName = r.name || (typeof t === 'function' ? t('lobby.roomName', { name: r.hostName }) : ('Sala de ' + r.hostName));
+      const displayName = _roomNameCache.get(String(r.id)) || r.name || (typeof t === 'function' ? t('lobby.roomName', { name: r.hostName }) : ('Sala de ' + r.hostName));
       row.innerHTML =
         `<div class="versus-friend-info">` +
           `<div class="public-room-name-row">` +
@@ -2114,17 +2136,24 @@ window.Lobby = (() => {
   let _publicChannel = null;
   let _publicSignalReceiveCh = null;
 
+  // Cache local de nombres personalizados recibidos por broadcast.
+  // Sobrevive los re-renders de loadPublicList para que el nombre no se pierda.
+  const _roomNameCache = new Map(); // lobbyId → nombre personalizado
+
   let _publicRefreshTimer = null;
   function _schedulePublicRefresh(msg) {
-    // Si el payload trae el nombre actualizado, aplicarlo directo al DOM sin re-fetch
     const p = msg?.payload;
     if (p?.id && typeof p.name !== 'undefined') {
+      // Nombre actualizado por el host: cachear y aplicar al DOM ahora
+      _roomNameCache.set(String(p.id), p.name);
       const list = document.getElementById('versus-public-list');
       if (list) {
         const rowEl = list.querySelector(`.versus-friend-row[data-lobby-id="${p.id}"]`);
         const nameSpan = rowEl?.querySelector('.versus-friend-name');
         if (nameSpan) nameSpan.textContent = p.name;
       }
+      // No re-renderizar: el cache garantiza que loadPublicList también use el nombre correcto
+      return;
     }
     clearTimeout(_publicRefreshTimer);
     _publicRefreshTimer = setTimeout(() => loadPublicList(true), 400);
@@ -2152,6 +2181,7 @@ window.Lobby = (() => {
     if (_publicSignalReceiveCh) { try { _publicSignalReceiveCh.unsubscribe(); } catch (e) {} _publicSignalReceiveCh = null; }
     clearInterval(_publicPollTimer);
     _publicPollTimer = null;
+    _roomNameCache.clear();
   }
 
   return { enterLobby, loadPublicList, startPublicRealtime, stopPublicRealtime, tryPendingJoin, tryRestore, showIncomingInvite, showInviteNotif, cancelCountdown: _stopCountdown };
