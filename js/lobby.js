@@ -1943,7 +1943,7 @@ window.Lobby = (() => {
     }
     clearTimeout(_notifTimer);
     if (!opts.persistent) {
-      _notifTimer = setTimeout(() => { const d = _notifDecline; _dismissNotif(); if (d) d(); }, NOTIF_MS);
+      _notifTimer = setTimeout(() => { _dismissNotif(); }, NOTIF_MS);
     }
   }
   function _dismissNotif() {
