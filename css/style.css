@@ -6834,7 +6834,7 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
 /* Botón "volver a mi sala" */
 .versus-return-lobby {
   position: absolute;
-  top: 22%;
+  top: 27%;
   left: calc(50% + 40cqmin);
   transform: translate(-50%, -50%);
   display: flex;
