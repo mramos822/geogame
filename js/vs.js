@@ -1033,7 +1033,10 @@ window.VS = (() => {
   window._vsStartListening = function() {
     window.VS.listenForInvites(
       match => _showIncomingPopup(match),
-      () => { if (typeof window.dismissInviteNotif === 'function') window.dismissInviteNotif(); } // host canceló
+      m => {
+        if (m && typeof window.removeVersusNotif === 'function') window.removeVersusNotif(m.id);
+        if (typeof window.dismissInviteNotif === 'function') window.dismissInviteNotif();
+      } // host canceló / expiró
     );
     // Consulta inmediata de invitaciones pendientes que llegaron antes de conectar.
     // Solo se muestra una vez por match (localStorage evita que reaparezca al recargar).
