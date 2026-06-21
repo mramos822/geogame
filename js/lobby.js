@@ -1045,6 +1045,13 @@ window.Lobby = (() => {
       if (!window._lobbyActive) return;
       _stopCountdown();
       _teardownCurrentMode();
+      // Ocultar HUD del juego que hardReset no limpia
+      ['score-display','flags-score-display','countdown-widget',
+       'flags-countdown-widget','pregame-countdown','flags-pregame-countdown',
+       'timeup-overlay','flags-timeup-overlay'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+      });
       window._lobbyActive = false;
       window._lobbyMembers = [];
       if (typeof window._setPlaying === 'function') window._setPlaying(false);
