@@ -11,7 +11,8 @@ window.LB = (() => {
   let _lobbyId  = null;
   let _hostId   = null;
   let _channel  = null;
-  let _members  = [];     // [{id, name, avatar, score, isHost}]
+  let _members  = [];     // [{id, name, avatar, score, isHost, is_playing}]
+  let _memberProfilesChannel = null;
   let _lobby    = null;   // fila de la tabla lobbies
   let _seed     = null;
   let _onMembers   = null;
@@ -23,9 +24,13 @@ window.LB = (() => {
   let _onWrong      = null;  // alguien falló una pregunta → señal visual
   let _onVisibility = null;  // host cambió la sala de pública a privada o viceversa
   let _onName       = null;  // host cambió el nombre de la sala
+  let _onModes      = null;  // host cambió el modo de juego
   let _onFinished   = null;  // un miembro terminó su partida → coordinación fin grupal
+  let _onScore      = null;  // score en vivo de otro miembro → actualizar leaderboard
   let _onPlayerGone = null;  // miembro perdió presencia durante partida activa
   let _onPlayerBack = null;  // miembro recuperó presencia durante partida activa
+  let _onAlone      = null;  // todos los demás se fueron durante partida activa → quedé solo
+  let _aloneCalledThisGame = false; // guard: _onAlone sólo dispara una vez por partida
   let _resubTime    = 0;     // timestamp del último _subscribe(); guard contra kicks falsos
   const _pendingKicks = new Set(); // miembros que se desconectaron durante la partida
 
@@ -47,15 +52,16 @@ window.LB = (() => {
   async function _fetchMembers() {
     if (!_lobbyId) return;
     const { data, error } = await window.sb.from('lobby_members')
-      .select('user_id, score, joined_at, p:user_id(username, avatar_url)')
+      .select('user_id, score, joined_at, p:user_id(username, avatar_url, is_playing)')
       .eq('lobby_id', _lobbyId).order('joined_at');
     if (error) { console.warn('[LB] fetchMembers:', error.message); return; }
     _members = (data || []).map(m => ({
-      id:     m.user_id,
-      name:   (m.p && m.p.username) || '?',
-      avatar: (m.p && m.p.avatar_url) || 'images/profilepic/ppdefault.png',
-      score:  m.score || 0,
-      isHost: m.user_id === _hostId,
+      id:        m.user_id,
+      name:      (m.p && m.p.username) || '?',
+      avatar:    (m.p && m.p.avatar_url) || 'images/profilepic/ppdefault.png',
+      score:     m.score || 0,
+      isHost:    m.user_id === _hostId,
+      is_playing: !!(m.p && m.p.is_playing),
     }));
     // Si la sala quedó totalmente vacía (todos se fueron sin avisar), cerrarla.
     if (_members.length === 0 && _lobbyId && !window._lobbyActive) {
@@ -70,6 +76,29 @@ window.LB = (() => {
       return;
     }
     if (_onMembers) _onMembers(_members);
+    _subscribeToMemberProfiles();
+  }
+
+  function _subscribeToMemberProfiles() {
+    if (_memberProfilesChannel) {
+      try { window.sb.removeChannel(_memberProfilesChannel); } catch (e) {}
+      _memberProfilesChannel = null;
+    }
+    const ids = _members.map(m => m.id).filter(Boolean);
+    if (!ids.length || !_lobbyId) return;
+    _memberProfilesChannel = window.sb
+      .channel('lobby-profiles-' + _lobbyId)
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'profiles',
+        filter: `id=in.(${ids.join(',')})`,
+      }, (payload) => {
+        const updated = payload.new;
+        const m = _members.find(x => x.id === updated.id);
+        if (!m) return;
+        m.is_playing = !!updated.is_playing;
+        if (_onMembers) _onMembers(_members);
+      })
+      .subscribe();
   }
 
   function _subscribe() {
@@ -91,8 +120,18 @@ window.LB = (() => {
         if (_lobby) _lobby.name = payload?.name || _lobby.name;
         if (_onName) _onName(payload?.name);
       })
+      .on('broadcast', { event: 'modes' }, ({ payload }) => {
+        if (_lobby && payload) {
+          if (payload.mode)  _lobby.mode  = payload.mode;
+          if (payload.modes !== undefined) _lobby.modes = payload.modes;
+        }
+        if (_onModes) _onModes(payload?.modes || [payload?.mode || 'flags'], !!payload?.changed);
+      })
       .on('broadcast', { event: 'finished' }, ({ payload }) => {
         if (_onFinished) _onFinished(payload?.uid, payload?.score);
+      })
+      .on('broadcast', { event: 'lbscore' }, ({ payload }) => {
+        if (_onScore && payload?.uid !== _myId()) _onScore(payload?.uid, payload?.score ?? 0);
       })
       // Cualquier cambio de miembros (alta/baja/score) → re-consultar a la sala.
       // _fetchMembers detecta si me kickearon (ya no figuro en la lista). No filtramos
@@ -103,9 +142,10 @@ window.LB = (() => {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lobbies',
         filter: 'id=eq.' + lid }, payload => {
         if (!payload.new) return;
-        _lobby  = payload.new;
         _hostId = payload.new.host_id;
-        if (payload.new.status === 'active' && _onStart) { _seed = payload.new.seed; _onStart(payload.new); }
+        _lobby  = payload.new;
+        // Solo lanzar el juego si la seed cambió (cambio de host_id no debe relanzar)
+        if (payload.new.status === 'active' && _onStart && payload.new.seed !== _seed) { _seed = payload.new.seed; _onStart(payload.new); }
         else if (payload.new.status === 'closed' && _onClosed) { const cb = _onClosed; cleanup(); cb('closed'); }
         else { _fetchMembers(); } // cambió el host (u otro campo) → re-render con el nuevo host
       })
@@ -113,10 +153,39 @@ window.LB = (() => {
       .on('presence', { event: 'leave' }, ({ key }) => {
         if (!key || key === uid) return;
         clearTimeout(_graceTimers[key]);
-        _graceTimers[key] = setTimeout(() => {
-          if (window._lobbyActive && _onPlayerGone) _onPlayerGone(key);
-          _handleMemberGone(key);
-        }, GRACE_MS);
+        if (window._lobbyActive) {
+          // Durante partida activa: reaccionar inmediatamente sin esperar el grace timer
+          _pendingKicks.add(key);
+          if (_onPlayerGone) _onPlayerGone(key);
+          // Si el HOST se fue, promover al heredero (mismo algoritmo que _handleMemberGone)
+          if (key === _hostId) {
+            const myId2 = _myId();
+            const heir = _members.find(m => m.id !== key && !_pendingKicks.has(m.id));
+            if (heir && heir.id === myId2) {
+              // Solo el heredero hace el UPDATE para evitar race conditions
+              _hostId = myId2;
+              window.sb.from('lobbies').update({ host_id: myId2 }).eq('id', _lobbyId).then(() => {}).catch(() => {});
+            } else if (!heir) {
+              // Quedé solo — el alone check lo maneja abajo
+            }
+          }
+          // Verificar si quedé solo — dos métodos complementarios:
+          // 1) presenceState: clave de presencia ES el uid, usar Object.keys directamente
+          const state = _channel?.presenceState?.() || {};
+          const presentNow = new Set(Object.keys(state));
+          presentNow.delete(key); // ya salió
+          presentNow.delete(uid); // yo mismo no cuento
+          // 2) pendingKicks como fallback: todos los demás ya en la lista de bajas
+          const myId = _myId();
+          const othersKicked = _members.length > 0 && _members.filter(m => m.id !== myId)
+            .every(m => m.id === key || _pendingKicks.has(m.id));
+          if (!_aloneCalledThisGame && (presentNow.size === 0 || othersKicked)) {
+            _aloneCalledThisGame = true;
+            if (_onAlone) _onAlone();
+          }
+          return; // sin grace timer durante partida activa
+        }
+        _graceTimers[key] = setTimeout(() => _handleMemberGone(key), GRACE_MS);
       })
       .on('presence', { event: 'join' }, ({ key }) => {
         if (!key || key === uid) return;
@@ -149,12 +218,17 @@ window.LB = (() => {
   const _graceTimers = {};
   async function _handleMemberGone(goneId) {
     delete _graceTimers[goneId];
-    if (window._lobbyActive) { _pendingKicks.add(goneId); return; } // se procesa al terminar la partida
+    if (window._lobbyActive) { _pendingKicks.add(goneId); return; } // presence.leave ya lo manejó
     if (!_lobbyId) return;
     if (!_lobby || _lobby.status !== 'waiting') return;
     if (Date.now() - _resubTime < 9000) return;            // ignorar drops falsos post-resubscripción
+    // Si el miembro tiene presencia activa, se reingresó antes de expirar el timer → no expulsar
+    if (_channel) {
+      const ps = _channel.presenceState?.() || {};
+      if (ps[goneId] && ps[goneId].length > 0) return;
+    }
     const present = _members.map(m => m.id);
-    if (!present.includes(goneId)) return;                  // ya no estaba
+    if (!present.includes(goneId)) return;                  // ya no estaba (otro proceso lo eliminó)
     if (goneId === _hostId) {
       // Se fue el HOST: lo promueve el miembro vivo que se unió primero (excluyendo al ido).
       const heir = _members.filter(m => m.id !== goneId)[0];
@@ -185,7 +259,11 @@ window.LB = (() => {
     const cutoff30m = new Date(Date.now() - 30 * 60 * 1000).toISOString();
     const cutoff45m = new Date(Date.now() - 45 * 60 * 1000).toISOString();
     try {
-      if (uid) await window.sb.from('lobbies').delete().eq('host_id', uid).eq('status', 'waiting');
+      if (uid) {
+        let q = window.sb.from('lobbies').delete().eq('host_id', uid).eq('status', 'waiting');
+        if (_lobbyId) q = q.neq('id', _lobbyId); // no borrar la sala propia activa
+        await q;
+      }
       await window.sb.from('lobbies').delete().eq('status', 'waiting').lt('created_at', cutoff30m);
       await window.sb.from('lobbies').update({ status: 'closed' }).eq('status', 'active').lt('created_at', cutoff45m);
     } catch (e) {}
@@ -331,7 +409,6 @@ window.LB = (() => {
     if (!isHost() || !_lobbyId) return;
     if (_members.length < 2) return; // hace falta al menos 2
     const seed = Math.floor(Math.random() * 1_000_000);
-    _seed = seed;
     await window.sb.from('lobbies').update({ status: 'active', seed }).eq('id', _lobbyId);
     // El propio host arranca por el realtime UPDATE, igual que el resto.
   }
@@ -352,6 +429,35 @@ window.LB = (() => {
   function sendVisibility(pub)  { _bcast('visibility', { isPublic: !!pub }); }
   function sendName(name)       { _bcast('name', { name }); }
   function sendFinished(score)  { _bcast('finished', { uid: _myId(), score }); }
+  function sendScore(score)     { _bcast('lbscore',  { uid: _myId(), score }); }
+  function sendModes(modes, changed = true) { _bcast('modes', { modes, mode: modes && modes.length > 1 ? modes.join('+') : ((modes && modes[0]) || 'flags'), changed: !!changed }); }
+
+  async function setModes(modes) {
+    if (!isHost() || !_lobbyId) return;
+    const mode = (modes && modes[0]) || 'flags';
+    // Codificar la lista en `mode` como "flags+shapes" — persiste aunque no exista columna `modes`
+    const modeEncoded = modes && modes.length > 1 ? modes.join('+') : mode;
+    // Supabase devuelve { error } en vez de lanzar excepción — hay que chequearlo explícitamente
+    const { error } = await window.sb.from('lobbies').update({ mode: modeEncoded, modes }).eq('id', _lobbyId);
+    if (error) {
+      // Columna `modes` no existe (42703) u otro error → solo actualizar `mode`
+      await window.sb.from('lobbies').update({ mode: modeEncoded }).eq('id', _lobbyId);
+    }
+    // Estado local y broadcast siempre, aunque el DB falle
+    if (_lobby) { _lobby.mode = modeEncoded; _lobby.modes = modes; }
+    sendModes(modes);
+  }
+
+  function getModes() {
+    if (!_lobby) return ['flags'];
+    if (_lobby.modes) {
+      const arr = Array.isArray(_lobby.modes) ? _lobby.modes : String(_lobby.modes).split(',').map(s => s.trim()).filter(Boolean);
+      if (arr.length) return arr;
+    }
+    if (!_lobby.mode) return ['flags'];
+    if (_lobby.mode.includes('+')) return _lobby.mode.split('+').map(s => s.trim()).filter(Boolean);
+    return [_lobby.mode];
+  }
 
   // ── Invitación push a un amigo (broadcast a su canal personal) ──────────────────
   function sendInvite(toUser, payload) {
@@ -417,22 +523,38 @@ window.LB = (() => {
   }
 
   function cleanup() {
+    window._lobbyCountingDown = false;
+    if (_memberProfilesChannel) { try { window.sb.removeChannel(_memberProfilesChannel); } catch (e) {} _memberProfilesChannel = null; }
     if (_channel) { _channel.unsubscribe(); _channel = null; }
     Object.values(_graceTimers).forEach(clearTimeout);
     for (const k in _graceTimers) delete _graceTimers[k];
     _pendingKicks.clear();
+    _aloneCalledThisGame = false;
     _lobbyId = _hostId = _lobby = _seed = null;
     _members = [];
-    _onMembers = _onStart = _onClosed = _onCountdown = _onCancel = _onNotReady = _onWrong = _onVisibility = _onName = _onFinished = _onPlayerGone = _onPlayerBack = null;
+    _onMembers = _onStart = _onClosed = _onCountdown = _onCancel = _onNotReady = _onWrong = _onVisibility = _onName = _onModes = _onFinished = _onScore = _onPlayerGone = _onPlayerBack = _onAlone = null;
   }
 
   return {
     create, joinByCode, joinById, leave, kick, start, reportScore, listPublic, cleanup,
-    sendCountdown, sendCancel, sendNotReady, sendWrong, sendVisibility, sendName, sendFinished, setPublic, isPublic, restoreActive, transferHost, cleanupMine,
-    sendInvite, listenForInvites, setName, getName,
+    sendCountdown, sendCancel, sendNotReady, sendWrong, sendVisibility, sendName, sendFinished, sendScore, setPublic, isPublic, restoreActive, transferHost, cleanupMine,
+    sendInvite, listenForInvites, setName, getName, setModes, getModes, sendModes,
     isHost, getMembers, getLobby, getCode, getId, getSeed,
     refreshMembers: () => _fetchMembers(),
     resubscribeChannel: () => { if (_lobbyId) _subscribe(); },
+    getPendingKicksCount: () => _pendingKicks.size,
+    clearPendingKicks: () => { _pendingKicks.clear(); },
+    processPendingKicks: async () => {
+      if (_pendingKicks.size && isHost()) {
+        const toKick = new Set(_pendingKicks);
+        _pendingKicks.clear();
+        const lid = _lobbyId;
+        toKick.forEach(async uid => {
+          try { await window.sb.from('lobby_members').delete().eq('lobby_id', lid).eq('user_id', uid); } catch (e) {}
+        });
+        setTimeout(() => _fetchMembers(), 500);
+      } else { _pendingKicks.clear(); }
+    },
     resetToWaiting: async () => {
       if (!_lobbyId || !_myId()) return;
       try {
@@ -452,9 +574,12 @@ window.LB = (() => {
     onWrong:      cb => { _onWrong = cb; },
     onVisibility: cb => { _onVisibility = cb; },
     onName:       cb => { _onName = cb; },
+    onModes:      cb => { _onModes = cb; },
     onFinished:   cb => { _onFinished = cb; },
+    onScore:      cb => { _onScore = cb; },
     onPlayerGone: cb => { _onPlayerGone = cb; },
     onPlayerBack: cb => { _onPlayerBack = cb; },
+    onAlone:      cb => { _onAlone = cb; if (cb) _aloneCalledThisGame = false; },
   };
 })();
 
@@ -477,22 +602,36 @@ window.Lobby = (() => {
       const newIds  = members.map(m => m.id);
       const joined  = members.filter(m => !_prevMemberIds.includes(m.id) && m.id !== myId);
       const leftIds = _prevMemberIds.filter(id => !newIds.includes(id) && id !== myId);
-      joined.forEach(m => window.showVersusToast((m.name || '?') + ' ' + T('lobby.memberJoined', 'se unió a la sala')));
+      joined.forEach(m => {
+        window.showVersusToast((m.name || '?') + ' ' + T('lobby.memberJoined', 'se unió a la sala'));
+        delete _inviteCooldowns[m.id]; // se unió → habilitar re-invitación si se va
+      });
       leftIds.forEach(id => {
         const name = _memberNameCache[id] || T('lobby.someone', 'Alguien');
         window.showVersusToast(name + ' ' + T('lobby.memberLeft', 'salió de la sala'));
       });
+      // Si alguien entra o sale durante la cuenta regresiva, el host la cancela para todos
+      if (_counting && window.LB.isHost() && (leftIds.length > 0 || joined.length > 0)) {
+        window.LB.sendCancel();
+      }
+      // El host re-emite los modos cuando entra alguien nuevo, por si el guest
+      // se unió tarde y perdió el broadcast original.
+      if (joined.length > 0 && window.LB.isHost()) {
+        const modes = window.LB.getModes();
+        if (modes.length > 1 || modes[0] !== 'flags') window.LB.sendModes(modes, false);
+      }
     }
     _prevMemberIds = members.map(m => m.id);
     list.innerHTML = '';
     members.forEach(m => {
       const row = document.createElement('div');
-      row.className = 'lobby-member-row' + (m.isHost ? ' is-host' : '') + (m.id !== myId ? ' clickable' : '');
+      row.className = 'lobby-member-row' + (m.isHost ? ' is-host' : '') + (m.id !== myId ? ' clickable' : '') + (m.is_playing ? ' is-playing' : '');
       row.dataset.memberId = m.id;
       row.innerHTML =
         `<img class="lobby-member-avatar" src="${m.avatar}" draggable="false" oncontextmenu="return false">` +
         `<span class="lobby-member-name">${m.name}${m.id === myId ? ' (' + T('lobby.you', 'tú') + ')' : ''}</span>` +
-        (m.isHost ? `<span class="lobby-member-badge">${T('lobby.host', 'HOST')}</span>` : '') +
+        (m.isHost    ? `<span class="lobby-member-badge">${T('lobby.host', 'HOST')}</span>` : '') +
+        (m.is_playing ? `<span class="lobby-member-playing-badge">${T('social.playing', 'Jugando')}</span>` : '') +
         ((host && !m.isHost) ? `<button class="lobby-host-btn" data-id="${m.id}" title="${T('lobby.makeHost', 'Hacer host')}">👑</button>` : '') +
         ((host && !m.isHost) ? `<button class="lobby-kick-btn" data-id="${m.id}" title="${T('lobby.kick', 'Expulsar')}">✕</button>` : '');
       if (m.id !== myId) {
@@ -539,10 +678,17 @@ window.Lobby = (() => {
     // Contador y estado del botón empezar
     const cnt = document.getElementById('lobby-count');
     if (cnt) cnt.textContent = members.length + '/10';
+    const anyPlaying = members.some(m => m.is_playing);
     const startBtn = document.getElementById('lobby-start-btn');
     if (startBtn) {
-      startBtn.disabled = members.length < 2;
-      startBtn.classList.toggle('disabled', members.length < 2);
+      const blocked = members.length < 2 || anyPlaying;
+      startBtn.disabled = blocked;
+      startBtn.classList.toggle('disabled', blocked);
+      startBtn.title = anyPlaying ? T('lobby.someoneIsPlaying', 'A member is currently in a game') : '';
+    }
+    // Cancelar cuenta regresiva si algún miembro inicia una partida durante ella
+    if (_counting && window.LB.isHost() && anyPlaying) {
+      window.LB.sendCancel();
     }
     // Mostrar los botones según haya o no cuenta regresiva en curso
     _applyCountdownButtons(_counting);
@@ -553,6 +699,15 @@ window.Lobby = (() => {
     const ip = document.getElementById('lobby-invite-popup');
     if (ip && ip.style.display !== 'none') _openInvitePopup();
   }
+
+  // ── Estado multi-modo ─────────────────────────────────────────────────────────
+  let _currentModeIdx  = 0;
+  let _lobbyModes      = [];  // secuencia de modos para la sesión de juego actual
+  let _baseSeed        = null;
+  let _modeAccScore    = 0;   // puntaje acumulado de todos los modos del jugador local
+  let _intermediateTimer = null;
+  let _pendingModesOrder = []; // estado del picker antes de guardar
+  let _savedLobbyModes  = []; // modos confirmados por broadcast; más fiable que el DB al arrancar
 
   // ── Cuenta regresiva de inicio (10s, cancelable) ───────────────────────────────
   let _counting = false;
@@ -572,14 +727,39 @@ window.Lobby = (() => {
     if (wait)    wait.style.display    = (!active && !host) ? '' : 'none';
   }
 
+  // ── Barra global de cuenta regresiva (visible fuera del panel de grupo) ────────
+  let _globalCdEl = null;
+  function _showGlobalCdBar(text) {
+    if (!_globalCdEl) {
+      _globalCdEl = document.createElement('div');
+      _globalCdEl.className = 'lobby-cd-global-bar';
+      document.body.appendChild(_globalCdEl);
+      requestAnimationFrame(() => requestAnimationFrame(() => { if (_globalCdEl) _globalCdEl.style.opacity = '1'; }));
+    }
+    _globalCdEl.textContent = text;
+  }
+  function _hideGlobalCdBar() {
+    if (!_globalCdEl) return;
+    _globalCdEl.style.opacity = '0';
+    const el = _globalCdEl;
+    _globalCdEl = null;
+    setTimeout(() => { try { el.remove(); } catch (e) {} }, 300);
+  }
+
   function _startCountdown(until) {
     _counting = true;
+    window._lobbyCountingDown = true;
     _applyCountdownButtons(true);
     clearInterval(_cdInterval);
     const tick = () => {
       const remain = Math.ceil((until - Date.now()) / 1000);
+      const text = T('lobby.starting', 'Empezando en') + ' ' + Math.max(0, remain) + '…';
       const cd = document.getElementById('lobby-countdown');
-      if (cd) cd.textContent = T('lobby.starting', 'Empezando en') + ' ' + Math.max(0, remain) + '…';
+      if (cd) cd.textContent = text;
+      // Solo mostrar la barra global si el panel de la sala NO está visible
+      const lobbyPanelVisible = !!document.getElementById('versus-screen-lobby')?.offsetParent;
+      if (!lobbyPanelVisible) _showGlobalCdBar(text);
+      else _hideGlobalCdBar();
       if (remain <= 0) {
         clearInterval(_cdInterval); _cdInterval = null;
         // No iniciar si el host está en otro juego (versus 1v1 o cualquier otro modo)
@@ -592,7 +772,9 @@ window.Lobby = (() => {
 
   function _stopCountdown() {
     _counting = false;
+    window._lobbyCountingDown = false;
     clearInterval(_cdInterval); _cdInterval = null;
+    _hideGlobalCdBar();
     _applyCountdownButtons(false);
   }
 
@@ -609,6 +791,7 @@ window.Lobby = (() => {
   }
 
   function enterLobby() {
+    _savedLobbyModes = []; // reset al entrar a sala nueva
     const codeEl = document.getElementById('lobby-code');
     if (codeEl) codeEl.textContent = window.LB.getCode() || '------';
     _updateInviteBtn();
@@ -617,7 +800,7 @@ window.Lobby = (() => {
 
     _counting = false;
     window.LB.onMembers(_renderMembers);
-    window.LB.onStart(lobby => _launchLobbyFlags(lobby.seed));
+    window.LB.onStart(lobby => _launchLobbyGame(lobby.seed));
     window.LB.onClosed(reason => {
       // Si todavía no empezó la partida, avisar y volver a la lista
       if (!window._lobbyActive) {
@@ -653,6 +836,15 @@ window.Lobby = (() => {
       }
     });
     window.LB.onName(() => _refreshLobbyName());
+    window.LB.onModes((modes, changed) => {
+      if (Array.isArray(modes) && modes.length) _savedLobbyModes = [...modes];
+      _refreshLobbyName();
+      if (changed && typeof window.showVersusToast === 'function') {
+        const names = (Array.isArray(modes) ? modes : window.LB.getModes())
+          .map(m => (_MODE_NAMES[m] || (() => m))()).join(' → ');
+        window.showVersusToast(T('lobby.pickMode', 'Modos de juego') + ': ' + names);
+      }
+    });
     // Re-suscribir el canal en caso de haberse desconectado durante una partida previa
     window.LB.resubscribeChannel?.();
     _prevMemberIds = [];
@@ -693,12 +885,12 @@ window.Lobby = (() => {
       const row = document.createElement('div');
       row.className = 'versus-friend-row';
       const roomModes = _getActiveModes(r);
-      const modeIconsHtml = roomModes.map(m => `<img class="public-room-mode-icon" src="${_MODE_ICONS[m] || 'images/game1.png'}" alt="${m}">`).join('');
+      const modeIconsHtml = _modeIconsHtml(roomModes, 'public-room-mode-icon');
       row.innerHTML =
         `<div class="versus-friend-info">` +
           `<div class="public-room-name-row">` +
-            `<div class="public-room-mode-icons">${modeIconsHtml}</div>` +
             `<span class="versus-friend-name">${r.name || (T('lobby.roomOf', 'Sala de') + ' ' + r.hostName)}</span>` +
+            `<div class="public-room-mode-icons">${modeIconsHtml}</div>` +
           `</div>` +
           `<span class="versus-friend-status">${r.count}/${r.max} ${T('lobby.players', 'jugadores')}</span>` +
         `</div>` +
@@ -730,14 +922,28 @@ window.Lobby = (() => {
   }
 
   // ── Lanzar la partida de banderas en modo lobby ────────────────────────────────
-  function _launchLobbyFlags(seed) {
+  function _launchLobbyGame(seed, modeIdx) {
+    modeIdx = modeIdx !== undefined ? modeIdx : 0;
+    _currentModeIdx = modeIdx;
+    if (modeIdx === 0) {
+      // _savedLobbyModes viene del broadcast y es más fiable que el DB (que puede estar desactualizado
+      // si el postgres_changes de start() llegó antes que el de setModes, pisando _lobby.mode)
+      _lobbyModes   = _savedLobbyModes.length ? [..._savedLobbyModes] : _getActiveModes(window.LB.getLobby());
+      _baseSeed     = seed;
+      _modeAccScore = 0;
+    }
+    // Semilla determinística por modo (igual en todos los dispositivos)
+    const modeSeed = Math.floor(Math.abs(_baseSeed + modeIdx * 7919) % 1_000_000);
+    const mode = _lobbyModes[modeIdx] || 'flags';
+
     _stopCountdown();
     window.practiceConfig = window.practiceConfig || {};
     window.practiceConfig.active = false;
-    window.pendingGameMode = 'flags';
+    window.pendingGameMode = mode;
     if (typeof window._setPlaying === 'function') window._setPlaying(true);
 
-    document.getElementById('loading-screen').style.display = 'none';
+    const _ls = document.getElementById('loading-screen');
+    if (_ls) { _ls.style.display = 'none'; _ls.classList.remove('lobby-interim-bg'); }
     document.getElementById('loading-versus-group')?.classList.add('table-gone');
     document.getElementById('loading-versus-group')?.classList.remove('panel-visible');
     document.getElementById('splash-screen').style.display = 'none';
@@ -747,13 +953,16 @@ window.Lobby = (() => {
     _finishedPlayers = new Map();
     _resultPresented = false;
     if (_waitingTimeout) { clearTimeout(_waitingTimeout); _waitingTimeout = null; }
+    // Al inicio de una nueva campaña forzar scores a 0 en la caché local para no mostrar
+    // valores residuales de la partida anterior mientras llega el primer _fetchMembers
+    if (modeIdx === 0) window.LB.getMembers().forEach(m => { m.score = 0; });
     _refreshLobbyOpponents();
 
     // Cuando cambian los scores de la sala (realtime) → actualizar leaderboard
     window.LB.onMembers(() => {
       _refreshLobbyOpponents();
-      if (typeof window.flagsSetLobbyScores === 'function') window.flagsSetLobbyScores(window._lobbyMembers);
-      // Si alguien se desconectó durante la espera, re-verificar si ya terminaron todos
+      const scoresFn = mode === 'shapes' ? window.shapesSetLobbyScores : window.flagsSetLobbyScores;
+      if (typeof scoresFn === 'function') scoresFn(window._lobbyMembers);
       if (_finishedPlayers.size > 0) _checkAllFinished();
     });
     // Cuando un miembro termina su partida → registrar y verificar si todos terminaron
@@ -761,21 +970,74 @@ window.Lobby = (() => {
       if (uid) _finishedPlayers.set(uid, score ?? 0);
       _checkAllFinished();
     });
+    // Score en vivo de otro jugador → actualizar leaderboard inmediatamente
+    window.LB.onScore((uid, score) => {
+      const lm = (window._lobbyMembers || []).find(m => m.id === uid);
+      if (lm) lm.score = score;
+      const scoresFn = mode === 'shapes' ? window.shapesSetLobbyScores : window.flagsSetLobbyScores;
+      if (typeof scoresFn === 'function') scoresFn(window._lobbyMembers || []);
+    });
     // Alguien en la sala falló → glow en su tarjeta específica del lb
     window.LB.onWrong(uid => {
-      if (typeof window.flagsTriggerLobbyWrongFor === 'function') window.flagsTriggerLobbyWrongFor(uid);
+      const wrongFn = mode === 'shapes' ? window.shapesSetLobbyWrongFor : window.flagsTriggerLobbyWrongFor;
+      if (typeof wrongFn === 'function') wrongFn(uid);
     });
     // Alguien perdió/recuperó presencia → mostrar/ocultar estado desconectado en su tarjeta
     window.LB.onPlayerGone(uid => {
-      if (typeof window.flagsSetLobbyDisconnected === 'function') window.flagsSetLobbyDisconnected(uid, true);
+      const goneFn = mode === 'shapes' ? window.shapesSetLobbyDisconnected : window.flagsSetLobbyDisconnected;
+      if (typeof goneFn === 'function') goneFn(uid, true);
     });
     window.LB.onPlayerBack(uid => {
-      if (typeof window.flagsSetLobbyDisconnected === 'function') window.flagsSetLobbyDisconnected(uid, false);
+      const backFn = mode === 'shapes' ? window.shapesSetLobbyDisconnected : window.flagsSetLobbyDisconnected;
+      if (typeof backFn === 'function') backFn(uid, false);
     });
-    // Si el host cierra a mitad, no hacemos nada disruptivo: la partida sigue local.
+    // Si quedé solo (todos los demás abandonaron durante la partida) → volver a sala
+    window.LB.onAlone(() => {
+      if (!window._lobbyActive) return;
+      _teardownCurrentMode();
+      window._lobbyActive = false;
+      window._lobbyMembers = [];
+      if (typeof window._setPlaying === 'function') window._setPlaying(false);
+      window.LB.onScore(null);
+      window.LB.onWrong(null);
+      window.LB.onPlayerGone(null);
+      window.LB.onPlayerBack(null);
+      window.LB.onAlone(null);
+      _resultPresented = false;
+      _currentModeIdx = 0; _lobbyModes = []; _baseSeed = null; _modeAccScore = 0;
+      _savedLobbyModes = [];
+      window.campaignBase = null;
+      if (_waitingTimeout) { clearTimeout(_waitingTimeout); _waitingTimeout = null; }
+      // Restaurar lobby a estado de espera: eliminar kicks pendientes + status→waiting
+      window.LB.reportScore?.(0).catch?.(() => {});
+      window.LB.processPendingKicks?.();
+      window.LB.resetToWaiting?.();
+      // Restaurar loading screen y panel de sala (igual que _presentFinalResult)
+      const ls = document.getElementById('loading-screen');
+      if (ls) { ls.style.display = 'flex'; ls.style.opacity = '1'; ls.classList.remove('lobby-interim-bg'); ls.classList.add('table-shown'); }
+      if (typeof window.showVersusPanel === 'function') window.showVersusPanel();
+      if (typeof window.versusGoTo === 'function') window.versusGoTo('lobby');
+      enterLobby();
+      window.LB.refreshMembers?.();
+      // Mostrar panel de "quedaste solo"
+      const aloneTitle = document.querySelector('#lobby-alone-screen [data-i18n="lobby.alone.title"]');
+      const aloneSub   = document.querySelector('#lobby-alone-screen [data-i18n="lobby.allLeft"]');
+      if (aloneTitle) aloneTitle.textContent = T('lobby.alone.title', 'QUEDASTE SOLO');
+      if (aloneSub)   aloneSub.textContent   = T('lobby.allLeft', 'Todos abandonaron la partida');
+      const aloneScreen = document.getElementById('lobby-alone-screen');
+      if (aloneScreen) aloneScreen.style.display = 'flex';
+    });
 
-    if (typeof window.flagsSetSeed === 'function') window.flagsSetSeed(seed);
-    if (typeof showFlagsMode === 'function') showFlagsMode();
+    // Base acumulada de modos previos: permite mostrar puntaje total en pantalla desde el inicio del modo
+    window.campaignBase = () => _modeAccScore;
+
+    if (mode === 'shapes') {
+      if (typeof window.shapesSetSeed === 'function') window.shapesSetSeed(modeSeed);
+      if (typeof showShapesMode === 'function') showShapesMode();
+    } else {
+      if (typeof window.flagsSetSeed === 'function') window.flagsSetSeed(modeSeed);
+      if (typeof showFlagsMode === 'function') showFlagsMode();
+    }
   }
 
   // Construye window._lobbyMembers = rivales (todos menos yo)
@@ -786,10 +1048,13 @@ window.Lobby = (() => {
       .map(m => ({ id: m.id, name: m.name, avatar: m.avatar, score: m.score || 0 }));
   }
 
-  // Reporte de respuesta desde flags.js
+  // Reporte de respuesta desde flags.js / shapes.js
   window._lobbyReportAnswer = function(correct, score) {
     if (!window.LB.getId()) return;
-    window.LB.reportScore(score);
+    const base = (typeof window.campaignBase === 'function') ? window.campaignBase() : 0;
+    const cumScore = score + base;
+    window.LB.reportScore(cumScore);
+    window.LB.sendScore(cumScore);
     if (!correct) window.LB.sendWrong();
   };
 
@@ -811,43 +1076,146 @@ window.Lobby = (() => {
 
   function _checkAllFinished() {
     if (_resultPresented) return;
-    const total = window.LB.getMembers().length;
+    const total = Math.max(1, window.LB.getMembers().length - (window.LB.getPendingKicksCount?.() || 0));
     if (!total) return;
-    if (_finishedPlayers.size >= total) _presentLobbyResult();
+    if (_finishedPlayers.size >= total) {
+      if (_currentModeIdx < _lobbyModes.length - 1) {
+        _presentIntermediateResult();
+      } else {
+        _presentFinalResult();
+      }
+    }
   }
 
-  function _presentLobbyResult() {
+  // Limpia el modo de juego actual (flags o shapes) sin cerrar el lobby
+  function _teardownCurrentMode() {
+    window._suppressGameover = true;
+    if (window.pendingGameMode === 'shapes') {
+      if (typeof hideShapesMode === 'function') hideShapesMode();
+      if (typeof window.shapesClearSeed === 'function') window.shapesClearSeed();
+    } else {
+      if (typeof hideFlagsMode === 'function') hideFlagsMode();
+      if (typeof window.flagsClearSeed === 'function') window.flagsClearSeed();
+    }
+    window._suppressGameover = false;
+  }
+
+  // Pantalla intermedia entre modos: muestra ranking parcial + cuenta regresiva 10s
+  function _presentIntermediateResult() {
     if (_resultPresented) return;
     _resultPresented = true;
     if (_waitingTimeout) { clearTimeout(_waitingTimeout); _waitingTimeout = null; }
     _hideLobbyWaiting();
-    if (typeof hideFlagsMode === 'function') hideFlagsMode();
     if (typeof window._setPlaying === 'function') window._setPlaying(false);
     window._lobbyActive = false;
     window._lobbyMembers = [];
-    if (typeof window.flagsClearSeed === 'function') window.flagsClearSeed();
-    // Procesar desconexiones que ocurrieron durante la partida
-    if (_pendingKicks.size && isHost()) {
-      const toKick = new Set(_pendingKicks);
-      _pendingKicks.clear();
-      toKick.forEach(async uid => {
-        try { await window.sb.from('lobby_members').delete().eq('lobby_id', _lobbyId).eq('user_id', uid); } catch (e) {}
-      });
-      setTimeout(() => _fetchMembers(), 500);
-    } else { _pendingKicks.clear(); }
-    // Cortar callbacks de partida para que eventos tardíos no re-disparen nada
-    window.LB.onFinished(null);
+    window.LB.onScore(null);
+    window.LB.onWrong(null);
     window.LB.onPlayerGone(null);
     window.LB.onPlayerBack(null);
-    // Resetear sala a 'waiting' ahora (antes de resubscribir canal) para que otros puedan unirse
+
+    const nextIdx  = _currentModeIdx + 1;
+    const nextMode = _lobbyModes[nextIdx];
+    const screen   = document.getElementById('lobby-intermediate-screen');
+    const list     = document.getElementById('lobby-intermediate-list');
+    const modeTag  = document.getElementById('lobby-intermediate-mode-tag');
+    const nextEl   = document.getElementById('lobby-intermediate-next');
+    const nextIcon = document.getElementById('lobby-intermediate-next-icon');
+    const nextName = document.getElementById('lobby-intermediate-next-name');
+
+    if (modeTag) {
+      const modeName = (_MODE_NAMES[window.pendingGameMode] || (() => window.pendingGameMode))();
+      modeTag.textContent = modeName + '  ·  ' + (_currentModeIdx + 1) + '/' + _lobbyModes.length;
+    }
+    if (nextEl && nextMode) {
+      nextEl.style.display = 'flex';
+      if (nextIcon) nextIcon.src = _MODE_ICONS[nextMode] || 'images/game1.png';
+      if (nextName) nextName.textContent = (_MODE_NAMES[nextMode] || (() => nextMode))();
+    } else if (nextEl) {
+      nextEl.style.display = 'none';
+    }
+
+    // Construir ranking con scores acumulados hasta ahora
+    const members = window.LB.getMembers().map(m => ({
+      ...m,
+      score: _finishedPlayers.has(m.id) ? _finishedPlayers.get(m.id) : (m.score || 0),
+    }));
+    members.sort((a, b) => b.score - a.score);
+    const myId    = window._sbUserId;
+    const medals  = ['🥇', '🥈', '🥉'];
+    if (list) {
+      list.innerHTML = '';
+      members.forEach((m, i) => {
+        const row = document.createElement('div');
+        row.className = 'lobby-result-row' + (m.id === myId ? ' is-me' : '');
+        row.innerHTML =
+          `<span class="lobby-result-pos">${medals[i] || (i + 1)}</span>` +
+          `<img class="lobby-result-avatar" src="${m.avatar}" draggable="false" oncontextmenu="return false">` +
+          `<span class="lobby-result-name">${m.name}${m.id === myId ? ' (' + T('lobby.you', 'tú') + ')' : ''}</span>` +
+          `<span class="lobby-result-score">${(m.score || 0).toLocaleString()}</span>`;
+        list.appendChild(row);
+      });
+    }
+
+    // Fondo mínimo: solo nubes/planeta/degradados (lobby-interim-bg oculta UI innecesaria)
+    const ls = document.getElementById('loading-screen');
+    if (ls) { ls.style.display = 'flex'; ls.style.opacity = '1'; ls.classList.add('lobby-interim-bg'); }
+
+    if (screen) screen.style.display = 'flex';
+
+    // Teardown DESPUÉS de mostrar el overlay para que los assets del juego
+    // permanezcan visibles hasta que la transición los cubra
+    _teardownCurrentMode();
+
+    // Cuenta regresiva 10s con barra animada
+    const bar  = document.getElementById('lobby-intermediate-bar');
+    const cdEl = document.getElementById('lobby-intermediate-cd');
+    const INTER_MS = 10000;
+    const start = Date.now();
+    if (bar) { bar.style.transition = 'none'; bar.style.width = '100%'; }
+    if (cdEl) cdEl.textContent = '10';
+    requestAnimationFrame(() => {
+      if (bar) { bar.style.transition = `width ${INTER_MS}ms linear`; bar.style.width = '0%'; }
+    });
+    clearInterval(_intermediateTimer);
+    _intermediateTimer = setInterval(() => {
+      const remain = Math.ceil((INTER_MS - (Date.now() - start)) / 1000);
+      if (cdEl) cdEl.textContent = Math.max(0, remain);
+      if (remain <= 0) {
+        clearInterval(_intermediateTimer); _intermediateTimer = null;
+        if (screen) screen.style.display = 'none';
+        // Arrancar el siguiente modo
+        _currentModeIdx = nextIdx;
+        _finishedPlayers = new Map();
+        _resultPresented = false;
+        _launchLobbyGame(_baseSeed, _currentModeIdx);
+      }
+    }, 200);
+  }
+
+  function _presentFinalResult() {
+    if (_resultPresented) return;
+    _resultPresented = true;
+    if (_waitingTimeout) { clearTimeout(_waitingTimeout); _waitingTimeout = null; }
+    _hideLobbyWaiting();
+    _teardownCurrentMode();
+    if (typeof window._setPlaying === 'function') window._setPlaying(false);
+    window._lobbyActive = false;
+    window._lobbyMembers = [];
+    // Procesar desconexiones que ocurrieron durante la partida (usa LB API para acceder a _pendingKicks)
+    window.LB.processPendingKicks?.();
+    window.LB.onFinished(null);
+    window.LB.onScore(null);
+    window.LB.onPlayerGone(null);
+    window.LB.onPlayerBack(null);
     window.LB.resetToWaiting?.();
-    // Mostrar loading panel-2 (nubes/cielo/mesa) como fondo del resultado
+    // Resetear estado multi-modo para la próxima partida
+    _currentModeIdx = 0; _lobbyModes = []; _baseSeed = null; _modeAccScore = 0;
+    // Fondo loading screen
     const ls = document.getElementById('loading-screen');
     if (ls) { ls.style.display = 'flex'; ls.style.opacity = '1'; ls.classList.add('table-shown'); }
-    // Montar el panel del lobby detrás del overlay de resultados
     if (typeof window.showVersusPanel === 'function') window.showVersusPanel();
     if (typeof window.versusGoTo === 'function') window.versusGoTo('lobby');
-    // Construir ranking con scores finales
     const members = window.LB.getMembers().map(m => ({
       ...m,
       score: _finishedPlayers.has(m.id) ? _finishedPlayers.get(m.id) : (m.score || 0),
@@ -858,13 +1226,19 @@ window.Lobby = (() => {
 
   window._lobbyHandleGameEnd = function(myFinalScore) {
     const myId = window._sbUserId;
-    if (window.LB.getId()) window.LB.reportScore(myFinalScore);
-    _finishedPlayers.set(myId, myFinalScore);
-    window.LB.sendFinished(myFinalScore);
-    // Esperar a todos; timeout de seguridad de 30s por si alguien se desconecta
+    // Acumular puntaje de todos los modos jugados hasta ahora
+    _modeAccScore += myFinalScore;
+    if (window.LB.getId()) window.LB.reportScore(_modeAccScore);
+    _finishedPlayers.set(myId, _modeAccScore);
+    window.LB.sendFinished(_modeAccScore);
+    // Timeout de seguridad: si alguien se desconecta y no reporta, avanzar igual
+    const isFinal = _currentModeIdx >= _lobbyModes.length - 1;
     _waitingTimeout = setTimeout(() => {
       _waitingTimeout = null;
-      if (window._lobbyActive) _presentLobbyResult();
+      if (!window._lobbyActive && !_resultPresented) return; // ya se procesó
+      if (window._lobbyActive) {
+        if (isFinal) _presentFinalResult(); else _presentIntermediateResult();
+      }
     }, 30000);
     _showLobbyWaiting();
     _checkAllFinished();
@@ -905,12 +1279,14 @@ window.Lobby = (() => {
     if (screen) screen.style.display = 'none';
     _finishedPlayers = new Map();
     _resultPresented = false;
+    _currentModeIdx = 0; _lobbyModes = []; _baseSeed = null; _modeAccScore = 0;
+    _savedLobbyModes = [];
+    window.campaignBase = null;
+    clearInterval(_intermediateTimer); _intermediateTimer = null;
     if (_waitingTimeout) { clearTimeout(_waitingTimeout); _waitingTimeout = null; }
     const lid = window.LB.getId();
     if (lid) window.LB.reportScore(0).catch(() => {});
-    // Segundo intento de reset por si falló en _presentLobbyResult (antes del resubscribeChannel)
     window.LB.resetToWaiting?.();
-    // Loading screen ya está visible (mostrado en _presentLobbyResult); ir al lobby
     if (typeof window.showVersusPanel === 'function') window.showVersusPanel();
     if (typeof window.versusGoTo === 'function') window.versusGoTo('lobby');
     enterLobby();
@@ -920,13 +1296,20 @@ window.Lobby = (() => {
   // Salir de una partida lobby en curso (botón power/quit)
   window._lobbyAbandon = function() {
     _hideLobbyWaiting();
+    const intScreen = document.getElementById('lobby-intermediate-screen');
+    if (intScreen) intScreen.style.display = 'none';
+    clearInterval(_intermediateTimer); _intermediateTimer = null;
     _finishedPlayers = new Map();
     _resultPresented = false;
+    _currentModeIdx = 0; _lobbyModes = []; _baseSeed = null; _modeAccScore = 0;
     if (_waitingTimeout) { clearTimeout(_waitingTimeout); _waitingTimeout = null; }
     window._lobbyActive = false;
     window._lobbyMembers = [];
-    _pendingKicks.clear();
+    window.LB.clearPendingKicks?.();
+    _savedLobbyModes = [];
+    window.campaignBase = null;
     if (typeof window.flagsClearSeed === 'function') window.flagsClearSeed();
+    if (typeof window.shapesClearSeed === 'function') window.shapesClearSeed();
     if (window.LB.getId()) { try { window.LB.leave(); } catch (e) {} }
   };
 
@@ -970,6 +1353,10 @@ window.Lobby = (() => {
     document.getElementById('lobby-result-back')?.addEventListener('click', () => {
       if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
       _returnFromLobbyResult();
+    });
+    document.getElementById('lobby-alone-back')?.addEventListener('click', () => {
+      if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+      document.getElementById('lobby-alone-screen').style.display = 'none';
     });
     const _copyCode = () => {
       const code = window.LB.getCode();
@@ -1029,18 +1416,26 @@ window.Lobby = (() => {
   // Nombre de la sala: el host lo edita con ✎/✓; para el resto es texto en vivo.
   let _editingName = false;
   const _MODE_ICONS = { flags: 'images/game1.png', shapes: 'images/game2.png', cities: 'images/game3.png', monuments: 'images/game4.png' };
+  const _MODE_NAMES = { flags: () => T('nav.flags', 'Banderas'), shapes: () => T('nav.shapes', 'Siluetas'), cities: () => T('nav.cities', 'Ciudades'), monuments: () => T('nav.monuments', 'Monumentos') };
   const _ALL_MODES  = ['flags', 'shapes', 'cities', 'monuments'];
+
+  // Genera el HTML de íconos de modo en orden de partida
+  function _modeIconsHtml(modes, cls = '') {
+    return modes.map(m => `<img ${cls ? `class="${cls}"` : ''} src="${_MODE_ICONS[m] || 'images/game1.png'}" alt="${m}">`).join('');
+  }
+
   function _getActiveModes(lobby) {
     if (!lobby) return ['flags'];
-    // modes field (future multi-mode): array or comma string
+    // Column `modes` (array en Supabase o string CSV)
     if (lobby.modes) {
       const arr = Array.isArray(lobby.modes) ? lobby.modes : String(lobby.modes).split(',').map(s => s.trim()).filter(Boolean);
       if (arr.length) return arr;
     }
-    // mode = 'all' → todos los 4
+    if (!lobby.mode) return ['flags'];
     if (lobby.mode === 'all') return _ALL_MODES;
-    // single mode string
-    return [lobby.mode || 'flags'];
+    // Fallback: modos codificados como "flags+shapes" en el campo `mode`
+    if (lobby.mode.includes('+')) return lobby.mode.split('+').map(s => s.trim()).filter(Boolean);
+    return [lobby.mode];
   }
   function _refreshLobbyName() {
     const text  = document.getElementById('lobby-name-text');
@@ -1055,12 +1450,14 @@ window.Lobby = (() => {
     const iconsEl = document.getElementById('lobby-mode-icons');
     if (iconsEl) {
       const modes = _getActiveModes(window.LB.getLobby());
-      iconsEl.innerHTML = modes.map(m => `<img src="${_MODE_ICONS[m] || 'images/game1.png'}" alt="${m}">`).join('');
+      iconsEl.innerHTML = _modeIconsHtml(modes);
     }
     text.style.display   = '';
     if (input) input.style.display = 'none';
     if (conf)  conf.style.display  = 'none';
     if (edit)  edit.style.display  = host ? '' : 'none';
+    const modeEditBtn = document.getElementById('lobby-mode-edit-btn');
+    if (modeEditBtn) modeEditBtn.style.display = host ? '' : 'none';
   }
   function _beginEditName() {
     if (!window.LB.isHost()) return;
@@ -1081,6 +1478,193 @@ window.Lobby = (() => {
     if (val) await window.LB.setName(val); // propaga a todos por realtime
     _refreshLobbyName();
   }
+
+  // ── Mode picker (multi-select + orden) ────────────────────────────────────────
+
+  function _renderPickerOrderList() {
+    const section = document.getElementById('lobby-mode-order-section');
+    const list    = document.getElementById('lobby-mode-order-list');
+    if (!section || !list) return;
+    section.style.display = _pendingModesOrder.length > 1 ? '' : 'none';
+    list.innerHTML = '';
+    _pendingModesOrder.forEach((mode, idx) => {
+      const item = document.createElement('div');
+      item.className = 'lobby-mode-order-item';
+      item.dataset.mode = mode;
+      item.innerHTML =
+        `<span class="lobby-mode-drag-handle">⠿</span>` +
+        `<span class="lobby-mode-order-num">${idx + 1}</span>` +
+        `<img src="${_MODE_ICONS[mode] || 'images/game1.png'}" alt="${mode}">` +
+        `<span class="lobby-mode-order-name">${(_MODE_NAMES[mode] || (() => mode))()}</span>`;
+      list.appendChild(item);
+    });
+  }
+
+  // Drag-and-drop estilo iOS: ítem levita, siblings se deslizan suavemente
+  function _setupOrderListDrag() {
+    const list = document.getElementById('lobby-mode-order-list');
+    if (!list) return;
+    let drag = null;
+
+    list.addEventListener('pointerdown', e => {
+      if (drag) return;
+      const item = e.target.closest('.lobby-mode-order-item');
+      if (!item || !list.contains(item)) return;
+      e.preventDefault();
+      item.setPointerCapture(e.pointerId);
+
+      const allItems = [...list.querySelectorAll('.lobby-mode-order-item')];
+      const fromIdx  = allItems.indexOf(item);
+      const rects    = allItems.map(el => el.getBoundingClientRect());
+
+      // Factor de escala: #app-stage usa transform:scale(); getBoundingClientRect
+      // devuelve coordenadas de viewport (post-scale) pero translateY opera en
+      // coordenadas locales (pre-scale). Hay que dividir todos los deltas por scale.
+      const scale = rects[0].width / item.offsetWidth || 1;
+
+      const itemH = rects[0].height;
+      const gap   = allItems.length > 1 ? rects[1].top - rects[0].bottom : 0;
+      // slotH en coordenadas locales (lo que translateY entiende)
+      const slotH = (itemH + gap) / scale;
+
+      // Levantar el ítem con animación (lift)
+      item.style.transition = 'transform 0.18s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.18s';
+      item.style.transform  = 'scale(1.06)';
+      item.style.boxShadow  = '0 10px 30px rgba(0,0,0,0.55)';
+      item.style.zIndex     = '20';
+      item.style.position   = 'relative';
+
+      // Habilitar transición suave en los siblings
+      allItems.forEach(el => {
+        if (el !== item) el.style.transition = 'transform 0.15s cubic-bezier(0.25,0.46,0.45,0.94)';
+      });
+
+      drag = { item, allItems, fromIdx, toIdx: fromIdx, rects, slotH, scale, startY: e.clientY, lifted: false };
+    });
+
+    list.addEventListener('pointermove', e => {
+      if (!drag) return;
+      e.preventDefault();
+      // deltaY en coordenadas locales
+      const deltaY = (e.clientY - drag.startY) / drag.scale;
+
+      // Primera vez que se mueve: quitar transición de transform para seguir el dedo sin lag
+      if (!drag.lifted) {
+        drag.lifted = true;
+        drag.item.style.transition = 'box-shadow 0.18s';
+      }
+      drag.item.style.transform = `translateY(${deltaY}px) scale(1.06)`;
+
+      // Calcular índice destino comparando e.clientY con centros originales (viewport)
+      let toIdx = 0;
+      drag.rects.forEach((r, i) => { if (e.clientY > r.top + r.height / 2) toIdx = i; });
+      toIdx = Math.max(0, Math.min(drag.allItems.length - 1, toIdx));
+
+      if (toIdx !== drag.toIdx) {
+        drag.toIdx = toIdx;
+        drag.allItems.forEach((el, i) => {
+          if (el === drag.item) return;
+          if (drag.fromIdx < toIdx && i > drag.fromIdx && i <= toIdx) {
+            el.style.transform = `translateY(-${drag.slotH}px)`;
+          } else if (drag.fromIdx > toIdx && i >= toIdx && i < drag.fromIdx) {
+            el.style.transform = `translateY(${drag.slotH}px)`;
+          } else {
+            el.style.transform = '';
+          }
+        });
+      }
+    });
+
+    const _finishDrag = () => {
+      if (!drag) return;
+      const { item, allItems, fromIdx, toIdx } = drag;
+      drag = null;
+      allItems.forEach(el => {
+        el.style.transition = '';
+        el.style.transform  = '';
+        el.style.zIndex     = '';
+        el.style.position   = '';
+        el.style.boxShadow  = '';
+      });
+      if (toIdx !== fromIdx) {
+        const [moved] = _pendingModesOrder.splice(fromIdx, 1);
+        _pendingModesOrder.splice(toIdx, 0, moved);
+      }
+      _renderPickerOrderList();
+      _renderPickerGridBadges();
+    };
+
+    list.addEventListener('pointerup',     _finishDrag);
+    list.addEventListener('pointercancel', _finishDrag);
+  }
+
+  function _renderPickerGridBadges() {
+    document.querySelectorAll('.lobby-mode-pick-btn').forEach(btn => {
+      const mode = btn.dataset.mode;
+      const idx  = _pendingModesOrder.indexOf(mode);
+      const numEl = btn.querySelector('.lobby-mode-pick-num');
+      btn.classList.toggle('is-selected', idx >= 0);
+      if (numEl) {
+        numEl.style.display = idx >= 0 ? 'flex' : 'none';
+        numEl.textContent   = idx >= 0 ? String(idx + 1) : '';
+      }
+    });
+  }
+
+  function _showModePicker() {
+    const pop = document.getElementById('lobby-mode-picker-popup');
+    if (!pop) return;
+    _pendingModesOrder = [..._getActiveModes(window.LB.getLobby())];
+    _renderPickerGridBadges();
+    _renderPickerOrderList();
+    pop.style.display = 'flex';
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    _setupOrderListDrag();
+
+    document.getElementById('lobby-mode-edit-btn')?.addEventListener('click', () => {
+      if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+      _showModePicker();
+    });
+
+    // Toggle de modo en el grid
+    document.getElementById('lobby-mode-picker-popup')?.addEventListener('click', e => {
+      const btn = e.target.closest('.lobby-mode-pick-btn');
+      if (btn && !btn.disabled) {
+        if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+        const mode = btn.dataset.mode;
+        const idx  = _pendingModesOrder.indexOf(mode);
+        if (idx >= 0) {
+          _pendingModesOrder.splice(idx, 1); // deseleccionar
+        } else {
+          _pendingModesOrder.push(mode); // seleccionar al final
+        }
+        _renderPickerGridBadges();
+        _renderPickerOrderList();
+        return;
+      }
+    });
+
+    // Guardar
+    document.getElementById('lobby-mode-picker-save')?.addEventListener('click', () => {
+      if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+      if (_pendingModesOrder.length === 0) return; // al menos 1 modo
+      window.LB.setModes([..._pendingModesOrder]);
+      document.getElementById('lobby-mode-picker-popup').style.display = 'none';
+      if (typeof window.showVersusToast === 'function') {
+        const names = _pendingModesOrder.map(m => (_MODE_NAMES[m] || (() => m))()).join(' → ');
+        window.showVersusToast(names);
+      }
+    });
+
+    // Click en el overlay (fondo) cierra sin guardar
+    document.getElementById('lobby-mode-picker-popup')?.addEventListener('click', e => {
+      if (e.target === e.currentTarget) {
+        document.getElementById('lobby-mode-picker-popup').style.display = 'none';
+      }
+    });
+  });
 
   // ── Link de invitación + deep-link ─────────────────────────────────────────────
   function _buildJoinLink() {
@@ -1150,58 +1734,69 @@ window.Lobby = (() => {
     return true;
   }
 
-  function _openInvitePopup() {
-    const pop   = document.getElementById('lobby-invite-popup');
-    const list  = document.getElementById('lobby-invite-list');
-    const empty = document.getElementById('lobby-invite-empty');
-    if (!pop || !list) return;
-    // Limpiar solo las filas de amigos, sin tocar el div de "vacío" que vive adentro
+  function _renderInviteList(list, empty) {
     Array.from(list.children).forEach(el => { if (el.id !== 'lobby-invite-empty') el.remove(); });
     const friends = (typeof getFriends === 'function') ? getFriends() : [];
     const memberIds = new Set(window.LB.getMembers().map(m => m.id));
     const statusOf = f => (typeof getStatusObj === 'function')
       ? getStatusObj(f).cls
       : ((f.last_active && (Date.now() - new Date(f.last_active)) / 1000 < 120) ? (f.is_playing ? 'playing' : 'online') : 'offline');
-    // Mostrar conectados Y jugando (como en social); ocultar offline.
     const shown = friends.filter(f => statusOf(f) !== 'offline');
     if (!shown.length) {
       if (empty) empty.style.display = 'block';
-    } else {
-      if (empty) empty.style.display = 'none';
-      shown.forEach(f => {
-        const inRoom  = memberIds.has(f.id);
-        const playing = statusOf(f) === 'playing';
-        const statusTxt = playing ? T('social.playing', 'Jugando') : T('versus.online', 'Conectado');
-        const row = document.createElement('div');
-        row.className = 'versus-friend-row' + (playing ? ' playing' : '');
-        const btnHtml = inRoom
-          ? `<button class="versus-challenge-btn disabled" disabled>${T('lobby.inRoom', 'En la sala')}</button>`
-          : `<button class="versus-challenge-btn" data-id="${f.id}" data-name="${f.name}">${T('lobby.invite', '+ Invitar')}</button>`;
-        row.innerHTML =
-          `<img class="versus-friend-avatar" src="${f.avatar || 'images/profilepic/ppdefault.png'}" draggable="false" oncontextmenu="return false">` +
-          `<div class="versus-friend-info"><span class="versus-friend-name">${f.name}</span>` +
-          `<span class="versus-friend-status${playing ? ' playing' : ''}"><span class="versus-friend-dot${playing ? ' playing' : ''}"></span>${statusTxt}</span></div>` +
-          btnHtml;
-        list.appendChild(row);
-      });
-      list.querySelectorAll('.versus-challenge-btn[data-id]').forEach(btn => {
-        _setInviteBtnCooldown(btn, btn.dataset.id); // aplicar cooldown si sigue activo
-        btn.addEventListener('click', () => {
-          if (btn.disabled) return;
-          if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
-          const fid = btn.dataset.id;
-          const myName = localStorage.getItem('playerName') || T('lobby.someone', 'Alguien');
-          window.LB.sendInvite(fid, { code: window.LB.getCode(), lobbyId: window.LB.getId(), fromName: myName });
-          if (typeof window.showVersusToast === 'function') {
-            window.showVersusToast(T('lobby.sentInvite', 'Invitación enviada a {name}').replace('{name}', btn.dataset.name));
-          }
-          _inviteCooldowns[fid] = Date.now() + INVITE_COOLDOWN_MS;
-          _setInviteBtnCooldown(btn, fid);
-        });
-      });
+      return;
     }
+    if (empty) empty.style.display = 'none';
+    shown.forEach(f => {
+      const inRoom  = memberIds.has(f.id);
+      const playing = statusOf(f) === 'playing';
+      const statusTxt = playing ? T('social.playing', 'Jugando') : T('versus.online', 'Conectado');
+      const row = document.createElement('div');
+      row.className = 'versus-friend-row' + (playing ? ' playing' : '');
+      const btnHtml = inRoom
+        ? `<button class="versus-challenge-btn disabled" disabled>${T('lobby.inRoom', 'En la sala')}</button>`
+        : `<button class="versus-challenge-btn" data-id="${f.id}" data-name="${f.name}">${T('lobby.invite', '+ Invitar')}</button>`;
+      row.innerHTML =
+        `<img class="versus-friend-avatar" src="${f.avatar || 'images/profilepic/ppdefault.png'}" draggable="false" oncontextmenu="return false">` +
+        `<div class="versus-friend-info"><span class="versus-friend-name">${f.name}</span>` +
+        `<span class="versus-friend-status${playing ? ' playing' : ''}"><span class="versus-friend-dot${playing ? ' playing' : ''}"></span>${statusTxt}</span></div>` +
+        btnHtml;
+      list.appendChild(row);
+    });
+    list.querySelectorAll('.versus-challenge-btn[data-id]').forEach(btn => {
+      _setInviteBtnCooldown(btn, btn.dataset.id);
+      btn.addEventListener('click', () => {
+        if (btn.disabled) return;
+        if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+        const fid = btn.dataset.id;
+        const myName = localStorage.getItem('playerName') || T('lobby.someone', 'Alguien');
+        window.LB.sendInvite(fid, { code: window.LB.getCode(), lobbyId: window.LB.getId(), fromName: myName });
+        if (typeof window.showVersusToast === 'function') {
+          window.showVersusToast(T('lobby.sentInvite', 'Invitación enviada a {name}').replace('{name}', btn.dataset.name));
+        }
+        _inviteCooldowns[fid] = Date.now() + INVITE_COOLDOWN_MS;
+        _setInviteBtnCooldown(btn, fid);
+      });
+    });
+  }
+
+  function _openInvitePopup() {
+    const pop   = document.getElementById('lobby-invite-popup');
+    const list  = document.getElementById('lobby-invite-list');
+    const empty = document.getElementById('lobby-invite-empty');
+    if (!pop || !list) return;
+    _renderInviteList(list, empty);
     pop.style.display = 'flex';
   }
+
+  // Llamado desde el handler de realtime en monuments.js cuando un amigo cambia is_playing
+  window._refreshLobbyInviteList = function() {
+    const pop   = document.getElementById('lobby-invite-popup');
+    const list  = document.getElementById('lobby-invite-list');
+    const empty = document.getElementById('lobby-invite-empty');
+    if (!pop || !list || pop.style.display === 'none' || !pop.offsetParent) return;
+    _renderInviteList(list, empty);
+  };
 
   // ── Notificación NO bloqueante arriba (genérica: invitaciones a sala y retos 1v1) ─
   // La barra cuenta UNA sola vez (10s) desde que llega; entrar/salir de paneles NO la
@@ -1489,20 +2084,24 @@ window.Lobby = (() => {
     _publicRefreshTimer = setTimeout(() => loadPublicList(true), 400);
   }
 
+  let _publicPollTimer = null;
+
   function startPublicRealtime() {
     if (_publicChannel) return;
     _publicChannel = window.sb.channel('public-lobbies-watch')
-      // Cambios de nombre, visibilidad, estado de la sala
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lobbies' }, _schedulePublicRefresh)
-      // Entradas y salidas de miembros → actualiza el contador de jugadores
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lobby_members' }, _schedulePublicRefresh)
       .subscribe();
+    // Polling de respaldo: por si postgres_changes en lobbies no está habilitado en Supabase
+    _publicPollTimer = setInterval(() => loadPublicList(true), 6000);
   }
 
   function stopPublicRealtime() {
     if (!_publicChannel) return;
     try { _publicChannel.unsubscribe(); } catch (e) {}
     _publicChannel = null;
+    clearInterval(_publicPollTimer);
+    _publicPollTimer = null;
   }
 
   return { enterLobby, loadPublicList, startPublicRealtime, stopPublicRealtime, tryPendingJoin, tryRestore, showIncomingInvite, showInviteNotif, cancelCountdown: _stopCountdown };

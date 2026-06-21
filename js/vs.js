@@ -1,15 +1,20 @@
 // ── VERSUS MODE ───────────────────────────────────────────────────────────────
 // Matchmaking, Realtime channel, y lógica de partida 1v1.
-//
-// La sincronización de preguntas la maneja flags.js con un RNG sembrado DEDICADO
-// (window.flagsSetSeed/flagsClearSeed). No tocamos Math.random global porque otras
-// llamadas (animaciones, emotes, UI) ocurren en distinto orden en cada cliente y
-// desincronizarían la secuencia. Ver flags.js → flagsRand().
-function _startSeededRandom(seed) {
-  if (typeof window.flagsSetSeed === 'function') window.flagsSetSeed(seed);
+let _vsCurrentMode = 'flags';
+function _startSeededRandom(seed, mode) {
+  _vsCurrentMode = mode || 'flags';
+  if (_vsCurrentMode === 'shapes') {
+    if (typeof window.shapesSetSeed === 'function') window.shapesSetSeed(seed);
+  } else {
+    if (typeof window.flagsSetSeed === 'function') window.flagsSetSeed(seed);
+  }
 }
 function _restoreRandom() {
-  if (typeof window.flagsClearSeed === 'function') window.flagsClearSeed();
+  if (_vsCurrentMode === 'shapes') {
+    if (typeof window.shapesClearSeed === 'function') window.shapesClearSeed();
+  } else {
+    if (typeof window.flagsClearSeed === 'function') window.flagsClearSeed();
+  }
 }
 
 window.VS = (() => {
@@ -72,14 +77,25 @@ window.VS = (() => {
       .on('presence', { event: 'leave' }, ({ key }) => {
         if (!key || key === uid) return; // el que se fue soy yo o un desconocido
         clearTimeout(_oppGoneTimer);
+        // Gris permanente: mostrar desconexión visual inmediatamente
+        if (typeof window.flagsSetVsDisconnected === 'function') window.flagsSetVsDisconnected(true);
+        if (typeof window.shapesSetVsDisconnected === 'function') window.shapesSetVsDisconnected(true);
         _oppGoneTimer = setTimeout(() => { if (_onOppLeft) _onOppLeft(); }, OPP_GRACE_MS);
       })
       .on('presence', { event: 'join' }, ({ key }) => {
-        if (key && key !== uid) clearTimeout(_oppGoneTimer); // el rival volvió a tiempo
+        if (key && key !== uid) clearTimeout(_oppGoneTimer); // rival volvió a tiempo; gris queda permanente
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
           try { await _channel.track({ uid: uid, t: Date.now() }); } catch (e) {}
+          // Catch-up: si el rival aceptó mientras la suscripción se confirmaba,
+          // el evento realtime ya pasó; verificamos el estado actual en DB.
+          if (_matchId && _onStart && !_started) {
+            try {
+              const m = await _getMatch(_matchId);
+              if (m && m.status === 'active') { _match = m; _started = true; _onStart(m); }
+            } catch (e) {}
+          }
         }
       });
   }
@@ -402,6 +418,24 @@ window.VS = (() => {
   };
   function _hideConfirm() { const p = document.getElementById('versus-confirm-popup'); if (p) p.style.display = 'none'; _confirmYes = null; }
 
+  // ── Mode selector popup wiring ────────────────────────────────────────────
+  document.addEventListener('click', e => {
+    const msel = document.getElementById('vs-mode-select-popup');
+    if (!msel || msel.style.display === 'none') return;
+    const guestId     = msel.dataset.guestId;
+    const guestName   = msel.dataset.guestName;
+    const guestAvatar = msel.dataset.guestAvatar;
+    if (e.target.closest('#vs-mode-btn-flags')) {
+      msel.style.display = 'none';
+      _sendInvite(guestId, guestName, guestAvatar, 'flags');
+    } else if (e.target.closest('#vs-mode-btn-shapes')) {
+      msel.style.display = 'none';
+      _sendInvite(guestId, guestName, guestAvatar, 'shapes');
+    } else if (e.target.closest('#vs-mode-cancel')) {
+      msel.style.display = 'none';
+    }
+  });
+
   function _setBtnLoading(btn, loading) {
     if (!btn) return;
     const titleEl = btn.querySelector('.versus-menu-title');
@@ -475,10 +509,14 @@ window.VS = (() => {
     list.querySelectorAll('.versus-challenge-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+        if (window._lobbyCountingDown) {
+          window.showGlobalToast?.(typeof t === 'function' ? t('lobby.cdBlocked') : 'The room is about to start — wait or cancel the countdown');
+          return;
+        }
         const guestId   = btn.dataset.id;
         const guestName = btn.dataset.name;
         const guestAvatar = btn.dataset.avatar;
-        _sendInvite(guestId, guestName, guestAvatar);
+        _showModeSelector(guestId, guestName, guestAvatar);
       });
     });
   }
@@ -502,13 +540,27 @@ window.VS = (() => {
     if (versusOpen || inviteOpen) loadFriends();
   }, 5000);
 
+  // ── Mode selector ─────────────────────────────────────────────────────────
+
+  function _showModeSelector(guestId, guestName, guestAvatar) {
+    const pop = document.getElementById('vs-mode-select-popup');
+    if (!pop) { _sendInvite(guestId, guestName, guestAvatar, 'flags'); return; }
+    document.getElementById('vs-mode-sel-name').textContent = guestName;
+    document.getElementById('vs-mode-sel-pic').src = guestAvatar || 'images/profilepic/ppdefault.png';
+    pop.style.display = 'flex';
+    pop.dataset.guestId     = guestId;
+    pop.dataset.guestName   = guestName;
+    pop.dataset.guestAvatar = guestAvatar || '';
+  }
+
   // ── Outgoing invite (host) ────────────────────────────────────────────────
 
-  async function _sendInvite(guestId, guestName, guestAvatar) {
+  async function _sendInvite(guestId, guestName, guestAvatar, mode) {
+    mode = mode || 'flags';
     _pendingOppName   = guestName;
     _pendingOppAvatar = guestAvatar;
     try {
-      await window.VS.invite(guestId);
+      await window.VS.invite(guestId, mode);
     } catch(e) { console.warn('[VS] invite error:', e); return; }
 
     // NO cerrar el panel competitivo: el popup de "esperando" se muestra encima y al
@@ -517,7 +569,7 @@ window.VS = (() => {
 
     window.VS.onStart(match => {
       _hideOutgoingPopup();
-      _launchVersusFlags(match);
+      _launchVersus(match);
     });
   }
 
@@ -566,13 +618,13 @@ window.VS = (() => {
     if (typeof window.showInviteNotif === 'function') {
       window.showInviteNotif({
         name,
-        sub: T('vs.challengedYou', 'te retó a un 1v1'),
+        sub: (match.mode === 'shapes' ? T('vs.challengedShapes', 'te retó a Siluetas 1v1') : T('vs.challengedYou', 'te retó a Banderas 1v1')),
         onAccept: async () => {
           if (typeof window.removeVersusNotif === 'function') window.removeVersusNotif(match.id);
           try {
             await window.VS.accept(match.id);
             const m = window.VS.getMatch();
-            if (m) _launchVersusFlags(m);
+            if (m) _launchVersus(m);
             else throw new Error('no match');
           } catch (e) {
             console.warn('[VS] accept error:', e);
@@ -664,7 +716,7 @@ window.VS = (() => {
         await window.VS.accept(matchId);
         // El guest arranca directamente con los datos del match ya conocidos
         const match = window.VS.getMatch();
-        if (match) _launchVersusFlags(match);
+        if (match) _launchVersus(match);
         else throw new Error('no match');
       } catch(e) {
         console.warn('[VS] accept error:', e);
@@ -710,6 +762,7 @@ window.VS = (() => {
     window._vsActive   = false;
     window._vsOpponent = null;
     window._vsOppScore = 0;
+    _vsLaunching = false;
   }
 
   // Llamado desde flags.js cuando el jugador responde correcto/incorrecto
@@ -740,21 +793,25 @@ window.VS = (() => {
   function _onOpponentAbandoned() {
     if (_resultShown) return;
     _endedByAbandon = true;
-    // Detener el juego de banderas si sigue corriendo
-    if (typeof window.flagsHardReset === 'function') { try { window.flagsHardReset(); } catch (e) {} }
-    // flagsHardReset no oculta el HUD (countdown/score/panel): hacerlo aquí, si no
-    // el countdown (z-index 1000) queda encima de la pantalla de resultado.
-    ['flags-countdown-widget', 'flags-score-display', 'flags-right-panel',
-     'flags-wrapper', 'flags-timeup-overlay'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.style.display = 'none';
-    });
-    document.getElementById('flags-speed-bonus-text')?.classList.remove('visible');
+    if (_vsCurrentMode === 'shapes') {
+      if (typeof window.shapesHardReset === 'function') { try { window.shapesHardReset(); } catch(e) {} }
+      ['score-display', 'right-panel', 'pregame-countdown'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.style.display = 'none';
+      });
+      document.getElementById('speed-bonus-text')?.classList.remove('visible');
+    } else {
+      if (typeof window.flagsHardReset === 'function') { try { window.flagsHardReset(); } catch(e) {} }
+      ['flags-countdown-widget', 'flags-score-display', 'flags-right-panel',
+       'flags-wrapper', 'flags-timeup-overlay'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.style.display = 'none';
+      });
+      document.getElementById('flags-speed-bonus-text')?.classList.remove('visible');
+    }
     const m = window.VS.getMatch() || {};
     const isHost   = window.VS.isHost();
     const myScore  = isHost ? (m.host_score || 0)  : (m.guest_score || 0);
     const oppScore = isHost ? (m.guest_score || 0) : (m.host_score || 0);
-    _showVsResult('win', myScore, oppScore, 'abandon');
+    _showVsResult('abandoned', myScore, oppScore);
   }
 
   // Llamado desde quitToMenu cuando salgo de una partida versus en curso.
@@ -781,14 +838,18 @@ window.VS = (() => {
     const title  = document.getElementById('vs-result-title');
     if (title) {
       title.className = 'vs-result-title ' + outcome;
-      title.textContent = outcome === 'win'  ? T('vs.result.win',  '¡GANASTE!')
-                        : outcome === 'lose' ? T('vs.result.lose', 'PERDISTE')
-                        :                      T('vs.result.draw', '¡EMPATE!');
+      title.textContent = outcome === 'win'       ? T('vs.result.win',       '¡GANASTE!')
+                        : outcome === 'lose'      ? T('vs.result.lose',      'PERDISTE')
+                        : outcome === 'abandoned' ? T('vs.result.abandoned',  'QUEDASTE SOLO')
+                        :                          T('vs.result.draw',       '¡EMPATE!');
     }
     const sub = document.getElementById('vs-result-sub');
     if (sub) {
-      sub.textContent = reason === 'abandon' ? T('vs.result.abandon', 'Tu rival abandonó la partida') : '';
-      sub.style.display = reason === 'abandon' ? 'block' : 'none';
+      const subText = outcome === 'abandoned' ? T('vs.result.solo', 'Todos abandonaron la partida')
+                    : reason === 'abandon'    ? T('vs.result.abandon', 'Tu rival abandonó la partida')
+                    : '';
+      sub.textContent = subText;
+      sub.style.display = subText ? 'block' : 'none';
     }
     document.getElementById('vs-result-me-name').textContent  = localStorage.getItem('playerName') || T('vs.result.you', 'Tú');
     document.getElementById('vs-result-me-pic').src           = localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png';
@@ -842,21 +903,20 @@ window.VS = (() => {
 
   // ── Arrancar partida versus ───────────────────────────────────────────────
 
-  function _launchVersusFlags(match) {
+  function _launchVersus(match) {
     if (_vsLaunching) return;
     _vsLaunching = true;
+    const mode = match.mode || 'flags';
     // Garantiza que quitToMenu no llame a _lobbyAbandon (que haría LB.leave()) al volver
     window._lobbyActive = false;
     const seed = match.seed;
     // Cancelar la cuenta regresiva del lobby si estaba corriendo
-    // (evita que LB.start() se dispare mientras el host está en el versus)
     if (window.Lobby?.cancelCountdown) window.Lobby.cancelCountdown();
     if (window.LB?.isHost?.() && window.LB.getId()) window.LB.sendCancel?.();
 
-    // Configurar entorno igual que si el jugador hubiera clickeado flags-btn
     window.practiceConfig = window.practiceConfig || {};
     window.practiceConfig.active = false;
-    window.pendingGameMode = 'flags';
+    window.pendingGameMode = mode;
     if (typeof window._setPlaying === 'function') window._setPlaying(true);
 
     // Ocultar loading/versus/splash, dejar solo el juego
@@ -866,39 +926,46 @@ window.VS = (() => {
     document.getElementById('splash-screen').style.display       = 'none';
     document.getElementById('vs-outgoing-popup').style.display   = 'none';
     document.getElementById('vs-incoming-popup').style.display   = 'none';
+    document.getElementById('vs-mode-select-popup').style.display = 'none';
 
-    // Modo versus activo: el oponente entra en el leaderboard real de flags.
     window._vsActive = true;
     _resultShown = false;
     _endedByAbandon = false;
     _setupVsOpponent(match);
 
-    // El rival se desconectó / cerró la pestaña / abandonó → gano por abandono
     window.VS.onOppLeft(_onOpponentAbandoned);
 
-    // Actualizar el leaderboard cuando llega score del oponente por Realtime
+    // Actualizar leaderboard del oponente según el modo
     window.VS.onScore((hostScore, guestScore) => {
       const isHost   = window.VS.isHost();
       const oppScore = isHost ? guestScore : hostScore;
-      if (typeof window.flagsSetVsOpponentScore === 'function') {
-        window.flagsSetVsOpponentScore(oppScore);
+      if (mode === 'shapes') {
+        if (typeof window.shapesSetVsOpponentScore === 'function') window.shapesSetVsOpponentScore(oppScore);
+      } else {
+        if (typeof window.flagsSetVsOpponentScore === 'function') window.flagsSetVsOpponentScore(oppScore);
       }
     });
 
-    // El rival falló → flash rojo en el panel de leaderboard
+    // Flash rojo en leaderboard del rival cuando falla
     window.VS.onWrong(() => {
-      if (typeof window.flagsTriggerOpponentWrong === 'function') window.flagsTriggerOpponentWrong();
+      if (mode === 'shapes') {
+        if (typeof window.shapesTriggerOpponentWrong === 'function') window.shapesTriggerOpponentWrong();
+      } else {
+        if (typeof window.flagsTriggerOpponentWrong === 'function') window.flagsTriggerOpponentWrong();
+      }
     });
 
-    window.VS.onEnd(winnerId => {
+    window.VS.onEnd(() => {
       _restoreRandom();
       _teardownVsOpponent();
     });
 
     // Arrancar con RNG seeded → mismas preguntas para ambos
-    _startSeededRandom(seed);
-    if (typeof showFlagsMode === 'function') {
-      showFlagsMode();
+    _startSeededRandom(seed, mode);
+    if (mode === 'shapes') {
+      if (typeof showShapesMode === 'function') showShapesMode();
+    } else {
+      if (typeof showFlagsMode === 'function') showFlagsMode();
     }
   }
 
@@ -935,7 +1002,7 @@ window.VS = (() => {
     try {
       await window.VS.accept(matchId);
       const m = window.VS.getMatch();
-      if (m) _launchVersusFlags(m);
+      if (m) _launchVersus(m);
       else throw new Error('no match');
     } catch(e) {
       console.warn('[VS] inbox accept error:', e);

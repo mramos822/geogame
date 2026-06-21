@@ -565,6 +565,19 @@ document.getElementById('loading-play-btn').addEventListener('mouseenter', () =>
   sfxSelect.currentTime = 0; sfxPlay(sfxSelect);
 });
 
+// Toast global: visible desde cualquier pantalla (position:fixed en body)
+window.showGlobalToast = function(msg) {
+  const item = document.createElement('div');
+  item.className = 'global-toast-item';
+  item.textContent = msg;
+  document.body.appendChild(item);
+  requestAnimationFrame(() => requestAnimationFrame(() => { item.style.opacity = '1'; }));
+  setTimeout(() => {
+    item.style.opacity = '0';
+    setTimeout(() => { try { item.remove(); } catch (e) {} }, 280);
+  }, 3200);
+};
+
 // Helper global: actualiza is_playing en Supabase si hay sesión activa
 window._setPlaying = function(playing) {
   window._isPlaying = !!playing;
@@ -738,6 +751,10 @@ document.getElementById('loading-panel2-back')?.addEventListener('click', () => 
 
 document.getElementById('loading-panel2-worldtour')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+  if (window._lobbyCountingDown) {
+    window.showGlobalToast(t('lobby.cdBlocked'));
+    return;
+  }
   window.startCampaign();
 });
 
@@ -944,6 +961,11 @@ window.startCampaign = function () {
             if (typeof loadFriends === 'function') loadFriends();
             if (typeof window.sbUpdateLastActive === 'function') window.sbUpdateLastActive(data.user.id).catch(() => {});
             // Escuchar invitaciones versus en tiempo real
+            // Session guard: token único → kickea la misma cuenta en otro dispositivo
+            const _sTok = crypto.randomUUID();
+            localStorage.setItem('_sbSessionToken', _sTok);
+            window.sbSetSessionToken?.(data.user.id, _sTok);
+            window.sbStartSessionGuard?.(data.user.id);
             if (typeof window._vsStartListening === 'function') window._vsStartListening();
             if (window.LB && typeof window.LB.listenForInvites === 'function') {
               window.LB.listenForInvites(p => { if (typeof window.showLobbyIncomingInvite === 'function') window.showLobbyIncomingInvite(p); });
@@ -1093,10 +1115,11 @@ window.startCampaign = function () {
     showView(viewLoggedIn || document.getElementById('account-view-loggedin'));
   });
 
-  document.getElementById('account-logout-confirm')?.addEventListener('click', async () => {
-    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+  async function _doLogout() {
     if (window._sbUserId) window.sbSetPlaying(window._sbUserId, false).catch(() => {});
-    closeModal();
+    if (window.LB?.getId?.()) { try { await window.LB.leave(); } catch (e) {} }
+    window.sbStopSessionGuard?.();
+    localStorage.removeItem('_sbSessionToken');
     if (_friendRealtimeChannel)  { window.sb.removeChannel(_friendRealtimeChannel);  _friendRealtimeChannel = null; }
     if (_friendshipsChannel)     { window.sb.removeChannel(_friendshipsChannel);     _friendshipsChannel = null; }
     await window.sbLogout?.();
@@ -1106,10 +1129,24 @@ window.startCampaign = function () {
     document.body.classList.remove('account-logged');
     localStorage.removeItem('profilePhoto');
     applyStoredProfilePic();
-    // playerName se mantiene para que el usuario no sea reconocido como primera vez
     clearLocalScores(true);
     if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
     _updateProfileBtnLabel();
+  }
+
+  // Logout forzado por sesión duplicada en otro dispositivo
+  window._forceSessionLogout = async function() {
+    if (!window._accountLoggedIn) return;
+    if (typeof closeModal === 'function') closeModal();
+    if (typeof window.showVersusToast === 'function')
+      window.showVersusToast('Sesión iniciada en otro dispositivo. Cerrando sesión…');
+    await _doLogout();
+  };
+
+  document.getElementById('account-logout-confirm')?.addEventListener('click', async () => {
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    closeModal();
+    await _doLogout();
   });
 
   // ── Cambiar contraseña ─────────────────────────────────────────────────────
@@ -1591,6 +1628,13 @@ function _subscribeFriendStatuses(friendIds) {
       if (!f) return;
       f.last_active  = updated.last_active;
       f.is_playing   = updated.is_playing;
+      // Sincronizar caché de friends.js (usada por el panel de invitar del lobby)
+      if (typeof getFriends === 'function') {
+        const fc = getFriends().find(x => x.id === updated.id);
+        if (fc) { fc.last_active = updated.last_active; fc.is_playing = updated.is_playing; }
+      }
+      // Refrescar en vivo el panel de amigos de la sala si está abierto
+      window._refreshLobbyInviteList?.();
       // Actualizar avatar si cambió
       if (updated.avatar_url && updated.avatar_url !== f.avatar) {
         f.avatar = updated.avatar_url;
@@ -2558,6 +2602,8 @@ window.gameStoppers.push(() => {
 });
 
 window.resetEntranceElements = function () {
+  // Cancelar cualquier timer pendiente de hidePracticePanel para evitar race conditions
+  if (typeof _hidePracticeTimer !== 'undefined') { clearTimeout(_hidePracticeTimer); _hidePracticeTimer = null; }
   const fa = document.querySelector('.flightatt-loading');
   const sh = document.querySelector('.flightatt-loading-shadow');
   const pw = document.querySelector('.loading-plane-wrap');
@@ -2584,6 +2630,11 @@ window.resetEntranceElements = function () {
   if (t2r) t2r.style.display = 'none';
   const lpg = document.getElementById('loading-practice-group');
   if (lpg) lpg.style.display = 'none';
+  // Cerrar cualquier sub-panel que haya quedado abierto (profile, social, amigos…)
+  ['loading-table-group','loading-social-group','loading-friend-group',
+   'loading-addfriend-group','loading-blocked-group','loading-sent-group']
+    .forEach(id => document.getElementById(id)?.classList.add('table-gone'));
+  document.getElementById('loading-screen')?.classList.remove('table-shown');
   if (typeof window.hideVersusPanel === 'function') window.hideVersusPanel();
 };
 
@@ -2908,7 +2959,11 @@ window.quitToMenu = quitToMenu;
       if (lock && lock.classList.contains('open')) { document.getElementById('social-lock-close')?.click(); return true; }
       return false;
     };
-    if (quitPopup && quitPopup.style.display === 'flex') {
+    const _modeSelPop = document.getElementById('vs-mode-select-popup');
+    if (_modeSelPop && _modeSelPop.style.display !== 'none') {
+      sfxSelect.currentTime = 0; sfxPlay(sfxSelect);
+      _modeSelPop.style.display = 'none';
+    } else if (quitPopup && quitPopup.style.display === 'flex') {
       sfxSelect.currentTime = 0; sfxPlay(sfxSelect);
       quitPopup.style.display = 'none';
       document.body.classList.remove('quit-open');
@@ -3319,6 +3374,29 @@ const LB_COLORS = ['#e74c3c','#e67e22','#f1c40f','#2ecc71','#1abc9c',
 // (js/friends.js -> getFriends()), la misma que usan las pantallas results/final.
 // friends.js se carga antes que este archivo, así getFriends() ya tiene datos.
 function buildFriendPlayers() {
+  // En lobby grupal: todos los rivales de la sala
+  if (window._lobbyActive && Array.isArray(window._lobbyMembers)) {
+    return window._lobbyMembers.map(m => ({
+      id: 'lob' + m.id,
+      name: m.name,
+      score: m.score || 0,
+      avatar: m.avatar || '',
+      color: '#888',
+      initial: (m.name && m.name[0]) ? m.name[0].toUpperCase() : '?',
+    }));
+  }
+  // En VS 1v1 (shapes): solo el rival
+  if (window._vsActive && window._vsOpponent) {
+    const o = window._vsOpponent;
+    return [{
+      id: 'vsopp',
+      name: o.name,
+      score: window._vsOppScore || 0,
+      avatar: o.avatar || '',
+      color: '#888',
+      initial: (o.name && o.name[0]) ? o.name[0].toUpperCase() : '?',
+    }];
+  }
   const src = (typeof getFriends === 'function') ? getFriends() : [];
   return src.map((f, i) => ({
     id: `friend${i}`,
@@ -3383,17 +3461,18 @@ function getLbRowHeight() {
 function initLeaderboard() {
   const lb = document.getElementById('leaderboard');
   lb.innerHTML = '';
+  lb.classList.toggle('vs-active', !!(window._vsActive || window._lobbyActive));
   lbElements = {};
-  mockPlayers = buildFriendPlayers(); // refrescar con la lista real de amigos
+  mockPlayers = buildFriendPlayers(); // refrescar; en VS devuelve solo al rival
   highscorePlayer.score = getTotalHighscore(); // ★ best = highscore global de campaña
 
   if (!window.practiceConfig || !window.practiceConfig.active) {
     mockPlayers.forEach(p => {
       const el = document.createElement('div');
-      el.className = 'lb-entry';
+      el.className = 'lb-entry' + (p.id === 'vsopp' ? ' lb-vsopp' : '');
       el.id = `lb-${p.id}`;
       const avatarHTML = p.avatar
-        ? `<div class="lb-avatar lb-avatar-img-wrap"><img class="lb-avatar-img" src="${p.avatar}" onerror="this.parentNode.innerHTML='${p.initial}';this.parentNode.style.background='${p.color}'"></div>`
+        ? `<div class="lb-avatar lb-avatar-img-wrap"><img class="lb-avatar-img" src="${p.avatar}" onerror="this.parentNode.innerHTML='${p.initial || '?'}';this.parentNode.style.background='${p.color || '#888'}'"></div>`
         : `<div class="lb-avatar" style="background:${p.color}">${p.initial}</div>`;
       el.innerHTML = avatarHTML + `<span class="lb-score">${p.score.toLocaleString()}</span>`;
       el.style.transition = 'none';
@@ -3402,6 +3481,31 @@ function initLeaderboard() {
       lb.appendChild(el);
     });
   }
+
+  // ── Helpers for shapes VS to update shared leaderboard from outside ──────────
+  window._lbUpdateEntry = function(id, score) {
+    const p = mockPlayers.find(x => x.id === id);
+    if (p) p.score = score;
+    const el = lbElements['lb-' + id];
+    if (el) { const s = el.querySelector('.lb-score'); if (s) s.textContent = score.toLocaleString(); }
+  };
+  window._lbWrongEffect = function(id) {
+    const el = lbElements['lb-' + id];
+    if (!el) return;
+    el.style.animation = 'none'; void el.offsetWidth;
+    el.style.animation = 'lb-wrong-flash 0.75s ease-out, lb-shake 0.45s ease-in-out';
+    setTimeout(() => { el.style.animation = ''; }, 820);
+    const srcs = ['images/emotes/1.png','images/emotes/2.png','images/emotes/3.png',
+                  'images/emotes/4.png','images/emotes/5.png','images/emotes/6.png'];
+    const bubble = document.createElement('div');
+    bubble.className = 'emote-bubble';
+    const img = document.createElement('img');
+    img.src = srcs[Math.floor(Math.random() * srcs.length)];
+    img.className = 'emote-img';
+    bubble.appendChild(img);
+    el.appendChild(bubble);
+    bubble.addEventListener('animationend', () => bubble.remove(), { once: true });
+  };
 
   const playerEl = document.createElement('div');
   playerEl.className = 'lb-entry lb-player';
@@ -3437,7 +3541,7 @@ function positionLeaderboard(playerScore, animate) {
 
   const playerRank = all.findIndex(p => p.id === 'player');
 
-  if (animate && lastPlayerRank !== -1 && playerRank < lastPlayerRank) {
+  if (animate && lastPlayerRank !== -1 && playerRank < lastPlayerRank && !window._vsActive && !window._lobbyActive) {
     let bubbleIndex = 0;
     for (let r = lastPlayerRank; r >= playerRank + 1; r--) {
       const overtaken = all[r];
@@ -5101,8 +5205,13 @@ window.practiceConfig = {
   difficulty: 'facil', // solo monumentos
 };
 
+let _hidePracticeTimer = null;
+
 // Muestra panel práctica, oculta panel 2
 function showPracticePanel() {
+  // Cancelar timer pendiente de hidePracticePanel para evitar race condition
+  clearTimeout(_hidePracticeTimer);
+  _hidePracticeTimer = null;
   document.getElementById('loading-screen')?.classList.add('table-shown');
   const lpg = document.getElementById('loading-practice-group');
   lpg.style.display = '';
@@ -5121,7 +5230,9 @@ function hidePracticePanel() {
   document.getElementById('loading-screen')?.classList.remove('table-shown');
   lpg.classList.remove('panel-visible');
   lpg.classList.add('table-gone');
-  setTimeout(() => {
+  clearTimeout(_hidePracticeTimer);
+  _hidePracticeTimer = setTimeout(() => {
+    _hidePracticeTimer = null;
     lpg.style.display = 'none';
     lpg.classList.remove('table-gone');
   }, 400);
@@ -5213,6 +5324,10 @@ document.getElementById('loading-panel2-versus')?.addEventListener('click', () =
 
 document.getElementById('loading-panel2-practice')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+  if (window._lobbyCountingDown) {
+    window.showGlobalToast(t('lobby.cdBlocked'));
+    return;
+  }
   showPracticePanel();
 });
 

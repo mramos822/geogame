@@ -661,6 +661,23 @@ function flagsSetLobbyDisconnected(uid, disconnected) {
 }
 window.flagsSetLobbyDisconnected = flagsSetLobbyDisconnected;
 
+window.flagsSetVsDisconnected = function(disconnected) {
+  const el = flagsLbElements['flags-lb-vsopp'];
+  if (!el) return;
+  if (disconnected) {
+    el.classList.add('is-disconnected');
+    if (!el.querySelector('.lb-disconnected-icon')) {
+      const icon = document.createElement('div');
+      icon.className = 'lb-disconnected-icon';
+      icon.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.5 2.5 5.09 3.91l2.59 2.59-2.09 2.09A3.003 3.003 0 0 0 6 14.83V17H4v2h2v2h2v-2h2v-2h.17c.93 0 1.76-.37 2.37-.96l-.01-.01 2.06 2.06 1.41-1.41-9.5-9.5zm1.59 9.09A1.003 1.003 0 0 1 8 10.83V9.41l1.5 1.5-.41.68H8.09zm5.72 1.64-.01-.01c.13-.29.2-.61.2-.93V9.17c0-.93-.37-1.76-.96-2.37L11.66 5h2.59L19 9.75l-3.17 3.17.02.01zM19.07 4.93l-1.41 1.42L19 7.68l1.5-1.5-1.43-1.25z"/></svg>';
+      el.appendChild(icon);
+    }
+  } else {
+    el.classList.remove('is-disconnected');
+    el.querySelector('.lb-disconnected-icon')?.remove();
+  }
+};
+
 const flagsProgressContainer = document.getElementById('flags-progress-dots');
 const flagsProgressDots      = flagsProgressContainer ? flagsProgressContainer.querySelectorAll('.dot') : [];
 const FLAGS_DOTS_NEEDED = 10;
@@ -1421,6 +1438,8 @@ function hideFlagsMode() {
 
   const finalScore = Math.round(flagsScore);
   window.lastModeScore = finalScore;
+
+  if (window._suppressGameover) { window._suppressGameover = false; return; }
 
   // ── LOBBY (grupal): ranking en vez del gameover normal ──
   if (window._lobbyActive && typeof window._lobbyHandleGameEnd === 'function') {

@@ -306,6 +306,7 @@
       <div class="versus-screen" id="versus-screen-lobby" style="display:none">
         <div class="lobby-name-row" id="lobby-name-row">
           <div id="lobby-mode-icons" class="lobby-mode-icons"></div>
+          <button class="lobby-mode-edit-btn" id="lobby-mode-edit-btn" type="button" style="display:none" aria-label="Cambiar modo"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.22-.07.47.12.61l2.03 1.58c-.05.3-.07.63-.07.94s.02.64.07.94L2.86 14.52c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg></button>
           <span class="lobby-name-text" id="lobby-name-text"></span>
           <button class="lobby-name-edit-btn" id="lobby-name-edit-btn" type="button" style="display:none" aria-label="Editar nombre">✎</button>
           <input id="lobby-name-input" class="lobby-name-input" type="text" maxlength="22" autocomplete="off" spellcheck="false" placeholder="Nombre de la sala" style="display:none">
@@ -337,6 +338,63 @@
       </button>
 
       <div id="versus-toast-stack" class="versus-toast-stack"></div>
+    </div>
+
+    <!-- Popup: selector de modo (antes de enviar el reto) -->
+    <div id="vs-mode-select-popup" class="vs-popup-overlay" style="display:none">
+      <div class="vs-popup-box vs-mode-box">
+        <img class="vs-popup-pic" id="vs-mode-sel-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
+        <span class="vs-popup-name" id="vs-mode-sel-name"></span>
+        <span class="vs-popup-sub" data-i18n="vs.chooseMode">¿Qué modo quieren jugar?</span>
+        <div class="vs-mode-btns">
+          <button class="vs-mode-btn" id="vs-mode-btn-flags">
+            <span class="vs-mode-icon">🏴</span>
+            <span class="vs-mode-label" data-i18n="nav.flags">Banderas</span>
+          </button>
+          <button class="vs-mode-btn" id="vs-mode-btn-shapes">
+            <span class="vs-mode-icon">🗺️</span>
+            <span class="vs-mode-label" data-i18n="nav.shapes">Siluetas</span>
+          </button>
+        </div>
+        <div class="vs-popup-confirm" id="vs-mode-cancel">
+          <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+          <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+        </div>
+      </div>
+    </div>
+
+    <!-- Popup: selector de modos para el lobby (host elige modos y orden) -->
+    <div id="lobby-mode-picker-popup" class="vs-popup-overlay" style="display:none">
+      <div class="vs-popup-box lobby-mode-picker-box">
+        <span class="vs-popup-sub" data-i18n="lobby.pickMode">Modos de juego</span>
+        <div class="lobby-mode-picker-grid">
+          <button class="lobby-mode-pick-btn" data-mode="flags" type="button">
+            <span class="lobby-mode-pick-num" style="display:none">1</span>
+            <img src="images/game1.png" alt="flags">
+            <span data-i18n="nav.flags">Banderas</span>
+          </button>
+          <button class="lobby-mode-pick-btn" data-mode="shapes" type="button">
+            <span class="lobby-mode-pick-num" style="display:none">2</span>
+            <img src="images/game2.png" alt="shapes">
+            <span data-i18n="nav.shapes">Siluetas</span>
+          </button>
+          <button class="lobby-mode-pick-btn lobby-mode-soon" data-mode="cities" type="button" disabled>
+            <img src="images/game3.png" alt="cities">
+            <span data-i18n="nav.cities">Ciudades</span>
+            <span class="lobby-mode-soon-badge" data-i18n="lobby.soon">Próx.</span>
+          </button>
+          <button class="lobby-mode-pick-btn lobby-mode-soon" data-mode="monuments" type="button" disabled>
+            <img src="images/game4.png" alt="monuments">
+            <span data-i18n="nav.monuments">Monumentos</span>
+            <span class="lobby-mode-soon-badge" data-i18n="lobby.soon">Próx.</span>
+          </button>
+        </div>
+        <div class="lobby-mode-order-section" id="lobby-mode-order-section" style="display:none">
+          <span class="lobby-mode-order-title" data-i18n="lobby.playOrder">Orden de juego</span>
+          <div id="lobby-mode-order-list" class="lobby-mode-order-list"></div>
+        </div>
+        <button class="versus-start-btn lobby-mode-picker-save" id="lobby-mode-picker-save" type="button" data-i18n="lobby.saveMode">Guardar</button>
+      </div>
     </div>
 
     <!-- Popup: invitación saliente (host espera) -->
@@ -981,7 +1039,7 @@
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
     </div>
-    <div id="loading-version">Ver. 2.6.75</div>
+    <div id="loading-version">Ver. 2.6.76</div>
   </div>
 
   <!-- Pantalla de resultado versus (W/L) — fuera del loading-screen para verse tras la partida -->
@@ -1022,6 +1080,38 @@
       <div class="vs-popup-confirm" id="lobby-result-back">
         <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel "quedaste solo" cuando todos abandonan durante la partida -->
+  <div id="lobby-alone-screen" class="vs-popup-overlay" style="display:none">
+    <div class="vs-popup-box">
+      <span class="vs-result-title abandoned" data-i18n="lobby.alone.title">QUEDASTE SOLO</span>
+      <span class="vs-popup-sub" data-i18n="lobby.allLeft">Todos abandonaron la partida</span>
+      <div class="vs-popup-confirm" id="lobby-alone-back">
+        <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+        <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+    </div>
+  </div>
+
+  <!-- Pantalla intermedia entre modos — fuera del loading-screen para verse durante gameplay -->
+  <div id="lobby-intermediate-screen" class="vs-popup-overlay" style="display:none">
+    <div class="vs-popup-box lobby-intermediate-box">
+      <span class="lobby-intermediate-label" id="lobby-intermediate-label">RESULTADOS</span>
+      <span class="lobby-intermediate-mode-tag" id="lobby-intermediate-mode-tag"></span>
+      <div id="lobby-intermediate-list" class="lobby-result-list"></div>
+      <div class="lobby-intermediate-next" id="lobby-intermediate-next" style="display:none">
+        <span data-i18n="lobby.nextMode">Siguiente:</span>
+        <img class="lobby-intermediate-next-icon" id="lobby-intermediate-next-icon" src="" alt="">
+        <span id="lobby-intermediate-next-name"></span>
+      </div>
+      <div class="lobby-intermediate-timer-row">
+        <div class="lobby-intermediate-bar-wrap">
+          <div id="lobby-intermediate-bar" class="lobby-intermediate-bar"></div>
+        </div>
+        <span class="lobby-intermediate-cd-txt"><span id="lobby-intermediate-cd">10</span>s</span>
       </div>
     </div>
   </div>

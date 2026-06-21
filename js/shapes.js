@@ -38,6 +38,47 @@ let shapesPracticePool = [];
 let shapesPracticeRemaining = [];
 let shapesPracticeCurrent = null;
 
+// ── Seeded RNG para Versus (mismas preguntas en ambos clientes) ──────────────
+let _shapesSeededRand = null;
+function shapesRand() { return _shapesSeededRand ? _shapesSeededRand() : Math.random(); }
+window.shapesSetSeed = function(seed) {
+  let s = seed >>> 0; if (!s) s = 1;
+  _shapesSeededRand = () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return (s >>> 0) / 0x100000000; };
+};
+window.shapesClearSeed = function() { _shapesSeededRand = null; };
+
+// ── Lobby hooks (grupo) ───────────────────────────────────────────────────────
+window.shapesSetLobbyScores = function(members) {
+  if (!Array.isArray(members) || typeof window._lbUpdateEntry !== 'function') return;
+  members.forEach(m => window._lbUpdateEntry('lob' + m.id, m.score || 0));
+  if (typeof positionLeaderboard === 'function') positionLeaderboard(shapesScore, true);
+};
+window.shapesSetLobbyWrongFor = function(uid) {
+  const myId = window._sbUserId;
+  const key = (!uid || uid === myId) ? 'player' : ('lob' + uid);
+  if (typeof window._lbWrongEffect === 'function') window._lbWrongEffect(key);
+};
+window.shapesSetLobbyDisconnected = function(uid, disconnected) {
+  const el = typeof lbElements !== 'undefined' ? lbElements['lb-lob' + uid] : null;
+  if (!el) return;
+  el.classList.toggle('is-disconnected', !!disconnected);
+};
+window.shapesSetVsDisconnected = function(disconnected) {
+  const el = typeof lbElements !== 'undefined' ? lbElements['lb-vsopp'] : null;
+  if (!el) return;
+  el.classList.toggle('is-disconnected', !!disconnected);
+};
+
+// ── VS opponent hooks ─────────────────────────────────────────────────────────
+window.shapesSetVsOpponentScore = function(score) {
+  window._vsOppScore = score;
+  if (typeof window._lbUpdateEntry === 'function') window._lbUpdateEntry('vsopp', score);
+  if (typeof positionLeaderboard === 'function') positionLeaderboard(shapesScore, true);
+};
+window.shapesTriggerOpponentWrong = function() {
+  if (typeof window._lbWrongEffect === 'function') window._lbWrongEffect('vsopp');
+};
+
 function buildShapesPracticePool(continents, difficulty) {
   const sh = a => { for (let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a; };
   const ok     = c => !continents || continents.has(SHAPE_COUNTRY_CONTINENT[c.name]);
@@ -297,7 +338,7 @@ function showCountryShape(country, ext1, ext2, startDelay) {
     }
     const shuffled = _distractorBase
       .filter(c => c.name !== country && c.label !== correctLabel)
-      .sort(() => Math.random() - 0.5);
+      .sort(() => shapesRand() - 0.5);
     const usedLabels = new Set([correctLabel]);
     const distractors = [];
     for (const c of shuffled) {
@@ -307,7 +348,7 @@ function showCountryShape(country, ext1, ext2, startDelay) {
         if (distractors.length === 3) break;
       }
     }
-    correctIdx = Math.floor(Math.random() * 4);
+    correctIdx = Math.floor(shapesRand() * 4);
     options    = [...distractors];
     options.splice(correctIdx, 0, correctLabel);
   }
@@ -445,6 +486,8 @@ function showCountryShape(country, ext1, ext2, startDelay) {
             positionLeaderboard(shapesScore, true);
           }
         }
+        if (typeof window._vsReportAnswer === 'function') window._vsReportAnswer(true, Math.round(shapesScore));
+        if (typeof window._lobbyReportAnswer === 'function' && window._lobbyActive) window._lobbyReportAnswer(true, Math.round(shapesScore));
         if (!(window.practiceConfig && window.practiceConfig.active)) shapesDots++;
         const dotsContainer = document.getElementById('shapes-progress-dots');
         if (dotsContainer && !(window.practiceConfig && window.practiceConfig.active)) {
@@ -495,6 +538,9 @@ function showCountryShape(country, ext1, ext2, startDelay) {
         shapesWrongAnswerCount++;
         shapesStreak = 0;
         if (sfxError) { sfxError.currentTime = 0; sfxPlay(sfxError); }
+        if (typeof window._vsReportAnswer === 'function') window._vsReportAnswer(false, Math.round(shapesScore));
+        if (typeof window._lobbyReportAnswer === 'function' && window._lobbyActive) window._lobbyReportAnswer(false, Math.round(shapesScore));
+        if ((window._vsActive || window._lobbyActive) && typeof window._lbWrongEffect === 'function') window._lbWrongEffect('player');
       }
       tagEls.forEach(t => { t.style.pointerEvents = 'none'; t.style.cursor = 'default'; });
       setTimeout(() => {
@@ -566,7 +612,7 @@ function showCountryShape(country, ext1, ext2, startDelay) {
           const activePool = getActiveShapesPool();
           const pool = activePool.filter(c => !shapesAnsweredSet.has(c.name) && !shapesWrongCooldown.has(c.name));
           const src  = pool.length > 0 ? pool : activePool.filter(c => !shapesAnsweredSet.has(c.name));
-          const next = (src.length > 0 ? src : activePool)[Math.floor(Math.random() * (src.length > 0 ? src : activePool).length)];
+          const next = (src.length > 0 ? src : activePool)[Math.floor(shapesRand() * (src.length > 0 ? src : activePool).length)];
           showCountryShape(next.name, next.ext1, next.ext2);
         }, 200);
       }, 500);
@@ -994,6 +1040,9 @@ function showShapesMode() {
   const rightPanel = document.getElementById('right-panel');
   if (rightPanel) { rightPanel.style.display = 'flex'; rightPanel.style.zIndex = '120'; }
 
+  // VS / Lobby: rebuild leaderboard with opponent/rival entries
+  if ((window._vsActive || window._lobbyActive) && typeof initLeaderboard === 'function') initLeaderboard();
+
   document.querySelectorAll('.game-bg-city').forEach(el => { el.src = 'images/bg/level2complete.png'; });
   shapesScore = 0; shapesDisplayedScore = 0; shapesStreak = 0; shapesDots = 0;
   shapesTrainTimeouts.forEach(clearTimeout); shapesTrainTimeouts = [];
@@ -1038,7 +1087,7 @@ function showShapesMode() {
     const initActive = getActiveShapesPool();
     const initPool   = initActive.filter(co => !shapesAnsweredSet.has(co.name));
     const initSrc    = initPool.length > 0 ? initPool : initActive;
-    c = initSrc[Math.floor(Math.random() * initSrc.length)];
+    c = initSrc[Math.floor(shapesRand() * initSrc.length)];
   }
   showCountryShape(c.name, c.ext1, c.ext2, PREGAME_DURATION);
   // Ocultar el widget del cronómetro durante el 3-2-1-GO
@@ -1148,6 +1197,20 @@ function hideShapesMode() {
   // final score & highscore
   const finalScore = Math.round(shapesScore);
   window.lastModeScore = finalScore;
+
+  if (window._suppressGameover) { window._suppressGameover = false; return; }
+
+  // ── VERSUS: reportar resultado y salir ────────────────────
+  if (window._vsActive && typeof window._vsHandleGameEnd === 'function') {
+    window._vsHandleGameEnd(finalScore);
+    return;
+  }
+
+  // ── LOBBY: reportar resultado al sistema de sala ──────────
+  if (window._lobbyActive && typeof window._lobbyHandleGameEnd === 'function') {
+    window._lobbyHandleGameEnd(finalScore);
+    return;
+  }
 
   // ── PRÁCTICA: redirigir al panel ──────────────────────────
   if (window.practiceConfig && window.practiceConfig.active) {
