@@ -538,7 +538,7 @@ window.VS = (() => {
           `<span class="versus-friend-name">${f.name}</span>` +
           `<span class="versus-friend-status${playing ? ' playing' : ''}"><span class="versus-friend-dot${playing ? ' playing' : ''}"></span>${statusTxt}</span>` +
         `</div>` +
-        `<button class="versus-challenge-btn" data-id="${f.id}" data-name="${f.name}" data-avatar="${f.avatar || ''}">${T('versus.challenge', 'Retar')}</button>`;
+        `<button class="versus-challenge-btn${playing ? ' disabled' : ''}" ${playing ? 'disabled' : ''} data-id="${f.id}" data-name="${f.name}" data-avatar="${f.avatar || ''}">${playing ? T('social.playing', 'Jugando') : T('versus.challenge', 'Retar')}</button>`;
       list.appendChild(row);
     });
 
