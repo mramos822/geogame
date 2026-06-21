@@ -7262,11 +7262,13 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   margin-top: 1cqmin;
 }
 .vs-mode-btn {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 1.2cqmin;
-  padding: 2.5cqmin 3.5cqmin;
+  padding: 2.5cqmin 1.5cqmin;
   background: rgba(255,255,255,0.12);
   border: 2px solid rgba(255,255,255,0.25);
   border-radius: 2cqmin;
@@ -7274,6 +7276,7 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   transition: background 0.15s, transform 0.1s;
   color: #fff;
   font-family: inherit;
+  text-align: center;
 }
 .vs-mode-btn:hover { background: rgba(255,255,255,0.22); transform: scale(1.04); }
 .vs-mode-btn:active { transform: scale(0.97); }
