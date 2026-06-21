@@ -53,6 +53,41 @@ window.sbGetSession = async function() {
   return data.session;
 };
 
+// ── SESSION GUARD (un solo dispositivo activo por cuenta) ─────────────────────
+
+window.sbSetSessionToken = async function(uid, token) {
+  try { await window.sb.from('profiles').update({ session_token: token }).eq('id', uid); } catch (e) {}
+};
+
+let _sgCh = null, _sgPoll = null;
+
+window.sbStartSessionGuard = function(uid) {
+  window.sbStopSessionGuard();
+  _sgCh = window.sb.channel('sg-' + uid)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${uid}` }, payload => {
+      const mine = localStorage.getItem('_sbSessionToken');
+      if (payload.new?.session_token && mine && payload.new.session_token !== mine)
+        window._forceSessionLogout?.();
+    })
+    .subscribe();
+  _sgPoll = setInterval(async () => {
+    if (!window._sbUserId) { clearInterval(_sgPoll); _sgPoll = null; return; }
+    try {
+      const { data } = await window.sb.from('profiles').select('session_token').eq('id', uid).single();
+      const mine = localStorage.getItem('_sbSessionToken');
+      if (data?.session_token && mine && data.session_token !== mine) {
+        clearInterval(_sgPoll); _sgPoll = null;
+        window._forceSessionLogout?.();
+      }
+    } catch (e) {}
+  }, 60000);
+};
+
+window.sbStopSessionGuard = function() {
+  if (_sgCh)   { try { window.sb.removeChannel(_sgCh); } catch (e) {} _sgCh = null; }
+  if (_sgPoll) { clearInterval(_sgPoll); _sgPoll = null; }
+};
+
 // ── PERFIL ────────────────────────────────────────────────────────────────────
 
 window.sbGetProfile = async function(userId) {
@@ -359,6 +394,11 @@ sb.auth.onAuthStateChange((event, session) => {
     }
   } catch(e) {}
   window.sbUpdateLastActive(session.user.id).catch(() => {});
+  // Session guard: registrar token único para esta sesión (kickea otros dispositivos)
+  const _sTok = crypto.randomUUID();
+  localStorage.setItem('_sbSessionToken', _sTok);
+  window.sbSetSessionToken(session.user.id, _sTok);
+  window.sbStartSessionGuard(session.user.id);
   // Notificar a monuments.js que la sesión está lista (sync de datos locales, etc.)
   window._sessionReady = true;
   document.dispatchEvent(new CustomEvent('sbSessionReady', { detail: { userId: session.user.id } }));
