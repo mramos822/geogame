@@ -1405,30 +1405,34 @@ function startFlagsRound() {
   });
 }
 
-function hideFlagsMode() {
+function _flagsCleanupVisuals() {
   flagsWrapper.style.display      = 'none';
+  flagsMachine.style.display      = 'none';
+  flagsMachine2.style.display     = 'none';
+  flagsMachine3.style.display     = 'none';
+  flagsMachine3b.style.display    = 'none';
+  flagsMachine3.classList.remove('scrolling');
+  flagsMachine3b.classList.remove('scrolling');
+  flagsFindLuggage.style.display  = 'none';
+  flagsFindLuggage.classList.remove('scrolling');
+  flagsLuggageWrap.style.display  = 'none';
+  flagsLuggageWrap.classList.remove('flags-six-mode');
+  flagsFlagImg.style.display      = 'none';
+  flagsFlagImg.src                = '';
+  flagsFlagidWrap.style.display   = 'none';
+  flagsBottomGroupIds.forEach(id => {
+    const g = document.getElementById(id);
+    if (g) g.style.display = 'none';
+  });
+}
+
+function hideFlagsMode() {
+  // Always: hide score/UI/overlays and stop timers
   flagsScoreDisplay.style.display = 'none';
   document.getElementById('flags-countdown-widget').style.display = 'none';
   flagsRightPanel.style.display   = 'none';
   mainRightPanel.style.display    = 'none';
   flagsTimeupEl.style.display     = 'none';
-  flagsMachine.style.display      = 'none';
-  flagsMachine2.style.display     = 'none';
-  flagsMachine3.style.display     = 'none';
-  flagsMachine3b.style.display    = 'none';
-  flagsFindLuggage.style.display  = 'none';
-  flagsFindLuggage.classList.remove('scrolling');
-  flagsLuggageWrap.style.display  = 'none';
-  flagsFlagImg.style.display      = 'none';
-  flagsFlagImg.src                = '';
-  flagsFlagidWrap.style.display   = 'none';
-  flagsMachine3.classList.remove('scrolling');
-  flagsMachine3b.classList.remove('scrolling');
-  flagsLuggageWrap.classList.remove('flags-six-mode');
-  flagsBottomGroupIds.forEach(id => {
-    const g = document.getElementById(id);
-    if (g) g.style.display = 'none';
-  });
   if (flagsScoreRafId) { cancelAnimationFrame(flagsScoreRafId); flagsScoreRafId = null; }
   clearTimeout(flagsSpeedBonusHideId);
   flagsSpeedBonusText.classList.remove('visible');
@@ -1439,18 +1443,23 @@ function hideFlagsMode() {
   const finalScore = Math.round(flagsScore);
   window.lastModeScore = finalScore;
 
-  if (window._suppressGameover) { window._suppressGameover = false; return; }
+  if (window._suppressGameover) { window._suppressGameover = false; _flagsCleanupVisuals(); return; }
 
   // ── LOBBY (grupal): ranking en vez del gameover normal ──
   if (window._lobbyActive && typeof window._lobbyHandleGameEnd === 'function') {
+    _flagsCleanupVisuals();
     window._lobbyHandleGameEnd(finalScore);
     return;
   }
   // ── VERSUS 1v1: pantalla de resultado W/L en vez del gameover normal ──
+  // Keep visual assets (machines, flag, luggage) alive as background during W/L result.
+  // flagsHardReset (via quitToMenu) handles cleanup when user exits.
   if (window._vsActive && typeof window._vsHandleGameEnd === 'function') {
     window._vsHandleGameEnd(finalScore);
     return;
   }
+
+  _flagsCleanupVisuals();
 
   // ── PRÁCTICA: redirigir al panel ──────────────────────────
   if (window.practiceConfig && window.practiceConfig.active) {

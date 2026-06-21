@@ -3037,7 +3037,7 @@ const SPEED_BONUS_WIN = 3;
 const SPEED_MULT      = 1.25;
 
 // Pixel thresholds on the DISPLAYED canvas
-const PERFECT_PX = 6;
+const PERFECT_PX = 8;
 const GOOD_PX    = 20;
 const FAIR_PX    = 45;
 
@@ -3407,6 +3407,50 @@ function buildFriendPlayers() {
     initial: (f.name && f.name[0]) ? f.name[0].toUpperCase() : '?',
   }));
 }
+
+// ── Hooks VS para modo Cities ─────────────────────────────────────────────────
+window.citiesSetVsDisconnected = function(disconnected) {
+  const el = typeof lbElements !== 'undefined' ? lbElements['lb-vsopp'] : null;
+  if (!el) return;
+  el.classList.toggle('is-disconnected', !!disconnected);
+};
+window.citiesSetVsOpponentScore = function(score) {
+  window._vsOppScore = score;
+  if (typeof window._lbUpdateEntry === 'function') window._lbUpdateEntry('vsopp', score);
+  if (typeof positionLeaderboard === 'function' && state) positionLeaderboard(state.score, true);
+};
+window.citiesTriggerOpponentWrong = function() {
+  if (typeof window._lbWrongEffect === 'function') window._lbWrongEffect('vsopp');
+};
+
+// ── Hooks Lobby para modo Cities ──────────────────────────────────────────────
+window.citiesSetLobbyScores = function(members) {
+  if (!Array.isArray(members) || typeof window._lbUpdateEntry !== 'function') return;
+  members.forEach(m => window._lbUpdateEntry('lob' + m.id, m.score || 0));
+  if (typeof positionLeaderboard === 'function' && state) positionLeaderboard(state.score, true);
+};
+window.citiesSetLobbyWrongFor = function(uid) {
+  const myId = window._sbUserId;
+  const key = (!uid || uid === myId) ? 'player' : ('lob' + uid);
+  if (typeof window._lbWrongEffect === 'function') window._lbWrongEffect(key);
+};
+window.citiesSetLobbyDisconnected = function(uid, disconnected) {
+  const el = typeof lbElements !== 'undefined' ? lbElements['lb-lob' + uid] : null;
+  if (!el) return;
+  el.classList.toggle('is-disconnected', !!disconnected);
+};
+window.citiesHardReset = function() {
+  try { gameAborted = true; } catch(e) {}
+  try { pregameAborted = true; clearTimeout(pregameTimeout); pregameTimeout = null; } catch(e) {}
+  try { clearTimeout(endGameTimeout1); clearTimeout(endGameTimeout2); } catch(e) {}
+  try { clearInterval(timerIntervalId); } catch(e) {}
+  try { if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; } } catch(e) {}
+  const _sbt = document.getElementById('speed-bonus-text');
+  if (_sbt) _sbt.classList.remove('visible');
+  const _tuo = document.getElementById('timeup-overlay');
+  if (_tuo) { _tuo.style.display = 'none'; _tuo.classList.remove('timeup-in','timeup-out'); }
+};
+
 let mockPlayers = buildFriendPlayers();
 
 // Highscore global = mejor total de campaña (suma de los 4 modos), guardado por
@@ -4051,6 +4095,11 @@ canvas.addEventListener('click', (e) => {
   const hintMult = slideTagIn._hintShown ? 0.5 : 1;
   const totalGained = Math.round((base + bonusAmt + streakBonus) * hintMult) + inRowBonus;
   state.score += totalGained;
+  if (window.pendingGameMode === 'game') {
+    if (window._vsActive && typeof window._vsReportAnswer === 'function') window._vsReportAnswer(grade !== 'wayoff', Math.round(state.score));
+    if (window._lobbyActive && typeof window._lobbyReportAnswer === 'function') window._lobbyReportAnswer(grade !== 'wayoff', Math.round(state.score));
+    if (grade === 'wayoff' && (window._vsActive || window._lobbyActive) && typeof window._lbWrongEffect === 'function') window._lbWrongEffect('player');
+  }
   if (base + bonusAmt + streakBonus > 0) showScorePopup(Math.round((base + bonusAmt + streakBonus) * hintMult));
   if (bonusAmt > 0) {
     clearTimeout(speedBonusHideId);
@@ -4091,9 +4140,12 @@ canvas.addEventListener('click', (e) => {
     // wayoff en práctica: no eliminar del pool tampoco
   }
 
-  // En práctica con ciudades: perfecto → marcar como completada; si no, sigue en el pool (practiceCityFullPool la mantiene disponible)
+  // En práctica con ciudades: marcar como completada según regiones seleccionadas
+  // >1 región → perfecto O bien la sacan del pool; 1 región → solo perfecto
   if (isPractice && window.pendingGameMode === 'game') {
-    if (grade === 'perfect') {
+    const multiRegion = window.practiceConfig && window.practiceConfig.continents && window.practiceConfig.continents.size > 1;
+    const qualifies = grade === 'perfect' || (multiRegion && grade === 'good');
+    if (qualifies) {
       state.citiesPerfect.add(state.currentCity.name);
     }
   }
@@ -4524,6 +4576,16 @@ function endGame() {
       const cwHide = document.getElementById('countdown-widget');
       if (cwHide) cwHide.style.display = 'none';
 
+      // ── VERSUS: redirigir al resultado W/L ───────────────
+      if (window._vsActive && window.pendingGameMode === 'game' && typeof window._vsHandleGameEnd === 'function') {
+        window._vsHandleGameEnd(state.score);
+        return;
+      }
+      // ── LOBBY: reportar fin de modo al sistema grupal ─────
+      if (window._lobbyActive && window.pendingGameMode === 'game' && typeof window._lobbyHandleGameEnd === 'function') {
+        window._lobbyHandleGameEnd(state.score);
+        return;
+      }
       // ── PRÁCTICA: redirigir al panel de práctica ──────────
       if (window.practiceConfig && window.practiceConfig.active) {
         window.practiceConfig.active = false;
@@ -4723,7 +4785,7 @@ function startGame() {
   scoreValueEl.textContent     = (window.campaignBase ? window.campaignBase() : 0).toLocaleString();
   lastLbScore = -1;
   lastPlayerRank = -1;
-  if (window.practiceConfig && window.practiceConfig.active) initLeaderboard();
+  if ((window._vsActive || window._lobbyActive) || (window.practiceConfig && window.practiceConfig.active)) initLeaderboard();
   sortLeaderboard(0);
   resultLabel.className        = '';
   speedBonusText.classList.remove('visible');
@@ -4817,6 +4879,7 @@ document.querySelector('.splash-confirm-wrap')?.addEventListener('click', () => 
     window._vsActive = false;
     window._lobbyActive = false;
     if (typeof window.flagsClearSeed === 'function') window.flagsClearSeed();
+    window.citiesClearSeed?.();
     if (window.pendingGameMode === 'flags') {
       splashScreen.style.display = 'none';
       if (typeof showFlagsMode !== 'undefined') showFlagsMode();

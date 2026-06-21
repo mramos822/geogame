@@ -7545,7 +7545,7 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   height: 100%;
   object-fit: contain;
   pointer-events: none;
-  opacity: 0;
+  opacity: 1;
   transition: opacity 0.15s;
 }
 .practice-continent-btn span {
@@ -7559,7 +7559,7 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   filter: grayscale(0%);
 }
 .practice-continent-btn.active .practice-continent-x {
-  opacity: 1;
+  opacity: 0;
 }
 .practice-continent-btn.active span {
   color: #111;

@@ -998,6 +998,7 @@ function shapesHardReset() {
 }
 window.gameStoppers = window.gameStoppers || [];
 window.gameStoppers.push(shapesHardReset);
+window.shapesHardReset = shapesHardReset;
 
 // Picks the next practice shape using the same tier-unlock logic as normal mode,
 // capped at practiceConfig.difficulty. Excludes `exc` (pass current when wrong, null when correct).
@@ -1169,20 +1170,18 @@ function showShapesMode() {
   }); // end runShapesPregame
 }
 
-function hideShapesMode() {
-  shapesUnblockInput();
-  // freeze & remove in-progress country display
-  document.querySelectorAll('.shapes-tag').forEach(t => t.remove());
-  document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
-  // Limpiar todos los elementos de ronda (no solo el último): en la transición
-  // entre formas puede quedar svgEl/board/img/clip de la ronda anterior si el
-  // setTimeout(200) no disparó a tiempo.
-  document.querySelectorAll('.shapes-stage-el').forEach(el => el.remove());
+function _shapesCleanupVisuals() {
+  document.querySelectorAll('.shapes-stage-el').forEach(el => { try { el.remove(); } catch(e) {} });
   shapesCurrentImg = shapesCurrentImg2 = shapesCurrentClip = null;
   shapesCurrentBoard = shapesCurrentSvg = null;
-
-  // remove countdown widget so it's recreated fresh next game
   document.getElementById('shapes-countdown-widget')?.remove();
+}
+
+function hideShapesMode() {
+  shapesUnblockInput();
+  // Quitar elementos interactivos inmediatamente (no se deben poder clickear)
+  document.querySelectorAll('.shapes-tag').forEach(t => t.remove());
+  document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
 
   // hide shared UI
   const scoreDisplay = document.getElementById('score-display');
@@ -1198,19 +1197,30 @@ function hideShapesMode() {
   const finalScore = Math.round(shapesScore);
   window.lastModeScore = finalScore;
 
-  if (window._suppressGameover) { window._suppressGameover = false; return; }
+  if (window._suppressGameover) {
+    _shapesCleanupVisuals();
+    window._suppressGameover = false;
+    return;
+  }
 
-  // ── VERSUS: reportar resultado y salir ────────────────────
+  // ── VERSUS: mantener los PNG de fondo hasta que el usuario salga al panel ──
+  // shapesHardReset (vía quitToMenu) limpia .shapes-stage-el cuando corresponde.
   if (window._vsActive && typeof window._vsHandleGameEnd === 'function') {
+    document.getElementById('shapes-countdown-widget')?.remove();
+    shapesCurrentImg = shapesCurrentImg2 = shapesCurrentClip = null;
+    shapesCurrentBoard = shapesCurrentSvg = null;
     window._vsHandleGameEnd(finalScore);
     return;
   }
 
   // ── LOBBY: reportar resultado al sistema de sala ──────────
   if (window._lobbyActive && typeof window._lobbyHandleGameEnd === 'function') {
+    _shapesCleanupVisuals();
     window._lobbyHandleGameEnd(finalScore);
     return;
   }
+
+  _shapesCleanupVisuals();
 
   // ── PRÁCTICA: redirigir al panel ──────────────────────────
   if (window.practiceConfig && window.practiceConfig.active) {

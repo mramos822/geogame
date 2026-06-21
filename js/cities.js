@@ -308,11 +308,20 @@ const CITY_UNLOCK_TIERS = [
   { at: 20, weights: { inicio: 0.15, facil: 0.35, medio: 0.35, dificil: 0.15 } },
 ];
 
+// ── Seeded RNG para Versus (mismas ciudades en ambos clientes) ──────────────
+let _citiesSeededRand = null;
+function citiesRand() { return _citiesSeededRand ? _citiesSeededRand() : Math.random(); }
+window.citiesSetSeed = function(seed) {
+  let s = seed >>> 0; if (!s) s = 1;
+  _citiesSeededRand = () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return (s >>> 0) / 0x100000000; };
+};
+window.citiesClearSeed = function() { _citiesSeededRand = null; };
+
 // continents: Set de strings (o null para sin filtro)
 function makeCityQueues(continents) {
   const shuffle = arr => {
     for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(citiesRand() * (i + 1));
       [arr[i], arr[j]] = [arr[j], arr[i]];
     }
     return arr;
@@ -341,7 +350,7 @@ function pickCity(queues, correctCount) {
   }
   // Selección ponderada
   const total = Object.values(weights).reduce((s, w) => s + w, 0);
-  let r = Math.random() * total;
+  let r = citiesRand() * total;
   let chosen = Object.keys(weights)[0];
   for (const [name, w] of Object.entries(weights)) {
     r -= w;

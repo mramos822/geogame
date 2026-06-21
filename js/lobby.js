@@ -13,6 +13,7 @@ window.LB = (() => {
   let _channel  = null;
   let _members  = [];     // [{id, name, avatar, score, isHost, is_playing}]
   let _memberProfilesChannel = null;
+  let _publicSignalCh = null; // canal para ENVIAR señales a viewers del panel público (host)
   let _lobby    = null;   // fila de la tabla lobbies
   let _seed     = null;
   let _onMembers   = null;
@@ -103,6 +104,10 @@ window.LB = (() => {
 
   function _subscribe() {
     if (_channel) _channel.unsubscribe();
+    // Suscribirse al canal público para poder emitir señales de actualización a los viewers
+    if (_publicSignalCh) { try { _publicSignalCh.unsubscribe(); } catch(e) {} }
+    // Nombre diferente a 'public-lobbies-watch' para no interferir con _publicChannel del viewer
+    _publicSignalCh = window.sb.channel('pub-room-signals', { config: { broadcast: { self: false } } }).subscribe();
     _resubTime = Date.now();
     const lid = _lobbyId;
     const uid = _myId();
@@ -279,10 +284,7 @@ window.LB = (() => {
     if (error) throw error;
     _lobbyId = data.id; _hostId = uid; _lobby = data; _seed = null;
     await window.sb.from('lobby_members').insert({ lobby_id: _lobbyId, user_id: uid, score: 0 });
-    // Nombre por defecto: "Sala de {host}" (best-effort: si la columna no existe, se ignora)
-    const myName = (window._sbProfile && window._sbProfile.username) || localStorage.getItem('playerName') || 'Host';
-    const defName = ((typeof t === 'function' ? t('lobby.roomOf') : 'Sala de')) + ' ' + myName;
-    try { await window.sb.from('lobbies').update({ name: defName }).eq('id', _lobbyId); _lobby.name = defName; } catch (e) {}
+    // No guardamos nombre localizado en DB: se construye desde i18n al mostrar (lobby.roomName)
     _subscribe();
     await _fetchMembers();
     return data;
@@ -329,6 +331,7 @@ window.LB = (() => {
       await window.sb.from('lobbies').update({ is_public: !!isPublic }).eq('id', _lobbyId);
       if (_lobby) _lobby.is_public = !!isPublic;
       sendVisibility(!!isPublic);
+      _publicSignalCh?.send({ type: 'broadcast', event: 'room-update', payload: { id: _lobbyId } });
     } catch (e) {}
   }
   function isPublic() { return !!(_lobby && _lobby.is_public); }
@@ -339,6 +342,7 @@ window.LB = (() => {
       await window.sb.from('lobbies').update({ name: name }).eq('id', _lobbyId);
       if (_lobby) _lobby.name = name;
       sendName(name);
+      _publicSignalCh?.send({ type: 'broadcast', event: 'room-update', payload: { id: _lobbyId, name } });
     } catch (e) {}
   }
   function getName() { return (_lobby && _lobby.name) || ''; }
@@ -410,6 +414,7 @@ window.LB = (() => {
     if (_members.length < 2) return; // hace falta al menos 2
     const seed = Math.floor(Math.random() * 1_000_000);
     await window.sb.from('lobbies').update({ status: 'active', seed }).eq('id', _lobbyId);
+    _publicSignalCh?.send({ type: 'broadcast', event: 'room-update', payload: { id: _lobbyId, started: true } });
     // El propio host arranca por el realtime UPDATE, igual que el resto.
   }
 
@@ -446,6 +451,7 @@ window.LB = (() => {
     // Estado local y broadcast siempre, aunque el DB falle
     if (_lobby) { _lobby.mode = modeEncoded; _lobby.modes = modes; }
     sendModes(modes);
+    _publicSignalCh?.send({ type: 'broadcast', event: 'room-update', payload: { id: _lobbyId } });
   }
 
   function getModes() {
@@ -526,6 +532,7 @@ window.LB = (() => {
     window._lobbyCountingDown = false;
     if (_memberProfilesChannel) { try { window.sb.removeChannel(_memberProfilesChannel); } catch (e) {} _memberProfilesChannel = null; }
     if (_channel) { _channel.unsubscribe(); _channel = null; }
+    if (_publicSignalCh) { try { _publicSignalCh.unsubscribe(); } catch(e) {} _publicSignalCh = null; }
     Object.values(_graceTimers).forEach(clearTimeout);
     for (const k in _graceTimers) delete _graceTimers[k];
     _pendingKicks.clear();
@@ -884,12 +891,14 @@ window.Lobby = (() => {
       const isMine = myLobbyId && myLobbyId === r.id;
       const row = document.createElement('div');
       row.className = 'versus-friend-row';
+      row.dataset.lobbyId = r.id;
       const roomModes = _getActiveModes(r);
       const modeIconsHtml = _modeIconsHtml(roomModes, 'public-room-mode-icon');
+      const displayName = r.name || (typeof t === 'function' ? t('lobby.roomName', { name: r.hostName }) : ('Sala de ' + r.hostName));
       row.innerHTML =
         `<div class="versus-friend-info">` +
           `<div class="public-room-name-row">` +
-            `<span class="versus-friend-name">${r.name || (T('lobby.roomOf', 'Sala de') + ' ' + r.hostName)}</span>` +
+            `<span class="versus-friend-name">${displayName}</span>` +
             `<div class="public-room-mode-icons">${modeIconsHtml}</div>` +
           `</div>` +
           `<span class="versus-friend-status">${r.count}/${r.max} ${T('lobby.players', 'jugadores')}</span>` +
@@ -939,7 +948,7 @@ window.Lobby = (() => {
     _stopCountdown();
     window.practiceConfig = window.practiceConfig || {};
     window.practiceConfig.active = false;
-    window.pendingGameMode = mode;
+    window.pendingGameMode = mode === 'cities' ? 'game' : mode;
     if (typeof window._setPlaying === 'function') window._setPlaying(true);
 
     const _ls = document.getElementById('loading-screen');
@@ -961,7 +970,7 @@ window.Lobby = (() => {
     // Cuando cambian los scores de la sala (realtime) → actualizar leaderboard
     window.LB.onMembers(() => {
       _refreshLobbyOpponents();
-      const scoresFn = mode === 'shapes' ? window.shapesSetLobbyScores : window.flagsSetLobbyScores;
+      const scoresFn = mode === 'shapes' ? window.shapesSetLobbyScores : mode === 'cities' ? window.citiesSetLobbyScores : window.flagsSetLobbyScores;
       if (typeof scoresFn === 'function') scoresFn(window._lobbyMembers);
       if (_finishedPlayers.size > 0) _checkAllFinished();
     });
@@ -974,21 +983,21 @@ window.Lobby = (() => {
     window.LB.onScore((uid, score) => {
       const lm = (window._lobbyMembers || []).find(m => m.id === uid);
       if (lm) lm.score = score;
-      const scoresFn = mode === 'shapes' ? window.shapesSetLobbyScores : window.flagsSetLobbyScores;
+      const scoresFn = mode === 'shapes' ? window.shapesSetLobbyScores : mode === 'cities' ? window.citiesSetLobbyScores : window.flagsSetLobbyScores;
       if (typeof scoresFn === 'function') scoresFn(window._lobbyMembers || []);
     });
     // Alguien en la sala falló → glow en su tarjeta específica del lb
     window.LB.onWrong(uid => {
-      const wrongFn = mode === 'shapes' ? window.shapesSetLobbyWrongFor : window.flagsTriggerLobbyWrongFor;
+      const wrongFn = mode === 'shapes' ? window.shapesSetLobbyWrongFor : mode === 'cities' ? window.citiesSetLobbyWrongFor : window.flagsTriggerLobbyWrongFor;
       if (typeof wrongFn === 'function') wrongFn(uid);
     });
     // Alguien perdió/recuperó presencia → mostrar/ocultar estado desconectado en su tarjeta
     window.LB.onPlayerGone(uid => {
-      const goneFn = mode === 'shapes' ? window.shapesSetLobbyDisconnected : window.flagsSetLobbyDisconnected;
+      const goneFn = mode === 'shapes' ? window.shapesSetLobbyDisconnected : mode === 'cities' ? window.citiesSetLobbyDisconnected : window.flagsSetLobbyDisconnected;
       if (typeof goneFn === 'function') goneFn(uid, true);
     });
     window.LB.onPlayerBack(uid => {
-      const backFn = mode === 'shapes' ? window.shapesSetLobbyDisconnected : window.flagsSetLobbyDisconnected;
+      const backFn = mode === 'shapes' ? window.shapesSetLobbyDisconnected : mode === 'cities' ? window.citiesSetLobbyDisconnected : window.flagsSetLobbyDisconnected;
       if (typeof backFn === 'function') backFn(uid, false);
     });
     // Si quedé solo (todos los demás abandonaron durante la partida) → volver a sala
@@ -1015,6 +1024,7 @@ window.Lobby = (() => {
       // Restaurar loading screen y panel de sala (igual que _presentFinalResult)
       const ls = document.getElementById('loading-screen');
       if (ls) { ls.style.display = 'flex'; ls.style.opacity = '1'; ls.classList.remove('lobby-interim-bg'); ls.classList.add('table-shown'); }
+      try { if (typeof playMusic === 'function' && typeof sfxMenuMusic !== 'undefined') playMusic(sfxMenuMusic); } catch(e) {}
       if (typeof window.showVersusPanel === 'function') window.showVersusPanel();
       if (typeof window.versusGoTo === 'function') window.versusGoTo('lobby');
       enterLobby();
@@ -1034,6 +1044,9 @@ window.Lobby = (() => {
     if (mode === 'shapes') {
       if (typeof window.shapesSetSeed === 'function') window.shapesSetSeed(modeSeed);
       if (typeof showShapesMode === 'function') showShapesMode();
+    } else if (mode === 'cities') {
+      if (typeof window.citiesSetSeed === 'function') window.citiesSetSeed(modeSeed);
+      if (typeof startGame === 'function') startGame();
     } else {
       if (typeof window.flagsSetSeed === 'function') window.flagsSetSeed(modeSeed);
       if (typeof showFlagsMode === 'function') showFlagsMode();
@@ -1089,15 +1102,18 @@ window.Lobby = (() => {
 
   // Limpia el modo de juego actual (flags o shapes) sin cerrar el lobby
   function _teardownCurrentMode() {
-    window._suppressGameover = true;
-    if (window.pendingGameMode === 'shapes') {
-      if (typeof hideShapesMode === 'function') hideShapesMode();
+    const teardownMode = _lobbyModes[_currentModeIdx] || 'flags';
+    if (teardownMode === 'shapes') {
+      window.shapesHardReset?.();
       if (typeof window.shapesClearSeed === 'function') window.shapesClearSeed();
+    } else if (teardownMode === 'cities') {
+      window.citiesHardReset?.();
+      if (typeof window.citiesClearSeed === 'function') window.citiesClearSeed();
     } else {
-      if (typeof hideFlagsMode === 'function') hideFlagsMode();
+      // flagsHardReset cancels all timers/intervals/abort flags; hideFlagsMode alone leaves flagsEndTimeout running
+      window.flagsHardReset?.();
       if (typeof window.flagsClearSeed === 'function') window.flagsClearSeed();
     }
-    window._suppressGameover = false;
   }
 
   // Pantalla intermedia entre modos: muestra ranking parcial + cuenta regresiva 10s
@@ -1124,7 +1140,8 @@ window.Lobby = (() => {
     const nextName = document.getElementById('lobby-intermediate-next-name');
 
     if (modeTag) {
-      const modeName = (_MODE_NAMES[window.pendingGameMode] || (() => window.pendingGameMode))();
+      const _activeMode = _lobbyModes[_currentModeIdx] || window.pendingGameMode;
+      const modeName = (_MODE_NAMES[_activeMode] || (() => _activeMode))();
       modeTag.textContent = modeName + '  ·  ' + (_currentModeIdx + 1) + '/' + _lobbyModes.length;
     }
     if (nextEl && nextMode) {
@@ -1162,6 +1179,7 @@ window.Lobby = (() => {
     if (ls) { ls.style.display = 'flex'; ls.style.opacity = '1'; ls.classList.add('lobby-interim-bg'); }
 
     if (screen) screen.style.display = 'flex';
+    try { if (typeof playMusic === 'function' && typeof sfxPostgame !== 'undefined') playMusic(sfxPostgame); } catch(e) {}
 
     // Teardown DESPUÉS de mostrar el overlay para que los assets del juego
     // permanezcan visibles hasta que la transición los cubra
@@ -1444,7 +1462,15 @@ window.Lobby = (() => {
     const conf  = document.getElementById('lobby-name-confirm-btn');
     if (!text) return;
     const host = window.LB.isHost();
-    const name = window.LB.getName() || T('lobby.unnamed', 'Sala');
+    const storedName = window.LB.getName();
+    let name;
+    if (storedName) {
+      name = storedName;
+    } else {
+      const hostMember = window.LB.getMembers().find(m => m.isHost);
+      const hostN = (hostMember && hostMember.name) || T('lobby.unnamed', 'Sala');
+      name = (typeof t === 'function') ? t('lobby.roomName', { name: hostN }) : hostN;
+    }
     if (_editingName && host) return; // no pisar mientras edita
     text.textContent = name;
     const iconsEl = document.getElementById('lobby-mode-icons');
@@ -2073,13 +2099,33 @@ window.Lobby = (() => {
     });
   }
 
-  // ── Realtime del panel de salas públicas ──────────────────────────────────────
-  let _publicChannel = null;
+  // Re-render room names when language switches (names are derived from i18n, not stored in DB)
+  if (typeof onLangChange === 'function') {
+    onLangChange(() => {
+      _refreshLobbyName();
+      const screen = document.getElementById('versus-screen-aleatorio');
+      if (screen && screen.style.display !== 'none') loadPublicList(true);
+    });
+  }
 
-  // Throttle: como lobby_members cambia frecuentemente (scores en partida), esperamos
-  // un tick corto antes de re-renderizar para agrupar ráfagas de cambios simultáneos.
+  // ── Realtime del panel de salas públicas ──────────────────────────────────────
+  // _publicChannel: postgres_changes (lobby_members/lobbies) → refresh periódico
+  // _publicSignalReceiveCh: recibe broadcasts del host (canal diferente para no colisionar)
+  let _publicChannel = null;
+  let _publicSignalReceiveCh = null;
+
   let _publicRefreshTimer = null;
-  function _schedulePublicRefresh() {
+  function _schedulePublicRefresh(msg) {
+    // Si el payload trae el nombre actualizado, aplicarlo directo al DOM sin re-fetch
+    const p = msg?.payload;
+    if (p?.id && typeof p.name !== 'undefined') {
+      const list = document.getElementById('versus-public-list');
+      if (list) {
+        const rowEl = list.querySelector(`.versus-friend-row[data-lobby-id="${p.id}"]`);
+        const nameSpan = rowEl?.querySelector('.versus-friend-name');
+        if (nameSpan) nameSpan.textContent = p.name;
+      }
+    }
     clearTimeout(_publicRefreshTimer);
     _publicRefreshTimer = setTimeout(() => loadPublicList(true), 400);
   }
@@ -2087,19 +2133,23 @@ window.Lobby = (() => {
   let _publicPollTimer = null;
 
   function startPublicRealtime() {
-    if (_publicChannel) return;
+    if (_publicChannel || _publicSignalReceiveCh) return;
+    // Canal postgres_changes — distinto nombre a 'pub-room-signals' para no interferir
     _publicChannel = window.sb.channel('public-lobbies-watch')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lobbies' }, _schedulePublicRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lobby_members' }, _schedulePublicRefresh)
       .subscribe();
-    // Polling de respaldo: por si postgres_changes en lobbies no está habilitado en Supabase
+    // Canal de señales del host: recibe broadcasts cuando el host cambia nombre/modo/visibilidad
+    _publicSignalReceiveCh = window.sb.channel('pub-room-signals')
+      .on('broadcast', { event: 'room-update' }, _schedulePublicRefresh)
+      .subscribe();
+    // Polling de respaldo: por si postgres_changes no está habilitado en Supabase
     _publicPollTimer = setInterval(() => loadPublicList(true), 6000);
   }
 
   function stopPublicRealtime() {
-    if (!_publicChannel) return;
-    try { _publicChannel.unsubscribe(); } catch (e) {}
-    _publicChannel = null;
+    if (_publicChannel) { try { _publicChannel.unsubscribe(); } catch (e) {} _publicChannel = null; }
+    if (_publicSignalReceiveCh) { try { _publicSignalReceiveCh.unsubscribe(); } catch (e) {} _publicSignalReceiveCh = null; }
     clearInterval(_publicPollTimer);
     _publicPollTimer = null;
   }

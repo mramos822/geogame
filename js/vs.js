@@ -5,6 +5,8 @@ function _startSeededRandom(seed, mode) {
   _vsCurrentMode = mode || 'flags';
   if (_vsCurrentMode === 'shapes') {
     if (typeof window.shapesSetSeed === 'function') window.shapesSetSeed(seed);
+  } else if (_vsCurrentMode === 'cities') {
+    window.citiesSetSeed?.(seed);
   } else {
     if (typeof window.flagsSetSeed === 'function') window.flagsSetSeed(seed);
   }
@@ -12,6 +14,8 @@ function _startSeededRandom(seed, mode) {
 function _restoreRandom() {
   if (_vsCurrentMode === 'shapes') {
     if (typeof window.shapesClearSeed === 'function') window.shapesClearSeed();
+  } else if (_vsCurrentMode === 'cities') {
+    window.citiesClearSeed?.();
   } else {
     if (typeof window.flagsClearSeed === 'function') window.flagsClearSeed();
   }
@@ -80,6 +84,7 @@ window.VS = (() => {
         // Gris permanente: mostrar desconexión visual inmediatamente
         if (typeof window.flagsSetVsDisconnected === 'function') window.flagsSetVsDisconnected(true);
         if (typeof window.shapesSetVsDisconnected === 'function') window.shapesSetVsDisconnected(true);
+        if (typeof window.citiesSetVsDisconnected === 'function') window.citiesSetVsDisconnected(true);
         _oppGoneTimer = setTimeout(() => { if (_onOppLeft) _onOppLeft(); }, OPP_GRACE_MS);
       })
       .on('presence', { event: 'join' }, ({ key }) => {
@@ -304,6 +309,16 @@ window.VS = (() => {
   // Pila de navegación para el botón "back"
   let _versusStack = ['root'];
 
+  // Refresh subtitle when language changes (textContent is set via JS, not data-i18n)
+  if (typeof onLangChange === 'function') {
+    onLangChange(() => {
+      const cur = _versusStack[_versusStack.length - 1];
+      if (!cur) return;
+      const sub = document.getElementById('versus-subtitle');
+      if (sub) sub.textContent = (VERSUS_SUBTITLES[cur] || (() => ''))();
+    });
+  }
+
   function _showScreen(name) {
     VERSUS_SCREENS.forEach(s => {
       const el = document.getElementById('versus-screen-' + s);
@@ -431,6 +446,9 @@ window.VS = (() => {
     } else if (e.target.closest('#vs-mode-btn-shapes')) {
       msel.style.display = 'none';
       _sendInvite(guestId, guestName, guestAvatar, 'shapes');
+    } else if (e.target.closest('#vs-mode-btn-cities')) {
+      msel.style.display = 'none';
+      _sendInvite(guestId, guestName, guestAvatar, 'cities');
     } else if (e.target.closest('#vs-mode-cancel')) {
       msel.style.display = 'none';
     }
@@ -618,7 +636,9 @@ window.VS = (() => {
     if (typeof window.showInviteNotif === 'function') {
       window.showInviteNotif({
         name,
-        sub: (match.mode === 'shapes' ? T('vs.challengedShapes', 'te retó a Siluetas 1v1') : T('vs.challengedYou', 'te retó a Banderas 1v1')),
+        sub: match.mode === 'shapes' ? T('vs.challengedShapes', 'te retó a Siluetas 1v1')
+           : match.mode === 'cities' ? T('vs.challengedCities', 'te retó a Ciudades 1v1')
+           : T('vs.challengedYou', 'te retó a Banderas 1v1'),
         onAccept: async () => {
           if (typeof window.removeVersusNotif === 'function') window.removeVersusNotif(match.id);
           try {
@@ -799,6 +819,12 @@ window.VS = (() => {
         const el = document.getElementById(id); if (el) el.style.display = 'none';
       });
       document.getElementById('speed-bonus-text')?.classList.remove('visible');
+    } else if (_vsCurrentMode === 'cities') {
+      window.citiesHardReset?.();
+      ['score-display', 'right-panel', 'pregame-countdown', 'countdown-widget', 'game-wrapper'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.style.display = 'none';
+      });
+      document.getElementById('speed-bonus-text')?.classList.remove('visible');
     } else {
       if (typeof window.flagsHardReset === 'function') { try { window.flagsHardReset(); } catch(e) {} }
       ['flags-countdown-widget', 'flags-score-display', 'flags-right-panel',
@@ -941,6 +967,8 @@ window.VS = (() => {
       const oppScore = isHost ? guestScore : hostScore;
       if (mode === 'shapes') {
         if (typeof window.shapesSetVsOpponentScore === 'function') window.shapesSetVsOpponentScore(oppScore);
+      } else if (mode === 'cities') {
+        window.citiesSetVsOpponentScore?.(oppScore);
       } else {
         if (typeof window.flagsSetVsOpponentScore === 'function') window.flagsSetVsOpponentScore(oppScore);
       }
@@ -950,6 +978,8 @@ window.VS = (() => {
     window.VS.onWrong(() => {
       if (mode === 'shapes') {
         if (typeof window.shapesTriggerOpponentWrong === 'function') window.shapesTriggerOpponentWrong();
+      } else if (mode === 'cities') {
+        window.citiesTriggerOpponentWrong?.();
       } else {
         if (typeof window.flagsTriggerOpponentWrong === 'function') window.flagsTriggerOpponentWrong();
       }
@@ -964,6 +994,9 @@ window.VS = (() => {
     _startSeededRandom(seed, mode);
     if (mode === 'shapes') {
       if (typeof showShapesMode === 'function') showShapesMode();
+    } else if (mode === 'cities') {
+      window.pendingGameMode = 'game';
+      if (typeof startGame === 'function') startGame();
     } else {
       if (typeof showFlagsMode === 'function') showFlagsMode();
     }
