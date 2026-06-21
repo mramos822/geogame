@@ -229,11 +229,16 @@
         <img class="loading-social-planet" src="images/sword.png" alt="" draggable="false" oncontextmenu="return false">
         <span class="loading-social-title" data-i18n="versus.lobbyTitle">Gira Competitiva</span>
         <img class="loading-social-planet" src="images/sword.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+      <div class="versus-titlebar-actions">
         <button id="versus-notif-bell" class="versus-notif-bell" type="button" title="Invitaciones pendientes">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6V11c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
           <span id="versus-notif-badge" class="versus-notif-badge" style="display:none">0</span>
         </button>
       </div>
+      <button class="versus-return-lobby" id="versus-return-lobby" type="button" style="display:none">
+        <span>↩</span><span data-i18n="lobby.myRoom">Mi sala</span>
+      </button>
       <!-- Inbox de invitaciones pendientes -->
       <div id="versus-notif-panel" class="versus-notif-panel" style="display:none">
         <div class="versus-notif-panel-head" data-i18n="notif.inbox">Invitaciones</div>
@@ -335,10 +340,6 @@
         </div>
       </div>
 
-      <button class="versus-return-lobby" id="versus-return-lobby" type="button" style="display:none">
-        <span>↩</span><span data-i18n="lobby.myRoom">Mi sala</span>
-      </button>
-
       <div id="versus-toast-stack" class="versus-toast-stack"></div>
     </div>
 
@@ -350,16 +351,20 @@
         <span class="vs-popup-sub" data-i18n="vs.chooseMode">¿Qué modo quieren jugar?</span>
         <div class="vs-mode-btns">
           <button class="vs-mode-btn" id="vs-mode-btn-flags">
-            <span class="vs-mode-icon">🏴</span>
-            <span class="vs-mode-label" data-i18n="nav.flags">Banderas</span>
+            <img class="vs-mode-icon" src="images/game1.png" alt="" draggable="false" oncontextmenu="return false">
+            <span class="vs-mode-label">Suitcase Shuffle</span>
           </button>
           <button class="vs-mode-btn" id="vs-mode-btn-shapes">
-            <span class="vs-mode-icon">🗺️</span>
-            <span class="vs-mode-label" data-i18n="nav.shapes">Siluetas</span>
+            <img class="vs-mode-icon" src="images/game2.png" alt="" draggable="false" oncontextmenu="return false">
+            <span class="vs-mode-label">Map Mayhem</span>
           </button>
           <button class="vs-mode-btn" id="vs-mode-btn-cities">
-            <span class="vs-mode-icon">📍</span>
-            <span class="vs-mode-label" data-i18n="nav.cities">Ciudades</span>
+            <img class="vs-mode-icon" src="images/game3.png" alt="" draggable="false" oncontextmenu="return false">
+            <span class="vs-mode-label">City Blitz</span>
+          </button>
+          <button class="vs-mode-btn" id="vs-mode-btn-monuments">
+            <img class="vs-mode-icon" src="images/game4.png" alt="" draggable="false" oncontextmenu="return false">
+            <span class="vs-mode-label">Landmark Loco</span>
           </button>
         </div>
         <div class="vs-popup-confirm" id="vs-mode-cancel">
@@ -388,10 +393,9 @@
             <img src="images/game3.png" alt="cities">
             <span data-i18n="nav.cities">Ciudades</span>
           </button>
-          <button class="lobby-mode-pick-btn lobby-mode-soon" data-mode="monuments" type="button" disabled>
+          <button class="lobby-mode-pick-btn" data-mode="monuments" type="button">
             <img src="images/game4.png" alt="monuments">
             <span data-i18n="nav.monuments">Monumentos</span>
-            <span class="lobby-mode-soon-badge" data-i18n="lobby.soon">Próx.</span>
           </button>
         </div>
         <div class="lobby-mode-order-section" id="lobby-mode-order-section" style="display:none">
@@ -1044,7 +1048,7 @@
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
     </div>
-    <div id="loading-version">Ver. 2.6.78</div>
+    <div id="loading-version">Ver. 2.6.79</div>
   </div>
 
   <!-- Pantalla de resultado versus (W/L) — fuera del loading-screen para verse tras la partida -->

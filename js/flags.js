@@ -1569,7 +1569,7 @@ function flagsHardReset() {
     if (flagsLuggageWrap) flagsLuggageWrap.classList.add('flags-game-ended');
     // Detener el titilo del countdown
     if (flagsTimerImg) flagsTimerImg.style.animationPlayState = 'paused';
-  } else {
+  } else if (!window._vsShowingResult) {
     // Ocultar/parar máquina, equipaje, banderas, overlays y countdown
     [flagsMachine, flagsMachine2, flagsMachine3, flagsMachine3b].forEach(m => {
       if (!m) return;

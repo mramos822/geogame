@@ -2867,7 +2867,7 @@ window.quitToMenu = quitToMenu;
     return el && getComputedStyle(el).display !== 'none';
   };
   const refreshIngamePower = () => {
-    const blocked = isVisible('loading-screen') || isVisible('results-screen') || isVisible('final-screen');
+    const blocked = isVisible('loading-screen') || isVisible('results-screen') || isVisible('final-screen') || isVisible('vs-result-screen');
     const prepost = isVisible('splash-screen') || isVisible('gameover-screen');
     // score-display / flags-score-display están visibles durante el juego de
     // cualquier modo (shapes agrega sus piezas al body, no usa game-wrapper).
@@ -2930,7 +2930,7 @@ window.quitToMenu = quitToMenu;
   const obs = new MutationObserver(refreshIngamePower);
   ['loading-screen','splash-screen','game-wrapper','flags-wrapper',
    'gameover-screen','results-screen','final-screen','score-display',
-   'flags-score-display'].forEach(id => {
+   'flags-score-display','vs-result-screen'].forEach(id => {
     const el = document.getElementById(id);
     if (el) obs.observe(el, { attributes: true, attributeFilter: ['style'] });
   });
@@ -3422,6 +3422,14 @@ window.citiesSetVsOpponentScore = function(score) {
 window.citiesTriggerOpponentWrong = function() {
   if (typeof window._lbWrongEffect === 'function') window._lbWrongEffect('vsopp');
 };
+window.monumentsSetVsOpponentScore = function(score) {
+  window._vsOppScore = score;
+  if (typeof window._lbUpdateEntry === 'function') window._lbUpdateEntry('vsopp', score);
+  if (typeof positionLeaderboard === 'function' && state) positionLeaderboard(state.score, true);
+};
+window.monumentsTriggerOpponentWrong = function() {
+  if (typeof window._lbWrongEffect === 'function') window._lbWrongEffect('vsopp');
+};
 
 // ── Hooks Lobby para modo Cities ──────────────────────────────────────────────
 window.citiesSetLobbyScores = function(members) {
@@ -3449,6 +3457,43 @@ window.citiesHardReset = function() {
   if (_sbt) _sbt.classList.remove('visible');
   const _tuo = document.getElementById('timeup-overlay');
   if (_tuo) { _tuo.style.display = 'none'; _tuo.classList.remove('timeup-in','timeup-out'); }
+};
+
+// ── Monuments lobby hooks (idéntico al patrón de cities) ─────────────────────
+let _monumentsSeededRand = null;
+function monumentsRand() { return _monumentsSeededRand ? _monumentsSeededRand() : Math.random(); }
+window.monumentsSetSeed = function(seed) {
+  let s = seed >>> 0; if (!s) s = 1;
+  _monumentsSeededRand = () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return (s >>> 0) / 0x100000000; };
+};
+window.monumentsClearSeed = function() { _monumentsSeededRand = null; };
+
+window.monumentsHardReset = function() {
+  try { gameAborted = true; } catch(e) {}
+  try { pregameAborted = true; clearTimeout(pregameTimeout); pregameTimeout = null; } catch(e) {}
+  try { clearTimeout(endGameTimeout1); clearTimeout(endGameTimeout2); } catch(e) {}
+  try { clearInterval(timerIntervalId); } catch(e) {}
+  try { if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; } } catch(e) {}
+  const _sbt = document.getElementById('speed-bonus-text');
+  if (_sbt) _sbt.classList.remove('visible');
+  const _tuo = document.getElementById('timeup-overlay');
+  if (_tuo) { _tuo.style.display = 'none'; _tuo.classList.remove('timeup-in','timeup-out'); }
+};
+
+window.monumentsSetLobbyScores = function(members) {
+  if (!Array.isArray(members) || typeof window._lbUpdateEntry !== 'function') return;
+  members.forEach(m => window._lbUpdateEntry('lob' + m.id, m.score || 0));
+  if (typeof positionLeaderboard === 'function' && state) positionLeaderboard(state.score, true);
+};
+window.monumentsSetLobbyWrongFor = function(uid) {
+  const myId = window._sbUserId;
+  const key = (!uid || uid === myId) ? 'player' : ('lob' + uid);
+  if (typeof window._lbWrongEffect === 'function') window._lbWrongEffect(key);
+};
+window.monumentsSetLobbyDisconnected = function(uid, disconnected) {
+  const el = typeof lbElements !== 'undefined' ? lbElements['lb-lob' + uid] : null;
+  if (!el) return;
+  el.classList.toggle('is-disconnected', !!disconnected);
 };
 
 let mockPlayers = buildFriendPlayers();
@@ -3718,7 +3763,7 @@ function resetState() {
     cityPool: shuffle(practiceGetCityPool()),
     cityQueues: makeCityQueues(null),     // weighted random for normal mode
     practiceCityFullPool: practiceGetCityPool(), // fixed reference for practice exhaustion + picking
-    monumentPool: shuffle(practiceGetMonumentPool()),
+    monumentPool: shuffle(practiceGetMonumentPool(), monumentsRand),
     monumentsCorrectCount: 0,
     monumentsUnlocked: false,
     monumentsSeen: new Set(),
@@ -3756,9 +3801,9 @@ function classify(px) {
   return 'wayoff';
 }
 
-function shuffle(arr) {
+function shuffle(arr, rng = Math.random) {
   for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rng() * (i + 1));
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
@@ -3967,7 +4012,7 @@ function nextCity() {
           endGame();
           return;
         }
-        state.monumentPool = shuffle(unseen.length ? unseen : [...base]);
+        state.monumentPool = shuffle(unseen.length ? unseen : [...base], monumentsRand);
         state.poolIndex = 0;
       }
       state.currentCity = state.monumentPool[state.poolIndex++];
@@ -4095,7 +4140,7 @@ canvas.addEventListener('click', (e) => {
   const hintMult = slideTagIn._hintShown ? 0.5 : 1;
   const totalGained = Math.round((base + bonusAmt + streakBonus) * hintMult) + inRowBonus;
   state.score += totalGained;
-  if (window.pendingGameMode === 'game') {
+  if (window.pendingGameMode === 'game' || window.pendingGameMode === 'monuments') {
     if (window._vsActive && typeof window._vsReportAnswer === 'function') window._vsReportAnswer(grade !== 'wayoff', Math.round(state.score));
     if (window._lobbyActive && typeof window._lobbyReportAnswer === 'function') window._lobbyReportAnswer(grade !== 'wayoff', Math.round(state.score));
     if (grade === 'wayoff' && (window._vsActive || window._lobbyActive) && typeof window._lbWrongEffect === 'function') window._lbWrongEffect('player');
@@ -4131,7 +4176,7 @@ canvas.addEventListener('click', (e) => {
         if (state.monumentsCorrectCount >= 3) {
           state.monumentsUnlocked = true;
           const remaining = MONUMENTS.filter(m => !state.monumentsSeen.has(m.name));
-          state.monumentPool = shuffle(remaining.length ? remaining : [...MONUMENTS]);
+          state.monumentPool = shuffle(remaining.length ? remaining : [...MONUMENTS], monumentsRand);
           state.poolIndex = 0;
         }
       }
@@ -4577,12 +4622,12 @@ function endGame() {
       if (cwHide) cwHide.style.display = 'none';
 
       // ── VERSUS: redirigir al resultado W/L ───────────────
-      if (window._vsActive && window.pendingGameMode === 'game' && typeof window._vsHandleGameEnd === 'function') {
+      if (window._vsActive && (window.pendingGameMode === 'game' || window.pendingGameMode === 'monuments') && typeof window._vsHandleGameEnd === 'function') {
         window._vsHandleGameEnd(state.score);
         return;
       }
       // ── LOBBY: reportar fin de modo al sistema grupal ─────
-      if (window._lobbyActive && window.pendingGameMode === 'game' && typeof window._lobbyHandleGameEnd === 'function') {
+      if (window._lobbyActive && (window.pendingGameMode === 'game' || window.pendingGameMode === 'monuments') && typeof window._lobbyHandleGameEnd === 'function') {
         window._lobbyHandleGameEnd(state.score);
         return;
       }

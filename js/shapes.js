@@ -981,7 +981,7 @@ function shapesHardReset() {
   clearTimeout(shapesCurrentClipFadeTimeout);
   clearTimeout(shapesSpeedBonusHideId);
   if (typeof sfxCountdown !== 'undefined') { try { sfxCountdown.pause(); sfxCountdown.currentTime = 0; } catch (e) {} }
-  if (!window._powerQuitOverlay) {
+  if (!window._powerQuitOverlay && !window._vsShowingResult) {
     // Quitar silueta/tag/board en curso y el countdown widget
     document.querySelectorAll('.shapes-tag').forEach(t => t.remove());
     document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());

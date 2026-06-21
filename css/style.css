@@ -6148,6 +6148,17 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   -webkit-text-stroke-color: #b3261a;
 }
 /* ── Bell de notificaciones ─────────────────────────────────────────────── */
+.versus-titlebar-actions {
+  position: absolute;
+  top: calc(50% - 30cqmin);
+  right: calc(50% - 46cqmin);
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 1.5cqmin;
+  z-index: 222;
+}
+
 .versus-notif-bell {
   position: relative;
   flex: none;
@@ -6834,9 +6845,9 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
 /* Botón "volver a mi sala" */
 .versus-return-lobby {
   position: absolute;
-  top: 28%;
-  left: calc(50% + 40cqmin);
-  transform: translate(-50%, -50%);
+  bottom: 13cqmin;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 0.8cqmin;
@@ -6853,7 +6864,7 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   transition: transform 0.08s;
 }
 .versus-return-lobby:hover  { background: #119a64; }
-.versus-return-lobby:active { transform: translate(-50%, -50%) translateY(0.3cqmin); box-shadow: none; }
+.versus-return-lobby:active { transform: translateX(-50%) translateY(0.3cqmin); box-shadow: none; }
 
 /* Popup de invitar amigos */
 .lobby-invite-box { min-width: 86cqmin; gap: 1.6cqmin; }
@@ -7266,7 +7277,7 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
 }
 .vs-mode-btn:hover { background: rgba(255,255,255,0.22); transform: scale(1.04); }
 .vs-mode-btn:active { transform: scale(0.97); }
-.vs-mode-icon { font-size: 6cqmin; line-height: 1; }
+.vs-mode-icon { width: 7cqmin; height: 7cqmin; object-fit: contain; display: block; }
 .vs-mode-label { font-size: 2.8cqmin; font-family: 'VAGRoundBold', 'Arial Black', sans-serif; }
 
 /* ── Pantalla de resultado versus (W/L) ── */

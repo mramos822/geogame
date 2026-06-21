@@ -7,6 +7,8 @@ function _startSeededRandom(seed, mode) {
     if (typeof window.shapesSetSeed === 'function') window.shapesSetSeed(seed);
   } else if (_vsCurrentMode === 'cities') {
     window.citiesSetSeed?.(seed);
+  } else if (_vsCurrentMode === 'monuments') {
+    window.monumentsSetSeed?.(seed);
   } else {
     if (typeof window.flagsSetSeed === 'function') window.flagsSetSeed(seed);
   }
@@ -16,6 +18,8 @@ function _restoreRandom() {
     if (typeof window.shapesClearSeed === 'function') window.shapesClearSeed();
   } else if (_vsCurrentMode === 'cities') {
     window.citiesClearSeed?.();
+  } else if (_vsCurrentMode === 'monuments') {
+    window.monumentsClearSeed?.();
   } else {
     if (typeof window.flagsClearSeed === 'function') window.flagsClearSeed();
   }
@@ -449,6 +453,9 @@ window.VS = (() => {
     } else if (e.target.closest('#vs-mode-btn-cities')) {
       msel.style.display = 'none';
       _sendInvite(guestId, guestName, guestAvatar, 'cities');
+    } else if (e.target.closest('#vs-mode-btn-monuments')) {
+      msel.style.display = 'none';
+      _sendInvite(guestId, guestName, guestAvatar, 'monuments');
     } else if (e.target.closest('#vs-mode-cancel')) {
       msel.style.display = 'none';
     }
@@ -635,10 +642,12 @@ window.VS = (() => {
     // Reto 1v1 → misma notificación NO bloqueante que las invitaciones a sala
     if (typeof window.showInviteNotif === 'function') {
       window.showInviteNotif({
+        persistent: true,
         name,
-        sub: match.mode === 'shapes' ? T('vs.challengedShapes', 'te retó a Siluetas 1v1')
-           : match.mode === 'cities' ? T('vs.challengedCities', 'te retó a Ciudades 1v1')
-           : T('vs.challengedYou', 'te retó a Banderas 1v1'),
+        sub: match.mode === 'shapes'    ? T('vs.challengedShapes',    'te retó a Map Mayhem 1v1')
+           : match.mode === 'cities'    ? T('vs.challengedCities',    'te retó a City Blitz 1v1')
+           : match.mode === 'monuments' ? T('vs.challengedMonuments', 'te retó a Landmark Loco 1v1')
+           : T('vs.challengedYou', 'te retó a Suitcase Shuffle 1v1'),
         onAccept: async () => {
           if (typeof window.removeVersusNotif === 'function') window.removeVersusNotif(match.id);
           try {
@@ -813,31 +822,22 @@ window.VS = (() => {
   function _onOpponentAbandoned() {
     if (_resultShown) return;
     _endedByAbandon = true;
+    // Marcar que el resultado VS está visible para que los hardResets no limpien assets
+    window._vsShowingResult = true;
+    // Parar timers/RAF del modo actual sin borrar assets ni ocultar elementos del juego
+    // (el overlay del resultado cubre todo con su fondo oscuro)
     if (_vsCurrentMode === 'shapes') {
       if (typeof window.shapesHardReset === 'function') { try { window.shapesHardReset(); } catch(e) {} }
-      ['score-display', 'right-panel', 'pregame-countdown'].forEach(id => {
-        const el = document.getElementById(id); if (el) el.style.display = 'none';
-      });
-      document.getElementById('speed-bonus-text')?.classList.remove('visible');
-    } else if (_vsCurrentMode === 'cities') {
-      window.citiesHardReset?.();
-      ['score-display', 'right-panel', 'pregame-countdown', 'countdown-widget', 'game-wrapper'].forEach(id => {
-        const el = document.getElementById(id); if (el) el.style.display = 'none';
-      });
-      document.getElementById('speed-bonus-text')?.classList.remove('visible');
+    } else if (_vsCurrentMode === 'cities' || _vsCurrentMode === 'monuments') {
+      (_vsCurrentMode === 'monuments' ? window.monumentsHardReset : window.citiesHardReset)?.();
     } else {
       if (typeof window.flagsHardReset === 'function') { try { window.flagsHardReset(); } catch(e) {} }
-      ['flags-countdown-widget', 'flags-score-display', 'flags-right-panel',
-       'flags-wrapper', 'flags-timeup-overlay'].forEach(id => {
-        const el = document.getElementById(id); if (el) el.style.display = 'none';
-      });
-      document.getElementById('flags-speed-bonus-text')?.classList.remove('visible');
     }
     const m = window.VS.getMatch() || {};
     const isHost   = window.VS.isHost();
     const myScore  = isHost ? (m.host_score || 0)  : (m.guest_score || 0);
     const oppScore = isHost ? (m.guest_score || 0) : (m.host_score || 0);
-    _showVsResult('abandoned', myScore, oppScore);
+    _showVsResult('win', myScore, oppScore, 'abandon');
   }
 
   // Llamado desde quitToMenu cuando salgo de una partida versus en curso.
@@ -854,6 +854,14 @@ window.VS = (() => {
   function _showVsResult(outcome, myScore, oppScore, reason) {
     if (_resultShown) return;
     _resultShown = true;
+    // Hide all HUD elements that could appear above the result overlay
+    ['score-display','countdown-widget','flags-score-display','flags-countdown-widget',
+     'shapes-countdown-widget','pregame-countdown','flags-pregame-countdown',
+     'right-panel','flags-right-panel','timeup-overlay','flags-timeup-overlay',
+     'speed-bonus-text','flags-speed-bonus-text','game-wrapper'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
     // Registrar el resultado en mi propio record (las tablas no cuentan empates)
     if ((outcome === 'win' || outcome === 'lose') && window._sbUserId
         && typeof window.sbRecordVersusResult === 'function') {
@@ -891,6 +899,7 @@ window.VS = (() => {
   }
 
   function _vsReturnToMenu() {
+    window._vsShowingResult = false;
     const screen = document.getElementById('vs-result-screen');
     if (screen) screen.style.display = 'none';
     // Registrar el match como finalizado en la DB (solo partidas normales; el abandono
@@ -969,6 +978,8 @@ window.VS = (() => {
         if (typeof window.shapesSetVsOpponentScore === 'function') window.shapesSetVsOpponentScore(oppScore);
       } else if (mode === 'cities') {
         window.citiesSetVsOpponentScore?.(oppScore);
+      } else if (mode === 'monuments') {
+        window.monumentsSetVsOpponentScore?.(oppScore);
       } else {
         if (typeof window.flagsSetVsOpponentScore === 'function') window.flagsSetVsOpponentScore(oppScore);
       }
@@ -980,6 +991,8 @@ window.VS = (() => {
         if (typeof window.shapesTriggerOpponentWrong === 'function') window.shapesTriggerOpponentWrong();
       } else if (mode === 'cities') {
         window.citiesTriggerOpponentWrong?.();
+      } else if (mode === 'monuments') {
+        window.monumentsTriggerOpponentWrong?.();
       } else {
         if (typeof window.flagsTriggerOpponentWrong === 'function') window.flagsTriggerOpponentWrong();
       }
@@ -996,6 +1009,8 @@ window.VS = (() => {
       if (typeof showShapesMode === 'function') showShapesMode();
     } else if (mode === 'cities') {
       window.pendingGameMode = 'game';
+      if (typeof startGame === 'function') startGame();
+    } else if (mode === 'monuments') {
       if (typeof startGame === 'function') startGame();
     } else {
       if (typeof showFlagsMode === 'function') showFlagsMode();

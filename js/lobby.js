@@ -175,7 +175,7 @@ window.LB = (() => {
       .on('presence', { event: 'leave' }, ({ key }) => {
         if (!key || key === uid) return;
         clearTimeout(_graceTimers[key]);
-        if (window._lobbyActive) {
+        if (window._lobbyActive || window._lobbyInTransition) {
           // Durante partida activa: reaccionar inmediatamente sin esperar el grace timer
           _pendingKicks.add(key);
           if (_onPlayerGone) _onPlayerGone(key);
@@ -620,6 +620,7 @@ window.LB = (() => {
     onPlayerGone: cb => { _onPlayerGone = cb; },
     onPlayerBack: cb => { _onPlayerBack = cb; },
     onAlone:      cb => { _onAlone = cb; if (cb) _aloneCalledThisGame = false; },
+    resetAloneGuard: () => { _aloneCalledThisGame = false; },
   };
 })();
 
@@ -987,6 +988,7 @@ window.Lobby = (() => {
     const mode = _lobbyModes[modeIdx] || 'flags';
 
     _stopCountdown();
+    _lobbyInTransition = false;
     window.practiceConfig = window.practiceConfig || {};
     window.practiceConfig.active = false;
     window.pendingGameMode = mode === 'cities' ? 'game' : mode;
@@ -1011,7 +1013,7 @@ window.Lobby = (() => {
     // Cuando cambian los scores de la sala (realtime) → actualizar leaderboard
     window.LB.onMembers(() => {
       _refreshLobbyOpponents();
-      const scoresFn = mode === 'shapes' ? window.shapesSetLobbyScores : mode === 'cities' ? window.citiesSetLobbyScores : window.flagsSetLobbyScores;
+      const scoresFn = mode === 'monuments' ? window.monumentsSetLobbyScores : mode === 'shapes' ? window.shapesSetLobbyScores : mode === 'cities' ? window.citiesSetLobbyScores : window.flagsSetLobbyScores;
       if (typeof scoresFn === 'function') scoresFn(window._lobbyMembers);
       if (_finishedPlayers.size > 0) _checkAllFinished();
     });
@@ -1024,32 +1026,39 @@ window.Lobby = (() => {
     window.LB.onScore((uid, score) => {
       const lm = (window._lobbyMembers || []).find(m => m.id === uid);
       if (lm) lm.score = score;
-      const scoresFn = mode === 'shapes' ? window.shapesSetLobbyScores : mode === 'cities' ? window.citiesSetLobbyScores : window.flagsSetLobbyScores;
+      const scoresFn = mode === 'monuments' ? window.monumentsSetLobbyScores : mode === 'shapes' ? window.shapesSetLobbyScores : mode === 'cities' ? window.citiesSetLobbyScores : window.flagsSetLobbyScores;
       if (typeof scoresFn === 'function') scoresFn(window._lobbyMembers || []);
     });
     // Alguien en la sala falló → glow en su tarjeta específica del lb
     window.LB.onWrong(uid => {
-      const wrongFn = mode === 'shapes' ? window.shapesSetLobbyWrongFor : mode === 'cities' ? window.citiesSetLobbyWrongFor : window.flagsTriggerLobbyWrongFor;
+      const wrongFn = mode === 'monuments' ? window.monumentsSetLobbyWrongFor : mode === 'shapes' ? window.shapesSetLobbyWrongFor : mode === 'cities' ? window.citiesSetLobbyWrongFor : window.flagsTriggerLobbyWrongFor;
       if (typeof wrongFn === 'function') wrongFn(uid);
     });
     // Alguien perdió/recuperó presencia → mostrar/ocultar estado desconectado en su tarjeta
     window.LB.onPlayerGone(uid => {
-      const goneFn = mode === 'shapes' ? window.shapesSetLobbyDisconnected : mode === 'cities' ? window.citiesSetLobbyDisconnected : window.flagsSetLobbyDisconnected;
+      const goneFn = mode === 'monuments' ? window.monumentsSetLobbyDisconnected : mode === 'shapes' ? window.shapesSetLobbyDisconnected : mode === 'cities' ? window.citiesSetLobbyDisconnected : window.flagsSetLobbyDisconnected;
       if (typeof goneFn === 'function') goneFn(uid, true);
     });
     window.LB.onPlayerBack(uid => {
-      const backFn = mode === 'shapes' ? window.shapesSetLobbyDisconnected : mode === 'cities' ? window.citiesSetLobbyDisconnected : window.flagsSetLobbyDisconnected;
+      const backFn = mode === 'monuments' ? window.monumentsSetLobbyDisconnected : mode === 'shapes' ? window.shapesSetLobbyDisconnected : mode === 'cities' ? window.citiesSetLobbyDisconnected : window.flagsSetLobbyDisconnected;
       if (typeof backFn === 'function') backFn(uid, false);
     });
     // Si quedé solo (todos los demás abandonaron durante la partida) → volver a sala
     window.LB.onAlone(() => {
-      if (!window._lobbyActive) return;
+      if (!window._lobbyActive && !_lobbyInTransition) return;
+      // Si estamos en la pantalla intermedia entre modos, limpiar su timer y overlay
+      if (_lobbyInTransition) {
+        _lobbyInTransition = false;
+        clearInterval(_intermediateTimer); _intermediateTimer = null;
+        const interScreen = document.getElementById('lobby-intermediate-screen');
+        if (interScreen) interScreen.style.display = 'none';
+      }
       _stopCountdown();
       _teardownCurrentMode();
       // Ocultar HUD del juego que hardReset no limpia + popup de confirmación de salida
       ['score-display','flags-score-display','countdown-widget',
        'flags-countdown-widget','pregame-countdown','flags-pregame-countdown',
-       'timeup-overlay','flags-timeup-overlay','ingame-quit-popup'].forEach(id => {
+       'timeup-overlay','flags-timeup-overlay','game-wrapper','ingame-quit-popup'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
       });
@@ -1096,6 +1105,9 @@ window.Lobby = (() => {
     } else if (mode === 'cities') {
       if (typeof window.citiesSetSeed === 'function') window.citiesSetSeed(modeSeed);
       if (typeof startGame === 'function') startGame();
+    } else if (mode === 'monuments') {
+      if (typeof window.monumentsSetSeed === 'function') window.monumentsSetSeed(modeSeed);
+      if (typeof startGame === 'function') startGame();
     } else {
       if (typeof window.flagsSetSeed === 'function') window.flagsSetSeed(modeSeed);
       if (typeof showFlagsMode === 'function') showFlagsMode();
@@ -1122,8 +1134,10 @@ window.Lobby = (() => {
 
   // ── Fin de partida grupal: esperar a todos antes de mostrar resultados ─────────
   let _finishedPlayers = new Map(); // uid → finalScore
-  let _resultPresented = false;
-  let _waitingTimeout  = null;
+  let _resultPresented   = false;
+  let _waitingTimeout    = null;
+  let _lobbyInTransition = false; // true entre modos (pantalla intermedia): alone sigue activo
+  Object.defineProperty(window, '_lobbyInTransition', { get: () => _lobbyInTransition, set: v => { _lobbyInTransition = v; }, configurable: true });
 
   function _showLobbyWaiting() {
     const el  = document.getElementById('lobby-waiting-overlay');
@@ -1158,6 +1172,9 @@ window.Lobby = (() => {
     } else if (teardownMode === 'cities') {
       window.citiesHardReset?.();
       if (typeof window.citiesClearSeed === 'function') window.citiesClearSeed();
+    } else if (teardownMode === 'monuments') {
+      window.monumentsHardReset?.();
+      if (typeof window.monumentsClearSeed === 'function') window.monumentsClearSeed();
     } else {
       // flagsHardReset cancels all timers/intervals/abort flags; hideFlagsMode alone leaves flagsEndTimeout running
       window.flagsHardReset?.();
@@ -1173,6 +1190,8 @@ window.Lobby = (() => {
     _hideLobbyWaiting();
     if (typeof window._setPlaying === 'function') window._setPlaying(false);
     window._lobbyActive = false;
+    _lobbyInTransition = true;
+    window.LB.resetAloneGuard?.();
     window._lobbyMembers = [];
     window.LB.onScore(null);
     window.LB.onWrong(null);
@@ -1268,6 +1287,7 @@ window.Lobby = (() => {
     _teardownCurrentMode();
     if (typeof window._setPlaying === 'function') window._setPlaying(false);
     window._lobbyActive = false;
+    _lobbyInTransition = false;
     window._lobbyMembers = [];
     // Procesar desconexiones que ocurrieron durante la partida (usa LB API para acceder a _pendingKicks)
     window.LB.processPendingKicks?.();
@@ -1377,6 +1397,7 @@ window.Lobby = (() => {
     window.campaignBase = null;
     if (typeof window.flagsClearSeed === 'function') window.flagsClearSeed();
     if (typeof window.shapesClearSeed === 'function') window.shapesClearSeed();
+    if (typeof window.monumentsClearSeed === 'function') window.monumentsClearSeed();
     if (window.LB.getId()) { try { window.LB.leave(); } catch (e) {} }
   };
 
@@ -1921,7 +1942,9 @@ window.Lobby = (() => {
       bar.style.width = '0%';
     }
     clearTimeout(_notifTimer);
-    _notifTimer = setTimeout(() => { const d = _notifDecline; _dismissNotif(); if (d) d(); }, NOTIF_MS);
+    if (!opts.persistent) {
+      _notifTimer = setTimeout(() => { const d = _notifDecline; _dismissNotif(); if (d) d(); }, NOTIF_MS);
+    }
   }
   function _dismissNotif() {
     const banner = document.getElementById('lobby-invite-notif');
