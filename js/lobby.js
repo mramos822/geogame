@@ -1025,6 +1025,7 @@ window.Lobby = (() => {
     // Si quedé solo (todos los demás abandonaron durante la partida) → volver a sala
     window.LB.onAlone(() => {
       if (!window._lobbyActive) return;
+      _stopCountdown();
       _teardownCurrentMode();
       window._lobbyActive = false;
       window._lobbyMembers = [];
