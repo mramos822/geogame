@@ -1960,7 +1960,7 @@ window.Lobby = (() => {
   window.dismissInviteNotif = _dismissNotif; // p. ej. cuando el host cancela el reto
 
   // ── Inbox de notificaciones ────────────────────────────────────────────────
-  const INBOX_TTL = 10 * 60 * 1000; // 10 minutos; se borra también al cerrar/reiniciar (sessionStorage)
+  const INBOX_TTL = 5 * 60 * 1000; // 5 minutos; se borra también al cerrar/refrescar (sessionStorage)
 
   function _inboxKey() { return window._sbUserId ? ('vs_inbox_' + window._sbUserId) : null; }
 
