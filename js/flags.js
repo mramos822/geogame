@@ -1655,6 +1655,7 @@ function endFlagsGame() {
 
 // ── BOTÓN DE INICIO ───────────────────────────────────────────────────────────
 document.getElementById('loading-flags-btn').addEventListener('click', () => {
+  window._autoDismissVsInvites?.();
   if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
   if (typeof window._setPlaying === 'function') window._setPlaying(true);
   window.pendingGameMode = 'flags';

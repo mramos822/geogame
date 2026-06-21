@@ -591,6 +591,7 @@ window._setPlaying = function(playing) {
 };
 
 document.getElementById('loading-play-btn').addEventListener('click', () => {
+  window._autoDismissVsInvites?.();
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   window._setPlaying(true);
   window.pendingGameMode = 'game';
@@ -5572,6 +5573,7 @@ document.getElementById('practice-score-btn')?.addEventListener('click', functio
 document.getElementById('practice-start-btn')?.addEventListener('click', function() {
   this.classList.add('confirm-pressed');
   setTimeout(() => this.classList.remove('confirm-pressed'), 200);
+  window._autoDismissVsInvites?.();
 
   const mode = window.practiceConfig.mode;
   if (!mode) return;

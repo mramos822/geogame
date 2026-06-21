@@ -2000,6 +2000,19 @@ window.Lobby = (() => {
   window.removeVersusNotif = _removeFromInbox;
   window.refreshVersusBell = _refreshBell;
 
+  // Declina automáticamente todos los retos 1v1 pendientes del inbox (p. ej. al empezar a jugar)
+  window._autoDismissVsInvites = function() {
+    const inbox = _loadInbox();
+    const vsItems = inbox.filter(x => x.type === 'vs');
+    if (!vsItems.length) return;
+    vsItems.forEach(item => {
+      _removeFromInbox(item.id);
+      if (window.VS && typeof window.VS.decline === 'function') window.VS.decline(item.matchId).catch(() => {});
+    });
+    _dismissNotif();
+    _closeNotifPanel();
+  };
+
   function _timeAgo(ts) {
     const diff = Math.floor((Date.now() - ts) / 60000);
     if (diff < 1) return T('notif.timeNow', 'Ahora');

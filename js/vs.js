@@ -71,6 +71,17 @@ window.VS = (() => {
         // Abandono explícito del rival (escribió status=abandoned con winner=nosotros)
         if (m.status === 'abandoned' && _onOppLeft) { clearTimeout(_oppGoneTimer); _onOppLeft(); }
         if (m.status === 'active' && _onScore) _onScore(m.host_score, m.guest_score);
+        // Guest rechazó / no está disponible → notificar al host
+        if ((m.status === 'declined' || m.status === 'expired') && _role === 'host' && !_started) {
+          _hideOutgoingPopup();
+          const T2 = (k, d) => (typeof t === 'function' ? t(k) : d);
+          if (typeof window.showVersusToast === 'function') {
+            window.showVersusToast(m.status === 'declined'
+              ? T2('vs.guestUnavailable', 'No está disponible ahora')
+              : T2('vs.inviteExpired',    'El reto expiró sin respuesta'));
+          }
+          cleanup();
+        }
       })
       // Score en tiempo real del rival: broadcast inmediato (no espera el WAL de postgres_changes)
       .on('broadcast', { event: 'score' }, ({ payload }) => {

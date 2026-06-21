@@ -1279,6 +1279,7 @@ function hideShapesMode() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 document.getElementById('loading-shapes-btn').addEventListener('click', () => {
+  window._autoDismissVsInvites?.();
   if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
   if (typeof window._setPlaying === 'function') window._setPlaying(true);
   if (typeof loadGameSFX !== 'undefined') loadGameSFX();
@@ -1327,6 +1328,7 @@ document.getElementById('loading-mode4-btn').addEventListener('mouseenter', () =
 });
 
 document.getElementById('loading-mode4-btn').addEventListener('click', () => {
+  window._autoDismissVsInvites?.();
   if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
   if (typeof window._setPlaying === 'function') window._setPlaying(true);
   if (typeof loadGameSFX !== 'undefined') loadGameSFX();
