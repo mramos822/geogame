@@ -1767,19 +1767,30 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
   let _rankingsCache = {};
 
   function _totalScore(p) {
-    return p.hs_total || ((p.hs_flags||0)+(p.hs_shapes||0)+(p.hs_cities||0)+(p.hs_monuments||0));
+    // hs_total may be NULL in DB — always compute from individual fields as fallback
+    const fromCols = (p.hs_flags||0)+(p.hs_shapes||0)+(p.hs_cities||0)+(p.hs_monuments||0);
+    return Math.max(p.hs_total||0, fromCols);
   }
   function _toRow(p, rank) {
     return { id: p.id, name: p.username || '?', avatar: p.avatar_url || 'images/profilepic/ppdefault.png', score: _totalScore(p), rank };
+  }
+  function _sortAndRank(profiles) {
+    return profiles
+      .map(p => ({ p, score: _totalScore(p) }))
+      .filter(x => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map((x, i) => _toRow(x.p, i + 1));
   }
   const SEL = 'id, username, avatar_url, hs_flags, hs_shapes, hs_cities, hs_monuments, hs_total';
 
   async function fetchTop100() {
     if (_rankingsCache.top100) return _rankingsCache.top100;
     if (!window.sb) return [];
+    // Fetch anyone with at least one individual score or hs_total set
     const { data } = await window.sb.from('profiles')
-      .select(SEL).gt('hs_total', 0).order('hs_total', { ascending: false }).limit(100);
-    const rows = (data || []).map((p, i) => _toRow(p, i + 1));
+      .select(SEL)
+      .or('hs_total.gt.0,hs_flags.gt.0,hs_shapes.gt.0,hs_cities.gt.0,hs_monuments.gt.0');
+    const rows = _sortAndRank(data || []).slice(0, 100);
     _rankingsCache.top100 = rows;
     return rows;
   }
@@ -1788,10 +1799,10 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
     if (_rankingsCache.global) return _rankingsCache.global;
     if (!window.sb) return [];
     const myId = window._sbProfile?.id;
-    // Get full ordered list to find my position
     const { data: all } = await window.sb.from('profiles')
-      .select(SEL).gt('hs_total', 0).order('hs_total', { ascending: false });
-    const allRows = (all || []).map((p, i) => _toRow(p, i + 1));
+      .select(SEL)
+      .or('hs_total.gt.0,hs_flags.gt.0,hs_shapes.gt.0,hs_cities.gt.0,hs_monuments.gt.0');
+    const allRows = _sortAndRank(all || []);
     if (!myId) {
       _rankingsCache.global = allRows.slice(0, 30);
       return _rankingsCache.global;
@@ -1799,7 +1810,6 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
     const myIdx = allRows.findIndex(r => r.id === myId);
     let start, end;
     if (myIdx === -1) {
-      // Not in list — show top 30
       start = 0; end = 30;
     } else {
       start = Math.max(0, myIdx - 15);
@@ -1812,15 +1822,16 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
 
   async function fetchTopFriends() {
     if (_rankingsCache.friends) return _rankingsCache.friends;
-    if (!window.sb || !window._accountLoggedIn) return null; // null = not logged in
+    if (!window.sb || !window._accountLoggedIn) return null;
     const friends = (typeof getFriends === 'function' ? getFriends() : []);
     const friendIds = friends.map(f => f.id).filter(Boolean);
     const myId = window._sbProfile?.id;
     const allIds = myId ? [...new Set([...friendIds, myId])] : friendIds;
     if (!allIds.length) { _rankingsCache.friends = []; return []; }
+    // No score filter — include everyone, sort client-side
     const { data } = await window.sb.from('profiles')
-      .select(SEL).in('id', allIds).gt('hs_total', 0).order('hs_total', { ascending: false });
-    const rows = (data || []).map((p, i) => _toRow(p, i + 1));
+      .select(SEL).in('id', allIds);
+    const rows = _sortAndRank(data || []);
     _rankingsCache.friends = rows;
     return rows;
   }
