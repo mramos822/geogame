@@ -238,8 +238,8 @@ window.sbUploadAvatar = async function(userId, blob) {
 window.sbLoadSocialData = async function(userId) {
   const { data, error } = await sb.from('friendships')
     .select(`id, status, initiated_by, user_a, user_b,
-      pa:user_a(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing,vs_wins,vs_losses,is_supporter),
-      pb:user_b(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing,vs_wins,vs_losses,is_supporter)`)
+      pa:user_a(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing,vs_wins,vs_losses,is_supporter,avg_sum_flags,avg_sum_shapes,avg_sum_cities,avg_sum_monuments,play_count_flags,play_count_shapes,play_count_cities,play_count_monuments),
+      pb:user_b(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing,vs_wins,vs_losses,is_supporter,avg_sum_flags,avg_sum_shapes,avg_sum_cities,avg_sum_monuments,play_count_flags,play_count_shapes,play_count_cities,play_count_monuments)`)
     .or(`user_a.eq.${userId},user_b.eq.${userId}`);
   if (error) throw error;
   function toEntry(row) {
@@ -251,6 +251,10 @@ window.sbLoadSocialData = async function(userId) {
       avatar: p.avatar_url || 'images/profilepic/ppdefault.png',
       hs_flags: p.hs_flags||0, hs_shapes: p.hs_shapes||0,
       hs_cities: p.hs_cities||0, hs_monuments: p.hs_monuments||0,
+      avg_sum_flags: p.avg_sum_flags||0, avg_sum_shapes: p.avg_sum_shapes||0,
+      avg_sum_cities: p.avg_sum_cities||0, avg_sum_monuments: p.avg_sum_monuments||0,
+      play_count_flags: p.play_count_flags||0, play_count_shapes: p.play_count_shapes||0,
+      play_count_cities: p.play_count_cities||0, play_count_monuments: p.play_count_monuments||0,
       play_count: p.play_count||0,
       last_active: p.last_active || null,
       is_playing: p.is_playing || false,

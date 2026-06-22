@@ -1674,8 +1674,14 @@ function _subscribeFriendStatuses(friendIds) {
           currentFriendProfile.hs_cities    = f.hs_cities;
           currentFriendProfile.hs_monuments = f.hs_monuments;
           const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-          const modeHs = [f.hs_flags, f.hs_shapes, f.hs_cities, f.hs_monuments];
-          modeHs.forEach((hs, k) => { setText('loading-friend-avg'+(k+1), hs.toLocaleString()); setText('loading-friend-hs'+(k+1), hs.toLocaleString()); });
+          const modeHs2   = [f.hs_flags, f.hs_shapes, f.hs_cities, f.hs_monuments];
+          const avgSums2  = [f.avg_sum_flags||0, f.avg_sum_shapes||0, f.avg_sum_cities||0, f.avg_sum_monuments||0];
+          const avgCounts2= [f.play_count_flags||0, f.play_count_shapes||0, f.play_count_cities||0, f.play_count_monuments||0];
+          modeHs2.forEach((hs, k) => {
+            setText('loading-friend-avg'+(k+1), hs.toLocaleString());
+            const avg = avgCounts2[k] > 0 ? Math.round(avgSums2[k] / avgCounts2[k]) : hs;
+            setText('loading-friend-hs'+(k+1), avg.toLocaleString());
+          });
           setText('loading-friend-total', f.score.toLocaleString());
           const rk = (typeof getRank === 'function') ? getRank(f.score) : null;
           const rankImg = document.getElementById('loading-friend-rank');
@@ -1769,7 +1775,7 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
   let _rankingsRawMap = {};      // tab → { id → raw profile object } for live updates
   let _rankingsRTChannel = null; // realtime channel
 
-  const SEL = 'id, username, avatar_url, hs_flags, hs_shapes, hs_cities, hs_monuments, hs_total, play_count, vs_wins, vs_losses, is_supporter';
+  const SEL = 'id, username, avatar_url, hs_flags, hs_shapes, hs_cities, hs_monuments, hs_total, play_count, vs_wins, vs_losses, is_supporter, avg_sum_flags, avg_sum_shapes, avg_sum_cities, avg_sum_monuments, play_count_flags, play_count_shapes, play_count_cities, play_count_monuments';
 
   function _totalScore(p) {
     const fromCols = (p.hs_flags||0)+(p.hs_shapes||0)+(p.hs_cities||0)+(p.hs_monuments||0);
@@ -1782,6 +1788,10 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
       score: _totalScore(p),
       hs_flags: p.hs_flags||0, hs_shapes: p.hs_shapes||0,
       hs_cities: p.hs_cities||0, hs_monuments: p.hs_monuments||0,
+      avg_sum_flags: p.avg_sum_flags||0, avg_sum_shapes: p.avg_sum_shapes||0,
+      avg_sum_cities: p.avg_sum_cities||0, avg_sum_monuments: p.avg_sum_monuments||0,
+      play_count_flags: p.play_count_flags||0, play_count_shapes: p.play_count_shapes||0,
+      play_count_cities: p.play_count_cities||0, play_count_monuments: p.play_count_monuments||0,
       play_count: p.play_count||0, vs_wins: p.vs_wins||0, vs_losses: p.vs_losses||0,
       is_supporter: p.is_supporter||false,
     };
@@ -2299,10 +2309,14 @@ function openFriendProfile(friend) {
     }
   }
 
-  const modeHs = [friend.hs_flags||0, friend.hs_shapes||0, friend.hs_cities||0, friend.hs_monuments||0];
+  const modeHs  = [friend.hs_flags||0, friend.hs_shapes||0, friend.hs_cities||0, friend.hs_monuments||0];
+  const avgSums  = [friend.avg_sum_flags||0, friend.avg_sum_shapes||0, friend.avg_sum_cities||0, friend.avg_sum_monuments||0];
+  const avgCounts= [friend.play_count_flags||0, friend.play_count_shapes||0, friend.play_count_cities||0, friend.play_count_monuments||0];
   modeHs.forEach((hs, k) => {
+    // loading-friend-avg* = Highscore column, loading-friend-hs* = Average column (inverted IDs in HTML)
     setText('loading-friend-avg' + (k + 1), hs.toLocaleString());
-    setText('loading-friend-hs'  + (k + 1), hs.toLocaleString());
+    const avg = avgCounts[k] > 0 ? Math.round(avgSums[k] / avgCounts[k]) : hs;
+    setText('loading-friend-hs'  + (k + 1), avg.toLocaleString());
   });
 
   const rk = (typeof getRank === 'function') ? getRank(friend.score) : null;
