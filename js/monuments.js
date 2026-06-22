@@ -1761,6 +1761,78 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
   loadSocialData();
 });
 
+// ── Rankings panel ─────────────────────────────────────────────────────────────
+(function () {
+  const FIELD = { flags: 'hs_flags', shapes: 'hs_shapes', cities: 'hs_cities', monuments: 'hs_monuments', total: 'hs_total' };
+  let _activeRTab = 'flags';
+  let _rankingsCache = {};
+
+  async function fetchRankings(tab) {
+    if (_rankingsCache[tab]) return _rankingsCache[tab];
+    if (!window.sb) return [];
+    const field = FIELD[tab];
+    const { data } = await window.sb.from('profiles')
+      .select('id, username, avatar_url, ' + field)
+      .gt(field, 0)
+      .order(field, { ascending: false })
+      .limit(10);
+    const rows = (data || []).map(p => ({ id: p.id, name: p.username || '?', avatar: p.avatar_url || 'images/profilepic/ppdefault.png', score: p[field] || 0 }));
+    _rankingsCache[tab] = rows;
+    return rows;
+  }
+
+  function renderRankings(rows) {
+    const list = document.getElementById('loading-rankings-list');
+    if (!list) return;
+    if (!rows.length) { list.innerHTML = '<div class="rankings-msg">' + t('rankings.noData') + '</div>'; return; }
+    const myId = window._sbProfile?.id;
+    list.innerHTML = rows.map((r, i) => {
+      const medal = i === 0 ? ' gold' : i === 1 ? ' silver' : i === 2 ? ' bronze' : '';
+      const isMe  = myId && r.id === myId ? ' is-me' : '';
+      return `<div class="rankings-row${isMe}">
+        <span class="rankings-rank${medal}">#${i + 1}</span>
+        <img class="rankings-avatar" src="${r.avatar}" onerror="this.src='images/profilepic/ppdefault.png'" alt="">
+        <span class="rankings-name">${r.name}</span>
+        <span class="rankings-score">${r.score.toLocaleString()}</span>
+      </div>`;
+    }).join('');
+  }
+
+  async function loadTab(tab) {
+    _activeRTab = tab;
+    const list = document.getElementById('loading-rankings-list');
+    if (list) list.innerHTML = '<div class="rankings-msg">' + t('rankings.loading') + '</div>';
+    const rows = await fetchRankings(tab);
+    if (_activeRTab === tab) renderRankings(rows);
+  }
+
+  document.getElementById('loading-rankings-btn')?.addEventListener('click', () => {
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    document.getElementById('loading-rankings-group')?.classList.remove('table-gone');
+    document.getElementById('loading-screen').classList.add('table-shown');
+    _rankingsCache = {};
+    loadTab(_activeRTab);
+  });
+
+  document.querySelectorAll('[data-rtab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-rtab]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+      loadTab(btn.dataset.rtab);
+    });
+  });
+
+  document.getElementById('loading-rankings-back-wrap')?.addEventListener('click', () => {
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    const wrap = document.getElementById('loading-rankings-back-wrap');
+    wrap.classList.add('confirm-pressed');
+    setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
+    document.getElementById('loading-rankings-group')?.classList.add('table-gone');
+    document.getElementById('loading-screen').classList.remove('table-shown');
+  });
+})();
+
 (function () {
   const popup = document.getElementById('social-lock-popup');
   document.getElementById('social-lock-close')?.addEventListener('click', () => {
@@ -2974,6 +3046,7 @@ window.quitToMenu = quitToMenu;
     else if (_panelVisible('loading-addfriend-group'))   { _clickBack('loading-addfriend-back-wrap'); }
     else if (_panelVisible('loading-blocked-group'))     { _clickBack('loading-blocked-back-wrap'); }
     else if (_panelVisible('loading-sent-group'))        { _clickBack('loading-sent-back-wrap'); }
+    else if (_panelVisible('loading-rankings-group'))    { _clickBack('loading-rankings-back-wrap'); }
     else if (_panelVisible('loading-social-group'))      { _clickBack('loading-social-back-wrap'); }
     else if (_panelVisible('loading-table-group')) {
       const sub = document.getElementById('loading-panel2-back');

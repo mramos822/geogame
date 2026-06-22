@@ -1312,6 +1312,80 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   transition: transform 0.4s ease-in;
   transform: translateY(-120%);
 }
+
+/* ── Rankings panel ── */
+#loading-rankings-group {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 210;
+  transition: transform 0.4s ease-out;
+  will-change: transform;
+  pointer-events: none;
+}
+#loading-rankings-group .loading-social-back-wrap { pointer-events: auto; }
+#loading-rankings-group.table-gone {
+  transition: transform 0.4s ease-in;
+  transform: translateY(-120%);
+}
+.loading-rankings-panel .loading-social-tab {
+  padding: 1cqmin 3.2cqmin 1.4cqmin;
+  font-size: 2cqmin;
+}
+.loading-rankings-panel .loading-social-tab.active { padding-bottom: 1.8cqmin; }
+.rankings-row {
+  display: flex;
+  align-items: center;
+  gap: 1.4cqmin;
+  padding: 1.4cqmin 1.2cqmin;
+  background: #fffef5;
+  border: 0.3cqmin solid #d8c47e;
+  border-radius: 1cqmin;
+}
+.rankings-row.is-me { border-color: #f0b800; background: #fffbe8; box-shadow: 0 0 0 0.2cqmin #f0b80044; }
+.rankings-rank {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2.8cqmin;
+  color: #8b6a00;
+  min-width: 5cqmin;
+  text-align: center;
+}
+.rankings-rank.gold   { color: #c8920a; }
+.rankings-rank.silver { color: #888; }
+.rankings-rank.bronze { color: #a05a2c; }
+.rankings-avatar {
+  width: 7cqmin;
+  height: 7cqmin;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 0.3cqmin solid #d8c47e;
+  flex-shrink: 0;
+}
+.rankings-name {
+  flex: 1;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2.6cqmin;
+  color: #5a4400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rankings-score {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2.6cqmin;
+  color: #8b6a00;
+  white-space: nowrap;
+}
+.rankings-msg {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 3cqmin;
+  color: #8b6a00;
+  text-align: center;
+  padding: 4cqmin 0;
+  width: 100%;
+}
+
 .loading-social-back-wrap {
   position: absolute;
   top: 22%;

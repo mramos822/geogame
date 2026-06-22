@@ -30,6 +30,10 @@ const I18N = {
     'name.orDivider': 'o', 'name.hasAccount': '¿Tienes cuenta? Inicia sesión o regístrate',
     'name.greet': '¡Hola, {name}!', 'name.greetSub': '¡Demuestra quién sabe más países, banderas y ciudades del mundo. Consigue tu ranking y supera a tus amigos!',
     // Social
+    // Rankings
+    'rankings.title': 'Rankings', 'rankings.loading': 'Cargando...', 'rankings.noData': 'Sin datos',
+    'rankings.tab.flags': 'Banderas', 'rankings.tab.shapes': 'Siluetas',
+    'rankings.tab.cities': 'Ciudades', 'rankings.tab.monuments': 'Monumentos', 'rankings.tab.total': 'Total',
     'social.title': 'Panel de Amigos', 'social.sort.conn': 'Conexión',
     'social.tab.friends': 'Mis Amigos', 'social.tab.requests': 'Solicitudes',
     'social.addFriend': 'Añadir Amigo', 'social.searchFriends': 'Buscar Amigos...',
@@ -203,6 +207,10 @@ const I18N = {
     'name.ph': 'Your name...', 'name.confirm': 'Confirm',
     'name.orDivider': 'or', 'name.hasAccount': 'Have an account? Sign in / Register',
     'name.greet': 'Hello, {name}!', 'name.greetSub': 'Prove once and for all who knows the most countries, flags and cities in the world. Get your ranking and beat your friends!',
+    // Rankings
+    'rankings.title': 'Rankings', 'rankings.loading': 'Loading...', 'rankings.noData': 'No data',
+    'rankings.tab.flags': 'Flags', 'rankings.tab.shapes': 'Shapes',
+    'rankings.tab.cities': 'Cities', 'rankings.tab.monuments': 'Monuments', 'rankings.tab.total': 'Total',
     'social.title': 'Friends Panel', 'social.sort.conn': 'Connection',
     'social.tab.friends': 'My Friends', 'social.tab.requests': 'Requests',
     'social.addFriend': 'Add Friend', 'social.searchFriends': 'Search Friends...',
