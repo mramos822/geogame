@@ -1764,34 +1764,45 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
 // ── Rankings panel ─────────────────────────────────────────────────────────────
 (function () {
   let _activeRTab = 'top100';
-  let _rankingsCache = {};
+  let _rankingsCache = {};       // tab → rows[]
+  let _rankingsRawMap = {};      // tab → { id → raw profile object } for live updates
+  let _rankingsRTChannel = null; // realtime channel
+
+  const SEL = 'id, username, avatar_url, hs_flags, hs_shapes, hs_cities, hs_monuments, hs_total, play_count, vs_wins, vs_losses, is_supporter';
 
   function _totalScore(p) {
-    // hs_total may be NULL in DB — always compute from individual fields as fallback
     const fromCols = (p.hs_flags||0)+(p.hs_shapes||0)+(p.hs_cities||0)+(p.hs_monuments||0);
     return Math.max(p.hs_total||0, fromCols);
   }
-  function _toRow(p, rank) {
-    return { id: p.id, name: p.username || '?', avatar: p.avatar_url || 'images/profilepic/ppdefault.png', score: _totalScore(p), rank };
+  function _toRow(p) {
+    return {
+      id: p.id, name: p.username || '?',
+      avatar: p.avatar_url || 'images/profilepic/ppdefault.png',
+      score: _totalScore(p),
+      hs_flags: p.hs_flags||0, hs_shapes: p.hs_shapes||0,
+      hs_cities: p.hs_cities||0, hs_monuments: p.hs_monuments||0,
+      play_count: p.play_count||0, vs_wins: p.vs_wins||0, vs_losses: p.vs_losses||0,
+      is_supporter: p.is_supporter||false,
+    };
   }
   function _sortAndRank(profiles) {
     return profiles
-      .map(p => ({ p, score: _totalScore(p) }))
-      .filter(x => x.score > 0)
+      .map(p => _toRow(p))
+      .filter(r => r.score > 0)
       .sort((a, b) => b.score - a.score)
-      .map((x, i) => _toRow(x.p, i + 1));
+      .map((r, i) => ({ ...r, rank: i + 1 }));
   }
-  const SEL = 'id, username, avatar_url, hs_flags, hs_shapes, hs_cities, hs_monuments, hs_total';
 
+  // ── fetchers ──────────────────────────────────────────────────────────────────
   async function fetchTop100() {
     if (_rankingsCache.top100) return _rankingsCache.top100;
     if (!window.sb) return [];
-    // Fetch anyone with at least one individual score or hs_total set
     const { data } = await window.sb.from('profiles')
       .select(SEL)
       .or('hs_total.gt.0,hs_flags.gt.0,hs_shapes.gt.0,hs_cities.gt.0,hs_monuments.gt.0');
     const rows = _sortAndRank(data || []).slice(0, 100);
     _rankingsCache.top100 = rows;
+    _rankingsRawMap.top100 = Object.fromEntries((data||[]).map(p => [p.id, p]));
     return rows;
   }
 
@@ -1803,20 +1814,17 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
       .select(SEL)
       .or('hs_total.gt.0,hs_flags.gt.0,hs_shapes.gt.0,hs_cities.gt.0,hs_monuments.gt.0');
     const allRows = _sortAndRank(all || []);
-    if (!myId) {
-      _rankingsCache.global = allRows.slice(0, 30);
-      return _rankingsCache.global;
-    }
-    const myIdx = allRows.findIndex(r => r.id === myId);
-    let start, end;
-    if (myIdx === -1) {
-      start = 0; end = 30;
-    } else {
-      start = Math.max(0, myIdx - 15);
-      end   = Math.min(allRows.length, start + 31);
-      start = Math.max(0, end - 31);
+    let start = 0, end = 30;
+    if (myId) {
+      const myIdx = allRows.findIndex(r => r.id === myId);
+      if (myIdx !== -1) {
+        start = Math.max(0, myIdx - 15);
+        end   = Math.min(allRows.length, start + 31);
+        start = Math.max(0, end - 31);
+      }
     }
     _rankingsCache.global = allRows.slice(start, end);
+    _rankingsRawMap.global = Object.fromEntries((all||[]).map(p => [p.id, p]));
     return _rankingsCache.global;
   }
 
@@ -1828,59 +1836,112 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
     const myId = window._sbProfile?.id;
     const allIds = myId ? [...new Set([...friendIds, myId])] : friendIds;
     if (!allIds.length) { _rankingsCache.friends = []; return []; }
-    // No score filter — include everyone, sort client-side
-    const { data } = await window.sb.from('profiles')
-      .select(SEL).in('id', allIds);
+    const { data } = await window.sb.from('profiles').select(SEL).in('id', allIds);
     const rows = _sortAndRank(data || []);
     _rankingsCache.friends = rows;
+    _rankingsRawMap.friends = Object.fromEntries((data||[]).map(p => [p.id, p]));
     return rows;
   }
 
+  // ── renderer ──────────────────────────────────────────────────────────────────
   function renderRankings(rows, tab) {
     const list = document.getElementById('loading-rankings-list');
     if (!list) return;
     if (rows === null) { list.innerHTML = '<div class="rankings-msg">' + t('rankings.notLoggedIn') + '</div>'; return; }
     if (!rows.length) {
-      const msg = tab === 'friends' ? t('rankings.noFriends') : t('rankings.noData');
-      list.innerHTML = '<div class="rankings-msg">' + msg + '</div>'; return;
+      list.innerHTML = '<div class="rankings-msg">' + t(tab === 'friends' ? 'rankings.noFriends' : 'rankings.noData') + '</div>';
+      return;
     }
     const myId = window._sbProfile?.id;
-    list.innerHTML = rows.map(r => {
+    list.innerHTML = '';
+    rows.forEach(r => {
       const isMe = myId && r.id === myId;
       const rk   = (typeof getRank === 'function') ? getRank(r.score) : { name: '', img: 'images/ranks/1.png' };
       const medalCls = r.rank === 1 ? ' rk-gold' : r.rank === 2 ? ' rk-silver' : r.rank === 3 ? ' rk-bronze' : '';
-      return `<div class="loading-social-row${isMe ? ' is-me-row' : ''}">` +
+      const el = document.createElement('div');
+      el.className = 'loading-social-row' + (isMe ? ' is-me-row' : '');
+      el.innerHTML =
         `<span class="rankings-pos${medalCls}">#${r.rank}</span>` +
         `<img class="loading-social-avatar" src="${r.avatar}" onerror="this.src='images/profilepic/ppdefault.png'" alt="" draggable="false" oncontextmenu="return false">` +
-        `<div class="loading-social-info">` +
-          `<span class="loading-social-name">${r.name}</span>` +
-        `</div>` +
+        `<div class="loading-social-info"><span class="loading-social-name">${r.name}</span></div>` +
         `<div class="loading-social-score">` +
           `<img class="loading-social-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">` +
           `<span class="loading-social-score-val">${r.score.toLocaleString()}</span>` +
         `</div>` +
         `<span class="loading-social-rankname">${rk.name}</span>` +
-        `<img class="loading-social-emote" src="${rk.img}" alt="" draggable="false" oncontextmenu="return false">` +
-      `</div>`;
-    }).join('');
+        `<img class="loading-social-emote" src="${rk.img}" alt="" draggable="false" oncontextmenu="return false">`;
+      el.addEventListener('click', () => {
+        if (typeof window.openFriendProfile === 'function') window.openFriendProfile(r);
+      });
+      list.appendChild(el);
+    });
   }
 
+  // ── realtime ──────────────────────────────────────────────────────────────────
+  function _subscribeRealtime(ids) {
+    if (_rankingsRTChannel) { window.sb?.removeChannel(_rankingsRTChannel); _rankingsRTChannel = null; }
+    if (!window.sb || !ids.length) return;
+    _rankingsRTChannel = window.sb
+      .channel('rankings-rt-' + ids.slice(0, 5).join('-'))
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=in.(${ids.join(',')})` }, payload => {
+        const upd = payload.new;
+        // Patch raw map for all tabs that contain this id
+        ['top100', 'global', 'friends'].forEach(tab => {
+          if (!_rankingsRawMap[tab] || !_rankingsRawMap[tab][upd.id]) return;
+          Object.assign(_rankingsRawMap[tab][upd.id], upd);
+          // Re-sort and re-rank from updated raw map
+          const rawArr = Object.values(_rankingsRawMap[tab]);
+          const newRows = _sortAndRank(rawArr);
+          // For top100 slice to 100; for global re-compute window
+          if (tab === 'top100') {
+            _rankingsCache[tab] = newRows.slice(0, 100);
+          } else if (tab === 'global') {
+            const myId = window._sbProfile?.id;
+            let start = 0, end = 30;
+            if (myId) {
+              const myIdx = newRows.findIndex(r => r.id === myId);
+              if (myIdx !== -1) {
+                start = Math.max(0, myIdx - 15);
+                end   = Math.min(newRows.length, start + 31);
+                start = Math.max(0, end - 31);
+              }
+            }
+            _rankingsCache[tab] = newRows.slice(start, end);
+          } else {
+            _rankingsCache[tab] = newRows;
+          }
+          if (_activeRTab === tab) renderRankings(_rankingsCache[tab], tab);
+        });
+      })
+      .subscribe();
+  }
+
+  function _unsubscribeRealtime() {
+    if (_rankingsRTChannel) { window.sb?.removeChannel(_rankingsRTChannel); _rankingsRTChannel = null; }
+  }
+
+  // ── load tab ──────────────────────────────────────────────────────────────────
   async function loadTab(tab) {
     _activeRTab = tab;
     const list = document.getElementById('loading-rankings-list');
     if (list) list.innerHTML = '<div class="rankings-msg">' + t('rankings.loading') + '</div>';
     let rows;
-    if (tab === 'top100')  rows = await fetchTop100();
+    if (tab === 'top100')       rows = await fetchTop100();
     else if (tab === 'global')  rows = await fetchTopGlobal();
     else                        rows = await fetchTopFriends();
-    if (_activeRTab === tab) renderRankings(rows, tab);
+    if (_activeRTab !== tab) return;
+    renderRankings(rows, tab);
+    // Subscribe realtime to IDs now visible
+    if (rows && rows.length) _subscribeRealtime(rows.map(r => r.id));
   }
 
+  // ── open / close ──────────────────────────────────────────────────────────────
   document.getElementById('loading-rankings-btn')?.addEventListener('click', () => {
     sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
     document.getElementById('loading-rankings-group')?.classList.remove('table-gone');
     document.getElementById('loading-screen').classList.add('table-shown');
     _rankingsCache = {};
+    _rankingsRawMap = {};
     loadTab(_activeRTab);
   });
 
@@ -1900,6 +1961,15 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
     setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
     document.getElementById('loading-rankings-group')?.classList.add('table-gone');
     document.getElementById('loading-screen').classList.remove('table-shown');
+    _unsubscribeRealtime();
+  });
+
+  // ── lang change ───────────────────────────────────────────────────────────────
+  if (typeof onLangChange === 'function') onLangChange(() => {
+    const group = document.getElementById('loading-rankings-group');
+    if (!group || group.classList.contains('table-gone')) return;
+    const cached = _rankingsCache[_activeRTab];
+    if (cached !== undefined) renderRankings(cached, _activeRTab);
   });
 })();
 
