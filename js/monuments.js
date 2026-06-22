@@ -1871,7 +1871,14 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
         `<span class="loading-social-rankname">${rk.name}</span>` +
         `<img class="loading-social-emote" src="${rk.img}" alt="" draggable="false" oncontextmenu="return false">`;
       el.addEventListener('click', () => {
-        if (typeof window.openFriendProfile === 'function') window.openFriendProfile(r);
+        const myId = window._sbProfile?.id;
+        if (myId && r.id === myId) {
+          // Own row → open own profile panel
+          sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+          document.getElementById('loading-table-group')?.classList.remove('table-gone');
+        } else if (typeof window.openFriendProfile === 'function') {
+          window.openFriendProfile(r);
+        }
       });
       list.appendChild(el);
     });
