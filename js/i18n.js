@@ -32,8 +32,8 @@ const I18N = {
     // Social
     // Rankings
     'rankings.title': 'Rankings', 'rankings.loading': 'Cargando...', 'rankings.noData': 'Sin datos',
-    'rankings.tab.flags': 'Banderas', 'rankings.tab.shapes': 'Siluetas',
-    'rankings.tab.cities': 'Ciudades', 'rankings.tab.monuments': 'Monumentos', 'rankings.tab.total': 'Total',
+    'rankings.noFriends': 'Aún no tienes amigos con cuenta.', 'rankings.notLoggedIn': 'Inicia sesión para ver esto.',
+    'rankings.tab.top100': 'Top 100', 'rankings.tab.global': 'Top Global', 'rankings.tab.friends': 'Top Friends',
     'social.title': 'Panel de Amigos', 'social.sort.conn': 'Conexión',
     'social.tab.friends': 'Mis Amigos', 'social.tab.requests': 'Solicitudes',
     'social.addFriend': 'Añadir Amigo', 'social.searchFriends': 'Buscar Amigos...',
@@ -209,8 +209,8 @@ const I18N = {
     'name.greet': 'Hello, {name}!', 'name.greetSub': 'Prove once and for all who knows the most countries, flags and cities in the world. Get your ranking and beat your friends!',
     // Rankings
     'rankings.title': 'Rankings', 'rankings.loading': 'Loading...', 'rankings.noData': 'No data',
-    'rankings.tab.flags': 'Flags', 'rankings.tab.shapes': 'Shapes',
-    'rankings.tab.cities': 'Cities', 'rankings.tab.monuments': 'Monuments', 'rankings.tab.total': 'Total',
+    'rankings.noFriends': 'No friends with an account yet.', 'rankings.notLoggedIn': 'Sign in to see this.',
+    'rankings.tab.top100': 'Top 100', 'rankings.tab.global': 'Top Global', 'rankings.tab.friends': 'Top Friends',
     'social.title': 'Friends Panel', 'social.sort.conn': 'Connection',
     'social.tab.friends': 'My Friends', 'social.tab.requests': 'Requests',
     'social.addFriend': 'Add Friend', 'social.searchFriends': 'Search Friends...',

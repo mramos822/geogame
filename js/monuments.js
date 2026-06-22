@@ -1763,38 +1763,94 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
 
 // ── Rankings panel ─────────────────────────────────────────────────────────────
 (function () {
-  const FIELD = { flags: 'hs_flags', shapes: 'hs_shapes', cities: 'hs_cities', monuments: 'hs_monuments', total: 'hs_total' };
-  let _activeRTab = 'flags';
+  let _activeRTab = 'top100';
   let _rankingsCache = {};
 
-  async function fetchRankings(tab) {
-    if (_rankingsCache[tab]) return _rankingsCache[tab];
+  function _totalScore(p) {
+    return p.hs_total || ((p.hs_flags||0)+(p.hs_shapes||0)+(p.hs_cities||0)+(p.hs_monuments||0));
+  }
+  function _toRow(p, rank) {
+    return { id: p.id, name: p.username || '?', avatar: p.avatar_url || 'images/profilepic/ppdefault.png', score: _totalScore(p), rank };
+  }
+  const SEL = 'id, username, avatar_url, hs_flags, hs_shapes, hs_cities, hs_monuments, hs_total';
+
+  async function fetchTop100() {
+    if (_rankingsCache.top100) return _rankingsCache.top100;
     if (!window.sb) return [];
-    const field = FIELD[tab];
     const { data } = await window.sb.from('profiles')
-      .select('id, username, avatar_url, ' + field)
-      .gt(field, 0)
-      .order(field, { ascending: false })
-      .limit(10);
-    const rows = (data || []).map(p => ({ id: p.id, name: p.username || '?', avatar: p.avatar_url || 'images/profilepic/ppdefault.png', score: p[field] || 0 }));
-    _rankingsCache[tab] = rows;
+      .select(SEL).gt('hs_total', 0).order('hs_total', { ascending: false }).limit(100);
+    const rows = (data || []).map((p, i) => _toRow(p, i + 1));
+    _rankingsCache.top100 = rows;
     return rows;
   }
 
-  function renderRankings(rows) {
+  async function fetchTopGlobal() {
+    if (_rankingsCache.global) return _rankingsCache.global;
+    if (!window.sb) return [];
+    const myId = window._sbProfile?.id;
+    // Get full ordered list to find my position
+    const { data: all } = await window.sb.from('profiles')
+      .select(SEL).gt('hs_total', 0).order('hs_total', { ascending: false });
+    const allRows = (all || []).map((p, i) => _toRow(p, i + 1));
+    if (!myId) {
+      _rankingsCache.global = allRows.slice(0, 30);
+      return _rankingsCache.global;
+    }
+    const myIdx = allRows.findIndex(r => r.id === myId);
+    let start, end;
+    if (myIdx === -1) {
+      // Not in list — show top 30
+      start = 0; end = 30;
+    } else {
+      start = Math.max(0, myIdx - 15);
+      end   = Math.min(allRows.length, start + 31);
+      start = Math.max(0, end - 31);
+    }
+    _rankingsCache.global = allRows.slice(start, end);
+    return _rankingsCache.global;
+  }
+
+  async function fetchTopFriends() {
+    if (_rankingsCache.friends) return _rankingsCache.friends;
+    if (!window.sb || !window._accountLoggedIn) return null; // null = not logged in
+    const friends = (typeof getFriends === 'function' ? getFriends() : []);
+    const friendIds = friends.map(f => f.id).filter(Boolean);
+    const myId = window._sbProfile?.id;
+    const allIds = myId ? [...new Set([...friendIds, myId])] : friendIds;
+    if (!allIds.length) { _rankingsCache.friends = []; return []; }
+    const { data } = await window.sb.from('profiles')
+      .select(SEL).in('id', allIds).gt('hs_total', 0).order('hs_total', { ascending: false });
+    const rows = (data || []).map((p, i) => _toRow(p, i + 1));
+    _rankingsCache.friends = rows;
+    return rows;
+  }
+
+  function renderRankings(rows, tab) {
     const list = document.getElementById('loading-rankings-list');
     if (!list) return;
-    if (!rows.length) { list.innerHTML = '<div class="rankings-msg">' + t('rankings.noData') + '</div>'; return; }
+    if (rows === null) { list.innerHTML = '<div class="rankings-msg">' + t('rankings.notLoggedIn') + '</div>'; return; }
+    if (!rows.length) {
+      const msg = tab === 'friends' ? t('rankings.noFriends') : t('rankings.noData');
+      list.innerHTML = '<div class="rankings-msg">' + msg + '</div>'; return;
+    }
     const myId = window._sbProfile?.id;
-    list.innerHTML = rows.map((r, i) => {
-      const medal = i === 0 ? ' gold' : i === 1 ? ' silver' : i === 2 ? ' bronze' : '';
-      const isMe  = myId && r.id === myId ? ' is-me' : '';
-      return `<div class="rankings-row${isMe}">
-        <span class="rankings-rank${medal}">#${i + 1}</span>
-        <img class="rankings-avatar" src="${r.avatar}" onerror="this.src='images/profilepic/ppdefault.png'" alt="">
-        <span class="rankings-name">${r.name}</span>
-        <span class="rankings-score">${r.score.toLocaleString()}</span>
-      </div>`;
+    list.innerHTML = rows.map(r => {
+      const isMe = myId && r.id === myId;
+      const rk   = (typeof getRank === 'function') ? getRank(r.score) : { name: '', img: 'images/ranks/1.png' };
+      const medalCls = r.rank === 1 ? ' rk-gold' : r.rank === 2 ? ' rk-silver' : r.rank === 3 ? ' rk-bronze' : '';
+      return `<div class="loading-social-row${isMe ? ' is-me-row' : ''}">` +
+        `<span class="rankings-pos${medalCls}">#${r.rank}</span>` +
+        `<img class="loading-social-avatar" src="${r.avatar}" onerror="this.src='images/profilepic/ppdefault.png'" alt="" draggable="false" oncontextmenu="return false">` +
+        `<div class="loading-social-info">` +
+          `<span class="loading-social-name">${r.name}</span>` +
+        `</div>` +
+        `<div class="loading-social-score">` +
+          `<img class="loading-social-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">` +
+          `<span class="loading-social-score-val">${r.score.toLocaleString()}</span>` +
+        `</div>` +
+        `<span class="loading-social-rankname">${rk.name}</span>` +
+        `<img class="loading-social-emote" src="${rk.img}" alt="" draggable="false" oncontextmenu="return false">` +
+      `</div>`;
     }).join('');
   }
 
@@ -1802,8 +1858,11 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
     _activeRTab = tab;
     const list = document.getElementById('loading-rankings-list');
     if (list) list.innerHTML = '<div class="rankings-msg">' + t('rankings.loading') + '</div>';
-    const rows = await fetchRankings(tab);
-    if (_activeRTab === tab) renderRankings(rows);
+    let rows;
+    if (tab === 'top100')  rows = await fetchTop100();
+    else if (tab === 'global')  rows = await fetchTopGlobal();
+    else                        rows = await fetchTopFriends();
+    if (_activeRTab === tab) renderRankings(rows, tab);
   }
 
   document.getElementById('loading-rankings-btn')?.addEventListener('click', () => {

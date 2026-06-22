@@ -1329,54 +1329,26 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   transition: transform 0.4s ease-in;
   transform: translateY(-120%);
 }
+.loading-rankings-panel { pointer-events: auto; }
 .loading-rankings-panel .loading-social-tab {
-  padding: 1cqmin 3.2cqmin 1.4cqmin;
-  font-size: 2cqmin;
+  padding: 1cqmin 5.5cqmin 1.4cqmin;
+  font-size: 2.1cqmin;
 }
 .loading-rankings-panel .loading-social-tab.active { padding-bottom: 1.8cqmin; }
-.rankings-row {
-  display: flex;
-  align-items: center;
-  gap: 1.4cqmin;
-  padding: 1.4cqmin 1.2cqmin;
-  background: #fffef5;
-  border: 0.3cqmin solid #d8c47e;
-  border-radius: 1cqmin;
-}
-.rankings-row.is-me { border-color: #f0b800; background: #fffbe8; box-shadow: 0 0 0 0.2cqmin #f0b80044; }
-.rankings-rank {
+/* position badge left of avatar in ranking rows */
+.rankings-pos {
   font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
-  font-size: 2.8cqmin;
+  font-size: 2.5cqmin;
   color: #8b6a00;
-  min-width: 5cqmin;
+  min-width: 6cqmin;
   text-align: center;
-}
-.rankings-rank.gold   { color: #c8920a; }
-.rankings-rank.silver { color: #888; }
-.rankings-rank.bronze { color: #a05a2c; }
-.rankings-avatar {
-  width: 7cqmin;
-  height: 7cqmin;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 0.3cqmin solid #d8c47e;
   flex-shrink: 0;
 }
-.rankings-name {
-  flex: 1;
-  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
-  font-size: 2.6cqmin;
-  color: #5a4400;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.rankings-score {
-  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
-  font-size: 2.6cqmin;
-  color: #8b6a00;
-  white-space: nowrap;
-}
+.rankings-pos.rk-gold   { color: #c8920a; }
+.rankings-pos.rk-silver { color: #888; }
+.rankings-pos.rk-bronze { color: #a05a2c; }
+/* highlight own row */
+.loading-social-row.is-me-row { border-color: #f0b800; background: #fffbe8; box-shadow: 0 0 0 0.2cqmin #f0b80044; }
 .rankings-msg {
   font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
   font-size: 3cqmin;
