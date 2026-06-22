@@ -303,9 +303,9 @@ const CITIES = [
 //   20+   → inicio 15%, facil 35%, medio 35%, dificil 15%
 const CITY_UNLOCK_TIERS = [
   { at:  0, weights: { inicio: 1.00 } },
-  { at:  3, weights: { inicio: 0.55, facil: 0.45 } },
-  { at: 10, weights: { inicio: 0.25, facil: 0.45, medio: 0.30 } },
-  { at: 20, weights: { inicio: 0.15, facil: 0.35, medio: 0.35, dificil: 0.15 } },
+  { at:  3, weights: { inicio: 0.50, facil: 0.45, medio: 0.05 } },
+  { at: 10, weights: { inicio: 0.20, facil: 0.40, medio: 0.40 } },
+  { at: 20, weights: { inicio: 0.10, facil: 0.28, medio: 0.37, dificil: 0.25 } },
 ];
 
 // ── Seeded RNG para Versus (mismas ciudades en ambos clientes) ──────────────

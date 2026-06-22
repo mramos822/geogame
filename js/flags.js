@@ -911,8 +911,8 @@ function startFlagsRound() {
     flagsIsFirstRound   = flagsVsIndex === 0;
     flagsEasyUnlocked   = flagsVsIndex >= 1;
     flagsSixUnlocked    = flagsVsIndex >= 3;
-    flagsMediumUnlocked = flagsVsIndex >= 8;
-    flagsHardUnlocked   = flagsVsIndex >= 17;
+    flagsMediumUnlocked = flagsVsIndex >= 10;
+    flagsHardUnlocked   = flagsVsIndex >= 20;
     flagsInsaneUnlocked = flagsVsIndex >= 30;
     flagsGroupIds = flagsSixUnlocked
       ? [...flagsTopGroupIds, ...flagsBottomGroupIds]
@@ -1050,15 +1050,15 @@ function startFlagsRound() {
     const lowerPool   = [...easyInitPool, ...mediumCountries, ...hardCountries];
     chosen = weightedPick(insaneParts, insaneCountries, lowerParts, lowerPool);
   } else if (flagsHardUnlocked) {
-    // hard vs medium+easy+inicio — 1:5 at 17 → 5:1 at 37
-    const hardParts  = Math.min(Math.floor((selCount - 17) / 5) + 1, 5);
+    // hard vs medium+easy+inicio — 1:5 at 20 → 5:1 at 40
+    const hardParts  = Math.min(Math.floor((selCount - 20) / 5) + 1, 5);
     const lowerParts = Math.max(6 - hardParts, 1);
     const lowerPool  = [...easyInitPool, ...mediumCountries];
     chosen = weightedPick(hardParts, hardCountries, lowerParts, lowerPool);
   } else if (flagsMediumUnlocked) {
     // medium vs easy+inicio
-    // 1:5 at 3 correct → 5:1 at 15 correct
-    const mediumParts = Math.min(Math.floor((selCount - 8) / 3) + 1, 5);
+    // 1:5 at 10 correct → 5:1 at 22 correct
+    const mediumParts = Math.min(Math.floor((selCount - 10) / 3) + 1, 5);
     const easyParts   = Math.max(6 - mediumParts, 1);
     chosen = weightedPick(mediumParts, mediumCountries, easyParts, easyInitPool);
   } else {
@@ -1313,10 +1313,10 @@ function startFlagsRound() {
           flagsSixUnlocked = true;
           flagsGroupIds = [...flagsTopGroupIds, ...flagsBottomGroupIds];
         }
-        if (flagsCorrectCount >= 8 && !flagsMediumUnlocked) {
+        if (flagsCorrectCount >= 10 && !flagsMediumUnlocked) {
           flagsMediumUnlocked = true;
         }
-        if (flagsCorrectCount >= 17) flagsHardUnlocked = true;
+        if (flagsCorrectCount >= 20) flagsHardUnlocked = true;
         if (flagsCorrectCount >= 30) flagsInsaneUnlocked = true;
         flagsAdvanceDot();
         if (typeof sfxCheck   !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
