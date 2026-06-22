@@ -2373,9 +2373,8 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   top: 25%;
   left: 94%;
   transform: translate(-50%, calc(-50% + 2px));
-  font-size: 3.2cqmin;
-  line-height: 1;
-  color: #f5c518;
+  width: 3.2cqmin;
+  height: auto;
   pointer-events: none;
   user-select: none;
 }
