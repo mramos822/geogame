@@ -1353,6 +1353,21 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 .rankings-pos.rk-bronze { color: #a05a2c; }
 /* highlight own row */
 .loading-social-row.is-me-row { border-color: #f0b800; background: #fffbe8; box-shadow: 0 0 0 0.2cqmin #f0b80044; }
+.rankings-desc {
+  position: absolute;
+  top: calc(50% - 22cqmin);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 88cqmin;
+  text-align: center;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2cqmin;
+  color: #a07820;
+  pointer-events: none;
+  z-index: 212;
+  white-space: normal;
+  line-height: 1.4;
+}
 .rankings-msg {
   font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
   font-size: 3cqmin;
