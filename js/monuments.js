@@ -1870,13 +1870,16 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
         `</div>` +
         `<span class="loading-social-rankname">${rk.name}</span>` +
         `<img class="loading-social-emote" src="${rk.img}" alt="" draggable="false" oncontextmenu="return false">`;
-      el.addEventListener('click', () => {
+      el.addEventListener('click', async () => {
         const myId = window._sbProfile?.id;
         if (myId && r.id === myId) {
-          // Own row → open own profile panel
           sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
           document.getElementById('loading-table-group')?.classList.remove('table-gone');
         } else if (typeof window.openFriendProfile === 'function') {
+          // Ensure social data (friend list) is loaded before relStatus() is called inside openFriendProfile
+          if (window._accountLoggedIn && !window._socialDataFetched) {
+            await loadSocialData(false);
+          }
           window.openFriendProfile(r);
         }
       });
@@ -2127,6 +2130,7 @@ async function loadSocialData(showLoader = true) {
     if (fresh) currentFriendProfile.friendshipId = fresh.friendshipId;
     if (typeof updateFriendButtons === 'function') updateFriendButtons();
   }
+  window._socialDataFetched = true;
 }
 
 // Pinta la pestaña activa.
