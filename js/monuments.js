@@ -1263,8 +1263,8 @@ document.getElementById('loading-play-confirm-wrap')?.addEventListener('click', 
   const screen = document.getElementById('loading-screen');
   const tableGroup = document.getElementById('loading-table-group');
   tableGroup.classList.add('table-gone');
-  tableGroup.classList.remove('above-rankings');
   screen.classList.remove('table-shown');
+  setTimeout(() => tableGroup.classList.remove('above-rankings'), 400);
 });
 
 document.getElementById('loading-name-edit')?.addEventListener('click', () => {
