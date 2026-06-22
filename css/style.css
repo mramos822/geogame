@@ -807,11 +807,11 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 
 /* ── LOADING ENTRANCE KEYFRAMES (replay al volver del juego) ─────────────── */
 @keyframes flightatt-enter-kf {
-  from { transform: translate(-50%,-50%) scaleX(-1) translateX(55cqmin); }
+  from { transform: translate(-50%,-50%) scaleX(-1) translateX(35cqmin); }
   to   { transform: translate(-50%,-50%) scaleX(-1) translateX(0); }
 }
 @keyframes shadow-enter-kf {
-  from { transform: translate(-50%,-50%) translateX(-55cqmin); }
+  from { transform: translate(-50%,-50%) translateX(-35cqmin); }
   to   { transform: translate(-50%,-50%) translateX(0); }
 }
 @keyframes plane-enter-kf {
@@ -836,8 +836,8 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 .flightatt-loading {
   position: absolute;
   top: 76%;
-  left: 26.5%;
-  transform: translate(-50%, -50%) scaleX(-1) translateX(55cqmin);
+  left: 23%;
+  transform: translate(-50%, -50%) scaleX(-1) translateX(35cqmin);
   width: 25cqmin;
   height: auto;
   z-index: 201;
@@ -923,8 +923,8 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 .flightatt-loading-shadow {
   position: absolute;
   top: 98%;
-  left: 25%;
-  transform: translate(-50%, -50%) translateX(-55cqmin);
+  left: 21.5%;
+  transform: translate(-50%, -50%) translateX(-35cqmin);
   width: 7cqmin;
   height: 2cqmin;
   background: black;
@@ -1353,6 +1353,7 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 .rankings-pos.rk-bronze { color: #a05a2c; }
 /* highlight own row */
 .loading-social-row.is-me-row { border-color: #f0b800; background: #fffbe8; box-shadow: 0 0 0 0.2cqmin #f0b80044; }
+
 .rankings-desc {
   position: absolute;
   top: calc(50% - 22cqmin);
@@ -1361,7 +1362,7 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   width: 88cqmin;
   text-align: center;
   font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
-  font-size: 2cqmin;
+  font-size: 2.4cqmin;
   color: #a07820;
   pointer-events: none;
   z-index: 212;
@@ -2176,7 +2177,7 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 .loading-friend-actions {
   position: absolute;
   top: 80%;
-  left: calc(50% - 25cqmin);
+  left: calc(50% - 35cqmin);
   transform: translate(-50%, -50%);
   z-index: 213;
   display: flex;
@@ -2877,7 +2878,7 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   font-size: 4cqmin;
   font-weight: bold;
   color: #fffbe6;
-  -webkit-text-stroke: 0.25cqmin #1c5e91;
+  -webkit-text-stroke: 0.35cqmin #1c5e91;
   paint-order: stroke fill;
 }
 .welcome-popup-sub {
@@ -2990,7 +2991,7 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 .loading-panel2-text2-wrap {
   position: absolute;
   top: 42%;
-  left: 34%;
+  left: 30%;
   transform: translate(-50%, -50%);
   width: 40cqmin;
   pointer-events: none;
@@ -3082,7 +3083,7 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 /* ── PROFILE ACCOUNT BTN + MODAL ────────────────────── */
 .profile-account-wrap {
   position: absolute;
-  bottom: 13cqmin;
+  bottom: 17cqmin;
   left: calc(50% + 50cqmin);
   width: 14cqmin;
   z-index: 205;
@@ -3397,7 +3398,7 @@ body.account-logged .loading-name-edit {
   gap: 2cqmin;
   width: 100%;
   background: rgba(139,106,0,0.08);
-  border: 0.25cqmin solid #d4aa30;
+  border: 0.35cqmin solid #d4aa30;
   border-radius: 2cqmin;
   padding: 1.8cqmin 2cqmin;
   font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
@@ -7271,7 +7272,7 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
   font-size: 4.5cqmin;
   color: #fff700;
-  -webkit-text-stroke: 0.25cqmin #1a3a6b;
+  -webkit-text-stroke: 0.35cqmin #1a3a6b;
 }
 .vs-popup-sub {
   font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
@@ -7864,7 +7865,7 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
 }
 .practice-score-points-img {
   position: absolute;
-  width: 25cqmin;
+  width: 35cqmin;
   height: auto;
   z-index: 0;
 }

@@ -1774,6 +1774,7 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
   let _rankingsCache = {};       // tab → rows[]
   let _rankingsRawMap = {};      // tab → { id → raw profile object } for live updates
   let _rankingsRTChannel = null; // realtime channel
+  let _allGlobalRows = null;     // full sorted list for rank computation
 
   const SEL = 'id, username, avatar_url, hs_flags, hs_shapes, hs_cities, hs_monuments, hs_total, play_count, vs_wins, vs_losses, is_supporter, avg_sum_flags, avg_sum_shapes, avg_sum_cities, avg_sum_monuments, play_count_flags, play_count_shapes, play_count_cities, play_count_monuments';
 
@@ -1821,7 +1822,8 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
     const myId = window._sbProfile?.id;
     const { data: all } = await window.sb.from('profiles')
       .select(SEL);
-    const allRows = _sortAndRank(all || []);
+    _allGlobalRows = _sortAndRank(all || []);
+    const allRows = _allGlobalRows;
     let start = 0, end = 30;
     if (myId) {
       const myIdx = allRows.findIndex(r => r.id === myId);
@@ -1962,6 +1964,7 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
     document.getElementById('loading-screen').classList.add('table-shown');
     _rankingsCache = {};
     _rankingsRawMap = {};
+    _allGlobalRows = null;
     loadTab(_activeRTab);
   });
 

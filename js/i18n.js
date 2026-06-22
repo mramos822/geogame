@@ -32,7 +32,7 @@ const I18N = {
     // Social
     // Rankings
     'rankings.title': 'Rankings', 'rankings.loading': 'Cargando...', 'rankings.noData': 'Sin datos',
-    'rankings.desc': 'Puntaje total acumulado de los 4 modos. Haz clic en un jugador para ver su perfil.',
+    'rankings.desc': '¿Cómo te comparas contra el resto del mundo?',
     'rankings.noFriends': 'Aún no tienes amigos con cuenta.', 'rankings.notLoggedIn': 'Inicia sesión para ver esto.',
     'rankings.tab.top100': 'Top 100', 'rankings.tab.global': 'Top Global', 'rankings.tab.friends': 'Top Friends',
     'social.title': 'Panel de Amigos', 'social.sort.conn': 'Conexión',
@@ -210,7 +210,7 @@ const I18N = {
     'name.greet': 'Hello, {name}!', 'name.greetSub': 'Prove once and for all who knows the most countries, flags and cities in the world. Get your ranking and beat your friends!',
     // Rankings
     'rankings.title': 'Rankings', 'rankings.loading': 'Loading...', 'rankings.noData': 'No data',
-    'rankings.desc': 'Combined total score across all 4 modes. Click a player to view their profile.',
+    'rankings.desc': 'How do you compare against the rest of the world?',
     'rankings.noFriends': 'No friends with an account yet.', 'rankings.notLoggedIn': 'Sign in to see this.',
     'rankings.tab.top100': 'Top 100', 'rankings.tab.global': 'Top Global', 'rankings.tab.friends': 'Top Friends',
     'social.title': 'Friends Panel', 'social.sort.conn': 'Connection',
