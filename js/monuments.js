@@ -1263,6 +1263,7 @@ document.getElementById('loading-play-confirm-wrap')?.addEventListener('click', 
   const screen = document.getElementById('loading-screen');
   const tableGroup = document.getElementById('loading-table-group');
   tableGroup.classList.add('table-gone');
+  tableGroup.classList.remove('above-rankings');
   screen.classList.remove('table-shown');
 });
 
@@ -1874,7 +1875,9 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
         const myId = window._sbProfile?.id;
         if (myId && r.id === myId) {
           sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
-          document.getElementById('loading-table-group')?.classList.remove('table-gone');
+          const tg = document.getElementById('loading-table-group');
+          tg?.classList.remove('table-gone');
+          tg?.classList.add('above-rankings');
         } else if (typeof window.openFriendProfile === 'function') {
           // Ensure social data (friend list) is loaded before relStatus() is called inside openFriendProfile
           if (window._accountLoggedIn && !window._socialDataFetched) {

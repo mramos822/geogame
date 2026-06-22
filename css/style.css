@@ -1277,6 +1277,10 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   inset: 0;
   width: 100%;
   height: 100%;  z-index: 210;
+}
+#loading-table-group.above-rankings {
+  z-index: 211; /* raised when opened from rankings panel */
+
   transition: transform 0.4s ease-out; /* bajada (vuelve la mesa) */
   will-change: transform;
   pointer-events: none; /* la capa no captura clicks; solo sus hijos interactivos */
@@ -1319,7 +1323,7 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   inset: 0;
   width: 100%;
   height: 100%;
-  z-index: 209; /* below table-group (210) so own profile appears on top */
+  z-index: 210;
   transition: transform 0.4s ease-out;
   will-change: transform;
   pointer-events: none;
