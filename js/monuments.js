@@ -1799,7 +1799,6 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
   function _sortAndRank(profiles) {
     return profiles
       .map(p => _toRow(p))
-      .filter(r => r.score > 0)
       .sort((a, b) => b.score - a.score)
       .map((r, i) => ({ ...r, rank: i + 1 }));
   }
@@ -1809,8 +1808,7 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
     if (_rankingsCache.top100) return _rankingsCache.top100;
     if (!window.sb) return [];
     const { data } = await window.sb.from('profiles')
-      .select(SEL)
-      .or('hs_total.gt.0,hs_flags.gt.0,hs_shapes.gt.0,hs_cities.gt.0,hs_monuments.gt.0');
+      .select(SEL);
     const rows = _sortAndRank(data || []).slice(0, 100);
     _rankingsCache.top100 = rows;
     _rankingsRawMap.top100 = Object.fromEntries((data||[]).map(p => [p.id, p]));
@@ -1822,8 +1820,7 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
     if (!window.sb) return [];
     const myId = window._sbProfile?.id;
     const { data: all } = await window.sb.from('profiles')
-      .select(SEL)
-      .or('hs_total.gt.0,hs_flags.gt.0,hs_shapes.gt.0,hs_cities.gt.0,hs_monuments.gt.0');
+      .select(SEL);
     const allRows = _sortAndRank(all || []);
     let start = 0, end = 30;
     if (myId) {
