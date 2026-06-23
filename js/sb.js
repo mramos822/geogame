@@ -43,8 +43,15 @@ window.sbChangePassword = async function(newPassword) {
 };
 
 window.sbChangeEmail = async function(newEmail) {
-  const { error } = await sb.auth.updateUser({ email: newEmail }, { emailRedirectTo: _AUTH_REDIRECT });
-  if (error) throw error;
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) throw new Error('No session');
+  const res = await fetch(`${_SB_URL}/functions/v1/send-change-email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': _SB_ANON },
+    body: JSON.stringify({ userId: user.id, newEmail }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Error al enviar el correo.');
 };
 
 window.sbLogout = async function() {
