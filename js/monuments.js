@@ -1568,6 +1568,7 @@ document.getElementById('loading-profile-btn')?.addEventListener('click', () => 
 
 let _friendRealtimeChannel = null;
 let _friendshipsChannel    = null;
+let _knownRequestIds       = null; // null = primera carga, no mostrar notif
 let _socialReloadTimer     = null;
 function _debouncedLoadSocial() {
   clearTimeout(_socialReloadTimer);
@@ -1762,9 +1763,10 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
   }
   document.getElementById('loading-social-group')?.classList.remove('table-gone');
   document.getElementById('loading-screen').classList.add('table-shown');
-  // Ocultar badge al entrar al panel
+  // Ocultar badge y notificación de solicitud al entrar al panel
   const badge = document.getElementById('social-notif-badge');
   if (badge) badge.style.display = 'none';
+  _dismissFriendRequestNotif();
   loadSocialData();
 });
 
@@ -2033,7 +2035,7 @@ let socialActiveTab = 'friends';
 let socialSort = localStorage.getItem('socialSort') || 'conn';
 
 // Cache de datos sociales cargado desde Supabase
-let socialData = { friends: [], requests: [], sent: [], blocked: [] };
+let socialData = { friends: [], requests: [], sent: [], blocked: [], blockedMe: [] };
 
 // Favoritos persistidos en localStorage por user ID
 function getSocialFavs() {
@@ -2105,12 +2107,99 @@ function _updateSocialBadge() {
   } else {
     badge.style.display = 'none';
   }
+
+  // Detectar solicitudes nuevas y mostrar notificación banner (solo si panel cerrado)
+  const currentIds = new Set(socialData.requests.map(r => r.friendshipId));
+  if (_knownRequestIds !== null && panelOpen === false) {
+    const newReqs = socialData.requests.filter(r => !_knownRequestIds.has(r.friendshipId));
+    if (newReqs.length > 0) {
+      _showFriendRequestNotif(newReqs[newReqs.length - 1]);
+    }
+  }
+  _knownRequestIds = currentIds;
+}
+
+const _FREQ_NOTIF_MS = 10000;
+let _freqNotifTimer   = null;
+let _freqNotifReqId   = null;
+let _freqNotifAcceptCb = null;
+let _freqNotifDeclineCb = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('friend-req-notif-accept')?.addEventListener('click', () => {
+    if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+    const cb = _freqNotifAcceptCb;
+    _dismissFriendRequestNotif();
+    if (cb) cb();
+  });
+  document.getElementById('friend-req-notif-decline')?.addEventListener('click', () => {
+    if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+    const cb = _freqNotifDeclineCb;
+    _dismissFriendRequestNotif();
+    if (cb) cb();
+  });
+});
+
+function _showFriendRequestNotif(req) {
+  const banner = document.getElementById('friend-req-notif');
+  const bar    = document.getElementById('friend-req-notif-bar');
+  const nameEl = document.getElementById('friend-req-notif-name');
+  const subEl  = document.getElementById('friend-req-notif-sub');
+  if (!banner) return;
+
+  _freqNotifReqId = req.friendshipId;
+
+  const capturedFriendshipId = req.friendshipId;
+  _freqNotifAcceptCb = async () => {
+    try {
+      await window.sbAcceptRequest(capturedFriendshipId);
+      loadSocialData(false);
+    } catch (e) { console.warn('[friendReqNotif] accept error:', e); }
+  };
+  _freqNotifDeclineCb = async () => {
+    try {
+      await window.sbDeleteFriendship(capturedFriendshipId);
+      loadSocialData(false);
+    } catch (e) { console.warn('[friendReqNotif] decline error:', e); }
+  };
+
+  if (nameEl) nameEl.textContent = req.name || '?';
+  if (subEl)  subEl.textContent  = typeof t === 'function'
+    ? t('social.sentYouRequest', 'te envió una solicitud de amistad')
+    : 'te envió una solicitud de amistad';
+
+  banner.style.display = 'block';
+  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+
+  if (bar) {
+    bar.style.transition = 'none';
+    bar.style.width = '100%';
+    void bar.offsetWidth;
+    bar.style.transition = 'width ' + _FREQ_NOTIF_MS + 'ms linear';
+    bar.style.width = '0%';
+  }
+
+  clearTimeout(_freqNotifTimer);
+  _freqNotifTimer = setTimeout(() => { _dismissFriendRequestNotif(); }, _FREQ_NOTIF_MS);
+}
+
+function _dismissFriendRequestNotif() {
+  const banner = document.getElementById('friend-req-notif');
+  if (banner) {
+    banner.classList.add('leaving');
+    setTimeout(() => { banner.style.display = 'none'; banner.classList.remove('leaving'); }, 300);
+  }
+  clearTimeout(_freqNotifTimer);
+  _freqNotifReqId    = null;
+  _freqNotifAcceptCb = null;
+  _freqNotifDeclineCb = null;
 }
 
 // Carga todos los datos sociales desde Supabase y re-renderiza.
 async function loadSocialData(showLoader = true) {
   if (!window._accountLoggedIn || !window._sbUserId) {
-    socialData = { friends: [], requests: [], sent: [], blocked: [] };
+    socialData = { friends: [], requests: [], sent: [], blocked: [], blockedMe: [] };
+    _knownRequestIds = null;
     renderSocial(); updateSocialTabCounts(); return;
   }
   if (showLoader) {
@@ -2287,6 +2376,15 @@ function _startFriendStatusPoll(friendId) {
 
 // Abre el perfil de amigo con datos reales de Supabase.
 function openFriendProfile(friend) {
+  if (socialData.blockedMe.some(b => b.id === friend.id)) {
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    currentFriendProfile = friend;
+    _clearFriendPanel();
+    const friendGroup = document.getElementById('loading-friend-group');
+    if (friendGroup) friendGroup.classList.remove('table-gone');
+    _showFriendPanelError(true);
+    return;
+  }
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   currentFriendProfile = friend;
   const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
@@ -2344,7 +2442,29 @@ function openFriendProfile(friend) {
 }
 window.openFriendProfile = openFriendProfile;
 
-function _showFriendPanelError() {
+function _clearFriendPanel() {
+  const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  const pic = document.getElementById('loading-friend-pic');
+  if (pic) pic.src = 'images/profilepic/ppdefault.png';
+  const fBadge = document.getElementById('loading-friend-supporter-badge');
+  if (fBadge) fBadge.style.display = 'none';
+  setText('loading-friend-name', '');
+  setText('loading-friend-total', '—');
+  setText('loading-friend-play-count', '');
+  [1,2,3,4].forEach(k => { setText('loading-friend-avg'+k,'—'); setText('loading-friend-hs'+k,'—'); });
+  const rankImg = document.getElementById('loading-friend-rank');
+  if (rankImg) rankImg.src = 'images/ranks/1.png';
+  const rankLabel = document.getElementById('loading-friend-rank-label');
+  if (rankLabel) rankLabel.textContent = '';
+  const vsEl = document.getElementById('loading-friend-vs-record');
+  if (vsEl) vsEl.style.display = 'none';
+  const statusEl = document.getElementById('loading-friend-status');
+  if (statusEl) { statusEl.textContent = ''; statusEl.className = 'loading-friend-status'; }
+  const actions = document.getElementById('loading-friend-actions');
+  if (actions) actions.style.visibility = 'hidden';
+}
+
+function _showFriendPanelError(persistent = false) {
   const panel = document.getElementById('loading-friend-group');
   if (!panel) return;
   let overlay = panel.querySelector('.friend-error-overlay');
@@ -2353,9 +2473,11 @@ function _showFriendPanelError() {
     overlay.className = 'friend-error-overlay';
     panel.appendChild(overlay);
   }
-  overlay.textContent = 'Ha ocurrido un error, por favor inténtelo más tarde';
+  overlay.textContent = typeof t === 'function'
+    ? t('social.profileUnavailable', 'No se ha podido cargar el perfil, por favor inténtalo más tarde')
+    : 'No se ha podido cargar el perfil, por favor inténtalo más tarde';
   overlay.classList.add('visible');
-  setTimeout(() => overlay.classList.remove('visible'), 3000);
+  if (!persistent) setTimeout(() => overlay.classList.remove('visible'), 3000);
 }
 
 // ── Botones de relación del perfil de amigo ───────────────────────────────────
@@ -2544,7 +2666,11 @@ document.getElementById('loading-friend-back-wrap')?.addEventListener('click', (
   wrap.classList.add('confirm-pressed');
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
   clearInterval(_friendStatusInterval);
-  document.getElementById('loading-friend-group')?.classList.add('table-gone');
+  const friendGroup = document.getElementById('loading-friend-group');
+  friendGroup?.classList.add('table-gone');
+  friendGroup?.querySelector('.friend-error-overlay')?.classList.remove('visible');
+  const actions = document.getElementById('loading-friend-actions');
+  if (actions) actions.style.visibility = '';
 });
 
 document.getElementById('loading-social-search-input')?.addEventListener('input', (e) => {

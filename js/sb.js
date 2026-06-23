@@ -264,10 +264,11 @@ window.sbLoadSocialData = async function(userId) {
   }
   const rows = data || [];
   return {
-    friends:  rows.filter(r => r.status === 'accepted').map(toEntry),
-    requests: rows.filter(r => r.status === 'pending' && r.user_b === userId).map(toEntry),
-    sent:     rows.filter(r => r.status === 'pending' && r.user_a === userId).map(toEntry),
-    blocked:  rows.filter(r => r.status === 'blocked' && r.initiated_by === userId).map(toEntry),
+    friends:   rows.filter(r => r.status === 'accepted').map(toEntry),
+    requests:  rows.filter(r => r.status === 'pending' && r.user_b === userId).map(toEntry),
+    sent:      rows.filter(r => r.status === 'pending' && r.user_a === userId).map(toEntry),
+    blocked:   rows.filter(r => r.status === 'blocked' && r.initiated_by === userId).map(toEntry),
+    blockedMe: rows.filter(r => r.status === 'blocked' && r.initiated_by !== userId).map(toEntry),
   };
 };
 

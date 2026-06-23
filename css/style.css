@@ -1277,6 +1277,7 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   inset: 0;
   width: 100%;
   height: 100%;  z-index: 210;
+  transition: transform 0.4s ease-out;
 }
 #loading-table-group.above-rankings {
   z-index: 211; /* raised when opened from rankings panel */

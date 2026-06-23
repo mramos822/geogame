@@ -1075,7 +1075,7 @@
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
     </div>
-    <div id="loading-version">Ver. 2.6.85</div>
+    <div id="loading-version">Ver. 2.6.86</div>
   </div>
 
   <!-- Pantalla de resultado versus (W/L) — fuera del loading-screen para verse tras la partida -->
@@ -1167,6 +1167,19 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- Notificación de solicitud de amistad entrante -->
+  <div id="friend-req-notif" class="lobby-invite-notif" style="display:none">
+    <div class="lobby-notif-row">
+      <div class="lobby-notif-text">
+        <span class="lobby-notif-name" id="friend-req-notif-name"></span>
+        <span class="lobby-notif-sub" id="friend-req-notif-sub"></span>
+      </div>
+      <button class="lobby-notif-btn accept" id="friend-req-notif-accept" type="button" aria-label="Aceptar">✓</button>
+      <button class="lobby-notif-btn decline" id="friend-req-notif-decline" type="button" aria-label="Rechazar">✕</button>
+    </div>
+    <div class="lobby-notif-bar"><div class="lobby-notif-bar-fill" id="friend-req-notif-bar"></div></div>
   </div>
 
   <!-- Notificación (no bloqueante) de invitación a sala: baja desde arriba con barra de 10s -->
