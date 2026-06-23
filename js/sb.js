@@ -28,10 +28,13 @@ window.sbLogin = async function(username, password) {
 const _AUTH_REDIRECT = 'https://mygeochallenge.com/play/';
 
 window.sbResetPassword = async function(email) {
-  const { error } = await sb.auth.resetPasswordForEmail(email, {
-    redirectTo: _AUTH_REDIRECT,
+  const res = await fetch(`${_SB_URL}/functions/v1/send-reset-email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': _SB_ANON },
+    body: JSON.stringify({ email }),
   });
-  if (error) throw error;
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Error al enviar el correo.');
 };
 
 window.sbChangePassword = async function(newPassword) {
