@@ -148,30 +148,7 @@
         const resultsBtn = document.getElementById('loading-results-btn');
         if (resultsBtn) resultsBtn.style.display = 'block';
         // Arrancar menuloop; si autoplay bloqueado, esperar primer gesto
-        setTimeout(() => {
-          const m = window.sfxMenuMusic;
-          if (!m) return;
-          m.loop = true;
-          m.currentTime = 0;
-          const isMuted = localStorage.getItem('muted') === 'true';
-          m.muted = isMuted;
-          const p = m.play();
-          if (p && typeof p.then === 'function') {
-            p.catch(() => {
-              // Autoplay bloqueado: arrancar en el primer gesto del usuario
-              const onGesture = () => {
-                m.currentTime = 0;
-                m.play().catch(() => {});
-                document.removeEventListener('click',      onGesture, true);
-                document.removeEventListener('touchstart', onGesture, true);
-                document.removeEventListener('keydown',    onGesture, true);
-              };
-              document.addEventListener('click',      onGesture, { once: true, capture: true });
-              document.addEventListener('touchstart', onGesture, { once: true, capture: true });
-              document.addEventListener('keydown',    onGesture, { once: true, capture: true });
-            });
-          }
-        }, 0);
+        window.startMenuMusic();
       }
 
       // Esperar a que name-prompt y account-modal estén cerrados antes de animar
@@ -393,6 +370,28 @@ sfxGameMusic.loop  = true;
 const sfxMenuMusic = new Audio('sfx/menuloop.mp3');
 sfxMenuMusic.loop  = true;
 window.sfxMenuMusic = sfxMenuMusic;
+window.startMenuMusic = function () {
+  const m = window.sfxMenuMusic;
+  if (!m) return;
+  m.loop = true;
+  m.currentTime = 0;
+  m.muted = localStorage.getItem('muted') === 'true';
+  const p = m.play();
+  if (p && typeof p.then === 'function') {
+    p.catch(() => {
+      const onGesture = () => {
+        m.currentTime = 0;
+        m.play().catch(() => {});
+        document.removeEventListener('click',      onGesture, true);
+        document.removeEventListener('touchstart', onGesture, true);
+        document.removeEventListener('keydown',    onGesture, true);
+      };
+      document.addEventListener('click',      onGesture, { once: true, capture: true });
+      document.addEventListener('touchstart', onGesture, { once: true, capture: true });
+      document.addEventListener('keydown',    onGesture, { once: true, capture: true });
+    });
+  }
+};
 const sfxSelect    = new Audio('sfx/select.mp3');
 if (localStorage.getItem('muted') === 'true') { sfxCheck.volume = 0; sfxPostgame.volume = 0; sfxGameMusic.volume = 0; sfxMenuMusic.volume = 0; sfxSelect.volume = 0; }
 [sfxCheck, sfxSelect].forEach(sfx => { sfx.load(); });

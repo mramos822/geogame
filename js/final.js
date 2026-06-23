@@ -128,17 +128,17 @@ function buildFriendClouds(ranking, playerPos) {
   const STEP_Y = -11 * CQW; // px por puesto (2:1)
   const playerName = localStorage.getItem('playerName') || 'John';
 
-  // Ventana "top 11": yo + 5 por encima + 5 por debajo. En los bordes se
-  // desplaza para mantener 11 (si hay suficientes), sin sobrecargar de nubes.
-  const HALF = 5;
+  // Ventana de 10 posiciones (yo incluido como hueco): 4 por encima + yo + 5 por debajo.
+  // En los bordes se desplaza para mantener 10 (si hay suficientes).
+  const WINDOW = 10;
   const fullN = ranking.length;
-  let start = playerPos - HALF;          // puesto real (1-based) del tope de la ventana
-  let end   = playerPos + HALF;
+  let start = playerPos - Math.floor((WINDOW - 1) / 2); // 4 por encima
+  let end   = start + WINDOW - 1;
   if (start < 1)      { end += (1 - start);     start = 1; }
   if (end > fullN)    { start -= (end - fullN); end = fullN; }
   if (start < 1)      start = 1;
   const windowed = ranking.slice(start - 1, end); // sigue ordenado desc
-  const N = windowed.length;                       // <= 11
+  const N = windowed.length;                       // <= 10
   const localPlayerPos = playerPos - start + 1;    // mi puesto dentro de la ventana
 
   for (let i = N - 1; i >= 0; i--) {
@@ -249,6 +249,7 @@ document.getElementById('final-confirm-back-wrap')?.addEventListener('click', ()
   setTimeout(() => w.classList.remove('confirm-pressed'), 50);
   if (typeof window.stopResultsMusic === 'function') window.stopResultsMusic();
   hideFinalScreen();
+  if (typeof window.startMenuMusic === 'function') window.startMenuMusic();
   if (typeof window.resetEntranceElements === 'function') window.resetEntranceElements();
   document.getElementById('loading-screen').style.display = '';
   document.getElementById('loading-screen').classList.remove('table-shown');
