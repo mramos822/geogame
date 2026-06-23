@@ -45,6 +45,7 @@ window.sbChangePassword = async function(newPassword) {
 window.sbChangeEmail = async function(newEmail) {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) throw new Error('No session');
+  if (user.email === newEmail) throw new Error('__same_email__');
   const res = await fetch(`${_SB_URL}/functions/v1/send-change-email`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'apikey': _SB_ANON },

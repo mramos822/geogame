@@ -892,7 +892,7 @@ window.startCampaign = function () {
       showView(viewForgotSent);
     } catch(e) {
       showView(viewForgot);
-      if (errEl) errEl.textContent = e.message || 'Error al enviar.';
+      if (errEl) errEl.textContent = (e.message && e.message !== '{}') ? e.message : 'Error al enviar el correo.';
     }
   });
 
@@ -1244,7 +1244,9 @@ window.startCampaign = function () {
       .then(() => showView(viewChangeEmailSent))
       .catch(e => {
         showView(viewChangeEmail);
-        if (err) err.textContent = e.message || t('account.errEmailInvalid');
+        if (err) err.textContent = e.message === '__same_email__'
+          ? (t('account.errSameEmail') || 'Este correo es igual al actual.')
+          : (e.message || t('account.errEmailInvalid'));
       });
   });
 
