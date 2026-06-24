@@ -1,12 +1,12 @@
 const CITIES = [
   // ── América del Sur ─────────────────────────────────────────────────────────
-  { name: "Buenos Aires",          country: "ARG", lat: -34.61, lon:  -58.38, diff: "inicio" },
+  { name: "Buenos Aires",          country: "ARG", lat: -34.61, lon:  -58.38, diff: "facil"  },
   { name: "Rosario",               country: "ARG", lat: -32.95, lon:  -60.66, diff: "medio"  },
   { name: "Ushuaia",               country: "ARG", lat: -54.00, lon:  -68.30, diff: "medio"  },
   { name: "Corrientes",            country: "ARG", lat: -27.47, lon:  -58.83, diff: "dificil"},
 
-  { name: "São Paulo",             country: "BRA", lat: -23.55, lon:  -46.63, diff: "inicio" },
-  { name: "Río de Janeiro",        country: "BRA", lat: -22.91, lon:  -43.17, diff: "inicio" },
+  { name: "São Paulo",             country: "BRA", lat: -23.55, lon:  -46.63, diff: "facil"  },
+  { name: "Río de Janeiro",        country: "BRA", lat: -22.91, lon:  -43.17, diff: "facil"  },
   { name: "Brasilia",              country: "BRA", lat: -15.78, lon:  -47.93, diff: "facil"  },
   { name: "Belo Horizonte",        country: "BRA", lat: -19.92, lon:  -43.94, diff: "medio"  },
   { name: "Recife",                country: "BRA", lat:  -8.05, lon:  -34.88, diff: "medio"  },
@@ -19,22 +19,22 @@ const CITIES = [
   { name: "Porto Velho",           country: "BRA", lat:  -8.76, lon:  -63.90, diff: "dificil"},
   { name: "Santarém",              country: "BRA", lat:  -2.44, lon:  -54.71, diff: "dificil"},
 
-  { name: "Santiago",              country: "CHI", lat: -33.45, lon:  -70.67, diff: "inicio" },
+  { name: "Santiago",              country: "CHI", lat: -33.45, lon:  -70.67, diff: "facil"  },
   { name: "Valparaíso",            country: "CHI", lat: -33.05, lon:  -71.62, diff: "medio"  },
   { name: "Antofagasta",           country: "CHI", lat: -23.65, lon:  -70.40, diff: "dificil"},
   { name: "Rancagua",              country: "CHI", lat: -34.17, lon:  -70.74, diff: "dificil"},
 
-  { name: "Lima",                  country: "PER", lat: -12.06, lon:  -77.04, diff: "inicio" },
+  { name: "Lima",                  country: "PER", lat: -12.06, lon:  -77.04, diff: "facil"  },
   { name: "Arequipa",              country: "PER", lat: -16.41, lon:  -71.54, diff: "dificil"},
   { name: "Iquitos",               country: "PER", lat:  -3.74, lon:  -73.25, diff: "dificil"},
   { name: "Piura",                 country: "PER", lat:  -5.19, lon:  -80.63, diff: "dificil"},
 
-  { name: "Bogotá",                country: "COL", lat:   4.71, lon:  -74.07, diff: "inicio" },
+  { name: "Bogotá",                country: "COL", lat:   4.71, lon:  -74.07, diff: "facil"  },
   { name: "Medellín",              country: "COL", lat:   6.25, lon:  -75.56, diff: "facil"  },
   { name: "Cali",                  country: "COL", lat:   3.43, lon:  -76.52, diff: "facil"  },
   { name: "Barranquilla",          country: "COL", lat:  10.96, lon:  -74.80, diff: "medio"  },
 
-  { name: "Caracas",               country: "VEN", lat:  10.49, lon:  -66.88, diff: "inicio" },
+  { name: "Caracas",               country: "VEN", lat:  10.49, lon:  -66.88, diff: "facil"  },
   { name: "Maracaibo",             country: "VEN", lat:  10.63, lon:  -71.64, diff: "medio"  },
 
   { name: "Quito",                 country: "ECU", lat:  -0.22, lon:  -78.51, diff: "facil"  },
@@ -58,8 +58,8 @@ const CITIES = [
   { name: "Tijuana",               country: "MEX", lat:  32.53, lon: -117.04, diff: "medio"  },
   { name: "Mérida",                country: "MEX", lat:  20.97, lon:  -89.62, diff: "medio"  },
 
-  { name: "La Habana",             country: "CUB", lat:  23.13, lon:  -82.38, diff: "inicio" },
-  { name: "Panamá",                country: "PAN", lat:   8.99, lon:  -79.52, diff: "inicio" },
+  { name: "La Habana",             country: "CUB", lat:  23.13, lon:  -82.38, diff: "facil"  },
+  { name: "Panamá",                country: "PAN", lat:   8.99, lon:  -79.52, diff: "facil"  },
   { name: "Santo Domingo",         country: "DOM", lat:  18.48, lon:  -69.90, diff: "facil"  },
   { name: "Puerto Príncipe",       country: "HAI", lat:  18.54, lon:  -72.34, diff: "facil"  },
   { name: "Kingston",              country: "JAM", lat:  17.99, lon:  -76.79, diff: "medio"  },
@@ -75,12 +75,12 @@ const CITIES = [
 
   // ── América del Norte ───────────────────────────────────────────────────────
   { name: "Nueva York",            country: "USA", lat:  40.71, lon:  -74.01, diff: "inicio" },
-  { name: "Los Ángeles",           country: "USA", lat:  34.05, lon: -118.24, diff: "inicio" },
-  { name: "Miami",                 country: "USA", lat:  25.77, lon:  -80.19, diff: "inicio" },
-  { name: "Washington D.C.",       country: "USA", lat:  38.91, lon:  -77.04, diff: "inicio" },
-  { name: "Chicago",               country: "USA", lat:  41.85, lon:  -87.65, diff: "inicio" },
-  { name: "Las Vegas",             country: "USA", lat:  36.17, lon: -115.14, diff: "inicio" },
-  { name: "San Francisco",         country: "USA", lat:  37.77, lon: -122.42, diff: "inicio" },
+  { name: "Los Ángeles",           country: "USA", lat:  34.05, lon: -118.24, diff: "facil"  },
+  { name: "Miami",                 country: "USA", lat:  25.77, lon:  -80.19, diff: "facil"  },
+  { name: "Washington D.C.",       country: "USA", lat:  38.91, lon:  -77.04, diff: "facil"  },
+  { name: "Chicago",               country: "USA", lat:  41.85, lon:  -87.65, diff: "facil"  },
+  { name: "Las Vegas",             country: "USA", lat:  36.17, lon: -115.14, diff: "facil"  },
+  { name: "San Francisco",         country: "USA", lat:  37.77, lon: -122.42, diff: "facil"  },
 
   { name: "Houston",               country: "USA", lat:  29.76, lon:  -95.37, diff: "facil"  },
   { name: "Dallas",                country: "USA", lat:  32.78, lon:  -96.80, diff: "facil"  },
@@ -116,16 +116,16 @@ const CITIES = [
   // ── Europa ──────────────────────────────────────────────────────────────────
   { name: "Londres",               country: "ENG", lat:  51.51, lon:   -0.13, diff: "inicio" },
   { name: "París",                 country: "FRA", lat:  48.85, lon:    2.35, diff: "inicio" },
-  { name: "Madrid",                country: "ESP", lat:  40.42, lon:   -3.70, diff: "inicio" },
-  { name: "Barcelona",             country: "ESP", lat:  41.39, lon:    2.17, diff: "inicio" },
-  { name: "Lisboa",                country: "POR", lat:  38.72, lon:   -9.14, diff: "inicio" },
-  { name: "Roma",                  country: "ITA", lat:  41.90, lon:   12.48, diff: "inicio" },
-  { name: "Milán",                 country: "ITA", lat:  45.46, lon:    9.19, diff: "inicio" },
-  { name: "Berlín",                country: "GER", lat:  52.52, lon:   13.41, diff: "inicio" },
-  { name: "Ámsterdam",             country: "NED", lat:  52.37, lon:    4.90, diff: "inicio" },
-  { name: "Moscú",                 country: "RUS", lat:  55.75, lon:   37.62, diff: "inicio" },
-  { name: "Estambul",              country: "TUR", lat:  41.01, lon:   28.95, diff: "inicio" },
-  { name: "Atenas",                country: "GRE", lat:  37.98, lon:   23.73, diff: "inicio" },
+  { name: "Madrid",                country: "ESP", lat:  40.42, lon:   -3.70, diff: "facil"  },
+  { name: "Barcelona",             country: "ESP", lat:  41.39, lon:    2.17, diff: "facil"  },
+  { name: "Lisboa",                country: "POR", lat:  38.72, lon:   -9.14, diff: "facil"  },
+  { name: "Roma",                  country: "ITA", lat:  41.90, lon:   12.48, diff: "facil"  },
+  { name: "Milán",                 country: "ITA", lat:  45.46, lon:    9.19, diff: "facil"  },
+  { name: "Berlín",                country: "GER", lat:  52.52, lon:   13.41, diff: "facil"  },
+  { name: "Ámsterdam",             country: "NED", lat:  52.37, lon:    4.90, diff: "facil"  },
+  { name: "Moscú",                 country: "RUS", lat:  55.75, lon:   37.62, diff: "facil"  },
+  { name: "Estambul",              country: "TUR", lat:  41.01, lon:   28.95, diff: "facil"  },
+  { name: "Atenas",                country: "GRE", lat:  37.98, lon:   23.73, diff: "facil"  },
 
   { name: "Venecia",               country: "ITA", lat:  45.44, lon:   12.32, diff: "facil"  },
   { name: "Nápoles",               country: "ITA", lat:  40.85, lon:   14.27, diff: "facil"  },
@@ -174,7 +174,7 @@ const CITIES = [
   { name: "Greenwich",             country: "ENG", lat:  51.48, lon:    0.00, diff: "dificil"},
 
   // ── África ──────────────────────────────────────────────────────────────────
-  { name: "El Cairo",              country: "EGY", lat:  30.06, lon:   31.25, diff: "inicio" },
+  { name: "El Cairo",              country: "EGY", lat:  30.06, lon:   31.25, diff: "facil"  },
 
   { name: "Lagos",                 country: "NGA", lat:   6.46, lon:    3.38, diff: "facil"  },
   { name: "Abuja",                 country: "NGA", lat:   9.07, lon:    7.40, diff: "medio"  },
@@ -207,7 +207,7 @@ const CITIES = [
   { name: "Mamoudzou",             country: "MAY", lat: -12.78, lon:   45.23, diff: "dificil"},
 
   // ── Medio Oriente ───────────────────────────────────────────────────────────
-  { name: "Dubai",                 country: "UAE", lat:  25.20, lon:   55.27, diff: "inicio" },
+  { name: "Dubai",                 country: "UAE", lat:  25.20, lon:   55.27, diff: "facil"  },
 
   { name: "Abu Dhabi",             country: "UAE", lat:  24.47, lon:   54.37, diff: "facil"  },
   { name: "Riad",                  country: "KSA", lat:  24.69, lon:   46.72, diff: "facil"  },
@@ -224,8 +224,8 @@ const CITIES = [
   { name: "Al-Manama",             country: "BHR", lat:  26.22, lon:   50.59, diff: "dificil"},
 
   // ── Asia Central y del Sur ──────────────────────────────────────────────────
-  { name: "Delhi",                 country: "IND", lat:  28.61, lon:   77.21, diff: "inicio" },
-  { name: "Mumbai",                country: "IND", lat:  19.08, lon:   72.88, diff: "inicio" },
+  { name: "Delhi",                 country: "IND", lat:  28.61, lon:   77.21, diff: "facil"  },
+  { name: "Mumbai",                country: "IND", lat:  19.08, lon:   72.88, diff: "facil"  },
 
   { name: "Karachi",               country: "PAK", lat:  24.86, lon:   67.01, diff: "medio"  },
   { name: "Dhaka",                 country: "BAN", lat:  23.72, lon:   90.41, diff: "medio"  },
@@ -246,12 +246,12 @@ const CITIES = [
 
   // ── Asia Oriental y Suroriental ─────────────────────────────────────────────
   { name: "Tokio",                 country: "JPN", lat:  35.68, lon:  139.69, diff: "inicio" },
-  { name: "Beijing",               country: "CHN", lat:  39.91, lon:  116.39, diff: "inicio" },
-  { name: "Shanghái",              country: "CHN", lat:  31.22, lon:  121.47, diff: "inicio" },
-  { name: "Hong Kong",             country: "HKG", lat:  22.32, lon:  114.17, diff: "inicio" },
-  { name: "Seúl",                  country: "KOR", lat:  37.57, lon:  126.98, diff: "inicio" },
-  { name: "Bangkok",               country: "THA", lat:  13.75, lon:  100.52, diff: "inicio" },
-  { name: "Singapur",              country: "SIN", lat:   1.35, lon:  103.82, diff: "inicio" },
+  { name: "Beijing",               country: "CHN", lat:  39.91, lon:  116.39, diff: "facil"  },
+  { name: "Shanghái",              country: "CHN", lat:  31.22, lon:  121.47, diff: "facil"  },
+  { name: "Hong Kong",             country: "HKG", lat:  22.32, lon:  114.17, diff: "facil"  },
+  { name: "Seúl",                  country: "KOR", lat:  37.57, lon:  126.98, diff: "facil"  },
+  { name: "Bangkok",               country: "THA", lat:  13.75, lon:  100.52, diff: "facil"  },
+  { name: "Singapur",              country: "SIN", lat:   1.35, lon:  103.82, diff: "facil"  },
 
   { name: "Ho Chi Minh",           country: "VIE", lat:  10.82, lon:  106.63, diff: "dificil"},
   { name: "Guangzhou",             country: "CHN", lat:  23.13, lon:  113.26, diff: "dificil"},
@@ -277,7 +277,7 @@ const CITIES = [
   { name: "Ürümqi",                country: "CHN", lat:  43.82, lon:   87.60, diff: "dificil"},
 
   // ── Oceanía ─────────────────────────────────────────────────────────────────
-  { name: "Sídney",                country: "AUS", lat: -33.87, lon:  151.21, diff: "inicio" },
+  { name: "Sídney",                country: "AUS", lat: -33.87, lon:  151.21, diff: "facil"  },
 
   { name: "Melbourne",             country: "AUS", lat: -37.81, lon:  144.96, diff: "facil"  },
   { name: "Brisbane",              country: "AUS", lat: -27.47, lon:  153.03, diff: "facil"  },
@@ -303,7 +303,7 @@ const CITIES = [
 //   20+   → inicio 15%, facil 35%, medio 35%, dificil 15%
 const CITY_UNLOCK_TIERS = [
   { at:  0, weights: { inicio: 1.00 } },
-  { at:  3, weights: { inicio: 0.50, facil: 0.45, medio: 0.05 } },
+  { at:  1, weights: { inicio: 0.50, facil: 0.45, medio: 0.05 } },
   { at: 10, weights: { inicio: 0.20, facil: 0.40, medio: 0.40 } },
   { at: 20, weights: { inicio: 0.10, facil: 0.28, medio: 0.37, dificil: 0.25 } },
 ];

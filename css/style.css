@@ -4418,7 +4418,7 @@ body.is-mobile #screen-warning-icon {
 
 #result-label.perfect { color: #ffffff; -webkit-text-stroke: 1px #ff2222; }
 #result-label.good    { color: #ffffff; -webkit-text-stroke: 1px #ffaa55; }
-#result-label.fair    { color: #ffffff; -webkit-text-stroke: 1px #ffff00; }
+#result-label.fair    { color: #ffffff; -webkit-text-stroke: 1px #097361; }
 #result-label.wayoff  { color: #ffffff; -webkit-text-stroke: 1px #55ccff; }
 
 
@@ -4576,7 +4576,7 @@ body.is-mobile #screen-warning-icon {
 
 #flags-result-label.perfect { color: #ffffff; -webkit-text-stroke: 1px #ff2222; }
 #flags-result-label.good    { color: #ffffff; -webkit-text-stroke: 1px #ffaa55; }
-#flags-result-label.fair    { color: #ffffff; -webkit-text-stroke: 1px #ffff00; }
+#flags-result-label.fair    { color: #ffffff; -webkit-text-stroke: 1px #097361; }
 #flags-result-label.wayoff  { color: #ffffff; -webkit-text-stroke: 1px #55ccff; }
 
 #flags-speed-bonus-text {
@@ -7848,7 +7848,7 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   text-align: center;
   font-family: 'VAGRoundBold', 'Arial', sans-serif;
   box-shadow: 0 0.8cqmin 2cqmin rgba(0,0,0,0.4);
-  min-width: 32cqmin;
+  width: 46cqmin;
   animation: welcomePopIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both;
 }
 .practice-score-title {

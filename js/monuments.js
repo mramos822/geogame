@@ -3413,6 +3413,19 @@ const FAIR_PX    = 45;
 const SCORE_MAP = { perfect: 300, good: 150, fair: 50, wayoff: 0 };
 const LABEL_MAP = { perfect: 'Perfecto', good: 'Bien', fair: 'Regular', wayoff: 'Muy lejos' };
 
+// ── CITIES SCORING (nuevo sistema fiel al juego viejo) ────────────────────────
+const CITIES_SCORE_MAP  = { perfect: 36, good: 24, fair: 20, wayoff: 0 };
+const CITIES_SPEED_MULT = 1.5;
+const CITIES_M_TABLE = [
+  [0, 1], [1, 1.5], [2, 2.5], [4, 4], [7, 5], [10, 6],
+  [13, 7.5], [18, 9], [22, 11], [25, 13], [31, 15], [35, 19],
+];
+function getCitiesM(n) {
+  let M = 1;
+  for (const [min, m] of CITIES_M_TABLE) { if (n >= min) M = m; }
+  return M;
+}
+
 // ── MAP CALIBRATION ──────────────────────────────────────────────────────────
 // Mercator projection — calibrated with 4 reference cities
 const MAP_LON_LEFT = -141.2;
@@ -4282,7 +4295,7 @@ function showTimeBonus() {
 }
 
 function advanceDot() {
-  if (window.practiceConfig && window.practiceConfig.active) return;
+  if (window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0) return;
   state.dots++;
   updateDotsUI();
 
@@ -4493,28 +4506,46 @@ canvas.addEventListener('click', (e) => {
 
   saveGradeCount(grade);
 
-  if (grade === 'wayoff') {
-    state.streak = 0;
-  } else {
-    state.streak++;
-    correctCount++;
-  }
-  const streakMult = 1 + Math.floor(state.streak / 4) * 0.3;
-
-  const badgeColor  = getBadgeImg(state.streak);
-  const inRowBonus  = getInRowBonus(state.streak);
-
-  const { base, bonusAmt } = computeScore(grade, shownAt);
-  const streakBonus = Math.round((base + bonusAmt) * (streakMult - 1));
   const hintMult = slideTagIn._hintShown ? 0.5 : 1;
-  const totalGained = Math.round((base + bonusAmt + streakBonus) * hintMult) + inRowBonus;
+  let base, bonusAmt, totalGained, badgeColor, inRowBonus;
+
+  if (window.pendingGameMode === 'game') {
+    // ── Cities: nuevo sistema ──
+    const M = getCitiesM(correctCount); // leer M ANTES de incrementar
+    if (grade !== 'wayoff') correctCount++;
+    base     = CITIES_SCORE_MAP[grade];
+    const elapsed = (Date.now() - shownAt) / 1000;
+    const _citiesPracticeInf = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
+    const gotBonus = !_citiesPracticeInf && base > 0 && elapsed < SPEED_BONUS_WIN;
+    bonusAmt      = gotBonus ? Math.round(base * (CITIES_SPEED_MULT - 1)) : 0;
+    totalGained   = Math.round((base + bonusAmt) * M * hintMult);
+    badgeColor    = null;
+    inRowBonus    = 0;
+  } else {
+    // ── Monuments: sistema actual ──
+    if (grade === 'wayoff') {
+      state.streak = 0;
+    } else {
+      state.streak++;
+      correctCount++;
+    }
+    const streakMult = 1 + Math.floor(state.streak / 4) * 0.3;
+    badgeColor  = getBadgeImg(state.streak);
+    inRowBonus  = getInRowBonus(state.streak);
+    ({ base, bonusAmt } = computeScore(grade, shownAt));
+    if (window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0) bonusAmt = 0;
+    const streakBonus = Math.round((base + bonusAmt) * (streakMult - 1));
+    totalGained = Math.round((base + bonusAmt + streakBonus) * hintMult) + inRowBonus;
+    if (base + bonusAmt + streakBonus > 0) showScorePopup(Math.round((base + bonusAmt + streakBonus) * hintMult));
+  }
+
   state.score += totalGained;
   if (window.pendingGameMode === 'game' || window.pendingGameMode === 'monuments') {
     if (window._vsActive && typeof window._vsReportAnswer === 'function') window._vsReportAnswer(grade !== 'wayoff', Math.round(state.score));
     if (window._lobbyActive && typeof window._lobbyReportAnswer === 'function') window._lobbyReportAnswer(grade !== 'wayoff', Math.round(state.score));
     if (grade === 'wayoff' && (window._vsActive || window._lobbyActive) && typeof window._lbWrongEffect === 'function') window._lbWrongEffect('player');
   }
-  if (base + bonusAmt + streakBonus > 0) showScorePopup(Math.round((base + bonusAmt + streakBonus) * hintMult));
+  if (window.pendingGameMode === 'game' && totalGained > 0) showScorePopup(totalGained);
   if (bonusAmt > 0) {
     clearTimeout(speedBonusHideId);
     speedBonusText.classList.remove('visible');
@@ -5728,10 +5759,10 @@ function buildPracticeImgRow(rowId, count, imgSrc, startDelay) {
     row.appendChild(none);
     return;
   }
-  // Squeeze logic igual que post-game: IMG_W en cqmin, max 12, aprieta con margin negativo
+  // Squeeze logic: IMG_W en cqmin; MAX_W = espacio disponible dentro del panel fijo (46cqmin − padding − label)
   const IMG_W = 3.5;   // cqmin, coincide con .practice-score-imgs-row img
   const BASE_GAP = 0.2; // cqmin gap normal
-  const MAX_W = 12 * IMG_W + 11 * BASE_GAP;
+  const MAX_W = 28;
   const gap = count > 1 ? (count > 12 ? (MAX_W - count * IMG_W) / (count - 1) : BASE_GAP) : 0;
   for (let i = 0; i < count; i++) {
     const img = document.createElement('img');

@@ -474,7 +474,8 @@ function showCountryShape(country, ext1, ext2, startDelay) {
         const inRowBonus = typeof getInRowBonus       !== 'undefined' ? getInRowBonus(shapesStreak)       : 0;
         const elapsed    = shapesRoundStartTime ? Math.max(0, (performance.now() - shapesRoundStartTime) / 1000) : SHAPES_SPEED_WIN;
         const ratio      = elapsed <= SHAPES_GRACE ? 1 : Math.max(0, 1 - (elapsed - SHAPES_GRACE) / (SHAPES_SPEED_WIN - SHAPES_GRACE));
-        const speedBonus = ratio > 0 ? Math.round(pts * (SHAPES_SPEED_MULT - 1) * ratio) : 0;
+        const _shapesPracticeInf = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
+        const speedBonus = (!_shapesPracticeInf && ratio > 0) ? Math.round(pts * (SHAPES_SPEED_MULT - 1) * ratio) : 0;
         shapesScore += pts + speedBonus + inRowBonus;
         shapesAnimateScore();
         if (typeof positionLeaderboard !== 'undefined') {
@@ -488,9 +489,10 @@ function showCountryShape(country, ext1, ext2, startDelay) {
         }
         if (typeof window._vsReportAnswer === 'function') window._vsReportAnswer(true, Math.round(shapesScore));
         if (typeof window._lobbyReportAnswer === 'function' && window._lobbyActive) window._lobbyReportAnswer(true, Math.round(shapesScore));
-        if (!(window.practiceConfig && window.practiceConfig.active)) shapesDots++;
+        const _shapesIsInf = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
+        if (!_shapesIsInf) shapesDots++;
         const dotsContainer = document.getElementById('shapes-progress-dots');
-        if (dotsContainer && !(window.practiceConfig && window.practiceConfig.active)) {
+        if (dotsContainer && !_shapesIsInf) {
           dotsContainer.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('filled', i < shapesDots));
           if (shapesDots >= 10 && !dotsContainer.classList.contains('train-animation')) {
             dotsContainer.classList.add('train-animation');

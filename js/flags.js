@@ -689,7 +689,7 @@ function flagsUpdateDotsUI() {
 }
 
 function flagsAdvanceDot() {
-  if (window.practiceConfig && window.practiceConfig.active) return;
+  if (window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0) return;
   flagsDots++;
   flagsUpdateDotsUI();
 
@@ -1327,7 +1327,8 @@ function startFlagsRound() {
         const elapsed = Math.max(0, (performance.now() - flagsRoundStartTime) / 1000);
         const GRACE = 0.8;
         const ratio = elapsed <= GRACE ? 1 : Math.max(0, 1 - (elapsed - GRACE) / (FLAGS_SPEED_WIN - GRACE));
-        const speedBonus = ratio > 0 ? Math.round(pts * (FLAGS_SPEED_MULT - 1) * ratio) : 0;
+        const _flagsPracticeInf = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
+        const speedBonus = (!_flagsPracticeInf && ratio > 0) ? Math.round(pts * (FLAGS_SPEED_MULT - 1) * ratio) : 0;
         flagsScore += pts + speedBonus + inRowBonus;
         flagsAnimateScore();
         sortFlagsLeaderboard(flagsScore);
