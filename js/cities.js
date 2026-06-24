@@ -295,17 +295,16 @@ const CITIES = [
   { name: "Port Moresby",          country: "PNG", lat:  -9.44, lon:  147.18, diff: "dificil"},
 ];
 
-// Pool ordenada por dificultad para modo práctica (respeta filtro de continentes)
 // Desbloqueo y pesos por tramo de respuestas correctas:
-//   0–2   → solo inicio (100%)
-//   3–9   → inicio 55%, facil 45%
-//   10–19 → inicio 25%, facil 45%, medio 30%
-//   20+   → inicio 15%, facil 35%, medio 35%, dificil 15%
+//   0     → solo inicio (5 ciudades famosas de intro, 100%)
+//   1–9   → facil 80%, medio 20%  (inicio sale del pool)
+//   10–19 → facil 55%, medio 35%, dificil 10%
+//   20+   → facil 30%, medio 40%, dificil 30%
 const CITY_UNLOCK_TIERS = [
   { at:  0, weights: { inicio: 1.00 } },
-  { at:  1, weights: { inicio: 0.50, facil: 0.45, medio: 0.05 } },
-  { at: 10, weights: { inicio: 0.20, facil: 0.40, medio: 0.40 } },
-  { at: 20, weights: { inicio: 0.10, facil: 0.28, medio: 0.37, dificil: 0.25 } },
+  { at:  1, weights: { facil: 0.80, medio: 0.20 } },
+  { at: 10, weights: { facil: 0.55, medio: 0.35, dificil: 0.10 } },
+  { at: 20, weights: { facil: 0.30, medio: 0.40, dificil: 0.30 } },
 ];
 
 // ── Seeded RNG para Versus (mismas ciudades en ambos clientes) ──────────────
@@ -333,9 +332,16 @@ function makeCityQueues(continents) {
     if (list.length < 2) list = CITIES.filter(c => c.diff === d); // sin filtro
     return shuffle(list);
   };
+  // La cola 'facil' incluye las ciudades de 'inicio' para que sigan apareciendo
+  // en el mix general una vez que termina el período de warmup.
+  const facil = (() => {
+    let list = CITIES.filter(c => (c.diff === 'facil' || c.diff === 'inicio') && ok(c));
+    if (list.length < 2) list = CITIES.filter(c => c.diff === 'facil' || c.diff === 'inicio');
+    return shuffle(list);
+  })();
   return {
     inicio:  { list: fallback('inicio'),  i: 0 },
-    facil:   { list: fallback('facil'),   i: 0 },
+    facil:   { list: facil, i: 0 },
     medio:   { list: fallback('medio'),   i: 0 },
     dificil: { list: fallback('dificil'), i: 0 },
     _shuffle: shuffle,
