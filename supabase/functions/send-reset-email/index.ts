@@ -5,11 +5,16 @@ const SUPABASE_URL          = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const REDIRECT_URL          = 'https://mygeochallenge.com/play/';
 
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
 const EMAIL_HTML = (resetUrl: string) => `
 <div style="background:#0a1628;padding:40px 20px;font-family:'Segoe UI',Arial,sans-serif;text-align:center;">
   <div style="max-width:480px;margin:0 auto;background:#111d35;border-radius:16px;padding:36px 32px;border:1px solid #1e3a5f;">
-    <img src="https://mygeochallenge.com/images/logo.png" alt="GeoChallenge" style="width:80px;margin-bottom:16px;">
-    <h1 style="color:#ffe066;font-size:24px;margin:0 0 8px;">GeoChallenge</h1>
+    <img src="https://mygeochallenge.com/images/logo.png" alt="GeoChallenge" style="width:140px;margin-bottom:16px;">
+    <h1 style="color:#ffe066;font-size:24px;margin:0 0 8px;">myGeoChallenge</h1>
     <p style="color:#8aabcf;font-size:13px;margin:0 0 28px;letter-spacing:0.05em;text-transform:uppercase;">Password Reset</p>
     <p style="color:#cce0ff;font-size:15px;line-height:1.6;margin:0 0 28px;">
       A password reset was requested for your account.<br>
@@ -28,15 +33,12 @@ const EMAIL_HTML = (resetUrl: string) => `
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    }});
+    return new Response('ok', { headers: CORS });
   }
 
   try {
     const { email } = await req.json();
-    if (!email) return new Response(JSON.stringify({ error: 'email required' }), { status: 400 });
+    if (!email) return new Response(JSON.stringify({ error: 'email required' }), { status: 400, headers: CORS });
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
       auth: { autoRefreshToken: false, persistSession: false }
@@ -47,7 +49,7 @@ Deno.serve(async (req) => {
       options: { redirectTo: REDIRECT_URL }
     });
     if (error || !data?.properties?.action_link) {
-      return new Response(JSON.stringify({ error: error?.message || 'link generation failed' }), { status: 500 });
+      return new Response(JSON.stringify({ error: error?.message || 'link generation failed' }), { status: 500, headers: CORS });
     }
 
     const res = await fetch('https://api.resend.com/emails', {
@@ -56,20 +58,18 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         from: 'myGeoChallenge <noreply@mygeochallenge.com>',
         to: [email],
-        subject: 'GeoChallenge — Reset your password 🌍',
+        subject: 'myGeoChallenge — Reset your password',
         html: EMAIL_HTML(data.properties.action_link),
       }),
     });
 
     if (!res.ok) {
       const err = await res.text();
-      return new Response(JSON.stringify({ error: err }), { status: 500 });
+      return new Response(JSON.stringify({ error: err }), { status: 500, headers: CORS });
     }
 
-    return new Response(JSON.stringify({ ok: true }), {
-      headers: { 'Access-Control-Allow-Origin': '*' }
-    });
+    return new Response(JSON.stringify({ ok: true }), { headers: CORS });
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500 });
+    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: CORS });
   }
 });
