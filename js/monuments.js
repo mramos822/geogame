@@ -4412,7 +4412,7 @@ function nextCity() {
       }
       state.currentCity = practiceCityPickNext();
     } else {
-      state.currentCity = pickCity(state.cityQueues, state.correctCount);
+      state.currentCity = pickCity(state.cityQueues, correctCount);
     }
     state.cityShownAt = Date.now();
     state.phase = 'waiting';
