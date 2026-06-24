@@ -332,12 +332,13 @@ function makeCityQueues(continents) {
     if (list.length < 2) list = CITIES.filter(c => c.diff === d); // sin filtro
     return shuffle(list);
   };
-  // La cola 'facil' incluye las ciudades de 'inicio' para que sigan apareciendo
-  // en el mix general una vez que termina el período de warmup.
+  // La cola 'facil' incluye las ciudades de 'inicio' al FINAL para que no
+  // aparezcan inmediatamente después del warmup; se mezclan tras rotar todo facil.
   const facil = (() => {
-    let list = CITIES.filter(c => (c.diff === 'facil' || c.diff === 'inicio') && ok(c));
-    if (list.length < 2) list = CITIES.filter(c => c.diff === 'facil' || c.diff === 'inicio');
-    return shuffle(list);
+    let main  = CITIES.filter(c => c.diff === 'facil'  && ok(c));
+    let intro = CITIES.filter(c => c.diff === 'inicio' && ok(c));
+    if (main.length < 2) main = CITIES.filter(c => c.diff === 'facil');
+    return [...shuffle(main), ...shuffle(intro)];
   })();
   return {
     inicio:  { list: fallback('inicio'),  i: 0 },
@@ -361,6 +362,11 @@ function pickCity(queues, correctCount) {
   for (const [name, w] of Object.entries(weights)) {
     r -= w;
     if (r <= 0) { chosen = name; break; }
+  }
+  // La cola inicio no se recicla: una vez agotadas las 5 ciudades de warmup,
+  // caer a facil para que no repitan antes de que el jugador avance de tier.
+  if (chosen === 'inicio' && queues.inicio.i >= queues.inicio.list.length) {
+    chosen = 'facil';
   }
   const q = queues[chosen];
   if (q.i >= q.list.length) { queues._shuffle(q.list); q.i = 0; }
