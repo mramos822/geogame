@@ -86,7 +86,11 @@ body {
   width: 1344px;
   height: 911px;
   overflow: hidden;
-  transform: translate(-50%, -50%) scale(var(--app-fit, 1));
+  /* --app-shift-x/y centran contra el viewport VISIBLE (descontando el chrome del
+     navegador que solapa, p.ej. la barra de búsqueda de Opera/Edge — ver letterbox.js).
+     --app-nudge es un translateZ imperceptible para forzar recompositing en Opera. */
+  transform: translate(calc(-50% + var(--app-shift-x, 0px)), calc(-50% + var(--app-shift-y, 0px)))
+             scale(var(--app-fit, 1)) translateZ(var(--app-nudge, 0px));
   transform-origin: 50% 50%;
 }
 /* Capa INTERNA: el contenido en su sistema completo de 1920×911 (contra el que se

@@ -56,8 +56,11 @@
   function update() {
     if (!stage) buildStage();
     var vp = window.visualViewport;
-    var w = vp ? vp.width  : window.innerWidth;
-    var h = vp ? vp.height : window.innerHeight;
+    // Usar el MENOR entre visualViewport e innerWidth/Height: si el chrome del
+    // navegador (barra de búsqueda de Opera/Edge) solapa el viewport, así no
+    // sobre-escalamos y el stage no se corta.
+    var w = vp ? Math.min(vp.width,  window.innerWidth)  : window.innerWidth;
+    var h = vp ? Math.min(vp.height, window.innerHeight) : window.innerHeight;
     var fitW = w, fitH = h;
     // On mobile (iOS & Android), track the largest dimensions seen so the
     // keyboard-open event (which shrinks visualViewport.height) doesn't rescale the stage.
@@ -66,7 +69,22 @@
       fitW = baseW; fitH = baseH;
     }
     var fit = Math.min(fitW / VISIBLE_W, fitH / VISIBLE_H);
-    document.documentElement.style.setProperty('--app-fit', fit);
+    var root = document.documentElement;
+    root.style.setProperty('--app-fit', fit);
+
+    // Centrar contra el viewport VISIBLE, no el de layout. #app-stage-outer es
+    // position:fixed con top/left:50% (centro del viewport de layout). Cuando el
+    // chrome del navegador solapa la página (offsetTop/Left > 0, p.ej. Opera GX),
+    // el centro de layout queda parcialmente bajo el chrome y el stage "se corta"
+    // arriba. Desplazamos el centro al del área visible. En desktop sin solape el
+    // offset es 0 → sin cambios.
+    var shiftX = 0, shiftY = 0;
+    if (vp && !isMobileLB) {
+      shiftX = (vp.offsetLeft || 0) + vp.width  / 2 - window.innerWidth  / 2;
+      shiftY = (vp.offsetTop  || 0) + vp.height / 2 - window.innerHeight / 2;
+    }
+    root.style.setProperty('--app-shift-x', shiftX + 'px');
+    root.style.setProperty('--app-shift-y', shiftY + 'px');
   }
 
   function init() {
@@ -90,7 +108,11 @@
   }
   window.addEventListener('resize', update);
   window.addEventListener('orientationchange', function () { baseW = 0; baseH = 0; update(); });
-  if (window.visualViewport) window.visualViewport.addEventListener('resize', update);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', update);
+    // El scroll del visualViewport cambia offsetTop/Left (chrome que aparece/oculta).
+    window.visualViewport.addEventListener('scroll', update);
+  }
   // Expuesto para que otras pantallas puedan forzar un re-cálculo del fit.
   // En iOS Safari, position:fixed puede tener Y incorrecto en el primer render;
   // llamar esto después de mostrar una pantalla fuerza la corrección.

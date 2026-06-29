@@ -945,6 +945,12 @@ function runShapesPregame(onDone) {
   const img = document.getElementById('pregame-countdown-img');
   if (!el || !img) { onDone(); return; }
   el.style.display = 'flex';
+  // Desbloquear el compositor de Opera al arrancar la cuenta regresiva (ver
+  // window.nudgeRepaint en monuments.js).
+  if (typeof window.nudgeRepaint === 'function') {
+    window.nudgeRepaint();
+    setTimeout(window.nudgeRepaint, 120);
+  }
   if (typeof sfxCountdown !== 'undefined') { sfxCountdown.currentTime = 0; sfxPlay(sfxCountdown); }
   let step = 0;
   function showStep() {
@@ -1241,6 +1247,9 @@ function hideShapesMode() {
     return;
   }
   // ──────────────────────────────────────────────────────────
+
+  // Registrar la partida single-player de figuras para stats.
+  if (window.Analytics) window.Analytics.logGame('shapes', finalScore);
 
   const baseShapes = (typeof window.campaignBase === 'function') ? window.campaignBase() : 0;
   const finalScoreEl = document.getElementById('final-score-value');

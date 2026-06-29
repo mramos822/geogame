@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>myGeoChallenge · Panel de Stats</title>
+<link rel="icon" href="../images/logo.png">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0a1628; --panel:#111d35; --panel2:#0e1830; --border:#1e3a5f;
+    --text:#cce0ff; --muted:#5a7da6; --accent:#ffe066; --green:#6fdf6f; --blue:#4aa3ff;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:'Segoe UI',system-ui,Arial,sans-serif;-webkit-font-smoothing:antialiased;}
+  a{color:var(--accent);}
+
+  /* ── Login ── */
+  #login{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;}
+  #login form{background:var(--panel);border:1px solid var(--border);border-radius:16px;
+    padding:34px 30px;width:100%;max-width:360px;text-align:center;}
+  #login img{width:120px;margin-bottom:10px;}
+  #login h1{color:var(--accent);font-size:20px;margin:0 0 4px;}
+  #login p{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin:0 0 24px;}
+  #login input{width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:8px;
+    color:var(--text);font-size:15px;padding:12px 14px;margin-bottom:12px;outline:none;}
+  #login input:focus{border-color:var(--accent);}
+  #login button{width:100%;background:var(--accent);color:var(--bg);font-weight:700;font-size:15px;
+    border:none;border-radius:8px;padding:13px;cursor:pointer;letter-spacing:.03em;margin-top:6px;}
+  #login button:disabled{opacity:.6;cursor:default;}
+  #login .err{color:#ff7a7a;font-size:13px;min-height:18px;margin-top:6px;}
+
+  /* ── Dashboard ── */
+  #dash{display:none;max-width:1200px;margin:0 auto;padding:22px 18px 60px;}
+  .topbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:22px;}
+  .topbar img{width:42px;}
+  .topbar h1{font-size:19px;margin:0;color:#fff;}
+  .topbar .spacer{flex:1;}
+  .topbar .upd{font-size:12px;color:var(--muted);}
+  .topbar .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);
+    margin-right:6px;animation:pulse 1.4s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.25;}}
+  .btn{background:transparent;border:1px solid var(--border);color:var(--text);border-radius:8px;
+    padding:8px 14px;font-size:13px;cursor:pointer;}
+  .btn:hover{border-color:var(--accent);color:var(--accent);}
+
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px;}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 16px 14px;}
+  .card .v{font-size:30px;font-weight:800;color:var(--accent);line-height:1.1;}
+  .card .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:6px;}
+  .card.live .v{color:var(--green);}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;}
+  .box{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 16px 10px;}
+  .box h2{font-size:13px;color:var(--text);margin:0 0 14px;font-weight:600;letter-spacing:.03em;}
+  .box.wide{grid-column:1 / -1;}
+  canvas{max-height:300px;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  table th{color:var(--muted);text-align:left;font-weight:600;padding:6px 8px;border-bottom:1px solid var(--border);text-transform:uppercase;font-size:10.5px;letter-spacing:.05em;}
+  table td{padding:7px 8px;border-bottom:1px solid #16263f;}
+  table tr:last-child td{border-bottom:none;}
+  table td.n{text-align:right;color:var(--accent);font-weight:700;font-variant-numeric:tabular-nums;}
+  .flag{font-size:16px;margin-right:7px;}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <form id="login-form" autocomplete="off">
+    <img src="../images/logo.png" alt="myGeoChallenge">
+    <h1>Panel de Stats</h1>
+    <p>Acceso privado</p>
+    <input id="in-user" type="text" placeholder="Usuario" autocomplete="username" spellcheck="false">
+    <input id="in-pass" type="password" placeholder="Contraseña" autocomplete="current-password">
+    <button id="login-btn" type="submit">Entrar</button>
+    <div class="err" id="login-err"></div>
+  </form>
+</div>
+
+<div id="dash">
+  <div class="topbar">
+    <img src="../images/logo.png" alt="">
+    <h1>myGeoChallenge · Stats</h1>
+    <span class="spacer"></span>
+    <span class="upd"><span class="dot"></span><span id="upd-time">—</span></span>
+    <button class="btn" id="refresh-btn">↺ Refrescar</button>
+    <button class="btn" id="logout-btn">Salir</button>
+  </div>
+
+  <div class="cards" id="cards"></div>
+
+  <div class="grid">
+    <div class="box wide">
+      <h2>Actividad diaria (últimos 30 días)</h2>
+      <canvas id="chart-activity"></canvas>
+    </div>
+    <div class="box">
+      <h2>Partidas por modo</h2>
+      <canvas id="chart-modes"></canvas>
+    </div>
+    <div class="box">
+      <h2>Países conectados</h2>
+      <table id="tbl-countries"><tbody></tbody></table>
+    </div>
+    <div class="box">
+      <h2>Top jugadores (puntaje total)</h2>
+      <table id="tbl-players"><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+
+<script>
+const FN_URL = 'https://xituwurshmaqsnnnrdhx.supabase.co/functions/v1/admin-stats';
+const ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhpdHV3dXJzaG1hcXNubm5yZGh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyMjU0OTUsImV4cCI6MjA5NjgwMTQ5NX0.jlT6O8dkuYXc8F3fOK_QXgH4Sqw6dAbhi2EIkvcS7Mk';
+
+const COUNTRY_NAMES = {AF:'Afganistán',AL:'Albania',DZ:'Argelia',AD:'Andorra',AO:'Angola',AR:'Argentina',AM:'Armenia',AU:'Australia',AT:'Austria',AZ:'Azerbaiyán',BS:'Bahamas',BH:'Baréin',BD:'Bangladés',BB:'Barbados',BY:'Bielorrusia',BE:'Bélgica',BZ:'Belice',BJ:'Benín',BT:'Bután',BO:'Bolivia',BA:'Bosnia',BW:'Botsuana',BR:'Brasil',BN:'Brunéi',BG:'Bulgaria',BF:'Burkina Faso',BI:'Burundi',CV:'Cabo Verde',KH:'Camboya',CM:'Camerún',CA:'Canadá',CF:'Rep. Centroafricana',TD:'Chad',CL:'Chile',CN:'China',CO:'Colombia',KM:'Comoras',CG:'Congo',CR:'Costa Rica',HR:'Croacia',CU:'Cuba',CY:'Chipre',CZ:'Chequia',DK:'Dinamarca',DJ:'Yibuti',DM:'Dominica',DO:'Rep. Dominicana',EC:'Ecuador',EG:'Egipto',SV:'El Salvador',GQ:'Guinea Ecuatorial',ER:'Eritrea',EE:'Estonia',SZ:'Esuatini',ET:'Etiopía',FJ:'Fiyi',FI:'Finlandia',FR:'Francia',GA:'Gabón',GM:'Gambia',GE:'Georgia',DE:'Alemania',GH:'Ghana',GR:'Grecia',GD:'Granada',GT:'Guatemala',GN:'Guinea',GW:'Guinea-Bisáu',GY:'Guyana',HT:'Haití',HN:'Honduras',HU:'Hungría',IS:'Islandia',IN:'India',ID:'Indonesia',IR:'Irán',IQ:'Irak',IE:'Irlanda',IL:'Israel',IT:'Italia',JM:'Jamaica',JP:'Japón',JO:'Jordania',KZ:'Kazajistán',KE:'Kenia',KI:'Kiribati',KW:'Kuwait',KG:'Kirguistán',LA:'Laos',LV:'Letonia',LB:'Líbano',LS:'Lesoto',LR:'Liberia',LY:'Libia',LI:'Liechtenstein',LT:'Lituania',LU:'Luxemburgo',MG:'Madagascar',MW:'Malaui',MY:'Malasia',MV:'Maldivas',ML:'Malí',MT:'Malta',MH:'Islas Marshall',MR:'Mauritania',MU:'Mauricio',MX:'México',FM:'Micronesia',MD:'Moldavia',MC:'Mónaco',MN:'Mongolia',ME:'Montenegro',MA:'Marruecos',MZ:'Mozambique',MM:'Birmania',NA:'Namibia',NR:'Nauru',NP:'Nepal',NL:'Países Bajos',NZ:'Nueva Zelanda',NI:'Nicaragua',NE:'Níger',NG:'Nigeria',MK:'Macedonia del Norte',NO:'Noruega',OM:'Omán',PK:'Pakistán',PW:'Palaos',PA:'Panamá',PG:'Papúa N. Guinea',PY:'Paraguay',PE:'Perú',PH:'Filipinas',PL:'Polonia',PT:'Portugal',QA:'Catar',RO:'Rumanía',RU:'Rusia',RW:'Ruanda',KN:'San Cristóbal y N.',LC:'Santa Lucía',VC:'San Vicente',WS:'Samoa',SM:'San Marino',ST:'Santo Tomé',SA:'Arabia Saudita',SN:'Senegal',RS:'Serbia',SC:'Seychelles',SL:'Sierra Leona',SG:'Singapur',SK:'Eslovaquia',SI:'Eslovenia',SB:'Islas Salomón',SO:'Somalia',ZA:'Sudáfrica',SS:'Sudán del Sur',ES:'España',LK:'Sri Lanka',SD:'Sudán',SR:'Surinam',SE:'Suecia',CH:'Suiza',SY:'Siria',TW:'Taiwán',TJ:'Tayikistán',TZ:'Tanzania',TH:'Tailandia',TL:'Timor Oriental',TG:'Togo',TO:'Tonga',TT:'Trinidad y Tobago',TN:'Túnez',TR:'Turquía',TM:'Turkmenistán',TV:'Tuvalu',UG:'Uganda',UA:'Ucrania',AE:'Emiratos Árabes',GB:'Reino Unido',US:'Estados Unidos',UY:'Uruguay',UZ:'Uzbekistán',VU:'Vanuatu',VE:'Venezuela',VN:'Vietnam',YE:'Yemen',ZM:'Zambia',ZW:'Zimbabue'};
+function flag(cc){ if(!cc||cc.length!==2) return '🏳️'; const u=cc.toUpperCase(); if(!/^[A-Z]{2}$/.test(u)) return '🏳️'; return String.fromCodePoint(...[...u].map(c=>0x1F1E6+c.charCodeAt(0)-65)); }
+function countryName(cc){ return COUNTRY_NAMES[(cc||'').toUpperCase()] || (cc==='XX'||!cc?'Desconocido':cc); }
+
+const $ = (id)=>document.getElementById(id);
+let creds = null, timer = null, charts = {};
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+async function callStats(user, pass){
+  const res = await fetch(FN_URL, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'apikey':ANON, 'Authorization':'Bearer '+ANON },
+    body: JSON.stringify({ user, pass }),
+  });
+  if(res.status === 401) throw new Error('Usuario o contraseña incorrectos');
+  const json = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(json.error || ('Error '+res.status));
+  return json;
+}
+
+$('login-form').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const user = $('in-user').value.trim(), pass = $('in-pass').value;
+  $('login-err').textContent = '';
+  $('login-btn').disabled = true; $('login-btn').textContent = 'Entrando…';
+  try {
+    const data = await callStats(user, pass);
+    creds = { user, pass };
+    localStorage.setItem('_admin_creds', JSON.stringify(creds));
+    $('login').style.display = 'none';
+    $('dash').style.display = 'block';
+    render(data);
+    startPolling();
+  } catch(err){
+    $('login-err').textContent = err.message || 'Error';
+  } finally {
+    $('login-btn').disabled = false; $('login-btn').textContent = 'Entrar';
+  }
+});
+
+$('logout-btn').addEventListener('click', ()=>{
+  localStorage.removeItem('_admin_creds');
+  creds = null; stopPolling();
+  $('dash').style.display = 'none';
+  $('login').style.display = 'flex';
+  $('in-pass').value = '';
+});
+
+$('refresh-btn').addEventListener('click', refresh);
+
+// ── Polling en vivo ───────────────────────────────────────────────────────────
+function startPolling(){ stopPolling(); timer = setInterval(refresh, 15000); }
+function stopPolling(){ if(timer){ clearInterval(timer); timer = null; } }
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && creds) refresh(); });
+
+async function refresh(){
+  if(!creds) return;
+  try { render(await callStats(creds.user, creds.pass)); }
+  catch(e){ /* si falla la auth (clave cambiada), volver al login */
+    if(/incorrect|unauthor/i.test(e.message)){ $('logout-btn').click(); }
+  }
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+const CARD_DEFS = [
+  ['onlineNow','En línea ahora',true],
+  ['playingNow','Jugando ahora',true],
+  ['totalUsers','Usuarios totales',false],
+  ['newToday','Nuevos hoy',false],
+  ['totalGames','Partidas totales',false],
+  ['gamesToday','Partidas hoy',false],
+  ['totalVisits','Visitas totales',false],
+  ['visitsToday','Visitas hoy',false],
+  ['versusTotal','Versus totales',false],
+  ['versusToday','Versus hoy',false],
+];
+
+function render(data){
+  const T = data.totals || {};
+  $('cards').innerHTML = CARD_DEFS.map(([k,l,live])=>
+    `<div class="card${live?' live':''}"><div class="v">${(T[k]??0).toLocaleString('es')}</div><div class="l">${l}</div></div>`
+  ).join('');
+
+  $('upd-time').textContent = 'Actualizado ' + new Date(data.generated_at||Date.now()).toLocaleTimeString('es');
+
+  renderActivity(data.series||{});
+  renderModes(data.gamesByMode||{});
+  renderCountries(data.topCountries||[]);
+  renderPlayers(data.topPlayers||[]);
+}
+
+function lineDS(label,arr,color){
+  return { label, data:arr, borderColor:color, backgroundColor:color+'22',
+    tension:.3, borderWidth:2, pointRadius:0, pointHoverRadius:4, fill:true };
+}
+function renderActivity(s){
+  const ctx = $('chart-activity');
+  const cfg = {
+    type:'line',
+    data:{ labels:(s.labels||[]).map(d=>d.slice(5)), datasets:[
+      lineDS('Visitantes', s.visitors||[], '#4aa3ff'),
+      lineDS('Partidas', s.games||[], '#ffe066'),
+      lineDS('Registros', s.registrations||[], '#6fdf6f'),
+      lineDS('Versus', s.versus||[], '#ff7ad9'),
+    ]},
+    options:{ responsive:true, interaction:{mode:'index',intersect:false},
+      plugins:{ legend:{ labels:{ color:'#cce0ff', boxWidth:12, font:{size:11} } } },
+      scales:{
+        x:{ ticks:{ color:'#5a7da6', maxRotation:0, autoSkip:true, maxTicksLimit:12, font:{size:10} }, grid:{ color:'#16263f' } },
+        y:{ beginAtZero:true, ticks:{ color:'#5a7da6', precision:0, font:{size:10} }, grid:{ color:'#16263f' } },
+      } }
+  };
+  if(charts.activity){ charts.activity.data = cfg.data; charts.activity.update('none'); }
+  else charts.activity = new Chart(ctx, cfg);
+}
+
+function renderModes(m){
+  const labels = ['Banderas','Figuras','Ciudades','Monumentos'];
+  const vals = [m.flags||0, m.shapes||0, m.cities||0, m.monuments||0];
+  const cfg = {
+    type:'doughnut',
+    data:{ labels, datasets:[{ data:vals,
+      backgroundColor:['#ffe066','#4aa3ff','#6fdf6f','#ff7ad9'], borderColor:'#111d35', borderWidth:2 }] },
+    options:{ responsive:true, cutout:'58%',
+      plugins:{ legend:{ position:'bottom', labels:{ color:'#cce0ff', boxWidth:12, font:{size:11} } } } }
+  };
+  if(charts.modes){ charts.modes.data = cfg.data; charts.modes.update('none'); }
+  else charts.modes = new Chart($('chart-modes'), cfg);
+}
+
+function renderCountries(rows){
+  const tb = $('tbl-countries').querySelector('tbody');
+  if(!rows.length){ tb.innerHTML = '<tr><td style="color:#5a7da6">Sin datos aún</td></tr>'; return; }
+  tb.innerHTML = '<tr><th>País</th><th style="text-align:right">Visitantes</th></tr>' +
+    rows.map(r=>`<tr><td><span class="flag">${flag(r.code)}</span>${countryName(r.code)}</td><td class="n">${r.count.toLocaleString('es')}</td></tr>`).join('');
+}
+
+function renderPlayers(rows){
+  const tb = $('tbl-players').querySelector('tbody');
+  if(!rows.length){ tb.innerHTML = '<tr><td style="color:#5a7da6">Sin datos aún</td></tr>'; return; }
+  tb.innerHTML = '<tr><th>#</th><th>Jugador</th><th style="text-align:right">Puntaje</th></tr>' +
+    rows.map((r,i)=>`<tr><td style="color:#5a7da6">${i+1}</td><td>${escapeHtml(r.username||'—')}</td><td class="n">${(r.hs_total||0).toLocaleString('es')}</td></tr>`).join('');
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// ── Sesión recordada ──────────────────────────────────────────────────────────
+(async function(){
+  const saved = localStorage.getItem('_admin_creds');
+  if(!saved) return;
+  try {
+    creds = JSON.parse(saved);
+    const data = await callStats(creds.user, creds.pass);
+    $('login').style.display = 'none';
+    $('dash').style.display = 'block';
+    render(data); startPolling();
+  } catch(e){ localStorage.removeItem('_admin_creds'); creds = null; }
+})();
+</script>
+</body>
+</html>

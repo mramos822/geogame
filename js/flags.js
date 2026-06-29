@@ -1480,6 +1480,9 @@ function hideFlagsMode() {
   }
   // ──────────────────────────────────────────────────────────
 
+  // Registrar la partida single-player de banderas para stats.
+  if (window.Analytics) window.Analytics.logGame('flags', finalScore);
+
   const base = (typeof window.campaignBase === 'function') ? window.campaignBase() : 0;
   const finalScoreEl = document.getElementById('final-score-value');
   if (finalScoreEl) finalScoreEl.textContent = (finalScore + base).toLocaleString();
@@ -1523,6 +1526,12 @@ let flagsAborted = false;
 function runFlagsPregame(onDone) {
   flagsAborted = false;
   flagsPregameEl.style.display = 'flex';
+  // Desbloquear el compositor de Opera al arrancar la cuenta regresiva (ver
+  // window.nudgeRepaint en monuments.js).
+  if (typeof window.nudgeRepaint === 'function') {
+    window.nudgeRepaint();
+    setTimeout(window.nudgeRepaint, 120);
+  }
   if (typeof sfxCountdown !== 'undefined') { sfxCountdown.currentTime = 0; sfxPlay(sfxCountdown); }
   let step = 0;
 

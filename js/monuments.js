@@ -457,6 +457,38 @@ window.resetSplashEntry = function () {
   if (w) w.classList.remove('slide-down');
   const l = document.querySelector('.splash-text2-label');
   if (l) l.classList.remove('step2');
+  // Ocultar cualquier HUD ingame que haya quedado visible de una partida previa
+  // (sobre todo el panel de amigos/leaderboard tras un Versus o lobby): si no se
+  // oculta acá, se filtra encima del splash/pre y no desaparece. Ver bug barra de amigos.
+  if (typeof window.hideIngameHud === 'function') window.hideIngameHud();
+};
+
+// Oculta TODO el HUD de juego (puntaje, countdown, panel de amigos/leaderboard de
+// ambos sets de modos). Reutilizable desde la entrada al splash y los teardown de VS.
+window.hideIngameHud = function () {
+  ['right-panel','flags-right-panel','score-display','flags-score-display',
+   'countdown-widget','flags-countdown-widget','shapes-countdown-widget',
+   'speed-bonus-text','flags-speed-bonus-text'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+};
+
+// Fuerza al compositor a presentar un frame nuevo del stage escalado. En Opera
+// (Chromium) la pantalla puede CONGELARSE al iniciar la cuenta regresiva: el hilo
+// principal sigue vivo pero el compositor deja de presentar hasta que el usuario
+// mueve la ventana. Re-aplicar el transform con un translateZ(0) (idéntico
+// visualmente) commitea una nueva capa GPU y desbloquea el render, sin tener que
+// mover la ventana. Inofensivo en Chrome/Edge/Firefox.
+window.nudgeRepaint = function () {
+  const root = document.documentElement;
+  // Toggla --app-nudge (translateZ imperceptible en el transform del stage):
+  // commitea una capa GPU nueva y desbloquea el render congelado de Opera, sin
+  // pisar el centrado/escala que maneja letterbox.js.
+  root.style.setProperty('--app-nudge', '0.01px');
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => { root.style.setProperty('--app-nudge', '0px'); });
+  });
 };
 
 const _iosMusicURL = new Map([
@@ -5049,6 +5081,10 @@ function endGame() {
         return;
       }
       // ─────────────────────────────────────────────────────
+      // Registrar la partida single-player para stats (cities/monuments).
+      if (window.Analytics) {
+        window.Analytics.logGame(window.pendingGameMode === 'monuments' ? 'monuments' : 'cities', state.score);
+      }
       window.lastModeScore = state.score;
       finalScoreEl.textContent = (state.score + (window.campaignBase ? window.campaignBase() : 0)).toLocaleString();
       let isNewHighscore = false;
@@ -5163,6 +5199,13 @@ let pregameAborted = false;
 function runPregameCountdown(onDone) {
   pregameAborted = false;
   pregameCountdownEl.style.display = 'flex';
+  // Desbloquear el compositor de Opera al arrancar la cuenta regresiva (ver
+  // window.nudgeRepaint). Se repite tras un instante por si el stall ocurre
+  // después del primer commit (canvas resize / primer frame del juego).
+  if (typeof window.nudgeRepaint === 'function') {
+    window.nudgeRepaint();
+    setTimeout(window.nudgeRepaint, 120);
+  }
   sfxCountdown.currentTime = 0;
   sfxCountdown.play().catch(() => {});
   let step = 0;
@@ -5323,6 +5366,11 @@ document.querySelector('.splash-confirm-wrap')?.addEventListener('click', () => 
     // y que la selección de banderas vuelva a Math.random (no la semilla sincronizada).
     window._vsActive = false;
     window._lobbyActive = false;
+    // Limpiar restos de un Versus/lobby previo para que no sobreviva una fila de
+    // rival en el leaderboard de single-player. (Ver bug barra de amigos.)
+    window._vsOpponent = null;
+    window._lobbyMembers = null;
+    if (typeof initLeaderboard === 'function') { try { initLeaderboard(); } catch (e) {} }
     if (typeof window.flagsClearSeed === 'function') window.flagsClearSeed();
     window.citiesClearSeed?.();
     if (window.pendingGameMode === 'flags') {
@@ -5608,20 +5656,36 @@ document.getElementById('vol-btn')?.addEventListener('click', () => {
     toast._t = setTimeout(() => { toast.style.opacity = '0'; }, 3500);
   }
 
+  // Fallbacks con prefijo (Opera, Safari): no todos exponen la API sin prefijo.
+  function fsElement() {
+    return document.fullscreenElement || document.webkitFullscreenElement || null;
+  }
+  function requestFs(el) {
+    const fn = el.requestFullscreen || el.webkitRequestFullscreen || el.webkitRequestFullScreen;
+    if (fn) { try { const p = fn.call(el); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
+  }
+  function exitFs() {
+    const fn = document.exitFullscreen || document.webkitExitFullscreen;
+    if (fn) { try { const p = fn.call(document); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
+  }
+
   function updateIcon() {
-    btn.textContent = document.fullscreenElement ? '✕' : '⛶';
+    btn.textContent = fsElement() ? '✕' : '⛶';
   }
   document.addEventListener('fullscreenchange', updateIcon);
+  document.addEventListener('webkitfullscreenchange', updateIcon);
 
   btn.addEventListener('click', () => {
     if (isIOS) {
       if (!isStandalone) showIOSToast();
       return;
     }
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
+    // Pantalla completa de la página entera (el stage centrado la rellena). En Opera
+    // la API suele requerir el prefijo webkit; sin él, el botón no hacía nada.
+    if (!fsElement()) {
+      requestFs(document.documentElement);
     } else {
-      document.exitFullscreen().catch(() => {});
+      exitFs();
     }
   });
 })();
