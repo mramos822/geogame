@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base href="../">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Learn World Geography — Flags, Countries, Capitals & Landmarks</title>
+  <meta name="description" content="Free geography study guides with real game assets: world flags, country shapes, capital cities, famous landmarks. Learn facts organized by continent and difficulty to improve your quiz scores.">
+  <link rel="canonical" href="https://mygeochallenge.com/learn/">
+  <link rel="icon" type="image/png" href="images/planet3.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6238929099865050" crossorigin="anonymous"></script>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--gold:#f5c842;--gold-dark:#c8920a;--dark:#0f1e2d;--sky:#3a8acb;--green:#2e7d32}
+    html{scroll-behavior:smooth}
+    body{font-family:'Nunito',sans-serif;background:var(--dark);color:#cdd8e8;overflow-x:hidden}
+    @keyframes cloudFly{from{transform:translateX(0)}to{transform:translateX(calc(100vw + 600px))}}
+    @keyframes planeFly{0%{left:-280px;opacity:0}4%{opacity:1}92%{opacity:1}100%{left:calc(100% + 280px);opacity:0}}
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+    @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+    @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(245,200,66,.5)}50%{box-shadow:0 0 0 18px rgba(245,200,66,0)}}
+    @keyframes marqueeL{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+    @keyframes marqueeR{from{transform:translateX(-50%)}to{transform:translateX(0)}}
+    @keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+    @keyframes fadeInUp{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes pop{0%{transform:scale(0.7);opacity:0}60%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+    @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+
+    nav{display:flex;align-items:center;justify-content:space-between;padding:14px 48px;background:rgba(10,30,55,.6);border-bottom:1px solid rgba(255,255,255,.1);position:sticky;top:0;z-index:200;backdrop-filter:blur(10px)}
+    .nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+    .nav-logo img{height:54px;filter:drop-shadow(0 2px 8px rgba(0,0,0,.4));transition:transform .2s}
+    .nav-logo:hover img{transform:scale(1.1)}
+    .nav-right{display:flex;align-items:center;gap:14px}
+    .nav-link{color:rgba(255,255,255,.8);text-decoration:none;font-size:.88rem;font-weight:700;transition:color .2s}
+    .nav-link:hover,.nav-link.active{color:var(--gold)}
+    .lang-btn{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);color:#fff;font-family:inherit;font-size:.82rem;font-weight:800;padding:6px 13px;border-radius:50px;cursor:pointer;transition:background .2s;letter-spacing:.5px}
+    .lang-btn:hover{background:rgba(255,255,255,.22)}
+    .nav-play{background:var(--gold);color:var(--dark);font-weight:900;font-size:.92rem;padding:9px 22px;border-radius:50px;text-decoration:none;transition:transform .15s,background .2s}
+    .nav-play:hover{background:var(--gold-dark);color:#fff;transform:scale(1.05)}
+
+    .hero{position:relative;min-height:88vh;display:flex;align-items:center;overflow:hidden;background:#0f1e2d url('images/background.png') center/cover no-repeat}
+    .hero::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(10,25,50,.94) 0%,rgba(20,55,100,.78) 60%,rgba(40,80,140,.5) 100%);z-index:1}
+    .hcloud{position:absolute;pointer-events:none;z-index:2}
+    .hcloud-1{top:8%;left:-380px;width:clamp(180px,24vw,320px);animation:cloudFly 50s linear infinite;opacity:.6}
+    .hcloud-2{top:28%;left:-260px;width:clamp(140px,17vw,240px);animation:cloudFly 70s linear infinite -24s;opacity:.4}
+    .hcloud-3{top:52%;left:-300px;width:clamp(110px,13vw,180px);animation:cloudFly 88s linear infinite -42s;opacity:.3}
+    .hero-plane{position:absolute;bottom:20%;width:clamp(150px,17vw,240px);z-index:3;animation:planeFly 22s linear infinite -5s;pointer-events:none;filter:drop-shadow(0 6px 18px rgba(0,0,0,.35))}
+    .hero-planet{position:absolute;top:14%;right:6%;width:clamp(55px,7vw,100px);z-index:3;animation:float 8s ease-in-out infinite,spin 45s linear infinite;filter:drop-shadow(0 4px 18px rgba(91,159,212,.5));pointer-events:none;opacity:.8}
+    .hero-inner{position:relative;z-index:10;display:flex;align-items:center;width:100%;max-width:1200px;margin:0 auto;padding:100px 48px 80px;gap:40px}
+    .hero-left{flex:1}
+    .hero-eyebrow{display:inline-block;font-size:.73rem;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:var(--gold);background:rgba(245,200,66,.1);border:1px solid rgba(245,200,66,.3);padding:5px 16px;border-radius:50px;margin-bottom:16px}
+    .hero-title{font-size:clamp(2.2rem,5vw,3.8rem);font-weight:900;color:#fff;text-shadow:0 3px 20px rgba(0,0,0,.6);line-height:1.1;margin-bottom:18px}
+    .hero-title span{color:var(--gold)}
+    .hero-desc{font-size:clamp(.95rem,1.8vw,1.08rem);color:rgba(255,255,255,.78);line-height:1.75;margin-bottom:32px;font-weight:600;max-width:540px}
+    .btn-gold{display:inline-block;background:var(--gold);color:var(--dark);font-size:1.05rem;font-weight:900;padding:14px 38px;border-radius:60px;text-decoration:none;animation:pulse 2.4s ease-in-out infinite;transition:transform .15s,background .2s}
+    .btn-gold:hover{transform:scale(1.07);background:var(--gold-dark);color:#fff;animation:none}
+    .hero-char{flex-shrink:0;width:clamp(200px,22vw,300px);position:relative;animation:fadeInUp .8s ease .3s both}
+    .hero-char-glow{position:absolute;bottom:-10px;left:50%;transform:translateX(-50%);width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(245,200,66,.22) 0%,transparent 70%)}
+    #char-anim{position:relative;z-index:2;width:100%;filter:drop-shadow(0 10px 30px rgba(0,0,0,.6));animation:float 5s ease-in-out infinite}
+
+    .ticker-wrap{background:var(--dark);overflow:hidden;padding:12px 0;border-top:2px solid rgba(245,200,66,.18);border-bottom:2px solid rgba(245,200,66,.18)}
+    .ticker-inner{display:flex;width:max-content;animation:ticker 44s linear infinite}
+    .ticker-item{white-space:nowrap;padding:0 28px;font-size:.86rem;font-weight:800;color:rgba(255,255,255,.65);display:flex;align-items:center;gap:10px}
+    .ticker-item .dot{color:var(--gold)}
+
+    section.content-section{padding:80px 24px}
+    .section-inner{max-width:1100px;margin:0 auto}
+    .eyebrow{display:inline-block;font-size:.73rem;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:var(--gold);background:rgba(245,200,66,.1);border:1px solid rgba(245,200,66,.25);padding:5px 16px;border-radius:50px;margin-bottom:13px}
+    .section-title{font-size:clamp(1.65rem,4vw,2.4rem);font-weight:900;color:#fff;line-height:1.2;margin-bottom:12px}
+    .section-title span{color:var(--gold)}
+    .section-head{text-align:center;margin-bottom:48px}
+    .section-sub{font-size:.98rem;font-weight:600;color:rgba(255,255,255,.58);max-width:540px;margin:0 auto;line-height:1.65}
+    h3.sub{font-size:1.1rem;font-weight:900;color:var(--gold);margin:30px 0 12px}
+    p.body{font-size:.97rem;font-weight:600;color:rgba(255,255,255,.68);line-height:1.85;margin-bottom:14px}
+    p.body strong{color:#fff}
+    ul.blist{margin:10px 0 16px 22px}
+    ul.blist li{font-size:.97rem;font-weight:600;color:rgba(255,255,255,.68);margin-bottom:8px;line-height:1.7}
+    ul.blist li strong{color:#fff}
+
+    /* FLAGS */
+    .flags-section{background:linear-gradient(180deg,rgba(0,0,0,.1) 0%,rgba(0,0,0,.2) 100%);overflow:hidden}
+    .flag-row{overflow:hidden;margin-bottom:10px}
+    .flag-strip{display:flex;width:max-content;align-items:center}
+    .flag-strip.lft{animation:marqueeL 28s linear infinite}
+    .flag-strip.rgt{animation:marqueeR 34s linear infinite}
+    .flag-strip.lft2{animation:marqueeL 22s linear infinite}
+    .fi{width:80px;height:54px;border-radius:7px;overflow:hidden;box-shadow:0 3px 14px rgba(0,0,0,.4);flex-shrink:0;transition:transform .18s,box-shadow .18s;margin-right:12px}
+    .fi:hover{transform:scale(1.18) translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.5)}
+    .fi img{width:100%;height:100%;object-fit:cover;display:block}
+
+    .flag-spotlight{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:32px 0}
+    @media(max-width:700px){.flag-spotlight{grid-template-columns:repeat(2,1fr)}}
+    .flag-spot{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:18px 14px;text-align:center;transition:background .2s,transform .2s}
+    .flag-spot:hover{background:rgba(245,200,66,.08);border-color:rgba(245,200,66,.3);transform:translateY(-5px)}
+    .flag-spot img{width:90px;height:60px;object-fit:cover;border-radius:6px;box-shadow:0 3px 12px rgba(0,0,0,.4);margin:0 auto 10px;display:block}
+    .flag-spot .country{font-size:.92rem;font-weight:900;color:#fff;margin-bottom:3px}
+    .flag-spot .fact{font-size:.78rem;font-weight:600;color:rgba(255,255,255,.48);line-height:1.5}
+
+    /* ── FLAG QUIZ (game style) ── */
+    @keyframes q-check-pop{
+      0%  {transform:translate(-50%,-50%) scale(0.2);opacity:0}
+      8%  {opacity:1}
+      24% {transform:translate(-50%,-50%) scale(1.08)}
+      35% {transform:translate(-50%,-50%) scale(0.95)}
+      46% {transform:translate(-50%,-50%) scale(1)}
+      73% {transform:translate(-50%,-50%) scale(1);opacity:1}
+      100%{transform:translate(-50%,-50%) scale(0);opacity:0}
+    }
+    @keyframes scorePulse{0%{transform:scale(1)}40%{transform:scale(1.4)}100%{transform:scale(1)}}
+    @keyframes qshake{
+      0%,100%{transform:scale(0.78) translateX(0)}
+      20%    {transform:scale(0.78) translateX(-7px)}
+      40%    {transform:scale(0.78) translateX(7px)}
+      60%    {transform:scale(0.78) translateX(-4px)}
+      80%    {transform:scale(0.78) translateX(4px)}
+    }
+    .quiz-game-frame{max-width:480px;margin:40px auto 0;border-radius:24px;overflow:hidden;box-shadow:0 28px 80px rgba(0,0,0,.8);background:linear-gradient(180deg,#0b1926 0%,#0d2035 100%);border:1.5px solid rgba(255,255,255,.07)}
+    .quiz-topbar{background:rgba(0,0,0,.35);padding:12px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.06)}
+    .qtop-left{display:flex;align-items:center;gap:9px}
+    .quiz-icon{width:28px;height:28px;object-fit:contain;filter:drop-shadow(0 2px 6px rgba(0,0,0,.5))}
+    .quiz-title-txt{font-size:.72rem;font-weight:900;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:2px}
+    .qtop-score{display:flex;align-items:center;gap:8px}
+    .qtop-score-checks{display:flex;gap:3px}
+    .qtop-check{width:22px;height:22px;object-fit:contain;opacity:.18;transition:opacity .15s,transform .25s}
+    .qtop-check.lit{opacity:1;animation:scorePulse .35s ease}
+    .qtop-score-num{font-size:1.1rem;font-weight:900;color:var(--gold);min-width:24px;text-align:right}
+    .quiz-timer-bar{height:4px;background:rgba(255,255,255,.07)}
+    .quiz-timer-fill{height:100%;background:linear-gradient(90deg,var(--gold),#e07a00);width:100%;transition:none}
+    .quiz-timer-fill.run{transition:width 8s linear;width:0%}
+    .quiz-stage{padding:20px 22px 28px;text-align:center;position:relative}
+    .quiz-progress-dots{display:flex;gap:6px;justify-content:center;margin-bottom:18px}
+    .qdot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.1);transition:background .2s}
+    .qdot.done-right{background:#4caf50}.qdot.done-wrong{background:#e53935}.qdot.active{background:var(--gold);box-shadow:0 0 8px rgba(245,200,66,.6)}
+    /* ── FLAGID HANGING RAIL ── */
+    .qflagid-rail{width:68%;max-width:220px;height:5px;background:linear-gradient(90deg,transparent,rgba(155,168,190,.5) 18%,rgba(200,215,235,.75) 50%,rgba(155,168,190,.5) 82%,transparent);border-radius:3px;margin:0 auto;position:relative}
+    .qflagid-rail::before,.qflagid-rail::after{content:'';position:absolute;top:5px;width:3px;height:16px;background:linear-gradient(180deg,rgba(180,195,215,.7),rgba(120,135,155,.45));border-radius:0 0 2px 2px}
+    .qflagid-rail::before{left:19%}
+    .qflagid-rail::after{right:19%}
+    /* ── FLAGID QUESTION BANNER ── */
+    .qflagid-wrap{position:relative;width:320px;max-width:100%;margin:0 auto 22px}
+    .qflagid-img{width:100%;display:block;pointer-events:none;-webkit-user-drag:none}
+    .qflagid-label{position:absolute;top:57%;left:50%;transform:translate(-50%,-50%);font-size:clamp(.8rem,3.8vw,1.15rem);font-weight:900;color:#fff;text-shadow:2px 2px 0 #000,-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000;white-space:nowrap;pointer-events:none;letter-spacing:.5px}
+    /* ── OPTION SUITCASES (exact game technique, 0.78× scale) ── */
+    .qopts-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:362px;margin:0 auto}
+    .qopt-suitcase{position:relative;width:171px;height:133px;cursor:pointer;justify-self:center}
+    .qopt-suitcase.answered{cursor:default;pointer-events:none}
+    .qopt-suit-group{position:relative;width:220px;height:170px;transform:scale(0.78);transform-origin:top left;filter:drop-shadow(0 8px 20px rgba(0,0,0,.65)) brightness(1);pointer-events:none;transition:filter .15s}
+    .qopt-suitcase:not(.answered):hover .qopt-suit-group{filter:drop-shadow(0 8px 20px rgba(0,0,0,.65)) brightness(1.28)}
+    .qopt-flag-container{position:absolute;top:41px;left:43px;width:172px;height:122px;overflow:visible;clip-path:path('M 9 2 Q 11 -12 26 -11 L 144 -1 Q 158 0 159 14 L 159 101 Q 171 108 146 116 L 8 116 Q -6 116 -4 104 Q -10 55 9 2 Z');transform:rotate(-6deg) perspective(400px) rotateX(4deg);z-index:1}
+    .qopt-flag-img{width:157px;height:95px;object-fit:fill;transform-origin:0 0;transform:matrix3d(1.0827,0.0764,0,0.000659,-0.1750,1.2702,0,-0.000665,0,0,1,0,11,-12,0,1);pointer-events:none;display:block;-webkit-user-drag:none}
+    .qopt-suit-img{position:absolute;top:0;left:0;width:220px;z-index:2;pointer-events:none;-webkit-user-drag:none}
+    .qopt-suitcase.correct .qopt-suit-group{filter:drop-shadow(0 0 22px rgba(76,175,80,.95)) drop-shadow(0 6px 18px rgba(0,0,0,.5)) brightness(1)}
+    .qopt-suitcase.wrong .qopt-suit-group{filter:drop-shadow(0 0 22px rgba(229,57,53,.9)) drop-shadow(0 6px 18px rgba(0,0,0,.5)) brightness(1);animation:qshake .4s ease}
+    /* ── CHECK/WRONG FEEDBACK OVERLAY ── */
+    .qfeedback{position:absolute;inset:0;pointer-events:none;z-index:20}
+    .qfeedback-img{position:absolute;top:50%;left:50%;width:130px;height:130px;object-fit:contain;opacity:0;pointer-events:none}
+    .qfeedback-img.animate{animation:q-check-pop 0.85s ease-out forwards}
+    .quiz-end-screen{padding:32px 24px;text-align:center;display:none}
+    .quiz-end-checks{display:flex;justify-content:center;gap:6px;margin-bottom:14px}
+    .quiz-end-checks img{width:44px;height:44px;object-fit:contain;animation:pop .5s ease both}
+    .quiz-end-score{font-size:4rem;font-weight:900;color:var(--gold);line-height:1;margin-bottom:2px}
+    .quiz-end-denom{font-size:1rem;font-weight:700;color:rgba(255,255,255,.3);margin-bottom:12px}
+    .quiz-end-label{font-size:1.15rem;font-weight:900;color:#fff;margin-bottom:8px}
+    .quiz-end-msg{font-size:.88rem;font-weight:600;color:rgba(255,255,255,.55);line-height:1.65;margin-bottom:24px;max-width:330px;margin-left:auto;margin-right:auto}
+    .qbtn-gold{display:inline-block;background:var(--gold);color:#0f1e2d;font-family:inherit;font-size:.95rem;font-weight:900;padding:12px 30px;border-radius:50px;text-decoration:none;border:none;cursor:pointer;transition:background .2s,transform .15s;animation:pulse 2.4s ease-in-out infinite}
+    .qbtn-gold:hover{background:var(--gold-dark);color:#fff;animation:none;transform:scale(1.05)}
+    .qbtn-ghost{display:inline-block;background:none;border:1.5px solid rgba(255,255,255,.2);color:rgba(255,255,255,.55);font-family:inherit;font-size:.85rem;font-weight:800;padding:10px 22px;border-radius:50px;cursor:pointer;transition:border-color .2s,color .2s;margin-left:8px;vertical-align:middle}
+    .qbtn-ghost:hover{border-color:rgba(255,255,255,.5);color:#fff}
+
+    /* LANDMARKS */
+    .landmarks-section{background:linear-gradient(135deg,#0d1d30 0%,#162a40 100%)}
+    .gallery-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:32px 0}
+    @media(max-width:900px){.gallery-grid{grid-template-columns:repeat(3,1fr)}}
+    @media(max-width:560px){.gallery-grid{grid-template-columns:repeat(2,1fr)}}
+    .gallery-item{position:relative;border-radius:12px;overflow:hidden;aspect-ratio:4/3;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.5)}
+    .gallery-item img{width:100%;height:100%;object-fit:cover;transition:transform .35s;display:block}
+    .gallery-item:hover img{transform:scale(1.12)}
+    .gallery-item::after{content:'';position:absolute;inset:0;background:linear-gradient(0deg,rgba(0,8,20,.7) 0%,transparent 60%);opacity:0;transition:opacity .25s}
+    .gallery-item:hover::after{opacity:1}
+    .gallery-zoom{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:.85rem;opacity:0;transition:opacity .25s;z-index:2}
+    .gallery-item:hover .gallery-zoom{opacity:1}
+
+    /* LANDMARK INFO CARD */
+    #lbcard{display:none;position:fixed;inset:0;background:rgba(0,8,20,.9);z-index:9000;align-items:center;justify-content:center;padding:20px}
+    #lbcard.open{display:flex}
+    .lbcard-inner{background:linear-gradient(155deg,#0f2035 0%,#0a1724 100%);border:1.5px solid rgba(255,255,255,.1);border-radius:22px;max-width:540px;width:100%;overflow:hidden;animation:pop .28s cubic-bezier(.34,1.56,.64,1);box-shadow:0 32px 90px rgba(0,0,0,.85)}
+    .lbcard-img-wrap{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden}
+    .lbcard-img-wrap img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .35s}
+    .lbcard-inner:hover .lbcard-img-wrap img{transform:scale(1.04)}
+    .lbcard-badge{position:absolute;top:12px;left:12px;background:rgba(0,8,20,.72);border:1px solid rgba(255,255,255,.14);border-radius:50px;padding:5px 13px;font-size:.7rem;font-weight:900;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);backdrop-filter:blur(6px)}
+    .lbcard-body{padding:18px 22px 22px}
+    .lbcard-country{font-size:.7rem;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:rgba(255,255,255,.42);margin-bottom:5px}
+    .lbcard-name{font-size:1.42rem;font-weight:900;color:#fff;margin-bottom:10px;line-height:1.2}
+    .lbcard-note{font-size:.88rem;color:rgba(255,255,255,.6);line-height:1.68;margin-bottom:18px;font-weight:600}
+    .lbcard-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .lbcard-play{display:inline-block;background:var(--gold);color:#0f1e2d;font-family:inherit;font-weight:900;font-size:.85rem;padding:9px 20px;border-radius:50px;text-decoration:none;transition:background .2s,transform .15s}
+    .lbcard-play:hover{background:var(--gold-dark);color:#fff;transform:scale(1.04)}
+    .lbcard-close{background:none;border:1.5px solid rgba(255,255,255,.18);color:rgba(255,255,255,.5);font-family:inherit;font-size:.82rem;font-weight:800;padding:9px 18px;border-radius:50px;cursor:pointer;transition:border-color .2s,color .2s}
+    .lbcard-close:hover{border-color:rgba(255,255,255,.45);color:#fff}
+
+    /* FACT CARDS */
+    .fact-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:24px 0}
+    @media(max-width:680px){.fact-grid{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:420px){.fact-grid{grid-template-columns:1fr}}
+    .fact-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:18px 16px;transition:transform .2s,background .2s}
+    .fact-card:hover{transform:translateY(-4px);background:rgba(255,255,255,.09)}
+    .fact-card .label{font-size:.7rem;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:var(--gold);margin-bottom:7px;display:block}
+    .fact-card .value{font-size:.95rem;font-weight:900;color:#fff;margin-bottom:4px}
+    .fact-card .note{font-size:.8rem;color:rgba(255,255,255,.45);font-weight:600;line-height:1.5}
+
+
+    /* RANKS */
+    .ranks-section{background:linear-gradient(135deg,#162a40 0%,#0d1d30 100%);overflow:hidden}
+    .rank-row-outer{overflow:hidden;margin:0 -24px;padding:6px 0}
+    .rank-row{display:flex;width:max-content;gap:10px}
+    .rank-row.r1{animation:marqueeL 40s linear infinite}
+    .rank-row.r2{animation:marqueeR 50s linear infinite}
+    .rk{width:86px;height:86px;object-fit:contain;border-radius:10px;background:rgba(255,255,255,.05);padding:5px;flex-shrink:0;transition:transform .2s;filter:drop-shadow(0 2px 8px rgba(0,0,0,.4))}
+    .rk:hover{transform:scale(1.22);filter:drop-shadow(0 4px 16px rgba(245,200,66,.35))}
+
+    .cta-section{position:relative;padding:100px 24px;text-align:center;background:linear-gradient(180deg,#1e5a9a 0%,var(--sky) 55%,#5bb8ee 100%);overflow:hidden}
+    .cta-cloud-1{position:absolute;top:10%;left:-280px;width:28%;animation:cloudFly 55s linear infinite;opacity:.26;pointer-events:none}
+    .cta-cloud-2{position:absolute;top:55%;left:-200px;width:20%;animation:cloudFly 74s linear infinite -22s;opacity:.18;pointer-events:none}
+    .cta-plane{position:absolute;bottom:22%;width:clamp(130px,15vw,200px);filter:drop-shadow(0 4px 14px rgba(0,0,0,.28));animation:planeFly 28s linear infinite -10s;pointer-events:none}
+    .cta-inner{position:relative;z-index:2}
+    .cta-section h2{font-size:clamp(1.65rem,4vw,2.7rem);font-weight:900;color:#fff;text-shadow:0 3px 16px rgba(0,0,0,.4);margin-bottom:15px}
+    .cta-section p{font-size:clamp(.93rem,2vw,1.1rem);font-weight:600;color:rgba(255,255,255,.8);margin-bottom:32px;max-width:500px;margin-left:auto;margin-right:auto;line-height:1.65}
+
+    footer{background:var(--dark);color:rgba(255,255,255,.42);padding:28px 24px;text-align:center;font-size:.84rem;font-weight:600;border-top:1px solid rgba(255,255,255,.06)}
+    .footer-links{margin-bottom:10px;display:flex;justify-content:center;flex-wrap:wrap;gap:5px 18px}
+    footer a{color:var(--gold);text-decoration:none}
+
+    .reveal{opacity:0;transform:translateY(26px);transition:opacity .65s ease,transform .65s ease}
+    .reveal.visible{opacity:1;transform:translateY(0)}
+    @media(max-width:660px){nav{padding:12px 16px}.nav-link{display:none}.hero-inner{flex-direction:column;padding:80px 20px 60px}.hero-char{width:190px}}
+  </style>
+</head>
+<body>
+
+<div id="lbcard" role="dialog" aria-modal="true">
+  <div class="lbcard-inner">
+    <div class="lbcard-img-wrap">
+      <img id="lbcard-img" src="" alt="">
+      <div class="lbcard-badge" id="lbcard-country"></div>
+    </div>
+    <div class="lbcard-body">
+      <div class="lbcard-name" id="lbcard-name"></div>
+      <p class="lbcard-note" id="lbcard-note"></p>
+      <div class="lbcard-actions">
+        <a class="lbcard-play" href="play/" data-i18n="lb.play">Find it in the game →</a>
+        <button class="lbcard-close" id="lbcard-close" data-i18n="lb.close">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<nav>
+  <a class="nav-logo" href="/"><img src="images/horizontallogo.png" alt="myGeoChallenge"></a>
+  <div class="nav-right">
+    <a class="nav-link" href="how-to-play/" data-i18n="nav.howto">How to Play</a>
+    <a class="nav-link active" href="learn/" data-i18n="nav.learn">Learn</a>
+    <a class="nav-link" href="about/" data-i18n="nav.about">About</a>
+    <button class="lang-btn" id="lang-btn" type="button">🌐 <span id="lang-label">ES</span></button>
+    <a class="nav-play" href="play/" data-i18n="nav.play">Play Free</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <img class="hcloud hcloud-1" src="images/bg/cloud1.png" alt=""><img class="hcloud hcloud-2" src="images/bg/cloud2.png" alt=""><img class="hcloud hcloud-3" src="images/bg/cloud4.png" alt="">
+  <img class="hero-plane" src="images/plane.png" alt="">
+  <img class="hero-planet" src="images/planet.png" alt="">
+  <div class="hero-inner">
+    <div class="hero-left">
+      <div class="hero-eyebrow" data-i18n="hero.eyebrow">🌍 Study Guide</div>
+      <h1 class="hero-title" data-i18n="hero.title">Know the flags.<br><span>Not just the big ones</span>.</h1>
+      <p class="hero-desc" data-i18n="hero.desc">Real flags from the game, actual landmark photos, capital city lists, and country silhouettes — organized by continent and difficulty. Spend 10 minutes here before playing and your score will be noticeably better.</p>
+      <a class="btn-gold" href="play/" data-i18n="hero.btn">Put It to the Test</a>
+    </div>
+    <div class="hero-char">
+      <div class="hero-char-glow"></div>
+      <img id="char-anim" src="images/characters/flightattpost2/1.png" alt="Guide character">
+    </div>
+  </div>
+</section>
+
+<div class="ticker-wrap" aria-hidden="true">
+  <div class="ticker-inner">
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.c">195 Countries</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.f">201 Flags</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.l">90 Landmark Photos</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.cont">6 Continents</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.diff">Easy · Medium · Hard</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.cap">Capital Cities</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.sh">Country Shapes</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.un">UNESCO Sites</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.c">195 Countries</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.f">201 Flags</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.l">90 Landmark Photos</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.cont">6 Continents</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.diff">Easy · Medium · Hard</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.cap">Capital Cities</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.sh">Country Shapes</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.un">UNESCO Sites</span></span>
+  </div>
+</div>
+
+<!-- FLAGS SECTION -->
+<section class="content-section flags-section" id="flags">
+  <div class="section-inner">
+    <div class="section-head reveal">
+      <div class="eyebrow" data-i18n="flags.eyebrow">Mode 01 — Suitcase Shuffle</div>
+      <h2 class="section-title" data-i18n="flags.title"><span>201 Flags</span> — Study Guide</h2>
+      <p class="section-sub" data-i18n="flags.sub">These are the actual flags from the game. The fastest way to master them is by pattern — not country by country.</p>
+    </div>
+  </div>
+
+  <div class="flag-row"><div class="flag-strip lft">
+    <div class="fi"><img src="images/flags/france.png" alt="France"></div><div class="fi"><img src="images/flags/japan.png" alt="Japan"></div><div class="fi"><img src="images/flags/brazil.png" alt="Brazil"></div><div class="fi"><img src="images/flags/germany.png" alt="Germany"></div><div class="fi"><img src="images/flags/india.png" alt="India"></div><div class="fi"><img src="images/flags/italy.png" alt="Italy"></div><div class="fi"><img src="images/flags/canada.png" alt="Canada"></div><div class="fi"><img src="images/flags/australia.png" alt="Australia"></div><div class="fi"><img src="images/flags/spain.png" alt="Spain"></div><div class="fi"><img src="images/flags/mexico.png" alt="Mexico"></div><div class="fi"><img src="images/flags/russia.png" alt="Russia"></div><div class="fi"><img src="images/flags/southkorea.png" alt="South Korea"></div><div class="fi"><img src="images/flags/netherlands.png" alt="Netherlands"></div><div class="fi"><img src="images/flags/argentina.png" alt="Argentina"></div><div class="fi"><img src="images/flags/china.png" alt="China"></div><div class="fi"><img src="images/flags/unitedkingdom.png" alt="UK"></div><div class="fi"><img src="images/flags/sweden.png" alt="Sweden"></div><div class="fi"><img src="images/flags/norway.png" alt="Norway"></div><div class="fi"><img src="images/flags/portugal.png" alt="Portugal"></div><div class="fi"><img src="images/flags/unitedstates.png" alt="USA"></div>
+    <div class="fi"><img src="images/flags/france.png" alt="France"></div><div class="fi"><img src="images/flags/japan.png" alt="Japan"></div><div class="fi"><img src="images/flags/brazil.png" alt="Brazil"></div><div class="fi"><img src="images/flags/germany.png" alt="Germany"></div><div class="fi"><img src="images/flags/india.png" alt="India"></div><div class="fi"><img src="images/flags/italy.png" alt="Italy"></div><div class="fi"><img src="images/flags/canada.png" alt="Canada"></div><div class="fi"><img src="images/flags/australia.png" alt="Australia"></div><div class="fi"><img src="images/flags/spain.png" alt="Spain"></div><div class="fi"><img src="images/flags/mexico.png" alt="Mexico"></div><div class="fi"><img src="images/flags/russia.png" alt="Russia"></div><div class="fi"><img src="images/flags/southkorea.png" alt="South Korea"></div><div class="fi"><img src="images/flags/netherlands.png" alt="Netherlands"></div><div class="fi"><img src="images/flags/argentina.png" alt="Argentina"></div><div class="fi"><img src="images/flags/china.png" alt="China"></div><div class="fi"><img src="images/flags/unitedkingdom.png" alt="UK"></div><div class="fi"><img src="images/flags/sweden.png" alt="Sweden"></div><div class="fi"><img src="images/flags/norway.png" alt="Norway"></div><div class="fi"><img src="images/flags/portugal.png" alt="Portugal"></div><div class="fi"><img src="images/flags/unitedstates.png" alt="USA"></div>
+  </div></div>
+
+  <div class="flag-row"><div class="flag-strip rgt">
+    <div class="fi"><img src="images/flags/egypt.png" alt="Egypt"></div><div class="fi"><img src="images/flags/nigeria.png" alt="Nigeria"></div><div class="fi"><img src="images/flags/turkey.png" alt="Turkey"></div><div class="fi"><img src="images/flags/greece.png" alt="Greece"></div><div class="fi"><img src="images/flags/poland.png" alt="Poland"></div><div class="fi"><img src="images/flags/belgium.png" alt="Belgium"></div><div class="fi"><img src="images/flags/switzerland.png" alt="Switzerland"></div><div class="fi"><img src="images/flags/indonesia.png" alt="Indonesia"></div><div class="fi"><img src="images/flags/newzealand.png" alt="New Zealand"></div><div class="fi"><img src="images/flags/southafrica.png" alt="South Africa"></div><div class="fi"><img src="images/flags/ukraine.png" alt="Ukraine"></div><div class="fi"><img src="images/flags/cuba.png" alt="Cuba"></div><div class="fi"><img src="images/flags/ghana.png" alt="Ghana"></div><div class="fi"><img src="images/flags/iran.png" alt="Iran"></div><div class="fi"><img src="images/flags/israel.png" alt="Israel"></div><div class="fi"><img src="images/flags/iraq.png" alt="Iraq"></div><div class="fi"><img src="images/flags/afghanistan.png" alt="Afghanistan"></div><div class="fi"><img src="images/flags/albania.png" alt="Albania"></div><div class="fi"><img src="images/flags/algeria.png" alt="Algeria"></div><div class="fi"><img src="images/flags/angola.png" alt="Angola"></div>
+    <div class="fi"><img src="images/flags/egypt.png" alt="Egypt"></div><div class="fi"><img src="images/flags/nigeria.png" alt="Nigeria"></div><div class="fi"><img src="images/flags/turkey.png" alt="Turkey"></div><div class="fi"><img src="images/flags/greece.png" alt="Greece"></div><div class="fi"><img src="images/flags/poland.png" alt="Poland"></div><div class="fi"><img src="images/flags/belgium.png" alt="Belgium"></div><div class="fi"><img src="images/flags/switzerland.png" alt="Switzerland"></div><div class="fi"><img src="images/flags/indonesia.png" alt="Indonesia"></div><div class="fi"><img src="images/flags/newzealand.png" alt="New Zealand"></div><div class="fi"><img src="images/flags/southafrica.png" alt="South Africa"></div><div class="fi"><img src="images/flags/ukraine.png" alt="Ukraine"></div><div class="fi"><img src="images/flags/cuba.png" alt="Cuba"></div><div class="fi"><img src="images/flags/ghana.png" alt="Ghana"></div><div class="fi"><img src="images/flags/iran.png" alt="Iran"></div><div class="fi"><img src="images/flags/israel.png" alt="Israel"></div><div class="fi"><img src="images/flags/iraq.png" alt="Iraq"></div><div class="fi"><img src="images/flags/afghanistan.png" alt="Afghanistan"></div><div class="fi"><img src="images/flags/albania.png" alt="Albania"></div><div class="fi"><img src="images/flags/algeria.png" alt="Algeria"></div><div class="fi"><img src="images/flags/angola.png" alt="Angola"></div>
+  </div></div>
+
+  <div class="flag-row"><div class="flag-strip lft2">
+    <div class="fi"><img src="images/flags/austria.png" alt="Austria"></div><div class="fi"><img src="images/flags/azerbaijan.png" alt="Azerbaijan"></div><div class="fi"><img src="images/flags/bahamas.png" alt="Bahamas"></div><div class="fi"><img src="images/flags/bangladesh.png" alt="Bangladesh"></div><div class="fi"><img src="images/flags/belarus.png" alt="Belarus"></div><div class="fi"><img src="images/flags/bolivia.png" alt="Bolivia"></div><div class="fi"><img src="images/flags/bosnia.png" alt="Bosnia"></div><div class="fi"><img src="images/flags/cambodia.png" alt="Cambodia"></div><div class="fi"><img src="images/flags/cameroon.png" alt="Cameroon"></div><div class="fi"><img src="images/flags/chile.png" alt="Chile"></div><div class="fi"><img src="images/flags/colombia.png" alt="Colombia"></div><div class="fi"><img src="images/flags/costarica.png" alt="Costa Rica"></div><div class="fi"><img src="images/flags/croatia.png" alt="Croatia"></div><div class="fi"><img src="images/flags/czechrepublic.png" alt="Czech Republic"></div><div class="fi"><img src="images/flags/denmark.png" alt="Denmark"></div><div class="fi"><img src="images/flags/ecuador.png" alt="Ecuador"></div><div class="fi"><img src="images/flags/ethiopia.png" alt="Ethiopia"></div><div class="fi"><img src="images/flags/finland.png" alt="Finland"></div><div class="fi"><img src="images/flags/hungary.png" alt="Hungary"></div><div class="fi"><img src="images/flags/iceland.png" alt="Iceland"></div>
+    <div class="fi"><img src="images/flags/austria.png" alt="Austria"></div><div class="fi"><img src="images/flags/azerbaijan.png" alt="Azerbaijan"></div><div class="fi"><img src="images/flags/bahamas.png" alt="Bahamas"></div><div class="fi"><img src="images/flags/bangladesh.png" alt="Bangladesh"></div><div class="fi"><img src="images/flags/belarus.png" alt="Belarus"></div><div class="fi"><img src="images/flags/bolivia.png" alt="Bolivia"></div><div class="fi"><img src="images/flags/bosnia.png" alt="Bosnia"></div><div class="fi"><img src="images/flags/cambodia.png" alt="Cambodia"></div><div class="fi"><img src="images/flags/cameroon.png" alt="Cameroon"></div><div class="fi"><img src="images/flags/chile.png" alt="Chile"></div><div class="fi"><img src="images/flags/colombia.png" alt="Colombia"></div><div class="fi"><img src="images/flags/costarica.png" alt="Costa Rica"></div><div class="fi"><img src="images/flags/croatia.png" alt="Croatia"></div><div class="fi"><img src="images/flags/czechrepublic.png" alt="Czech Republic"></div><div class="fi"><img src="images/flags/denmark.png" alt="Denmark"></div><div class="fi"><img src="images/flags/ecuador.png" alt="Ecuador"></div><div class="fi"><img src="images/flags/ethiopia.png" alt="Ethiopia"></div><div class="fi"><img src="images/flags/finland.png" alt="Finland"></div><div class="fi"><img src="images/flags/hungary.png" alt="Hungary"></div><div class="fi"><img src="images/flags/iceland.png" alt="Iceland"></div>
+  </div></div>
+
+  <!-- MINI FLAG QUIZ -->
+  <div class="section-inner">
+    <div class="quiz-game-frame reveal">
+      <div class="quiz-topbar">
+        <div class="qtop-left">
+          <img class="quiz-icon" src="images/game1.png" alt="">
+          <span class="quiz-title-txt" data-i18n="quiz.label">Suitcase Shuffle</span>
+        </div>
+        <div class="qtop-score">
+          <div class="qtop-score-checks" id="qchecks"></div>
+          <div class="qtop-score-num" id="qsc">0</div>
+        </div>
+      </div>
+      <div class="quiz-timer-bar"><div class="quiz-timer-fill" id="qtimer"></div></div>
+      <div class="quiz-stage" id="qstage">
+        <div class="quiz-progress-dots" id="qdots"></div>
+        <div class="qflagid-rail"></div>
+        <div class="qflagid-wrap">
+          <img class="qflagid-img" src="images/flagid.png" alt="">
+          <div class="qflagid-label" id="qflagid-label"></div>
+        </div>
+        <div class="qopts-grid" id="quiz-opts"></div>
+        <div class="qfeedback" id="qfeedback">
+          <img class="qfeedback-img" id="qfeedback-img" src="" alt="">
+        </div>
+      </div>
+      <div class="quiz-end-screen" id="qend">
+        <div class="quiz-end-checks" id="qend-checks"></div>
+        <div class="quiz-end-score" id="qend-score"></div>
+        <div class="quiz-end-denom">/10</div>
+        <div class="quiz-end-label" id="qend-label"></div>
+        <p class="quiz-end-msg" id="qend-msg"></p>
+        <a class="qbtn-gold" href="play/" data-i18n="quiz.playbtn">Play the Real Game</a>
+        <button class="qbtn-ghost" id="qrestart" data-i18n="quiz.restart">Try Again</button>
+      </div>
+    </div>
+
+    <h3 class="sub reveal" data-i18n="spot.head">Flags Worth Memorizing First</h3>
+    <p class="body reveal" data-i18n="spot.body">These distinctive flags appear in Suitcase Shuffle and are almost guaranteed correct answers once you recognize them — they have no close look-alikes.</p>
+    <div class="flag-spotlight reveal">
+      <div class="flag-spot"><img src="images/flags/switzerland.png" alt="Switzerland"><div class="country" data-i18n="sp0.c">Switzerland</div><div class="fact" data-i18n="sp0.f">Only square national flag. Red with white cross — impossible to confuse.</div></div>
+      <div class="flag-spot"><img src="images/flags/jamaica.png" alt="Jamaica"><div class="country" data-i18n="sp1.c">Jamaica</div><div class="fact" data-i18n="sp1.f">Gold diagonal cross on black and green. No other flag uses this combo.</div></div>
+      <div class="flag-spot"><img src="images/flags/mexico.png" alt="Mexico"><div class="country" data-i18n="sp2.c">Mexico</div><div class="fact" data-i18n="sp2.f">Green, white, red — with a golden eagle on cactus in the center stripe.</div></div>
+      <div class="flag-spot"><img src="images/flags/brazil.png" alt="Brazil"><div class="country" data-i18n="sp3.c">Brazil</div><div class="fact" data-i18n="sp3.f">Yellow diamond on green. The shape alone gives it away in South America.</div></div>
+      <div class="flag-spot"><img src="images/flags/southafrica.png" alt="South Africa"><div class="country" data-i18n="sp4.c">South Africa</div><div class="fact" data-i18n="sp4.f">Six colors including a horizontal Y-shape. Most colorful flag on the continent.</div></div>
+      <div class="flag-spot"><img src="images/flags/ukraine.png" alt="Ukraine"><div class="country" data-i18n="sp5.c">Ukraine</div><div class="fact" data-i18n="sp5.f">Two stripes: blue (sky) over yellow (wheat). Simple and vivid.</div></div>
+      <div class="flag-spot"><img src="images/flags/bangladesh.png" alt="Bangladesh"><div class="country" data-i18n="sp6.c">Bangladesh</div><div class="fact" data-i18n="sp6.f">Green with offset red circle. Like Japan but with green background and shifted circle.</div></div>
+      <div class="flag-spot"><img src="images/flags/cambodia.png" alt="Cambodia"><div class="country" data-i18n="sp7.c">Cambodia</div><div class="fact" data-i18n="sp7.f">Only national flag featuring a building: Angkor Wat temple in the center.</div></div>
+    </div>
+
+    <h3 class="sub reveal" data-i18n="col.head">Learn by Color Family</h3>
+    <p class="body reveal" data-i18n="col.body">Most flags use 2–3 colors. Grouping by color scheme is the fastest elimination strategy in Suitcase Shuffle:</p>
+    <ul class="blist reveal">
+      <li data-i18n="col.1"><strong>Red, White &amp; Blue tricolor</strong> — France, Netherlands, Russia, Czech Republic, Slovakia, Slovenia, Chile, Cuba. The stripe direction and arrangement are the key differentiators.</li>
+      <li data-i18n="col.2"><strong>Red, White &amp; Green</strong> — Italy, Mexico, Hungary, Bulgaria, Belarus, Maldives, Iran. Look for emblems in the center stripe.</li>
+      <li data-i18n="col.3"><strong>Pan-African (red, yellow, green)</strong> — Ethiopia, Ghana, Guinea, Mali, Cameroon, Senegal. Stars and stripe arrangements vary.</li>
+      <li data-i18n="col.4"><strong>Pan-Arab (red, white, black, green)</strong> — Jordan, Iraq, Syria, UAE, Yemen. Most use horizontal stripes; central emblems differ.</li>
+      <li data-i18n="col.5"><strong>Nordic Cross</strong> — Denmark, Sweden, Norway, Finland, Iceland. Off-center cross on a plain field. Instantly recognizable once you know the pattern.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- LANDMARKS SECTION -->
+<section class="content-section landmarks-section" id="landmarks">
+  <div class="section-inner">
+    <div class="section-head reveal">
+      <div class="eyebrow" data-i18n="land.eyebrow">Mode 04 — Landmark Loco</div>
+      <h2 class="section-title" data-i18n="land.title">The Actual <span>Landmark Photos</span></h2>
+      <p class="section-sub" data-i18n="land.sub">These are pulled straight from the game. If you recognize them now, you'll nail them during Landmark Loco. Click any photo to zoom in. 30 of 90 shown here.</p>
+    </div>
+
+    <div class="gallery-grid reveal">
+      <div class="gallery-item" data-src="images/places/1.jpg"><img src="images/places/1.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/2.jpg"><img src="images/places/2.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/3.jpg"><img src="images/places/3.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/4.jpg"><img src="images/places/4.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/5.jpg"><img src="images/places/5.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/6.jpg"><img src="images/places/6.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/7.jpeg"><img src="images/places/7.jpeg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/8.jpg"><img src="images/places/8.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/9.jpg"><img src="images/places/9.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/10.jpg"><img src="images/places/10.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/11.jpg"><img src="images/places/11.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/12.jpg"><img src="images/places/12.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/13.jpg"><img src="images/places/13.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/14.jpg"><img src="images/places/14.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/15.jpg"><img src="images/places/15.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/16.jpg"><img src="images/places/16.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/17.jpg"><img src="images/places/17.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/18.jpg"><img src="images/places/18.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/19.jpg"><img src="images/places/19.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/20.jpg"><img src="images/places/20.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/21.jpg"><img src="images/places/21.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/22.jpg"><img src="images/places/22.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/23.jpg"><img src="images/places/23.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/24.jpg"><img src="images/places/24.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/25.jpg"><img src="images/places/25.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/26.jpg"><img src="images/places/26.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/27.jpg"><img src="images/places/27.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/28.jpg"><img src="images/places/28.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/29.jpg"><img src="images/places/29.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+      <div class="gallery-item" data-src="images/places/30.jpg"><img src="images/places/30.jpg" alt="Landmark" loading="lazy"><span class="gallery-zoom">🔍</span></div>
+    </div>
+
+    <h3 class="sub reveal" data-i18n="lshort.head">Landmark Recognition Shortcuts</h3>
+    <ul class="blist reveal">
+      <li data-i18n="lshort.1"><strong>Architectural style is your first clue.</strong> Islamic geometric patterns → Middle East/North Africa. Tiered stone temples → Southeast Asia. Classical columns → Mediterranean Europe.</li>
+      <li data-i18n="lshort.2"><strong>Know these country associations:</strong> Hagia Sophia → Turkey (not Greece). Angkor Wat → Cambodia (not Thailand). Machu Picchu → Peru (not Bolivia).</li>
+      <li data-i18n="lshort.3"><strong>UNESCO sites dominate the list.</strong> Familiarizing yourself with the World Heritage list by region prepares you for the majority of Landmark Loco questions.</li>
+      <li data-i18n="lshort.4">Natural wonders have their own logic — Victoria Falls (Zambia/Zimbabwe), Iguazú (Argentina/Brazil), Uluru (Australia). Pay attention to the country attribution, not just the landmark name.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- WORLD FACTS -->
+<section class="content-section" id="facts" style="background:linear-gradient(180deg,rgba(0,0,0,.12) 0%,rgba(0,0,0,.2) 100%)">
+  <div class="section-inner">
+    <div class="section-head reveal">
+      <div class="eyebrow" data-i18n="facts.eyebrow">Geography Facts</div>
+      <h2 class="section-title" data-i18n="facts.title">The World at a <span>Glance</span></h2>
+      <p class="section-sub" data-i18n="facts.sub">Quick-fire facts that give context to every question you'll face in the game.</p>
+    </div>
+    <div class="fact-grid reveal">
+      <div class="fact-card"><span class="label" data-i18n="fc0.l">Largest Country</span><div class="value" data-i18n="fc0.v">Russia</div><div class="note" data-i18n="fc0.n">17.1 million km² — bigger than the surface of Pluto</div></div>
+      <div class="fact-card"><span class="label" data-i18n="fc1.l">Smallest Country</span><div class="value" data-i18n="fc1.v">Vatican City</div><div class="note" data-i18n="fc1.n">0.44 km² — smaller than most city parks</div></div>
+      <div class="fact-card"><span class="label" data-i18n="fc2.l">Most Countries</span><div class="value" data-i18n="fc2.v">Africa: 54</div><div class="note" data-i18n="fc2.n">More sovereign nations than any other continent</div></div>
+      <div class="fact-card"><span class="label" data-i18n="fc3.l">Longest Country (N–S)</span><div class="value" data-i18n="fc3.v">Chile</div><div class="note" data-i18n="fc3.n">4,270 km from tip to tip — unmistakable shape in Map Mayhem</div></div>
+      <div class="fact-card"><span class="label" data-i18n="fc4.l">Most Time Zones</span><div class="value" data-i18n="fc4.v">Russia: 11</div><div class="note" data-i18n="fc4.n">When midnight in Kaliningrad, it's 10AM next day in Kamchatka</div></div>
+      <div class="fact-card"><span class="label" data-i18n="fc5.l">Highest Peak</span><div class="value" data-i18n="fc5.v">Everest — Nepal/China</div><div class="note" data-i18n="fc5.n">8,849 m — on the border, disputed attribution</div></div>
+    </div>
+
+    <h3 class="sub reveal" data-i18n="cap.head">Capitals That Aren't the Biggest City</h3>
+    <p class="body reveal" data-i18n="cap.body">These surprise capitals are frequently tested in City Blitz and often catch players off guard:</p>
+    <ul class="blist reveal">
+      <li data-i18n="cap.1"><strong>Australia:</strong> Canberra (not Sydney or Melbourne)</li>
+      <li data-i18n="cap.2"><strong>Canada:</strong> Ottawa (not Toronto)</li>
+      <li data-i18n="cap.3"><strong>Brazil:</strong> Brasília (not São Paulo or Rio — Brasília was purpose-built in 1960)</li>
+      <li data-i18n="cap.4"><strong>USA:</strong> Washington D.C. (not New York City)</li>
+      <li data-i18n="cap.5"><strong>India:</strong> New Delhi (not Mumbai)</li>
+      <li data-i18n="cap.6"><strong>Nigeria:</strong> Abuja (not Lagos)</li>
+      <li data-i18n="cap.7"><strong>Pakistan:</strong> Islamabad (not Karachi)</li>
+      <li data-i18n="cap.8"><strong>South Africa:</strong> Three capitals — Pretoria (executive), Cape Town (legislative), Bloemfontein (judicial)</li>
+      <li data-i18n="cap.9"><strong>Tanzania:</strong> Dodoma (not Dar es Salaam)</li>
+      <li data-i18n="cap.10"><strong>Kazakhstan:</strong> Astana (formerly Nur-Sultan — not Almaty)</li>
+    </ul>
+  </div>
+</section>
+
+<!-- RANKS STRIP -->
+<section class="content-section ranks-section" id="ranks">
+  <div class="section-inner">
+    <div class="section-head reveal">
+      <div class="eyebrow" data-i18n="ranks.eyebrow">Progression</div>
+      <h2 class="section-title" data-i18n="ranks.title">35 Ranks to <span>Earn</span></h2>
+      <p class="section-sub" data-i18n="ranks.sub">Apply what you study here in the game and watch your rank climb. Every correct answer you know from memory is a speed bonus opportunity.</p>
+    </div>
+  </div>
+  <div class="rank-row-outer">
+    <div class="rank-row r1" style="margin-bottom:10px">
+      <img class="rk" src="images/ranks/1.png" alt="Rank 1"><img class="rk" src="images/ranks/2.png" alt="Rank 2"><img class="rk" src="images/ranks/3.png" alt="Rank 3"><img class="rk" src="images/ranks/4.png" alt="Rank 4"><img class="rk" src="images/ranks/5.png" alt="Rank 5"><img class="rk" src="images/ranks/6.png" alt="Rank 6"><img class="rk" src="images/ranks/7.png" alt="Rank 7"><img class="rk" src="images/ranks/8.png" alt="Rank 8"><img class="rk" src="images/ranks/9.png" alt="Rank 9"><img class="rk" src="images/ranks/10.png" alt="Rank 10"><img class="rk" src="images/ranks/11.png" alt="Rank 11"><img class="rk" src="images/ranks/12.png" alt="Rank 12"><img class="rk" src="images/ranks/13.png" alt="Rank 13"><img class="rk" src="images/ranks/14.png" alt="Rank 14"><img class="rk" src="images/ranks/15.png" alt="Rank 15"><img class="rk" src="images/ranks/16.png" alt="Rank 16"><img class="rk" src="images/ranks/17.png" alt="Rank 17"><img class="rk" src="images/ranks/18.png" alt="Rank 18">
+      <img class="rk" src="images/ranks/1.png" alt="Rank 1"><img class="rk" src="images/ranks/2.png" alt="Rank 2"><img class="rk" src="images/ranks/3.png" alt="Rank 3"><img class="rk" src="images/ranks/4.png" alt="Rank 4"><img class="rk" src="images/ranks/5.png" alt="Rank 5"><img class="rk" src="images/ranks/6.png" alt="Rank 6"><img class="rk" src="images/ranks/7.png" alt="Rank 7"><img class="rk" src="images/ranks/8.png" alt="Rank 8"><img class="rk" src="images/ranks/9.png" alt="Rank 9"><img class="rk" src="images/ranks/10.png" alt="Rank 10"><img class="rk" src="images/ranks/11.png" alt="Rank 11"><img class="rk" src="images/ranks/12.png" alt="Rank 12"><img class="rk" src="images/ranks/13.png" alt="Rank 13"><img class="rk" src="images/ranks/14.png" alt="Rank 14"><img class="rk" src="images/ranks/15.png" alt="Rank 15"><img class="rk" src="images/ranks/16.png" alt="Rank 16"><img class="rk" src="images/ranks/17.png" alt="Rank 17"><img class="rk" src="images/ranks/18.png" alt="Rank 18">
+    </div>
+    <div class="rank-row r2">
+      <img class="rk" src="images/ranks/19.png" alt="Rank 19"><img class="rk" src="images/ranks/20.png" alt="Rank 20"><img class="rk" src="images/ranks/21.png" alt="Rank 21"><img class="rk" src="images/ranks/22.png" alt="Rank 22"><img class="rk" src="images/ranks/23.png" alt="Rank 23"><img class="rk" src="images/ranks/24.png" alt="Rank 24"><img class="rk" src="images/ranks/25.png" alt="Rank 25"><img class="rk" src="images/ranks/26.png" alt="Rank 26"><img class="rk" src="images/ranks/27.png" alt="Rank 27"><img class="rk" src="images/ranks/28.png" alt="Rank 28"><img class="rk" src="images/ranks/29.png" alt="Rank 29"><img class="rk" src="images/ranks/30.png" alt="Rank 30"><img class="rk" src="images/ranks/31.png" alt="Rank 31"><img class="rk" src="images/ranks/32.png" alt="Rank 32"><img class="rk" src="images/ranks/33.png" alt="Rank 33"><img class="rk" src="images/ranks/34.png" alt="Rank 34"><img class="rk" src="images/ranks/35.png" alt="Rank 35">
+      <img class="rk" src="images/ranks/19.png" alt="Rank 19"><img class="rk" src="images/ranks/20.png" alt="Rank 20"><img class="rk" src="images/ranks/21.png" alt="Rank 21"><img class="rk" src="images/ranks/22.png" alt="Rank 22"><img class="rk" src="images/ranks/23.png" alt="Rank 23"><img class="rk" src="images/ranks/24.png" alt="Rank 24"><img class="rk" src="images/ranks/25.png" alt="Rank 25"><img class="rk" src="images/ranks/26.png" alt="Rank 26"><img class="rk" src="images/ranks/27.png" alt="Rank 27"><img class="rk" src="images/ranks/28.png" alt="Rank 28"><img class="rk" src="images/ranks/29.png" alt="Rank 29"><img class="rk" src="images/ranks/30.png" alt="Rank 30"><img class="rk" src="images/ranks/31.png" alt="Rank 31"><img class="rk" src="images/ranks/32.png" alt="Rank 32"><img class="rk" src="images/ranks/33.png" alt="Rank 33"><img class="rk" src="images/ranks/34.png" alt="Rank 34"><img class="rk" src="images/ranks/35.png" alt="Rank 35">
+    </div>
+  </div>
+</section>
+
+
+<!-- CTA -->
+<section class="cta-section">
+  <img class="cta-cloud-1" src="images/bg/cloud1.png" alt=""><img class="cta-cloud-2" src="images/bg/cloud2.png" alt="">
+  <img class="cta-plane" src="images/plane.png" alt="">
+  <div class="cta-inner reveal">
+    <h2 data-i18n="cta.title">Okay, now go actually play.</h2>
+    <p data-i18n="cta.desc">The best way to learn geography is to get something wrong and never forget it. The game does that faster than any list. Start with Practice Tour for zero pressure, or jump into World Tour if you're feeling confident.</p>
+    <a class="btn-gold" href="play/" data-i18n="cta.btn">Start Playing — It's Free</a>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-links">
+    <a href="/" data-i18n="f.home">Home</a>
+    <a href="about/" data-i18n="f.about">About</a>
+    <a href="how-to-play/" data-i18n="f.howto">How to Play</a>
+    <a href="privacy/" data-i18n="f.priv">Privacy Policy</a>
+    <a href="play/" data-i18n="f.play">Play</a>
+    <a href="https://ko-fi.com/mygeochallenge" target="_blank" rel="noopener" data-i18n="f.ko">☕ Support us</a>
+  </div>
+  <p>&copy; 2026 myGeoChallenge · mygeochallenge.com · <span data-i18n="f.rights">All rights reserved</span></p>
+</footer>
+
+<script>
+/* ── TRANSLATIONS ── */
+const T={
+  en:{
+    'nav.howto':'How to Play','nav.learn':'Learn','nav.about':'About','nav.play':'Play Free',
+    'hero.eyebrow':'✈️ before your next run',
+    'hero.title':'Know the flags.<br><span>Not just the big ones</span>.',
+    'hero.desc':'Same flags, same landmark photos, same cities that come up in the game — organized so you can skim what you need. Ten minutes here saves you ten wrong answers later.',
+    'hero.btn':'Put It to the Test',
+    'tick.c':'195 Countries','tick.f':'201 Flags','tick.l':'90 Landmark Photos','tick.cont':'6 Continents','tick.diff':'Easy · Medium · Hard','tick.cap':'Capital Cities','tick.sh':'Country Shapes','tick.un':'UNESCO Sites',
+    'flags.eyebrow':'Mode 01 — Suitcase Shuffle','flags.title':'All <span>201 Flags</span>','flags.sub':'These are the actual flags from the game. Pattern recognition beats memorization — here\'s how to group them.',
+    'quiz.label':'Suitcase Shuffle','quiz.restart':'Try Again','quiz.playbtn':'Play the Real Game',
+    'spot.head':'The ones you should know cold','spot.body':'Eight flags with no real look-alikes. If you see them in the game, you should never get them wrong.',
+    'sp0.c':'Switzerland','sp0.f':'Only square national flag. Red with white cross — impossible to confuse.',
+    'sp1.c':'Jamaica','sp1.f':'Gold diagonal cross on black and green. No other flag uses this combo.',
+    'sp2.c':'Mexico','sp2.f':'Green, white, red — with a golden eagle on cactus in the center stripe.',
+    'sp3.c':'Brazil','sp3.f':'Yellow diamond on green. The shape alone gives it away in South America.',
+    'sp4.c':'South Africa','sp4.f':'Six colors including a horizontal Y-shape. Most colorful flag on the continent.',
+    'sp5.c':'Ukraine','sp5.f':'Two stripes: blue (sky) over yellow (wheat). Simple and vivid.',
+    'sp6.c':'Bangladesh','sp6.f':'Green with offset red circle. Like Japan but with green background and shifted circle.',
+    'sp7.c':'Cambodia','sp7.f':'Only national flag featuring a building: Angkor Wat temple in the center.',
+    'col.head':'The color groups that actually help','col.body':'Most flags use 2–3 colors. Know the groups and you can eliminate wrong answers before reading all the options:',
+    'col.1':'<strong>Red, White &amp; Blue tricolor</strong> — France, Netherlands, Russia, Czech Republic, Slovakia, Slovenia, Chile, Cuba. The stripe direction and arrangement are the key differentiators.',
+    'col.2':'<strong>Red, White &amp; Green</strong> — Italy, Mexico, Hungary, Bulgaria, Belarus, Maldives, Iran. Look for emblems in the center stripe.',
+    'col.3':'<strong>Pan-African (red, yellow, green)</strong> — Ethiopia, Ghana, Guinea, Mali, Cameroon, Senegal. Stars and stripe arrangements vary.',
+    'col.4':'<strong>Pan-Arab (red, white, black, green)</strong> — Jordan, Iraq, Syria, UAE, Yemen. Most use horizontal stripes; central emblems differ.',
+    'col.5':'<strong>Nordic Cross</strong> — Denmark, Sweden, Norway, Finland, Iceland. Off-center cross on a plain field. Instantly recognizable once you know the pattern.',
+    'land.eyebrow':'Mode 04 — Landmark Loco','land.title':'The Actual <span>Landmark Photos</span>','land.sub':'30 of the 90 photos from Landmark Loco. If you\'ve seen it here, you\'ll recognize it mid-game. Click any photo for details.',
+    'lshort.head':'How to read a landmark you\'ve never seen',
+    'lshort.1':'<strong>Architectural style is your first clue.</strong> Islamic geometric patterns → Middle East/North Africa. Tiered stone temples → Southeast Asia. Classical columns → Mediterranean Europe.',
+    'lshort.2':'<strong>Know these country associations:</strong> Hagia Sophia → Turkey (not Greece). Angkor Wat → Cambodia (not Thailand). Machu Picchu → Peru (not Bolivia).',
+    'lshort.3':'<strong>UNESCO sites dominate the list.</strong> Familiarizing yourself with the World Heritage list by region prepares you for the majority of Landmark Loco questions.',
+    'lshort.4':'Natural wonders have their own logic — Victoria Falls (Zambia/Zimbabwe), Iguazú (Argentina/Brazil), Uluru (Australia). Pay attention to the country attribution, not just the landmark name.',
+    'facts.eyebrow':'Good to know','facts.title':'Numbers that <span>keep coming up</span>','facts.sub':'These come up across all four modes. Worth knowing.',
+    'fc0.l':'Largest Country','fc0.v':'Russia','fc0.n':'17.1 million km² — bigger than the surface of Pluto',
+    'fc1.l':'Smallest Country','fc1.v':'Vatican City','fc1.n':'0.44 km² — smaller than most city parks',
+    'fc2.l':'Most Countries','fc2.v':'Africa: 54','fc2.n':'More sovereign nations than any other continent',
+    'fc3.l':'Longest Country (N–S)','fc3.v':'Chile','fc3.n':'4,270 km from tip to tip — unmistakable shape in Map Mayhem',
+    'fc4.l':'Most Time Zones','fc4.v':'Russia: 11','fc4.n':'When midnight in Kaliningrad, it\'s 10AM next day in Kamchatka',
+    'fc5.l':'Highest Peak','fc5.v':'Everest — Nepal/China','fc5.n':'8,849 m — on the border, disputed attribution',
+    'cap.head':'Capitals That Aren\'t the Biggest City','cap.body':'City Blitz loves these. Everyone assumes the biggest city — the capital is the other one:',
+    'cap.1':'<strong>Australia:</strong> Canberra (not Sydney or Melbourne)',
+    'cap.2':'<strong>Canada:</strong> Ottawa (not Toronto)',
+    'cap.3':'<strong>Brazil:</strong> Brasília (not São Paulo or Rio — Brasília was purpose-built in 1960)',
+    'cap.4':'<strong>USA:</strong> Washington D.C. (not New York City)',
+    'cap.5':'<strong>India:</strong> New Delhi (not Mumbai)',
+    'cap.6':'<strong>Nigeria:</strong> Abuja (not Lagos)',
+    'cap.7':'<strong>Pakistan:</strong> Islamabad (not Karachi)',
+    'cap.8':'<strong>South Africa:</strong> Three capitals — Pretoria (executive), Cape Town (legislative), Bloemfontein (judicial)',
+    'cap.9':'<strong>Tanzania:</strong> Dodoma (not Dar es Salaam)',
+    'cap.10':'<strong>Kazakhstan:</strong> Astana (formerly Nur-Sultan — not Almaty)',
+    'ranks.eyebrow':'Progression','ranks.title':'35 Ranks to <span>Earn</span>','ranks.sub':'Every answer you already know here is a speed bonus in the making. The ranks are earned, not given.',
+    'cta.title':'Okay, now go actually play.','cta.desc':'The best way to learn geography is to get something wrong and never forget it. The game does that faster than any list. Start with Practice Tour for zero pressure, or jump into World Tour if you\'re feeling confident.','cta.btn':"Start Playing — It's Free",
+    'f.home':'Home','f.about':'About','f.howto':'How to Play','f.priv':'Privacy Policy','f.play':'Play','f.ko':'☕ Support us','f.rights':'All rights reserved',
+    'lb.play':'Find it in the game →','lb.close':'Close'
+  },
+  es:{
+    'nav.howto':'Cómo Jugar','nav.learn':'Aprender','nav.about':'El Juego','nav.play':'Jugar Gratis',
+    'hero.eyebrow':'✈️ antes de tu próxima partida',
+    'hero.title':'Conoce las banderas.<br><span>No solo las fáciles</span>.',
+    'hero.desc':'Las mismas banderas, fotos de monumentos y ciudades que salen en el juego — organizadas para que puedas repasar rápido. Diez minutos aquí te ahorran diez errores después.',
+    'hero.btn':'Ponlo a Prueba',
+    'tick.c':'195 Países','tick.f':'201 Banderas','tick.l':'90 Fotos de Monumentos','tick.cont':'6 Continentes','tick.diff':'Fácil · Medio · Difícil','tick.cap':'Capitales del Mundo','tick.sh':'Formas de Países','tick.un':'Sitios UNESCO',
+    'flags.eyebrow':'Modo 01 — Suitcase Shuffle','flags.title':'Las <span>201 Banderas</span>','flags.sub':'Estas son las banderas reales del juego. El reconocimiento de patrones le gana a la memorización — acá cómo agruparlas.',
+    'quiz.label':'Suitcase Shuffle','quiz.restart':'Intentar de nuevo','quiz.playbtn':'Jugar el Juego Real',
+    'spot.head':'Las que no deberías fallar nunca','spot.body':'Ocho banderas sin parecido con ninguna otra. Si las ves en el juego, no hay excusa para fallarlas.',
+    'sp0.c':'Suiza','sp0.f':'La única bandera cuadrada. Roja con cruz blanca — imposible confundir.',
+    'sp1.c':'Jamaica','sp1.f':'Cruz dorada diagonal sobre negro y verde. Ninguna otra bandera usa esta combinación.',
+    'sp2.c':'México','sp2.f':'Verde, blanco, rojo — con un águila dorada sobre nopal en la franja central.',
+    'sp3.c':'Brasil','sp3.f':'Diamante amarillo sobre verde. La forma sola ya la delata en Sudamérica.',
+    'sp4.c':'Sudáfrica','sp4.f':'Seis colores incluyendo una Y horizontal. La bandera más colorida del continente.',
+    'sp5.c':'Ucrania','sp5.f':'Dos franjas: azul (cielo) sobre amarillo (trigo). Simple y vívida.',
+    'sp6.c':'Bangladesh','sp6.f':'Verde con círculo rojo descentrado. Como Japón pero con fondo verde y círculo corrido.',
+    'sp7.c':'Camboya','sp7.f':'La única bandera nacional con un edificio: el templo de Angkor Wat en el centro.',
+    'col.head':'Los grupos de colores que de verdad sirven','col.body':'La mayoría de las banderas usan 2–3 colores. Si conocés los grupos, eliminás opciones antes de leer todas:',
+    'col.1':'<strong>Tricolor rojo, blanco y azul</strong> — Francia, Países Bajos, Rusia, República Checa, Eslovaquia, Eslovenia, Chile, Cuba. La dirección y disposición de las franjas son los diferenciadores clave.',
+    'col.2':'<strong>Rojo, blanco y verde</strong> — Italia, México, Hungría, Bulgaria, Bielorrusia, Maldivas, Irán. Busca emblemas en la franja central.',
+    'col.3':'<strong>Panafricano (rojo, amarillo, verde)</strong> — Etiopía, Ghana, Guinea, Mali, Camerún, Senegal. Las estrellas y disposición de franjas varían.',
+    'col.4':'<strong>Panárabe (rojo, blanco, negro, verde)</strong> — Jordania, Iraq, Siria, EAU, Yemen. La mayoría usa franjas horizontales; los emblemas centrales difieren.',
+    'col.5':'<strong>Cruz Nórdica</strong> — Dinamarca, Suecia, Noruega, Finlandia, Islandia. Cruz descentrada sobre fondo liso. Reconocible al instante una vez que conoces el patrón.',
+    'land.eyebrow':'Modo 04 — Landmark Loco','land.title':'Las Fotos Reales de <span>Monumentos</span>','land.sub':'30 de las 90 fotos de Landmark Loco. Si lo viste acá, lo vas a reconocer en el juego. Clic en cualquier foto para ver detalles.',
+    'lshort.head':'Cómo leer un monumento que nunca viste',
+    'lshort.1':'<strong>El estilo arquitectónico es tu primera pista.</strong> Patrones geométricos islámicos → Oriente Medio/Norte de África. Templos de piedra escalonados → Sudeste Asiático. Columnas clásicas → Europa mediterránea.',
+    'lshort.2':'<strong>Conoce estas asociaciones de países:</strong> Hagia Sophia → Turquía (no Grecia). Angkor Wat → Camboya (no Tailandia). Machu Picchu → Perú (no Bolivia).',
+    'lshort.3':'<strong>Los sitios UNESCO dominan la lista.</strong> Familiarizarte con la Lista del Patrimonio Mundial por región te prepara para la mayoría de las preguntas de Landmark Loco.',
+    'lshort.4':'Las maravillas naturales tienen su propia lógica — Cataratas Victoria (Zambia/Zimbabue), Iguazú (Argentina/Brasil), Uluru (Australia). Presta atención al país, no solo al nombre del monumento.',
+    'facts.eyebrow':'Vale la pena saber','facts.title':'Números que <span>siempre aparecen</span>','facts.sub':'Aparecen en los cuatro modos. Vale memorizarlos.',
+    'fc0.l':'País más grande','fc0.v':'Rusia','fc0.n':'17,1 millones de km² — más grande que la superficie de Plutón',
+    'fc1.l':'País más pequeño','fc1.v':'Ciudad del Vaticano','fc1.n':'0,44 km² — más pequeño que la mayoría de los parques urbanos',
+    'fc2.l':'Más países','fc2.v':'África: 54','fc2.n':'Más naciones soberanas que cualquier otro continente',
+    'fc3.l':'País más largo (N–S)','fc3.v':'Chile','fc3.n':'4.270 km de punta a punta — silueta inconfundible en Map Mayhem',
+    'fc4.l':'Más husos horarios','fc4.v':'Rusia: 11','fc4.n':'Cuando es medianoche en Kaliningrado, ya son las 10AM del día siguiente en Kamchatka',
+    'fc5.l':'Pico más alto','fc5.v':'Everest — Nepal/China','fc5.n':'8.849 m — en la frontera, atribución disputada',
+    'cap.head':'Capitales que No Son la Ciudad más Grande','cap.body':'City Blitz las adora. Todo el mundo asume la ciudad más grande — pero la capital siempre es otra:',
+    'cap.1':'<strong>Australia:</strong> Canberra (no Sídney ni Melbourne)',
+    'cap.2':'<strong>Canadá:</strong> Ottawa (no Toronto)',
+    'cap.3':'<strong>Brasil:</strong> Brasilia (no São Paulo ni Río — Brasilia fue construida a propósito en 1960)',
+    'cap.4':'<strong>EE.UU.:</strong> Washington D.C. (no Nueva York)',
+    'cap.5':'<strong>India:</strong> Nueva Delhi (no Bombay)',
+    'cap.6':'<strong>Nigeria:</strong> Abuja (no Lagos)',
+    'cap.7':'<strong>Pakistán:</strong> Islamabad (no Karachi)',
+    'cap.8':'<strong>Sudáfrica:</strong> Tres capitales — Pretoria (ejecutiva), Ciudad del Cabo (legislativa), Bloemfontein (judicial)',
+    'cap.9':'<strong>Tanzania:</strong> Dodoma (no Dar es Salaam)',
+    'cap.10':'<strong>Kazajistán:</strong> Astana (antes Nur-Sultán — no Almaty)',
+    'ranks.eyebrow':'Progresión','ranks.title':'35 Rangos para <span>Ganar</span>','ranks.sub':'Cada respuesta que ya sabés de acá es un bono de velocidad listo para usarse. Los rangos se ganan, no se regalan.',
+    'cta.title':'Bien, ahora ve a jugar de verdad.','cta.desc':'La mejor forma de aprender geografía es equivocarte y no olvidarlo nunca. El juego hace eso más rápido que cualquier lista. Empieza con el Modo Práctica si quieres sin presión, o entra directo al Tour Mundial si te sientes con confianza.','cta.btn':'Empezar a Jugar — Es Gratis',
+    'f.home':'Inicio','f.about':'El Juego','f.howto':'Cómo Jugar','f.priv':'Política de Privacidad','f.play':'Jugar','f.ko':'☕ Apóyanos','f.rights':'Todos los derechos reservados',
+    'lb.play':'Encuéntralo en el juego →','lb.close':'Cerrar'
+  }
+};
+
+/* ── LANG ── */
+const lb=document.getElementById('lang-btn');
+const ll=document.getElementById('lang-label');
+let lang=localStorage.getItem('mgc-landing-lang')||'en';
+function applyLang(l){
+  lang=l;localStorage.setItem('mgc-landing-lang',l);document.documentElement.lang=l;
+  document.querySelectorAll('[data-i18n]').forEach(el=>{const k=el.dataset.i18n;if(T[l]&&T[l][k]!==undefined)el.innerHTML=T[l][k];});
+  ll.textContent=l==='en'?'ES':'EN';
+}
+lb.addEventListener('click',()=>applyLang(lang==='en'?'es':'en'));
+
+/* ── CHARACTER ANIMATION ── */
+let cf=1;
+setInterval(()=>{cf=cf%11+1;const e=document.getElementById('char-anim');if(e)e.src=`images/characters/flightattpost2/${cf}.png`;},120);
+
+/* ── SCROLL REVEAL ── */
+const obs=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');obs.unobserve(e.target);}});},{threshold:0.08});
+function observeReveals(){document.querySelectorAll('.reveal:not(.visible)').forEach(el=>obs.observe(el));}
+
+/* ── LANDMARK INFO CARD ── */
+const LINFO=[
+  {img:'1.jpg',  nameEN:'Eiffel Tower',           nameES:'Torre Eiffel',           cEN:'France',           cES:'Francia',          noteEN:'Iron lattice tower in Paris, completed in 1889 for the World\'s Fair — originally meant to be dismantled after 20 years.',noteES:'Torre de hierro en París terminada en 1889 para la Exposición Universal. Iba a ser desmontada a los 20 años.'},
+  {img:'2.jpg',  nameEN:'Statue of Liberty',       nameES:'Estatua de la Libertad', cEN:'United States',    cES:'Estados Unidos',   noteEN:'Gift from France to the US in 1886. She holds a torch in one hand and a tablet with the date July 4, 1776 in the other.',noteES:'Regalo de Francia a los EE.UU. en 1886. Sostiene una antorcha y una tableta con la fecha 4 de julio de 1776.'},
+  {img:'3.jpg',  nameEN:'National Mall',           nameES:'National Mall',          cEN:'United States',    cES:'Estados Unidos',   noteEN:'A 3-km open-air park in Washington D.C. lined with monuments and Smithsonian museums between the Capitol and Lincoln Memorial.',noteES:'Parque de 3 km en Washington D.C. entre el Capitolio y el Lincoln Memorial, con museos Smithsonian.'},
+  {img:'4.jpg',  nameEN:'Sydney Opera House',      nameES:'Ópera de Sídney',        cEN:'Australia',        cES:'Australia',        noteEN:'Completed in 1973 after 16 years of construction. Its shell-shaped roof is a UNESCO World Heritage Site.',noteES:'Terminada en 1973 tras 16 años de construcción. Su techo en forma de conchas es Patrimonio UNESCO.'},
+  {img:'5.jpg',  nameEN:'Temple of Heaven',        nameES:'Templo del Cielo',       cEN:'China',            cES:'China',            noteEN:'15th-century complex in Beijing where emperors held annual ceremonies to pray for good harvests.',noteES:'Complejo del siglo XV en Pekín donde los emperadores realizaban ceremonias anuales para pedir buenas cosechas.'},
+  {img:'6.jpg',  nameEN:'Mount Fuji',              nameES:'Monte Fuji',             cEN:'Japan',            cES:'Japón',            noteEN:'Japan\'s highest peak at 3,776 m. An active stratovolcano and UNESCO site that draws 300,000+ climbers per year.',noteES:'La montaña más alta de Japón (3.776 m). Volcán activo y sitio UNESCO que atrae más de 300.000 escaladores al año.'},
+  {img:'7.jpeg', nameEN:'Taj Mahal',               nameES:'Taj Mahal',              cEN:'India',            cES:'India',            noteEN:'Ivory-white marble mausoleum built by Emperor Shah Jahan for his wife Mumtaz Mahal, who died in 1631.',noteES:'Mausoleo de mármol blanco construido por el Emperador Shah Jahan para su esposa Mumtaz Mahal.'},
+  {img:'8.jpg',  nameEN:'Kinkaku-ji (Golden Pavilion)',nameES:'Pabellón de Oro',    cEN:'Japan',            cES:'Japón',            noteEN:'Zen Buddhist temple in Kyoto. Its top two floors are covered in gold leaf. It burned down in 1950 and was rebuilt in 1955.',noteES:'Templo budista zen en Kioto. Sus dos pisos superiores están cubiertos de hoja de oro. Fue reconstruido en 1955.'},
+  {img:'9.jpg',  nameEN:'Leaning Tower of Pisa',   nameES:'Torre de Pisa',          cEN:'Italy',            cES:'Italia',           noteEN:'Built over 199 years (1173–1372). The lean started during construction due to soft ground on one side.',noteES:'Construida a lo largo de 199 años (1173–1372). La inclinación comenzó durante la construcción por el terreno blando.'},
+  {img:'10.jpg', nameEN:'London Eye',              nameES:'London Eye',             cEN:'United Kingdom',   cES:'Reino Unido',      noteEN:'135-metre Ferris wheel on the South Bank of the Thames, London. When it opened in 2000, it was the world\'s tallest.',noteES:'Noria de 135 m en la orilla sur del Támesis, Londres. Al inaugurarse en 2000, era la más alta del mundo.'},
+  {img:'11.jpg', nameEN:'Arc de Triomphe',         nameES:'Arco del Triunfo',       cEN:'France',           cES:'Francia',          noteEN:'Commissioned by Napoleon after Austerlitz (1806). The Unknown Soldier has been buried beneath it since 1921.',noteES:'Encargado por Napoleón tras Austerlitz (1806). El Soldado Desconocido está enterrado bajo él desde 1921.'},
+  {img:'12.jpg', nameEN:'Golden Temple (Harmandir Sahib)',nameES:'Templo Dorado',   cEN:'India',            cES:'India',            noteEN:'The holiest shrine in Sikhism, in Amritsar. Its upper floors are covered in 750 kg of pure gold.',noteES:'El santuario más sagrado del sijismo, en Amritsar. Sus pisos superiores están cubiertos con 750 kg de oro puro.'},
+  {img:'13.jpg', nameEN:'Niagara Falls',           nameES:'Cataratas del Niágara',  cEN:'Canada / USA',     cES:'Canadá / EE.UU.', noteEN:'Three waterfalls on the US–Canada border. About 3,160 tonnes of water flow over them every second.',noteES:'Tres cataratas en la frontera entre EE.UU. y Canadá. Unas 3.160 toneladas de agua caen por segundo.'},
+  {img:'14.jpg', nameEN:'Golden Gate Bridge',      nameES:'Puente Golden Gate',     cEN:'United States',    cES:'Estados Unidos',   noteEN:'Suspension bridge spanning 1.28 km across San Francisco Bay. Its official color is "International Orange."',noteES:'Puente colgante de 1,28 km en la bahía de San Francisco. Su color oficial es "Naranja Internacional."'},
+  {img:'15.jpg', nameEN:'Angkor Wat',              nameES:'Angkor Wat',             cEN:'Cambodia',         cES:'Camboya',          noteEN:'The largest religious monument in the world. Built in the early 12th century, first Hindu then Buddhist.',noteES:'El monumento religioso más grande del mundo. Construido en el siglo XII, primero hindú y luego budista.'},
+  {img:'16.jpg', nameEN:'Windmill at Lisse',       nameES:'Molino de Lisse',        cEN:'Netherlands',      cES:'Países Bajos',     noteEN:'About 1,000 windmills still stand in the Netherlands. They were used to drain flooded land and grind grain.',noteES:'Cerca de 1.000 molinos de viento todavía están en pie en los Países Bajos. Se usaban para drenar tierras y moler grano.'},
+  {img:'17.jpg', nameEN:'Grand Canyon',            nameES:'Gran Cañón',             cEN:'United States',    cES:'Estados Unidos',   noteEN:'Up to 1.6 km deep and 446 km long. Its rock layers record nearly 2 billion years of Earth\'s geological history.',noteES:'Hasta 1,6 km de profundidad y 446 km de largo. Sus capas de roca registran casi 2.000 millones de años de historia.'},
+  {img:'18.jpg', nameEN:'Tiananmen Square',        nameES:'Plaza de Tiananmen',     cEN:'China',            cES:'China',            noteEN:'World\'s largest public square at 440,000 m². "Tiananmen" means "Gate of Heavenly Peace" in Chinese.',noteES:'La plaza pública más grande del mundo con 440.000 m². "Tiananmen" significa "Puerta de la Paz Celestial."'},
+  {img:'19.jpg', nameEN:'Yellowstone National Park',nameES:'Yellowstone',           cEN:'United States',    cES:'Estados Unidos',   noteEN:'The world\'s first national park (1872). Home to more than half of the world\'s geysers, including Old Faithful.',noteES:'El primer parque nacional del mundo (1872). Tiene más de la mitad de los géiseres del mundo, incluido Old Faithful.'},
+  {img:'20.jpg', nameEN:'Venice',                  nameES:'Venecia',                cEN:'Italy',            cES:'Italia',           noteEN:'Built on 118 small islands linked by 400+ bridges. The city sinks about 1–2 mm per year.',noteES:'Construida sobre 118 islas conectadas por más de 400 puentes. La ciudad se hunde unos 1–2 mm por año.'},
+  {img:'21.jpg', nameEN:'Hyde Park',               nameES:'Hyde Park',              cEN:'United Kingdom',   cES:'Reino Unido',      noteEN:'One of London\'s Royal Parks, covering 142 hectares. Famous for Speakers\' Corner where anyone can give a speech.',noteES:'Uno de los Parques Reales de Londres, con 142 hectáreas. Famoso por Speakers\' Corner donde cualquiera puede hablar.'},
+  {img:'22.jpg', nameEN:'Roman Colosseum',         nameES:'Coliseo Romano',         cEN:'Italy',            cES:'Italia',           noteEN:'Built 70–80 AD, it could hold 50,000–80,000 spectators. It hosted gladiator fights for over 400 years.',noteES:'Construido en 70–80 d.C., podía albergar 50.000–80.000 espectadores. Albergó luchas de gladiadores por 400 años.'},
+  {img:'23.jpg', nameEN:'The Little Mermaid',      nameES:'La Sirenita',            cEN:'Denmark',          cES:'Dinamarca',        noteEN:'Bronze statue in Copenhagen Harbour inspired by Hans Christian Andersen\'s fairy tale. Just 1.25 m tall.',noteES:'Estatua de bronce en el puerto de Copenhague, inspirada en el cuento de Andersen. Mide solo 1,25 m de alto.'},
+  {img:'24.jpg', nameEN:'Oia, Santorini',          nameES:'Oia, Santorini',         cEN:'Greece',           cES:'Grecia',           noteEN:'Village on the volcanic island of Santorini, famous for its white-washed buildings and blue-domed churches at sunset.',noteES:'Pueblo en la isla volcánica de Santorini, famoso por sus edificios blancos e iglesias de cúpula azul al atardecer.'},
+  {img:'25.jpg', nameEN:'Pyramids of Giza',        nameES:'Pirámides de Giza',      cEN:'Egypt',            cES:'Egipto',           noteEN:'The Great Pyramid was the world\'s tallest man-made structure for 3,800 years. Built around 2560 BC.',noteES:'La Gran Pirámide fue la estructura más alta del mundo durante 3.800 años. Construida alrededor del 2560 a.C.'},
+  {img:'26.jpg', nameEN:'Brandenburg Gate',        nameES:'Puerta de Brandemburgo', cEN:'Germany',          cES:'Alemania',         noteEN:'18th-century neoclassical arch in Berlin. For 28 years it stood closed between East and West Germany.',noteES:'Arco neoclásico del siglo XVIII en Berlín. Durante 28 años estuvo cerrado entre Alemania del Este y del Oeste.'},
+  {img:'27.jpg', nameEN:'Panama Canal',            nameES:'Canal de Panamá',        cEN:'Panama',           cES:'Panamá',           noteEN:'82-km waterway connecting the Atlantic and Pacific Oceans. Opened in 1914 after 10 years of construction.',noteES:'Canal de 82 km que une el Atlántico y el Pacífico. Abierto en 1914 tras 10 años de construcción.'},
+  {img:'28.jpg', nameEN:"St. Peter's Square",      nameES:'Plaza de San Pedro',     cEN:'Vatican City',     cES:'Ciudad del Vaticano',noteEN:'Iconic colonnade designed by Bernini in the 17th century. The square can hold up to 300,000 people.',noteES:'Icónica columnata diseñada por Bernini en el siglo XVII. La plaza puede albergar hasta 300.000 personas.'},
+  {img:'29.jpg', nameEN:'Sacré-Cœur Basilica',    nameES:'Basílica del Sacré-Cœur',cEN:'France',           cES:'Francia',          noteEN:'Romano-Byzantine basilica atop Montmartre in Paris. Its white exterior actually gets whiter over time from rainwater.',noteES:'Basílica romano-bizantina en Montmartre, París. Su exterior se vuelve más blanco con el tiempo gracias a la lluvia.'},
+  {img:'30.jpg', nameEN:'Melrose Abbey',           nameES:'Abadía de Melrose',      cEN:'Scotland',         cES:'Escocia',          noteEN:'12th-century Gothic ruin in the Scottish Borders. Believed to contain the embalmed heart of Robert the Bruce.',noteES:'Ruina gótica del siglo XII en los Borders escoceses. Se cree que contiene el corazón embalsamado de Robert the Bruce.'}
+];
+
+const lbcard=document.getElementById('lbcard');
+document.querySelectorAll('.gallery-item').forEach(item=>{
+  item.addEventListener('click',()=>{
+    const src=item.dataset.src||item.querySelector('img').src;
+    const fn=src.split('/').pop();
+    const info=LINFO.find(d=>d.img===fn)||null;
+    document.getElementById('lbcard-img').src=src;
+    document.getElementById('lbcard-name').textContent=info?(lang==='en'?info.nameEN:info.nameES):'';
+    document.getElementById('lbcard-country').textContent=info?(lang==='en'?info.cEN:info.cES):'';
+    document.getElementById('lbcard-note').textContent=info?(lang==='en'?info.noteEN:info.noteES):'';
+    lbcard.classList.add('open');
+    document.body.style.overflow='hidden';
+  });
+});
+function closeLandmarkCard(){lbcard.classList.remove('open');document.body.style.overflow='';}
+document.getElementById('lbcard-close').addEventListener('click',closeLandmarkCard);
+lbcard.addEventListener('click',e=>{if(e.target===lbcard)closeLandmarkCard();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeLandmarkCard();});
+
+/* ── FLAG QUIZ ── */
+const FDATA=[
+  {f:'france',en:'France',es:'Francia'},{f:'japan',en:'Japan',es:'Japón'},{f:'brazil',en:'Brazil',es:'Brasil'},
+  {f:'germany',en:'Germany',es:'Alemania'},{f:'india',en:'India',es:'India'},{f:'italy',en:'Italy',es:'Italia'},
+  {f:'canada',en:'Canada',es:'Canadá'},{f:'australia',en:'Australia',es:'Australia'},{f:'spain',en:'Spain',es:'España'},
+  {f:'mexico',en:'Mexico',es:'México'},{f:'russia',en:'Russia',es:'Rusia'},{f:'southkorea',en:'South Korea',es:'Corea del Sur'},
+  {f:'netherlands',en:'Netherlands',es:'Países Bajos'},{f:'argentina',en:'Argentina',es:'Argentina'},{f:'china',en:'China',es:'China'},
+  {f:'unitedkingdom',en:'United Kingdom',es:'Reino Unido'},{f:'sweden',en:'Sweden',es:'Suecia'},{f:'portugal',en:'Portugal',es:'Portugal'},
+  {f:'unitedstates',en:'United States',es:'EE.UU.'},{f:'egypt',en:'Egypt',es:'Egipto'},{f:'nigeria',en:'Nigeria',es:'Nigeria'},
+  {f:'turkey',en:'Turkey',es:'Turquía'},{f:'greece',en:'Greece',es:'Grecia'},{f:'poland',en:'Poland',es:'Polonia'},
+  {f:'switzerland',en:'Switzerland',es:'Suiza'},{f:'indonesia',en:'Indonesia',es:'Indonesia'},{f:'colombia',en:'Colombia',es:'Colombia'},
+  {f:'southafrica',en:'South Africa',es:'Sudáfrica'},{f:'ukraine',en:'Ukraine',es:'Ucrania'},{f:'ghana',en:'Ghana',es:'Ghana'},
+  {f:'chile',en:'Chile',es:'Chile'},{f:'denmark',en:'Denmark',es:'Dinamarca'},{f:'finland',en:'Finland',es:'Finlandia'},
+  {f:'iceland',en:'Iceland',es:'Islandia'},{f:'ethiopia',en:'Ethiopia',es:'Etiopía'},{f:'cuba',en:'Cuba',es:'Cuba'},
+  {f:'norway',en:'Norway',es:'Noruega'},{f:'belgium',en:'Belgium',es:'Bélgica'},{f:'newzealand',en:'New Zealand',es:'Nueva Zelanda'},
+  {f:'croatia',en:'Croatia',es:'Croacia'},{f:'bolivia',en:'Bolivia',es:'Bolivia'},{f:'iran',en:'Iran',es:'Irán'},
+  {f:'nepal',en:'Nepal',es:'Nepal'},{f:'romania',en:'Romania',es:'Rumanía'},{f:'hungary',en:'Hungary',es:'Hungría'},
+  {f:'austria',en:'Austria',es:'Austria'},{f:'vietnam',en:'Vietnam',es:'Vietnam'},{f:'peru',en:'Peru',es:'Perú'},
+  {f:'kenya',en:'Kenya',es:'Kenia'},{f:'morocco',en:'Morocco',es:'Marruecos'}
+];
+
+let qPool=[],qIdx=0,qScore=0,qAnswered=false,qDotResults=[];
+const qScEl=document.getElementById('qsc');
+const qChecksEl=document.getElementById('qchecks');
+const qOpts=document.getElementById('quiz-opts');
+const qStage=document.getElementById('qstage');
+const qEnd=document.getElementById('qend');
+const qEndScore=document.getElementById('qend-score');
+const qEndLabel=document.getElementById('qend-label');
+const qEndMsg=document.getElementById('qend-msg');
+const qEndChecks=document.getElementById('qend-checks');
+const qTimer=document.getElementById('qtimer');
+
+function shuffle(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+function buildDots(){
+  const c=document.getElementById('qdots');c.innerHTML='';
+  for(let i=0;i<10;i++){const d=document.createElement('div');d.className='qdot'+(i===0?' active':'');c.appendChild(d);}
+}
+function updateDots(){
+  document.querySelectorAll('.qdot').forEach((d,i)=>{
+    d.className='qdot';
+    if(i<qIdx)d.classList.add(qDotResults[i]?'done-right':'done-wrong');
+    else if(i===qIdx)d.classList.add('active');
+  });
+}
+
+function buildTopChecks(){
+  qChecksEl.innerHTML='';
+  for(let i=0;i<10;i++){
+    const img=document.createElement('img');
+    img.className='qtop-check'+(i<qScore?' lit':'');
+    img.src='images/check1.png';img.alt='';
+    qChecksEl.appendChild(img);
+  }
+}
+
+function startTimer(){
+  qTimer.classList.remove('run');
+  qTimer.style.transition='none';
+  qTimer.style.width='100%';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    qTimer.style.transition='';
+    qTimer.classList.add('run');
+  }));
+}
+function stopTimer(){
+  qTimer.style.transition='none';
+  qTimer.classList.remove('run');
+  qTimer.style.width='100%';
+}
+
+function startQuiz(){
+  qPool=shuffle(FDATA).slice(0,10);qIdx=0;qScore=0;qAnswered=false;qDotResults=[];
+  qScEl.textContent=0;
+  qEnd.style.display='none';qStage.style.display='block';
+  buildDots();buildTopChecks();showQuestion();
+}
+
+function showQuestion(){
+  if(qIdx>=10){endQuiz();return;}
+  qAnswered=false;
+  const fbImg=document.getElementById('qfeedback-img');
+  fbImg.classList.remove('animate');fbImg.src='';
+  const q=qPool[qIdx];
+  document.getElementById('qflagid-label').textContent=lang==='en'?q.en:q.es;
+  updateDots();startTimer();
+  const wrong=shuffle(FDATA.filter(x=>x.f!==q.f)).slice(0,3);
+  const opts=shuffle([q,...wrong]);
+  qOpts.innerHTML='';
+  opts.forEach(opt=>{
+    const wrap=document.createElement('div');
+    wrap.className='qopt-suitcase';
+    wrap.dataset.flag=opt.f;
+    wrap.innerHTML=`<div class="qopt-suit-group"><div class="qopt-flag-container"><img class="qopt-flag-img" src="images/flags/${opt.f}.png" alt=""></div><img class="qopt-suit-img" src="images/luggage.png" alt=""></div>`;
+    wrap.addEventListener('click',()=>handleAnswer(wrap,opt.f===q.f,q));
+    qOpts.appendChild(wrap);
+  });
+}
+
+function handleAnswer(wrap,correct,q){
+  if(qAnswered)return;
+  qAnswered=true;stopTimer();
+  qDotResults[qIdx]=correct;
+  Array.from(qOpts.children).forEach(el=>el.classList.add('answered'));
+  if(correct){
+    qScore++;qScEl.textContent=qScore;
+    wrap.classList.add('correct');
+    buildTopChecks();
+  } else {
+    wrap.classList.add('wrong');
+    Array.from(qOpts.children).forEach(el=>{if(el.dataset.flag===q.f)el.classList.add('correct');});
+  }
+  const fbImg=document.getElementById('qfeedback-img');
+  fbImg.src=correct?'images/check.png':'images/wrong.png';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    fbImg.classList.add('animate');
+    fbImg.addEventListener('animationend',()=>{fbImg.classList.remove('animate');fbImg.src='';},{once:true});
+  }));
+  setTimeout(()=>{qIdx++;showQuestion();},1100);
+}
+
+function endQuiz(){
+  stopTimer();qStage.style.display='none';qEnd.style.display='block';
+  const pct=qScore/10;
+  const tier=pct<.4?0:pct<.6?1:pct<.8?2:pct<1?3:4;
+  const titlesEn=['Keep practicing!','Getting there!','Not bad!','Nice work!','Flag master!'];
+  const titlesEs=['¡Sigue practicando!','¡Vas mejorando!','¡Nada mal!','¡Buen trabajo!','¡Maestro de banderas!'];
+  const msgsEn=[
+    'Jump into Suitcase Shuffle in the real game and drill those patterns.',
+    'A few more sessions in Practice Tour will lock those in.',
+    'Solid base. The game will sharpen the rest — try it now.',
+    "You're ready for the full World Tour campaign.",
+    'Seriously impressive. Go challenge someone in Versus mode.'
+  ];
+  const msgsEs=[
+    'Entra a Suitcase Shuffle en el juego real y practica esos patrones.',
+    'Unas sesiones más en el Tour de Práctica van a fijarlos.',
+    'Buena base. El juego va a pulir el resto — pruébalo ahora.',
+    'Estás listo para la campaña Tour Mundial completa.',
+    'Impresionante. En serio. Reta a alguien en modo Versus.'
+  ];
+  /* end-screen check icons — one per correct answer */
+  qEndChecks.innerHTML='';
+  const checkImgs=['images/check3.png','images/check2.png','images/check1.png'];
+  const icon=pct>=1?'images/crown.png':pct>=.8?checkImgs[2]:pct>=.6?checkImgs[1]:pct>=.4?checkImgs[0]:'images/wrong.png';
+  for(let i=0;i<Math.max(qScore,1);i++){
+    const img=document.createElement('img');
+    img.src=i<qScore?'images/check1.png':'images/wrong.png';
+    img.alt='';
+    img.style.animationDelay=`${i*0.06}s`;
+    qEndChecks.appendChild(img);
+  }
+  if(qScore===10){const cr=document.createElement('img');cr.src='images/crown.png';cr.alt='';cr.style.animationDelay='0.62s';qEndChecks.appendChild(cr);}
+  qEndScore.textContent=qScore;
+  qEndLabel.textContent=lang==='en'?titlesEn[tier]:titlesEs[tier];
+  qEndMsg.textContent=lang==='en'?msgsEn[tier]:msgsEs[tier];
+}
+
+document.getElementById('qrestart').addEventListener('click',startQuiz);
+
+/* ── INIT ── */
+applyLang(lang);
+startQuiz();
+observeReveals();
+</script>
+</body>
+</html>

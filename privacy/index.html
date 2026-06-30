@@ -27,31 +27,32 @@
       padding: 14px 48px;
       background: rgba(10,30,55,.6);
       border-bottom: 1px solid rgba(255,255,255,.1);
-      position: sticky; top: 0; z-index: 100;
+      position: sticky; top: 0; z-index: 200;
       backdrop-filter: blur(10px);
     }
     .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
-    .nav-logo img { height: 54px; width: auto; filter: drop-shadow(0 2px 8px rgba(0,0,0,.4)); transition: transform .2s ease, filter .2s ease; }
-    .nav-logo:hover img { transform: scale(1.1); filter: drop-shadow(0 3px 12px rgba(0,0,0,.55)); }
-    .nav-right { display: flex; align-items: center; gap: 12px; }
+    .nav-logo img { height: 54px; width: auto; filter: drop-shadow(0 2px 8px rgba(0,0,0,.4)); transition: transform .2s; }
+    .nav-logo:hover img { transform: scale(1.1); }
+    .nav-right { display: flex; align-items: center; gap: 14px; }
+    .nav-link { color: rgba(255,255,255,.8); text-decoration: none; font-size: .88rem; font-weight: 700; transition: color .2s; }
+    .nav-link:hover { color: #f5c842; }
     .lang-btn {
       display: flex; align-items: center; gap: 5px;
-      background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2);
+      background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.22);
       color: #fff; font-family: inherit; font-size: .82rem; font-weight: 800;
       padding: 6px 13px; border-radius: 50px; cursor: pointer;
       transition: background .2s; letter-spacing: .5px;
     }
-    .lang-btn:hover { background: rgba(255,255,255,.2); }
-    .nav-back {
-      background: rgba(245,200,66,.15); color: #f5c842;
-      font-weight: 800; font-size: .9rem;
-      padding: 8px 20px; border-radius: 50px;
-      text-decoration: none;
-      border: 1px solid rgba(245,200,66,.3);
-      transition: background .2s;
+    .lang-btn:hover { background: rgba(255,255,255,.22); }
+    .nav-play {
+      background: #f5c842; color: #0f1e2d;
+      font-weight: 900; font-size: .92rem;
+      padding: 9px 22px; border-radius: 50px;
+      text-decoration: none; transition: transform .15s, background .2s;
       white-space: nowrap;
     }
-    .nav-back:hover { background: rgba(245,200,66,.25); }
+    .nav-play:hover { background: #c8920a; color: #fff; transform: scale(1.05); }
+    @media(max-width:660px){nav{padding:12px 16px}.nav-link{display:none}}
 
     /* ── CONTENT ── */
     .content {
@@ -110,8 +111,11 @@
       <img src="images/horizontallogo.png" alt="myGeoChallenge">
     </a>
     <div class="nav-right">
+      <a class="nav-link" href="how-to-play/" id="nav-howto">How to Play</a>
+      <a class="nav-link" href="learn/" id="nav-learn">Learn</a>
+      <a class="nav-link" href="about/" id="nav-about">About</a>
       <button class="lang-btn" id="lang-btn" type="button" aria-label="Change language">🌐 <span id="lang-label">ES</span></button>
-      <a class="nav-back" id="nav-back" href="/">← Back to Home</a>
+      <a class="nav-play" href="play/" id="nav-play">Play Free</a>
     </div>
   </nav>
 
@@ -229,7 +233,15 @@
   </div>
 
   <footer>
-    <p>&copy; 2026 myGeoChallenge &nbsp;·&nbsp; mygeochallenge.com &nbsp;·&nbsp; <span id="footer-rights">All rights reserved</span> &nbsp;·&nbsp; <a href="/" id="footer-back">Back to Home</a></p>
+    <div style="margin-bottom:10px;display:flex;justify-content:center;flex-wrap:wrap;gap:5px 18px">
+      <a href="/" id="footer-home">Home</a>
+      <a href="how-to-play/" id="footer-howto">How to Play</a>
+      <a href="learn/" id="footer-learn">Learn Geography</a>
+      <a href="about/" id="footer-about">About</a>
+      <a href="play/" id="footer-play">Play</a>
+      <a href="https://ko-fi.com/mygeochallenge" target="_blank" rel="noopener" id="footer-ko">☕ Support us</a>
+    </div>
+    <p>&copy; 2026 myGeoChallenge · mygeochallenge.com · <span id="footer-rights">All rights reserved</span></p>
   </footer>
 
   <script>
@@ -239,8 +251,10 @@
       title:     'Privacy Policy',
       effective: 'Effective date: June 12, 2025  ·  Last updated: June 2026',
       'nav-back': '← Back to Home',
+      'nav-howto': 'How to Play', 'nav-learn': 'Learn', 'nav-about': 'About', 'nav-play': 'Play Free',
+      'footer-home': 'Home', 'footer-howto': 'How to Play', 'footer-learn': 'Learn Geography',
+      'footer-about': 'About', 'footer-play': 'Play', 'footer-ko': '&#9749; Support us',
       'footer-rights': 'All rights reserved',
-      'footer-back':   'Back to Home',
       introBox: 'This Privacy Policy explains how <strong>myGeoChallenge</strong> ("we", "us", or "our"), operated at <a href="https://mygeochallenge.com">mygeochallenge.com</a>, collects, uses, and protects your information when you use our website and game. By using myGeoChallenge you agree to the practices described in this policy.',
       // Section headings (via data-en on the h2)
       // list items & paragraphs
@@ -299,8 +313,10 @@
       title:     'Política de Privacidad',
       effective: 'Fecha de vigencia: 12 de junio de 2025  ·  Última actualización: junio 2026',
       'nav-back': '← Volver al Inicio',
+      'nav-howto': 'Cómo Jugar', 'nav-learn': 'Aprender', 'nav-about': 'El Juego', 'nav-play': 'Jugar Gratis',
+      'footer-home': 'Inicio', 'footer-howto': 'Cómo Jugar', 'footer-learn': 'Aprender Geografía',
+      'footer-about': 'El Juego', 'footer-play': 'Jugar', 'footer-ko': '&#9749; Apóyanos',
       'footer-rights': 'Todos los derechos reservados',
-      'footer-back':   'Volver al Inicio',
       introBox: 'Esta Política de Privacidad explica cómo <strong>myGeoChallenge</strong> ("nosotros" o "nuestro"), operado en <a href="https://mygeochallenge.com">mygeochallenge.com</a>, recopila, usa y protege tu información cuando usas nuestro sitio web y juego. Al usar myGeoChallenge, aceptas las prácticas descritas en esta política.',
       p1a: 'Podemos recopilar los siguientes tipos de información según cómo utilices el juego:',
       'li1a-s': 'Información de cuenta:', 'li1a-t': 'Si creas una cuenta, recopilamos tu nombre de usuario y dirección de correo electrónico. La foto de perfil es opcional.',
@@ -357,7 +373,9 @@
 
   // ── ELEMENTS THAT HAVE PLAIN textContent ─────────────────────
   const TEXT_IDS = [
-    'pp-effective','nav-back','footer-rights','footer-back',
+    'pp-effective',
+    'nav-howto','nav-learn','nav-about','nav-play',
+    'footer-home','footer-howto','footer-learn','footer-about','footer-play','footer-ko','footer-rights',
     'p1a',
     'li1a-t','li1b-t','li1c-t','li1d-t','li1e-t',
     'li1a-s','li1b-s','li1c-s','li1d-s','li1e-s',

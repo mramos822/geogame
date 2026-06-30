@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base href="../">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How to Play myGeoChallenge — Complete Game Guide</title>
+  <meta name="description" content="Complete guide to playing myGeoChallenge. Rules for all 4 modes, scoring system, speed bonus, World Tour campaign, Versus mode, Practice Tour, and 35 rank titles explained.">
+  <link rel="canonical" href="https://mygeochallenge.com/how-to-play/">
+  <link rel="icon" type="image/png" href="images/planet3.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6238929099865050" crossorigin="anonymous"></script>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--gold:#f5c842;--gold-dark:#c8920a;--dark:#0f1e2d;--sky:#3a8acb}
+    html{scroll-behavior:smooth}
+    body{font-family:'Nunito',sans-serif;background:var(--dark);color:#cdd8e8;overflow-x:hidden}
+    @keyframes cloudFly{from{transform:translateX(0)}to{transform:translateX(calc(100vw + 600px))}}
+    @keyframes planeFly{0%{left:-280px;opacity:0}4%{opacity:1}92%{opacity:1}100%{left:calc(100% + 280px);opacity:0}}
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+    @keyframes floatB{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-9px) rotate(4deg)}}
+    @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(245,200,66,.5)}50%{box-shadow:0 0 0 18px rgba(245,200,66,0)}}
+    @keyframes glow{0%,100%{filter:drop-shadow(0 0 6px rgba(245,200,66,.3))}50%{filter:drop-shadow(0 0 22px rgba(245,200,66,.85))}}
+    @keyframes marqueeL{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+    @keyframes fadeInUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+    @keyframes pop{0%{transform:scale(0.6);opacity:0}60%{transform:scale(1.18)}100%{transform:scale(1);opacity:1}}
+
+    nav{display:flex;align-items:center;justify-content:space-between;padding:14px 48px;background:rgba(10,30,55,.6);border-bottom:1px solid rgba(255,255,255,.1);position:sticky;top:0;z-index:200;backdrop-filter:blur(10px)}
+    .nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+    .nav-logo img{height:54px;filter:drop-shadow(0 2px 8px rgba(0,0,0,.4));transition:transform .2s}
+    .nav-logo:hover img{transform:scale(1.1)}
+    .nav-right{display:flex;align-items:center;gap:14px}
+    .nav-link{color:rgba(255,255,255,.8);text-decoration:none;font-size:.88rem;font-weight:700;transition:color .2s}
+    .nav-link:hover,.nav-link.active{color:var(--gold)}
+    .lang-btn{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);color:#fff;font-family:inherit;font-size:.82rem;font-weight:800;padding:6px 13px;border-radius:50px;cursor:pointer;transition:background .2s;letter-spacing:.5px}
+    .lang-btn:hover{background:rgba(255,255,255,.22)}
+    .nav-play{background:var(--gold);color:var(--dark);font-weight:900;font-size:.92rem;padding:9px 22px;border-radius:50px;text-decoration:none;transition:transform .15s,background .2s}
+    .nav-play:hover{background:var(--gold-dark);color:#fff;transform:scale(1.05)}
+
+    .hero{position:relative;min-height:100vh;display:flex;align-items:center;overflow:hidden;background:#0f1e2d url('images/background.png') center/cover no-repeat}
+    .hero::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(10,25,50,.94) 0%,rgba(20,55,100,.78) 60%,rgba(40,80,140,.52) 100%);z-index:1}
+    .hcloud{position:absolute;pointer-events:none;z-index:2}
+    .hcloud-1{top:10%;left:-380px;width:clamp(180px,24vw,320px);animation:cloudFly 48s linear infinite;opacity:.6}
+    .hcloud-2{top:30%;left:-260px;width:clamp(140px,17vw,240px);animation:cloudFly 68s linear infinite -20s;opacity:.42}
+    .hcloud-3{top:55%;left:-300px;width:clamp(110px,14vw,190px);animation:cloudFly 85s linear infinite -38s;opacity:.3}
+    .hero-plane{position:absolute;bottom:18%;width:clamp(150px,17vw,240px);z-index:3;animation:planeFly 20s linear infinite -4s;pointer-events:none;filter:drop-shadow(0 6px 18px rgba(0,0,0,.35))}
+    .hero-inner{position:relative;z-index:10;display:flex;align-items:center;width:100%;max-width:1200px;margin:0 auto;padding:100px 48px 80px;gap:40px}
+    .hero-left{flex:1}
+    .hero-eyebrow{display:inline-block;font-size:.73rem;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:var(--gold);background:rgba(245,200,66,.1);border:1px solid rgba(245,200,66,.3);padding:5px 16px;border-radius:50px;margin-bottom:16px}
+    .hero-title{font-size:clamp(2.2rem,5vw,3.8rem);font-weight:900;color:#fff;text-shadow:0 3px 20px rgba(0,0,0,.6);line-height:1.1;margin-bottom:18px}
+    .hero-title span{color:var(--gold)}
+    .hero-desc{font-size:clamp(.95rem,1.8vw,1.08rem);color:rgba(255,255,255,.78);line-height:1.75;margin-bottom:32px;font-weight:600;max-width:540px}
+    .btn-gold{display:inline-block;background:var(--gold);color:var(--dark);font-size:1.05rem;font-weight:900;padding:14px 38px;border-radius:60px;text-decoration:none;animation:pulse 2.4s ease-in-out infinite;transition:transform .15s,background .2s}
+    .btn-gold:hover{transform:scale(1.07);background:var(--gold-dark);color:#fff;animation:none}
+    .hero-right{position:relative;flex-shrink:0;width:clamp(220px,26vw,360px);display:flex;flex-direction:column;align-items:center;gap:16px;animation:fadeInUp .8s ease .3s both}
+    .hero-char-wrap{position:relative}
+    .hero-char-glow{position:absolute;bottom:-10px;left:50%;transform:translateX(-50%);width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(245,200,66,.25) 0%,transparent 70%);pointer-events:none}
+    #char-anim{position:relative;z-index:2;width:100%;max-width:280px;filter:drop-shadow(0 10px 30px rgba(0,0,0,.6));animation:float 5s ease-in-out infinite}
+    .countdown-row{display:flex;gap:10px;justify-content:center}
+    .countdown-row img{width:clamp(50px,6vw,72px);animation:float 4s ease-in-out infinite;filter:drop-shadow(0 4px 12px rgba(0,0,0,.5))}
+    .countdown-row img:nth-child(1){animation-delay:0s}.countdown-row img:nth-child(2){animation-delay:.3s}.countdown-row img:nth-child(3){animation-delay:.6s}
+
+    .ticker-wrap{background:var(--dark);overflow:hidden;padding:12px 0;border-top:2px solid rgba(245,200,66,.18);border-bottom:2px solid rgba(245,200,66,.18)}
+    .ticker-inner{display:flex;width:max-content;animation:ticker 40s linear infinite}
+    .ticker-item{white-space:nowrap;padding:0 28px;font-size:.86rem;font-weight:800;color:rgba(255,255,255,.65);display:flex;align-items:center;gap:10px}
+    .ticker-item .dot{color:var(--gold)}
+
+    .toc-section{background:linear-gradient(135deg,#0d1d30 0%,#162a40 100%);padding:48px 24px}
+    .toc-inner{max-width:900px;margin:0 auto}
+    .toc-inner h2{font-size:1rem;font-weight:900;color:var(--gold);margin-bottom:18px;text-transform:uppercase;letter-spacing:1.5px}
+    .toc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    @media(max-width:600px){.toc-grid{grid-template-columns:repeat(2,1fr)}}
+    .toc-link{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:12px 14px;text-decoration:none;transition:background .2s,border-color .2s,transform .15s}
+    .toc-link:hover{background:rgba(245,200,66,.1);border-color:rgba(245,200,66,.3);transform:translateY(-2px)}
+    .toc-link img{width:36px;height:36px;object-fit:contain;flex-shrink:0}
+    .toc-link span{font-size:.88rem;font-weight:800;color:#fff}
+
+    section.content-section{padding:80px 24px}
+    .section-inner{max-width:1060px;margin:0 auto}
+    .eyebrow{display:inline-block;font-size:.73rem;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:var(--gold);background:rgba(245,200,66,.1);border:1px solid rgba(245,200,66,.25);padding:5px 16px;border-radius:50px;margin-bottom:13px}
+    .eyebrow:empty{display:none}
+    .section-title{font-size:clamp(1.65rem,4vw,2.4rem);font-weight:900;color:#fff;line-height:1.2;margin-bottom:12px}
+    .section-title span{color:var(--gold)}
+    .section-head{text-align:center;margin-bottom:48px}
+    .section-sub{font-size:.98rem;font-weight:600;color:rgba(255,255,255,.58);max-width:520px;margin:0 auto;line-height:1.65}
+    p.body-text{font-size:.97rem;font-weight:600;color:rgba(255,255,255,.68);line-height:1.85;margin-bottom:14px}
+    p.body-text strong{color:#fff}
+    ul.body-list{margin:10px 0 18px 22px}
+    ul.body-list li{font-size:.97rem;font-weight:600;color:rgba(255,255,255,.68);margin-bottom:8px;line-height:1.7}
+    ul.body-list li strong{color:#fff}
+    h3.sub-head{font-size:1.08rem;font-weight:900;color:var(--gold);margin:28px 0 10px}
+
+    .modes-section{background:linear-gradient(180deg,rgba(0,0,0,.15) 0%,rgba(0,0,0,.25) 100%)}
+    .mode-detail{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-bottom:28px}
+    @media(max-width:760px){.mode-detail{grid-template-columns:1fr}}
+    .mode-video-card{position:relative;border-radius:22px;overflow:hidden;min-height:300px;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+    .mode-video-card video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+    .mode-video-card .overlay{position:absolute;inset:0;background:linear-gradient(0deg,rgba(0,8,20,.92) 0%,rgba(0,8,20,.35) 60%,transparent 100%)}
+    .mode-video-card .card-icon{position:absolute;top:16px;right:16px;width:62px;height:62px;animation:float 5s ease-in-out infinite;filter:drop-shadow(0 4px 14px rgba(0,0,0,.6));z-index:2;border-radius:50%}
+    .mode-video-card .card-body{position:absolute;bottom:0;left:0;right:0;padding:22px 20px;z-index:2}
+    .mode-video-card .card-num{font-size:.65rem;font-weight:900;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:4px}
+    .mode-video-card .card-name{font-size:1.5rem;font-weight:900;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.5);margin-bottom:6px}
+    .mode-video-card .card-tag{display:inline-block;background:rgba(245,200,66,.18);color:var(--gold);border:1px solid rgba(245,200,66,.35);font-size:.68rem;font-weight:900;letter-spacing:1px;text-transform:uppercase;padding:3px 11px;border-radius:50px}
+    .mode-text-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:22px;padding:28px 24px}
+    .mode-text-card h3{font-size:1.15rem;font-weight:900;color:#fff;margin-bottom:12px}
+
+
+    .versus-section{background:var(--dark)}
+    .versus-grid{display:grid;grid-template-columns:1fr 280px;gap:48px;align-items:center}
+    @media(max-width:780px){.versus-grid{grid-template-columns:1fr}}
+    .versus-visual{text-align:center}
+    .sword-img{width:clamp(100px,14vw,180px);animation:float 4s ease-in-out infinite,glow 3s ease-in-out infinite;filter:drop-shadow(0 6px 20px rgba(245,200,66,.4))}
+    .emotes-row{display:flex;gap:12px;justify-content:center;margin-top:22px;flex-wrap:wrap}
+    .emote-img{width:clamp(48px,6vw,68px);height:clamp(48px,6vw,68px);object-fit:contain;transition:transform .2s;animation:float 5s ease-in-out infinite;filter:drop-shadow(0 3px 10px rgba(0,0,0,.5))}
+    .emote-img:nth-child(1){animation-delay:0s}.emote-img:nth-child(2){animation-delay:.4s}.emote-img:nth-child(3){animation-delay:.8s}.emote-img:nth-child(4){animation-delay:1.2s}.emote-img:nth-child(5){animation-delay:1.6s}
+    .emote-img:hover{transform:scale(1.3) rotate(-5deg)}
+
+    .practice-section{background:linear-gradient(135deg,#162a40 0%,#0d1d30 100%)}
+    .practice-grid{display:grid;grid-template-columns:280px 1fr;gap:48px;align-items:center}
+    @media(max-width:780px){.practice-grid{grid-template-columns:1fr}.practice-visual{display:none}}
+    .practice-visual{text-align:center}
+    .practice-btn-img{width:clamp(140px,18vw,220px);animation:float 5s ease-in-out infinite;filter:drop-shadow(0 8px 24px rgba(0,0,0,.5))}
+
+    .ranks-section{background:var(--dark);overflow:hidden}
+    .rank-row-outer{overflow:hidden;margin:8px -24px}
+    .rank-row{display:flex;width:max-content;gap:12px}
+    .rank-row.fwd{animation:marqueeL 36s linear infinite}
+    .rk{width:90px;height:90px;object-fit:contain;border-radius:10px;background:rgba(255,255,255,.05);padding:5px;flex-shrink:0;transition:transform .2s;filter:drop-shadow(0 2px 8px rgba(0,0,0,.4))}
+    .rk:hover{transform:scale(1.2);filter:drop-shadow(0 4px 16px rgba(245,200,66,.35))}
+
+    /* ACCORDION TIPS */
+    .tips-section{background:linear-gradient(180deg,rgba(0,0,0,.12) 0%,rgba(0,0,0,.2) 100%)}
+    .accordion{display:flex;flex-direction:column;gap:10px;margin-top:28px}
+    .acc-item{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:16px;overflow:hidden;transition:border-color .2s}
+    .acc-item.open{border-color:rgba(245,200,66,.3)}
+    .acc-header{display:flex;align-items:center;gap:14px;padding:18px 20px;cursor:pointer;user-select:none}
+    .acc-header img{width:40px;height:40px;object-fit:contain;flex-shrink:0;filter:drop-shadow(0 2px 8px rgba(0,0,0,.4))}
+    .acc-header h4{font-size:1rem;font-weight:900;color:#fff;flex:1}
+    .acc-chevron{color:rgba(255,255,255,.4);font-size:1.1rem;transition:transform .3s;flex-shrink:0}
+    .acc-item.open .acc-chevron{transform:rotate(180deg);color:var(--gold)}
+    .acc-body{max-height:0;overflow:hidden;transition:max-height .4s ease,padding .3s}
+    .acc-item.open .acc-body{max-height:400px;padding:0 20px 20px}
+    .acc-body ul{margin-left:18px}
+    .acc-body li{font-size:.9rem;font-weight:600;color:rgba(255,255,255,.68);margin-bottom:8px;line-height:1.65}
+    .acc-body li strong{color:#fff}
+    .strategy-note{background:rgba(245,200,66,.07);border:1px solid rgba(245,200,66,.2);border-radius:14px;padding:22px 26px;margin-top:28px}
+    .strategy-note p{font-size:.97rem;font-weight:600;color:rgba(255,255,255,.82);line-height:1.75;margin:0}
+
+    .cta-section{position:relative;padding:100px 24px;text-align:center;background:linear-gradient(180deg,#1e5a9a 0%,var(--sky) 55%,#5bb8ee 100%);overflow:hidden}
+    .cta-cloud-1{position:absolute;top:10%;left:-280px;width:28%;animation:cloudFly 55s linear infinite;opacity:.26;pointer-events:none}
+    .cta-cloud-2{position:absolute;top:55%;left:-200px;width:20%;animation:cloudFly 74s linear infinite -22s;opacity:.18;pointer-events:none}
+    .cta-plane{position:absolute;bottom:22%;width:clamp(130px,15vw,200px);filter:drop-shadow(0 4px 14px rgba(0,0,0,.28));animation:planeFly 28s linear infinite -10s;pointer-events:none}
+    .cta-inner{position:relative;z-index:2}
+    .cta-section h2{font-size:clamp(1.65rem,4vw,2.7rem);font-weight:900;color:#fff;text-shadow:0 3px 16px rgba(0,0,0,.4);margin-bottom:15px}
+    .cta-section p{font-size:clamp(.93rem,2vw,1.1rem);font-weight:600;color:rgba(255,255,255,.8);margin-bottom:32px;max-width:500px;margin-left:auto;margin-right:auto;line-height:1.65}
+
+    footer{background:var(--dark);color:rgba(255,255,255,.42);padding:28px 24px;text-align:center;font-size:.84rem;font-weight:600;border-top:1px solid rgba(255,255,255,.06)}
+    .footer-links{margin-bottom:10px;display:flex;justify-content:center;flex-wrap:wrap;gap:5px 18px}
+    footer a{color:var(--gold);text-decoration:none}
+
+    .reveal{opacity:0;transform:translateY(26px);transition:opacity .65s ease,transform .65s ease}
+    .reveal.visible{opacity:1;transform:translateY(0)}
+    @media(max-width:660px){nav{padding:12px 16px}.nav-link{display:none}.hero-inner{flex-direction:column;padding:80px 20px 60px}.hero-right{width:200px}}
+  </style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-logo" href="/"><img src="images/horizontallogo.png" alt="myGeoChallenge"></a>
+  <div class="nav-right">
+    <a class="nav-link active" href="how-to-play/" data-i18n="nav.howto">How to Play</a>
+    <a class="nav-link" href="learn/" data-i18n="nav.learn">Learn</a>
+    <a class="nav-link" href="about/" data-i18n="nav.about">About</a>
+    <button class="lang-btn" id="lang-btn" type="button">🌐 <span id="lang-label">ES</span></button>
+    <a class="nav-play" href="play/" data-i18n="nav.play">Play Free</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <img class="hcloud hcloud-1" src="images/bg/cloud1.png" alt=""><img class="hcloud hcloud-2" src="images/bg/cloud2.png" alt=""><img class="hcloud hcloud-3" src="images/bg/cloud3.png" alt="">
+  <img class="hero-plane" src="images/plane.png" alt="">
+  <div class="hero-inner">
+    <div class="hero-left">
+      <div class="hero-eyebrow" data-i18n="hero.eyebrow">📖 Complete Game Guide</div>
+      <h1 class="hero-title" data-i18n="hero.title">You could jump in blind.<br>Or read this <span>first</span>.</h1>
+      <p class="hero-desc" data-i18n="hero.desc">The players who actually understand the speed bonus, the answer elimination, and when to use Practice mode score way higher. This is everything — rules, scoring secrets, mode strategies, all of it.</p>
+      <a class="btn-gold" href="play/" data-i18n="hero.btn">Start Playing — It's Free</a>
+    </div>
+    <div class="hero-right">
+      <div class="hero-char-wrap">
+        <div class="hero-char-glow"></div>
+        <img id="char-anim" src="images/characters/flightattpost/1.png" alt="Guide character">
+      </div>
+      <div class="countdown-row">
+        <img src="images/countdown/3.png" alt="3"><img src="images/countdown/2.png" alt="2"><img src="images/countdown/1.png" alt="1">
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="ticker-wrap" aria-hidden="true">
+  <div class="ticker-inner">
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.m">4 Game Modes</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.c">195 Countries</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.r">35 Rank Titles</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.s">Speed Bonus System</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.v">Real-Time Versus</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.t">World Tour Campaign</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.p">Practice Tour</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.l">Global Leaderboards</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.m">4 Game Modes</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.c">195 Countries</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.r">35 Rank Titles</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.s">Speed Bonus System</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.v">Real-Time Versus</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.t">World Tour Campaign</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.p">Practice Tour</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.l">Global Leaderboards</span></span>
+  </div>
+</div>
+
+<div class="toc-section">
+  <div class="toc-inner">
+    <h2 data-i18n="toc.head">Jump To</h2>
+    <div class="toc-grid">
+      <a class="toc-link" href="#modes"><img src="images/game1.png" alt=""><span data-i18n="toc.m">The 4 Modes</span></a>
+<a class="toc-link" href="#campaign"><img src="images/planet3.png" alt=""><span data-i18n="toc.t">World Tour</span></a>
+      <a class="toc-link" href="#versus"><img src="images/sword.png" alt=""><span data-i18n="toc.v">Versus</span></a>
+      <a class="toc-link" href="#practice"><img src="images/practice.png" alt=""><span data-i18n="toc.p">Practice Tour</span></a>
+      <a class="toc-link" href="#tips"><img src="images/crown.png" alt=""><span data-i18n="toc.tp">Pro Tips</span></a>
+    </div>
+  </div>
+</div>
+
+<!-- MODES -->
+<section class="content-section modes-section" id="modes">
+  <div class="section-inner">
+    <div class="section-head reveal">
+      <div class="eyebrow" data-i18n="modes.eyebrow">Game Modes</div>
+      <h2 class="section-title" data-i18n="modes.title">4 Modes. <span>All Different. All Hard.</span></h2>
+      <p class="section-sub" data-i18n="modes.sub">Each mode hits a completely different skill set. Flags are pattern recognition. Shapes are spatial memory. Cities are speed and confidence. Landmarks are cultural knowledge. You'll be good at one right away and bad at the others. That's normal.</p>
+    </div>
+
+    <div class="mode-detail reveal">
+      <div class="mode-video-card">
+        <video muted loop autoplay playsinline><source src="images/howtoplay/howtoplay1.mp4" type="video/mp4"></video>
+        <div class="overlay"></div>
+        <img class="card-icon" src="images/game1.png" alt="Suitcase Shuffle">
+        <div class="card-body">
+          <div class="card-num" data-i18n="m1.num">Mode 01</div>
+          <div class="card-name" data-i18n="m1.name">Suitcase Shuffle</div>
+          <span class="card-tag" data-i18n="m1.tag">Flags &amp; Countries</span>
+        </div>
+      </div>
+      <div class="mode-text-card">
+        <h3 data-i18n="hw">How it works</h3>
+        <p class="body-text" data-i18n="m1.p1">Suitcases roll down an airport carousel, each belonging to a different country. Your job is to match the correct flag to each bag before the <strong>8-second clock</strong> runs out.</p>
+        <p class="body-text" data-i18n="m1.p2">Six answer options are shown at first. Wrong options fade out progressively to help you narrow it down — 6 choices → 4 → 2. Clicking a faded option does nothing.</p>
+        <p class="body-text" data-i18n="m1.p3">A correct answer scores points. A wrong answer or timeout scores zero. The speed bonus multiplier builds with consecutive correct answers — miss one and it resets.</p>
+      </div>
+    </div>
+
+    <div class="mode-detail reveal" style="transition-delay:.05s">
+      <div class="mode-video-card">
+        <video muted loop autoplay playsinline><source src="images/howtoplay/howtoplay2.mp4" type="video/mp4"></video>
+        <div class="overlay"></div>
+        <img class="card-icon" src="images/game2.png" alt="Map Mayhem">
+        <div class="card-body">
+          <div class="card-num" data-i18n="m2.num">Mode 02</div>
+          <div class="card-name" data-i18n="m2.name">Map Mayhem</div>
+          <span class="card-tag" data-i18n="m2.tag">Country Shapes</span>
+        </div>
+      </div>
+      <div class="mode-text-card">
+        <h3 data-i18n="hw">How it works</h3>
+        <p class="body-text" data-i18n="m2.p1">A country's silhouette appears on screen and you must identify it from <strong>four options</strong>. No labels, no map context — just the shape.</p>
+        <p class="body-text" data-i18n="m2.p2">Shapes range from instantly recognizable (Italy's boot, Japan's islands) to surprisingly tricky (neighboring African nations, small Central European countries).</p>
+        <p class="body-text" data-i18n="m2.p3">This mode draws from all six inhabited continents. African and Southeast Asian country shapes tend to be the hardest — a good reason to drill those regions in Practice Tour first.</p>
+      </div>
+    </div>
+
+    <div class="mode-detail reveal" style="transition-delay:.1s">
+      <div class="mode-video-card">
+        <video muted loop autoplay playsinline><source src="images/howtoplay/howtoplay3.mp4" type="video/mp4"></video>
+        <div class="overlay"></div>
+        <img class="card-icon" src="images/game3.png" alt="City Blitz">
+        <div class="card-body">
+          <div class="card-num" data-i18n="m3.num">Mode 03</div>
+          <div class="card-name" data-i18n="m3.name">City Blitz</div>
+          <span class="card-tag" data-i18n="m3.tag">World Cities</span>
+        </div>
+      </div>
+      <div class="mode-text-card">
+        <h3 data-i18n="hw">How it works</h3>
+        <p class="body-text" data-i18n="m3.p1">A city name appears at the top. An interactive world map fills the screen. Click the country where that city is located. <strong>Speed matters</strong> — the faster you click, the bigger your bonus.</p>
+        <p class="body-text" data-i18n="m3.p2">Cities are drawn from three difficulty tiers that unlock progressively. Get 5 right → Medium cities unlock. Get 15 right → Hard cities unlock (Ashgabat, Paramaribo, Dili…).</p>
+        <p class="body-text" data-i18n="m3.p3">You don't need to click the exact city dot — clicking anywhere in the correct country region is usually enough to score the point.</p>
+      </div>
+    </div>
+
+    <div class="mode-detail reveal" style="transition-delay:.15s">
+      <div class="mode-video-card">
+        <video muted loop autoplay playsinline><source src="images/howtoplay/howtoplay4.mp4" type="video/mp4"></video>
+        <div class="overlay"></div>
+        <img class="card-icon" src="images/game4.png" alt="Landmark Loco">
+        <div class="card-body">
+          <div class="card-num" data-i18n="m4.num">Mode 04</div>
+          <div class="card-name" data-i18n="m4.name">Landmark Loco</div>
+          <span class="card-tag" data-i18n="m4.tag">World Landmarks</span>
+        </div>
+      </div>
+      <div class="mode-text-card">
+        <h3 data-i18n="hw">How it works</h3>
+        <p class="body-text" data-i18n="m4.p1">A landmark photo appears on screen. You select the correct answer from four options — each option shows a <strong>"Landmark, Country"</strong> pair. The combined pair is the answer unit.</p>
+        <p class="body-text" data-i18n="m4.p2">Landmarks include UNESCO World Heritage Sites, architectural icons, natural wonders, and cultural monuments from every continent — from the Eiffel Tower to Angkor Wat.</p>
+        <p class="body-text" data-i18n="m4.p3">Architectural style is often the biggest clue. Islamic geometric patterns → Middle East or North Africa. Tiered stone temples → Southeast Asia. Classical columns → Mediterranean.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WORLD TOUR -->
+<section class="content-section" id="campaign" style="background:var(--dark)">
+  <div class="section-inner">
+    <div class="section-head reveal">
+      <div class="eyebrow" data-i18n="tour.eyebrow">Campaign</div>
+      <h2 class="section-title" data-i18n="tour.title">World Tour — <span>The Real Test</span></h2>
+      <p class="section-sub" data-i18n="tour.sub">All 4 modes back-to-back, one combined score, one rank title at the end. This is what the leaderboard is based on. You can't just be good at flags — all four count.</p>
+    </div>
+    <div style="display:flex;gap:16px;justify-content:center;align-items:center;flex-wrap:wrap;margin:32px 0" class="reveal">
+      <img src="images/game1.png" alt="Mode 1" style="width:72px;height:72px;object-fit:contain;animation:float 5s ease-in-out infinite 0s;filter:drop-shadow(0 4px 14px rgba(0,0,0,.5))">
+      <span style="color:var(--gold);font-size:1.5rem;font-weight:900">→</span>
+      <img src="images/game2.png" alt="Mode 2" style="width:72px;height:72px;object-fit:contain;animation:float 5s ease-in-out infinite .4s;filter:drop-shadow(0 4px 14px rgba(0,0,0,.5))">
+      <span style="color:var(--gold);font-size:1.5rem;font-weight:900">→</span>
+      <img src="images/game3.png" alt="Mode 3" style="width:72px;height:72px;object-fit:contain;animation:float 5s ease-in-out infinite .8s;filter:drop-shadow(0 4px 14px rgba(0,0,0,.5))">
+      <span style="color:var(--gold);font-size:1.5rem;font-weight:900">→</span>
+      <img src="images/game4.png" alt="Mode 4" style="width:72px;height:72px;object-fit:contain;animation:float 5s ease-in-out infinite 1.2s;filter:drop-shadow(0 4px 14px rgba(0,0,0,.5))">
+      <span style="color:var(--gold);font-size:1.5rem;font-weight:900">→</span>
+      <img src="images/crown.png" alt="Rank" style="width:72px;height:72px;object-fit:contain;animation:glow 3s ease-in-out infinite,float 5s ease-in-out infinite 1.6s;filter:drop-shadow(0 4px 14px rgba(245,200,66,.4))">
+    </div>
+    <p class="body-text reveal" data-i18n="tour.p1">Your score accumulates across all four modes. At the end, you receive a <strong>final World Tour score</strong> and a rank title based on total performance — this rank appears on the global World Tour leaderboard.</p>
+    <p class="body-text reveal" data-i18n="tour.p2">Topping the World Tour leaderboard requires consistent performance across all four modes. You can't coast on one favorite — all four count equally.</p>
+  </div>
+</section>
+
+<!-- VERSUS -->
+<section class="content-section versus-section" id="versus">
+  <div class="section-inner">
+    <div class="section-head reveal">
+      <div class="eyebrow" data-i18n="vs.eyebrow">Multiplayer</div>
+      <h2 class="section-title" data-i18n="vs.title">Versus — <span>Real-Time PvP</span></h2>
+    </div>
+    <div class="versus-grid">
+      <div>
+        <p class="body-text reveal" data-i18n="vs.p1">Versus mode lets you battle friends in real time. Both players see the <strong>same questions in the same order</strong> (seeded for fairness) and answer simultaneously. Live scores show on screen the whole time.</p>
+        <p class="body-text reveal" data-i18n="vs.p2">To start a Versus match, you need a free account. Invite a friend directly from the social panel in the loading screen. Send emotes during the match — they only trigger on your opponent's wrong answers, so no spam during streaks.</p>
+        <ul class="body-list reveal">
+          <li data-i18n="vs.li1">Same questions for both players — no unfair advantages</li>
+          <li data-i18n="vs.li2">Live score comparison on screen at all times</li>
+          <li data-i18n="vs.li3">Win/Loss tracked in your profile history</li>
+          <li data-i18n="vs.li4">Emotes: 5 reaction options available mid-match</li>
+        </ul>
+      </div>
+      <div class="versus-visual reveal">
+        <img class="sword-img" src="images/sword.png" alt="Versus">
+        <div class="emotes-row">
+          <img class="emote-img" src="images/emotes/1.png" alt="Emote 1"><img class="emote-img" src="images/emotes/2.png" alt="Emote 2"><img class="emote-img" src="images/emotes/3.png" alt="Emote 3"><img class="emote-img" src="images/emotes/4.png" alt="Emote 4"><img class="emote-img" src="images/emotes/5.png" alt="Emote 5">
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRACTICE -->
+<section class="content-section practice-section" id="practice">
+  <div class="section-inner">
+    <div class="section-head reveal">
+      <div class="eyebrow" data-i18n="prac.eyebrow">Study Mode</div>
+      <h2 class="section-title" data-i18n="prac.title">Practice Tour — <span>No Pressure</span></h2>
+    </div>
+    <div class="practice-grid">
+      <div class="practice-visual reveal">
+        <img class="practice-btn-img" src="images/practice.png" alt="Practice Tour">
+      </div>
+      <div>
+        <p class="body-text reveal" data-i18n="prac.p1">Practice Tour removes the game-over timer. You answer at your own pace and focus on whatever area you want to improve. It's the best way to prepare before a competitive run.</p>
+        <p class="body-text reveal" data-i18n="prac.p2">Filter by <strong>continent</strong>, <strong>difficulty</strong>, or <strong>mode</strong> — then drill exactly the questions that will help you most. Practice Tour scores don't count toward global leaderboards.</p>
+        <ul class="body-list reveal">
+          <li data-i18n="prac.li1"><strong>Continents:</strong> Africa · Asia · Europe · Americas · Oceania</li>
+          <li data-i18n="prac.li2"><strong>Difficulties:</strong> Easy · Medium · Hard</li>
+          <li data-i18n="prac.li3"><strong>Any of the 4 modes</strong> available in Practice</li>
+          <li data-i18n="prac.li4">No time limit — answer when you're ready</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- RANKS -->
+<section class="content-section ranks-section" id="ranks">
+  <div class="section-inner">
+    <div class="section-head reveal">
+      <div class="eyebrow" data-i18n="ranks.eyebrow">Progression</div>
+      <h2 class="section-title" data-i18n="ranks.title">35 Ranks. Climb <span>Them All</span>.</h2>
+      <p class="section-sub" data-i18n="ranks.sub">Your combined high score across all modes determines your rank. Every session you play pushes you further up the ladder.</p>
+    </div>
+  </div>
+  <div class="rank-row-outer">
+    <div class="rank-row fwd">
+      <img class="rk" src="images/ranks/1.png" alt="Rank 1"><img class="rk" src="images/ranks/2.png" alt="Rank 2"><img class="rk" src="images/ranks/3.png" alt="Rank 3"><img class="rk" src="images/ranks/4.png" alt="Rank 4"><img class="rk" src="images/ranks/5.png" alt="Rank 5"><img class="rk" src="images/ranks/6.png" alt="Rank 6"><img class="rk" src="images/ranks/7.png" alt="Rank 7"><img class="rk" src="images/ranks/8.png" alt="Rank 8"><img class="rk" src="images/ranks/9.png" alt="Rank 9"><img class="rk" src="images/ranks/10.png" alt="Rank 10"><img class="rk" src="images/ranks/11.png" alt="Rank 11"><img class="rk" src="images/ranks/12.png" alt="Rank 12"><img class="rk" src="images/ranks/13.png" alt="Rank 13"><img class="rk" src="images/ranks/14.png" alt="Rank 14"><img class="rk" src="images/ranks/15.png" alt="Rank 15"><img class="rk" src="images/ranks/16.png" alt="Rank 16"><img class="rk" src="images/ranks/17.png" alt="Rank 17"><img class="rk" src="images/ranks/18.png" alt="Rank 18"><img class="rk" src="images/ranks/19.png" alt="Rank 19"><img class="rk" src="images/ranks/20.png" alt="Rank 20"><img class="rk" src="images/ranks/21.png" alt="Rank 21"><img class="rk" src="images/ranks/22.png" alt="Rank 22"><img class="rk" src="images/ranks/23.png" alt="Rank 23"><img class="rk" src="images/ranks/24.png" alt="Rank 24"><img class="rk" src="images/ranks/25.png" alt="Rank 25"><img class="rk" src="images/ranks/26.png" alt="Rank 26"><img class="rk" src="images/ranks/27.png" alt="Rank 27"><img class="rk" src="images/ranks/28.png" alt="Rank 28"><img class="rk" src="images/ranks/29.png" alt="Rank 29"><img class="rk" src="images/ranks/30.png" alt="Rank 30"><img class="rk" src="images/ranks/31.png" alt="Rank 31"><img class="rk" src="images/ranks/32.png" alt="Rank 32"><img class="rk" src="images/ranks/33.png" alt="Rank 33"><img class="rk" src="images/ranks/34.png" alt="Rank 34"><img class="rk" src="images/ranks/35.png" alt="Rank 35">
+      <img class="rk" src="images/ranks/1.png" alt="Rank 1"><img class="rk" src="images/ranks/2.png" alt="Rank 2"><img class="rk" src="images/ranks/3.png" alt="Rank 3"><img class="rk" src="images/ranks/4.png" alt="Rank 4"><img class="rk" src="images/ranks/5.png" alt="Rank 5"><img class="rk" src="images/ranks/6.png" alt="Rank 6"><img class="rk" src="images/ranks/7.png" alt="Rank 7"><img class="rk" src="images/ranks/8.png" alt="Rank 8"><img class="rk" src="images/ranks/9.png" alt="Rank 9"><img class="rk" src="images/ranks/10.png" alt="Rank 10"><img class="rk" src="images/ranks/11.png" alt="Rank 11"><img class="rk" src="images/ranks/12.png" alt="Rank 12"><img class="rk" src="images/ranks/13.png" alt="Rank 13"><img class="rk" src="images/ranks/14.png" alt="Rank 14"><img class="rk" src="images/ranks/15.png" alt="Rank 15"><img class="rk" src="images/ranks/16.png" alt="Rank 16"><img class="rk" src="images/ranks/17.png" alt="Rank 17"><img class="rk" src="images/ranks/18.png" alt="Rank 18"><img class="rk" src="images/ranks/19.png" alt="Rank 19"><img class="rk" src="images/ranks/20.png" alt="Rank 20"><img class="rk" src="images/ranks/21.png" alt="Rank 21"><img class="rk" src="images/ranks/22.png" alt="Rank 22"><img class="rk" src="images/ranks/23.png" alt="Rank 23"><img class="rk" src="images/ranks/24.png" alt="Rank 24"><img class="rk" src="images/ranks/25.png" alt="Rank 25"><img class="rk" src="images/ranks/26.png" alt="Rank 26"><img class="rk" src="images/ranks/27.png" alt="Rank 27"><img class="rk" src="images/ranks/28.png" alt="Rank 28"><img class="rk" src="images/ranks/29.png" alt="Rank 29"><img class="rk" src="images/ranks/30.png" alt="Rank 30"><img class="rk" src="images/ranks/31.png" alt="Rank 31"><img class="rk" src="images/ranks/32.png" alt="Rank 32"><img class="rk" src="images/ranks/33.png" alt="Rank 33"><img class="rk" src="images/ranks/34.png" alt="Rank 34"><img class="rk" src="images/ranks/35.png" alt="Rank 35">
+    </div>
+  </div>
+</section>
+
+<!-- TIPS -->
+<section class="content-section tips-section" id="tips">
+  <div class="section-inner">
+    <div class="section-head reveal">
+      <div class="eyebrow" data-i18n="tips.eyebrow">Strategy</div>
+      <h2 class="section-title" data-i18n="tips.title">Things You <span>Learn the Hard Way</span></h2>
+      <p class="section-sub" data-i18n="tips.sub">Figured out by playing way too much of this game. These are the things that actually move your score.</p>
+    </div>
+    <div class="accordion" id="accordion"></div>
+    <div class="strategy-note reveal">
+      <p data-i18n="tips.note"><strong style="color:var(--gold)">General strategy:</strong> For the World Tour, aim for consistent "Good" or better across all modes. A single mode where you time out constantly will drag your total score down significantly. The speed multiplier is the biggest lever — don't sacrifice accuracy for speed.</p>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <img class="cta-cloud-1" src="images/bg/cloud1.png" alt=""><img class="cta-cloud-2" src="images/bg/cloud2.png" alt="">
+  <img class="cta-plane" src="images/plane.png" alt="">
+  <div class="cta-inner reveal">
+    <h2 data-i18n="cta.title">You've read enough. Go play.</h2>
+    <p data-i18n="cta.desc">No account needed to start — guest play begins in seconds. Create an account later to save your score to the global leaderboard.</p>
+    <a class="btn-gold" href="play/" data-i18n="cta.btn">Start Playing — It's Free</a>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-links">
+    <a href="/" data-i18n="f.home">Home</a>
+    <a href="about/" data-i18n="f.about">About</a>
+    <a href="learn/" data-i18n="f.learn">Learn Geography</a>
+    <a href="privacy/" data-i18n="f.priv">Privacy Policy</a>
+    <a href="play/" data-i18n="f.play">Play</a>
+    <a href="https://ko-fi.com/mygeochallenge" target="_blank" rel="noopener" data-i18n="f.ko">☕ Support us</a>
+  </div>
+  <p>&copy; 2026 myGeoChallenge · mygeochallenge.com · <span data-i18n="f.rights">All rights reserved</span></p>
+</footer>
+
+<script>
+/* ── TRANSLATIONS ── */
+const T={
+  en:{
+    'nav.howto':'How to Play','nav.learn':'Learn','nav.about':'About','nav.play':'Play Free',
+    'hero.eyebrow':'rules · scoring · strategies',
+    'hero.title':'You could jump in blind.<br>Or read this <span>first</span>.',
+    'hero.desc':'The players who understand how the speed bonus works, when wrong options fade out, and what Practice Tour is actually for score noticeably higher. Everything in one place.',
+    'hero.btn':"Start Playing — It's Free",
+    'tick.m':'4 Game Modes','tick.c':'195 Countries','tick.r':'35 Rank Titles','tick.s':'Speed Bonus System','tick.v':'Real-Time Versus','tick.t':'World Tour Campaign','tick.p':'Practice Tour','tick.l':'Global Leaderboards',
+    'toc.head':'Jump To','toc.m':'The 4 Modes','toc.s':'Scoring','toc.t':'World Tour','toc.v':'Versus','toc.p':'Practice Tour','toc.tp':'Pro Tips',
+    'modes.eyebrow':'Game Modes','modes.title':'4 Modes. <span>All Different. All Hard.</span>','modes.sub':"Each mode tests a different skill. You'll be decent at one going in and confused by the rest — that's just how it works. The modes you're bad at are the ones worth practicing first.",
+    'hw':'How it works',
+    'm1.num':'Mode 01','m1.name':'Suitcase Shuffle','m1.tag':'Flags &amp; Countries',
+    'm1.p1':'Suitcases roll down an airport carousel, each belonging to a different country. Your job is to match the correct flag to each bag before the <strong>8-second clock</strong> runs out.',
+    'm1.p2':'Six answer options are shown at first. Wrong options fade out progressively to help you narrow it down — 6 choices → 4 → 2. Clicking a faded option does nothing.',
+    'm1.p3':'A correct answer scores points. A wrong answer or timeout scores zero. The speed bonus multiplier builds with consecutive correct answers — miss one and it resets.',
+    'm2.num':'Mode 02','m2.name':'Map Mayhem','m2.tag':'Country Shapes',
+    'm2.p1':'A country\'s silhouette appears on screen and you must identify it from <strong>four options</strong>. No labels, no map context — just the shape.',
+    'm2.p2':'Shapes range from instantly recognizable (Italy\'s boot, Japan\'s islands) to surprisingly tricky (neighboring African nations, small Central European countries).',
+    'm2.p3':'This mode draws from all six inhabited continents. African and Southeast Asian country shapes tend to be the hardest — a good reason to drill those regions in Practice Tour first.',
+    'm3.num':'Mode 03','m3.name':'City Blitz','m3.tag':'World Cities',
+    'm3.p1':'A city name appears at the top. An interactive world map fills the screen. Click the country where that city is located. <strong>Speed matters</strong> — the faster you click, the bigger your bonus.',
+    'm3.p2':'Cities are drawn from three difficulty tiers that unlock progressively. Get 5 right → Medium cities unlock. Get 15 right → Hard cities unlock (Ashgabat, Paramaribo, Dili…).',
+    'm3.p3':'You don\'t need to click the exact city dot — clicking anywhere in the correct country region is usually enough to score the point.',
+    'm4.num':'Mode 04','m4.name':'Landmark Loco','m4.tag':'World Landmarks',
+    'm4.p1':'A landmark photo appears on screen. You select the correct answer from four options — each option shows a <strong>"Landmark, Country"</strong> pair. The combined pair is the answer unit.',
+    'm4.p2':'Landmarks include UNESCO World Heritage Sites, architectural icons, natural wonders, and cultural monuments from every continent — from the Eiffel Tower to Angkor Wat.',
+    'm4.p3':'Architectural style is often the biggest clue. Islamic geometric patterns → Middle East or North Africa. Tiered stone temples → Southeast Asia. Classical columns → Mediterranean.',
+    'score.eyebrow':'Scoring','score.title':'Speed = <span>More Points</span>','score.sub':'Answer fast and keep your streak alive. The score multiplier is the biggest lever for climbing the leaderboard.',
+    'sc.perfect':'PERFECT','sc.good':'GOOD','sc.fair':'FAIR','sc.wrong':'WRONG / TIMEOUT','sc.wrong2':'WRONG',
+    'sc.p.sp':'Within 1.5 seconds','sc.g.sp':'1.5 – 3.5 seconds','sc.f.sp':'3.5 – 8 seconds',
+    'sb.label':'🎮 Try it — click to simulate scoring','sb.score':'Score','sb.streak':'Streak','sb.mult':'Multiplier','sb.reset':'Reset',
+    'cd.count':'Countdown','cd.ans':'Answer!','cd.score':'Score!',
+    'mult.head':'The Multiplier',
+    'mult.p1':'A streak multiplier (M) builds as you answer correctly in a row. It increases gradually with each consecutive correct answer — miss one and it resets to 1×. This means sustained accuracy is more valuable than occasional perfect-speed answers.',
+    'mult.p2':'Every <strong>10 correct answers</strong> also grants a +5 second time extension in the active mode, giving skilled players longer sessions inside the game timer.',
+    'tour.eyebrow':'Campaign','tour.title':'World Tour — <span>The Real Test</span>','tour.sub':'All 4 modes back-to-back, one combined score, one rank title at the end. This is what the leaderboard is based on. You can\'t just be good at flags — all four count.',
+    'tour.p1':'Your score accumulates across all four modes. At the end, you receive a <strong>final World Tour score</strong> and a rank title based on total performance — this rank appears on the global World Tour leaderboard.',
+    'tour.p2':'Topping the World Tour leaderboard requires consistent performance across all four modes. You can\'t coast on one favorite — all four count equally.',
+    'vs.eyebrow':'','vs.title':'Versus — <span>Real-Time PvP</span>',
+    'vs.p1':'Versus mode lets you battle friends in real time. Both players see the <strong>same questions in the same order</strong> (seeded for fairness) and answer simultaneously. Live scores show on screen the whole time.',
+    'vs.p2':'To start a Versus match, you need a free account. Invite a friend directly from the social panel in the loading screen. Send emotes during the match — they only trigger on your opponent\'s wrong answers, so no spam during streaks.',
+    'vs.li1':'Same questions for both players — no unfair advantages',
+    'vs.li2':'Live score comparison on screen at all times',
+    'vs.li3':'Win/Loss tracked in your profile history',
+    'vs.li4':'Emotes: 5 reaction options available mid-match',
+    'prac.eyebrow':'','prac.title':'Practice Tour — <span>No Pressure</span>',
+    'prac.p1':"Practice Tour removes the game-over timer. You answer at your own pace and focus on whatever area you want to improve. It's the best way to prepare before a competitive run.",
+    'prac.p2':'Filter by <strong>continent</strong>, <strong>difficulty</strong>, or <strong>mode</strong> — then drill exactly the questions that will help you most. Practice Tour scores don\'t count toward global leaderboards.',
+    'prac.li1':'<strong>Continents:</strong> Africa · Asia · Europe · Americas · Oceania',
+    'prac.li2':'<strong>Difficulties:</strong> Easy · Medium · Hard',
+    'prac.li3':'<strong>Any of the 4 modes</strong> available in Practice',
+    'prac.li4':"No time limit — answer when you're ready",
+    'ranks.eyebrow':'Progression','ranks.title':'35 Ranks. Climb <span>Them All</span>.','ranks.sub':'Your combined high score across all modes determines your rank. Every session you play pushes you further up the ladder.',
+    'tips.eyebrow':'Strategy','tips.title':'Things You <span>Learn the Hard Way</span>','tips.sub':'Figured out by playing way too much of this game. These are the things that actually move your score.',
+    'tips.note':'<strong style="color:var(--gold)">General strategy:</strong> For the World Tour, aim for consistent "Good" or better across all modes. A single mode where you time out constantly will drag your total score down significantly. The speed multiplier is the biggest lever — don\'t sacrifice accuracy for speed.',
+    'cta.title':"You've read enough. Go play.",'cta.desc':'No account needed to start — guest play begins in seconds. Create an account later to save your score to the global leaderboard.','cta.btn':"Start Playing — It's Free",
+    'f.home':'Home','f.about':'About','f.learn':'Learn Geography','f.priv':'Privacy Policy','f.play':'Play','f.ko':'☕ Support us','f.rights':'All rights reserved'
+  },
+  es:{
+    'nav.howto':'Cómo Jugar','nav.learn':'Aprender','nav.about':'El Juego','nav.play':'Jugar Gratis',
+    'hero.eyebrow':'reglas · puntaje · estrategias',
+    'hero.title':'Podrías entrar de golpe.<br>O leer esto <span>primero</span>.',
+    'hero.desc':'Los jugadores que entienden cómo funciona el bonus de velocidad, cuándo se desvanecen las opciones y para qué sirve el Tour de Práctica sacan puntajes notablemente más altos. Todo en un lugar.',
+    'hero.btn':'Empezar a Jugar — Es Gratis',
+    'tick.m':'4 Modos de Juego','tick.c':'195 Países','tick.r':'35 Títulos de Rango','tick.s':'Sistema de Bonus de Velocidad','tick.v':'Versus en Tiempo Real','tick.t':'Campaña Tour Mundial','tick.p':'Tour de Práctica','tick.l':'Rankings Globales',
+    'toc.head':'Ir a','toc.m':'Los 4 Modos','toc.s':'Puntaje','toc.t':'Tour Mundial','toc.v':'Versus','toc.p':'Tour de Práctica','toc.tp':'Consejos Pro',
+    'modes.eyebrow':'Modos de Juego','modes.title':'4 Modos. <span>Todos Distintos. Todos Difíciles.</span>','modes.sub':'Cada modo prueba una habilidad diferente. Vas a ser decente en uno de entrada y no tener idea en el resto — así es como funciona. Los modos en los que fallás son los que vale practicar primero.',
+    'hw':'Cómo funciona',
+    'm1.num':'Modo 01','m1.name':'Suitcase Shuffle','m1.tag':'Banderas y Países',
+    'm1.p1':'Las maletas bajan por una cinta de aeropuerto, cada una perteneciente a un país diferente. Tu trabajo es emparejar la bandera correcta con cada maleta antes de que se acabe el <strong>reloj de 8 segundos</strong>.',
+    'm1.p2':'Al principio se muestran seis opciones. Las respuestas incorrectas se difuminan progresivamente para ayudarte a reducir las opciones — 6 opciones → 4 → 2. Hacer clic en una opción difuminada no hace nada.',
+    'm1.p3':'Una respuesta correcta da puntos. Una respuesta incorrecta o timeout da cero. El multiplicador de bonus de velocidad sube con respuestas correctas consecutivas — falla una y se reinicia.',
+    'm2.num':'Modo 02','m2.name':'Map Mayhem','m2.tag':'Formas de Países',
+    'm2.p1':'La silueta de un país aparece en pantalla y debes identificarla entre <strong>cuatro opciones</strong>. Sin etiquetas, sin contexto del mapa — solo la forma.',
+    'm2.p2':'Las formas van desde las instantáneamente reconocibles (la bota de Italia, las islas de Japón) hasta las sorprendentemente difíciles (países africanos vecinos, pequeños países de Europa Central).',
+    'm2.p3':'Este modo incluye los seis continentes habitados. Las formas de países africanos y del Sudeste Asiático tienden a ser las más difíciles — una buena razón para practicarlas en el Tour de Práctica primero.',
+    'm3.num':'Modo 03','m3.name':'City Blitz','m3.tag':'Ciudades del Mundo',
+    'm3.p1':'Aparece el nombre de una ciudad arriba. Un mapa mundial interactivo llena la pantalla. Haz clic en el país donde está esa ciudad. <strong>La velocidad importa</strong> — cuanto más rápido hagas clic, mayor es tu bonus.',
+    'm3.p2':'Las ciudades se dividen en tres niveles de dificultad que se desbloquean progresivamente. 5 correctas → se desbloquean las ciudades Medias. 15 correctas → se desbloquean las ciudades Difíciles (Ashgabat, Paramaribo, Dili…).',
+    'm3.p3':'No necesitas hacer clic exactamente sobre el punto de la ciudad — hacer clic en cualquier lugar dentro del país correcto suele ser suficiente para anotar el punto.',
+    'm4.num':'Modo 04','m4.name':'Landmark Loco','m4.tag':'Monumentos del Mundo',
+    'm4.p1':'Aparece una foto de un monumento. Seleccionas la respuesta correcta entre cuatro opciones — cada opción muestra un par <strong>"Monumento, País"</strong>. El par completo es la unidad de respuesta.',
+    'm4.p2':'Los monumentos incluyen sitios UNESCO, íconos arquitectónicos, maravillas naturales y monumentos culturales de todos los continentes — desde la Torre Eiffel hasta Angkor Wat.',
+    'm4.p3':'El estilo arquitectónico suele ser la pista más grande. Patrones geométricos islámicos → Oriente Medio o Norte de África. Templos de piedra escalonados → Sudeste Asiático. Columnas clásicas → Mediterráneo.',
+    'score.eyebrow':'Puntaje','score.title':'Velocidad = <span>Más Puntos</span>','score.sub':'Responde rápido y mantén tu racha. El multiplicador de puntaje es la palanca más grande para subir en el ranking.',
+    'sc.perfect':'PERFECTO','sc.good':'BUENO','sc.fair':'REGULAR','sc.wrong':'MAL / TIMEOUT','sc.wrong2':'MAL',
+    'sc.p.sp':'Menos de 1,5 segundos','sc.g.sp':'1,5 – 3,5 segundos','sc.f.sp':'3,5 – 8 segundos',
+    'sb.label':'🎮 Pruébalo — haz clic para simular el puntaje','sb.score':'Puntaje','sb.streak':'Racha','sb.mult':'Multiplicador','sb.reset':'Reiniciar',
+    'cd.count':'Cuenta regresiva','cd.ans':'¡Responde!','cd.score':'¡Puntaje!',
+    'mult.head':'El Multiplicador',
+    'mult.p1':'Un multiplicador de racha (M) sube mientras respondas correctamente de forma consecutiva. Aumenta gradualmente con cada respuesta correcta — falla una y se reinicia a 1×. Esto significa que la precisión sostenida vale más que respuestas ocasionales a velocidad perfecta.',
+    'mult.p2':'Cada <strong>10 respuestas correctas</strong> también otorga una extensión de +5 segundos en el modo activo, dando a los jugadores hábiles sesiones más largas dentro del temporizador.',
+    'tour.eyebrow':'Campaña','tour.title':'Tour Mundial — <span>La Prueba Real</span>','tour.sub':'Los 4 modos seguidos, un puntaje combinado, un título de rango al final. En eso se basa el ranking. No puedes ser bueno solo en banderas — los cuatro cuentan.',
+    'tour.p1':'Tu puntaje se acumula en los cuatro modos. Al final recibes un <strong>puntaje final del Tour Mundial</strong> y un título de rango basado en el rendimiento total — este rango aparece en el ranking global del Tour Mundial.',
+    'tour.p2':'Encabezar el ranking del Tour Mundial requiere rendimiento consistente en los cuatro modos. No puedes depender de uno favorito — los cuatro cuentan igual.',
+    'vs.eyebrow':'','vs.title':'Versus — <span>PvP en Tiempo Real</span>',
+    'vs.p1':'El modo Versus te permite enfrentarte a amigos en tiempo real. Ambos jugadores ven las <strong>mismas preguntas en el mismo orden</strong> (generadas con semilla para ser justos) y responden simultáneamente. Los puntajes en vivo se muestran en pantalla todo el tiempo.',
+    'vs.p2':'Para iniciar un Versus, necesitas una cuenta gratuita. Invita a un amigo directamente desde el panel social en la pantalla de carga. Envía emotes durante el partido — solo se activan en las respuestas incorrectas de tu oponente, así que no hay spam durante rachas.',
+    'vs.li1':'Las mismas preguntas para ambos jugadores — sin ventajas injustas',
+    'vs.li2':'Comparación de puntaje en vivo en pantalla en todo momento',
+    'vs.li3':'Victorias/Derrotas registradas en el historial de tu perfil',
+    'vs.li4':'Emotes: 5 opciones de reacción disponibles durante el partido',
+    'prac.eyebrow':'','prac.title':'Tour de Práctica — <span>Sin Presión</span>',
+    'prac.p1':'El Tour de Práctica elimina el temporizador de fin de juego. Respondes a tu propio ritmo y te enfocas en lo que quieras mejorar. Es la mejor forma de prepararte antes de una sesión competitiva.',
+    'prac.p2':'Filtra por <strong>continente</strong>, <strong>dificultad</strong> o <strong>modo</strong> — y practica exactamente las preguntas que más te van a ayudar. Los puntajes del Tour de Práctica no cuentan en los rankings globales.',
+    'prac.li1':'<strong>Continentes:</strong> África · Asia · Europa · Américas · Oceanía',
+    'prac.li2':'<strong>Dificultades:</strong> Fácil · Medio · Difícil',
+    'prac.li3':'<strong>Cualquiera de los 4 modos</strong> disponible en Práctica',
+    'prac.li4':'Sin límite de tiempo — responde cuando estés listo',
+    'ranks.eyebrow':'Progresión','ranks.title':'35 Rangos. Súbelos <span>Todos</span>.','ranks.sub':'Tu puntaje máximo combinado en todos los modos determina tu rango. Cada sesión que juegas te empuja más arriba en la tabla.',
+    'tips.eyebrow':'Estrategia','tips.title':'Lo Que Aprendes <span>a las Malas</span>','tips.sub':'Descubierto jugando demasiado este juego. Estas son las cosas que de verdad mueven tu puntaje.',
+    'tips.note':'<strong style="color:var(--gold)">Estrategia general:</strong> En el Tour Mundial, apunta a "Bueno" o mejor de forma consistente en todos los modos. Un modo donde constantemente se te acaba el tiempo va a arrastrar tu puntaje total hacia abajo. El multiplicador de velocidad es la palanca más grande — no sacrifiques precisión por velocidad.',
+    'cta.title':'Ya leíste suficiente. A jugar.','cta.desc':'No necesitas cuenta para empezar — el modo invitado empieza en segundos. Crea una cuenta después para guardar tu puntaje en el ranking global.','cta.btn':'Empezar a Jugar — Es Gratis',
+    'f.home':'Inicio','f.about':'El Juego','f.learn':'Aprender Geografía','f.priv':'Política de Privacidad','f.play':'Jugar','f.ko':'☕ Apóyanos','f.rights':'Todos los derechos reservados'
+  }
+};
+
+/* ── TIPS DATA ── */
+const TIPS_DATA=[
+  {img:'images/game1.png',
+   en:{h:'Suitcase Shuffle',li:['<strong>Learn by color family first.</strong> Red/white/blue, Pan-African, Nordic cross — color narrows the field fast.','<strong>Unique flags = easy points.</strong> Nepal, Switzerland, Jamaica — you\'ll recognize them instantly after a few attempts.',"Don't try to memorize all 195 at once. Start with your region, expand outward."]},
+   es:{h:'Suitcase Shuffle',li:['<strong>Aprende por familia de colores primero.</strong> Rojo/blanco/azul, Panafricano, Cruz Nórdica — el color reduce las opciones rápido.','<strong>Banderas únicas = puntos fáciles.</strong> Nepal, Suiza, Jamaica — las vas a reconocer al instante después de unos intentos.','No intentes memorizar las 195 de una vez. Empieza por tu región y expándete.']}},
+  {img:'images/game2.png',
+   en:{h:'Map Mayhem',li:['<strong>Very large countries are almost never the trick answer.</strong> Their scale gives them away.','Central American countries are hardest — Nicaragua is the biggest, El Salvador the smallest.','African shapes: Sudan/South Sudan split and Madagascar\'s location are key anchors.']},
+   es:{h:'Map Mayhem',li:['<strong>Los países muy grandes casi nunca son la trampa.</strong> Su escala los delata.','Los países centroamericanos son los más difíciles — Nicaragua es el más grande, El Salvador el más pequeño.','Formas africanas: la división Sudán/Sudán del Sur y la ubicación de Madagascar son puntos de referencia clave.']}},
+  {img:'images/game3.png',
+   en:{h:'City Blitz',li:['<strong>Click the country, not the dot.</strong> Approximate region is enough — speed bonus rewards fast confident clicks.','Hard cities appear after 15 correct answers. Use Practice Tour to drill them before campaign runs.','Most capitals cluster near coasts, river deltas, or historical heartlands — use that as a mental anchor.']},
+   es:{h:'City Blitz',li:['<strong>Haz clic en el país, no en el punto.</strong> La región aproximada es suficiente — el bonus de velocidad recompensa los clics rápidos y confiados.','Las ciudades difíciles aparecen después de 15 respuestas correctas. Usa el Tour de Práctica para practicarlas antes de partidas de campaña.','La mayoría de las capitales se agrupan cerca de costas, deltas de ríos o zonas históricas — úsalo como ancla mental.']}},
+  {img:'images/game4.png',
+   en:{h:'Landmark Loco',li:['<strong>Architecture style = region clue.</strong> You don\'t need to know the name — the style narrows it down.','Focus on Europe and Asia first — highest density of landmarks in the game.','Know the Hagia Sophia is Turkey, not Greece. Historical context helps with the trickier ones.']},
+   es:{h:'Landmark Loco',li:['<strong>Estilo arquitectónico = pista de región.</strong> No necesitas saber el nombre — el estilo lo reduce.','Enfócate en Europa y Asia primero — la mayor densidad de monumentos del juego está ahí.','La Hagia Sophia es de Turquía, no de Grecia. El contexto histórico ayuda con los más difíciles.']}}
+];
+
+/* ── LANG ── */
+const lb=document.getElementById('lang-btn');
+const ll=document.getElementById('lang-label');
+let lang=localStorage.getItem('mgc-landing-lang')||'en';
+
+function buildAccordion(){
+  const acc=document.getElementById('accordion');
+  if(!acc)return;
+  acc.innerHTML='';
+  TIPS_DATA.forEach((tip,i)=>{
+    const d=lang==='en'?tip.en:tip.es;
+    const div=document.createElement('div');
+    div.className='acc-item reveal';
+    div.style.transitionDelay=`${i*0.06}s`;
+    div.innerHTML=`<div class="acc-header"><img src="${tip.img}" alt=""><h4>${d.h}</h4><span class="acc-chevron">▾</span></div><div class="acc-body"><ul>${d.li.map(x=>`<li>${x}</li>`).join('')}</ul></div>`;
+    div.querySelector('.acc-header').addEventListener('click',()=>{
+      const wasOpen=div.classList.contains('open');
+      document.querySelectorAll('.acc-item.open').forEach(x=>x.classList.remove('open'));
+      if(!wasOpen)div.classList.add('open');
+    });
+    acc.appendChild(div);
+  });
+  observeReveals();
+}
+
+function applyLang(l){
+  lang=l;localStorage.setItem('mgc-landing-lang',l);document.documentElement.lang=l;
+  document.querySelectorAll('[data-i18n]').forEach(el=>{const k=el.dataset.i18n;if(T[l]&&T[l][k]!==undefined)el.innerHTML=T[l][k];});
+  ll.textContent=l==='en'?'ES':'EN';
+  buildAccordion();
+}
+lb.addEventListener('click',()=>applyLang(lang==='en'?'es':'en'));
+
+/* ── CHARACTER ── */
+let cf=1;
+setInterval(()=>{cf=cf%16+1;const e=document.getElementById('char-anim');if(e)e.src=`images/characters/flightattpost/${cf}.png`;},110);
+
+/* ── SCROLL REVEAL ── */
+const obs=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');obs.unobserve(e.target);}});},{threshold:0.1});
+function observeReveals(){document.querySelectorAll('.reveal:not(.visible)').forEach(el=>obs.observe(el));}
+
+/* ── INIT ── */
+applyLang(lang);
+observeReveals();
+</script>
+</body>
+</html>
