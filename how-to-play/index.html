@@ -633,6 +633,15 @@ function observeReveals(){document.querySelectorAll('.reveal:not(.visible)').for
 /* ── INIT ── */
 applyLang(lang);
 observeReveals();
+
+/* fix: <base href="../"> breaks href="#id" anchor links */
+document.querySelectorAll('a[href^="#"]').forEach(a=>{
+  a.addEventListener('click',e=>{
+    e.preventDefault();
+    const el=document.getElementById(a.getAttribute('href').slice(1));
+    if(el)el.scrollIntoView({behavior:'smooth'});
+  });
+});
 </script>
 </body>
 </html>
