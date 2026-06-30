@@ -44,6 +44,8 @@
       transition: background .2s; letter-spacing: .5px;
     }
     .lang-btn:hover { background: rgba(255,255,255,.22); }
+    .nav-kofi { background: #ff5e5b; color: #fff; font-weight: 800; font-size: .85rem; padding: 8px 16px; border-radius: 50px; text-decoration: none; transition: background .15s, transform .15s; white-space: nowrap; }
+    .nav-kofi:hover { background: #e04a47; transform: scale(1.05); }
     .nav-play {
       background: #f5c842; color: #0f1e2d;
       font-weight: 900; font-size: .92rem;
@@ -52,7 +54,7 @@
       white-space: nowrap;
     }
     .nav-play:hover { background: #c8920a; color: #fff; transform: scale(1.05); }
-    @media(max-width:660px){nav{padding:12px 16px}.nav-link{display:none}}
+    @media(max-width:660px){nav{padding:12px 16px}.nav-link{display:none}.nav-kofi{display:none}}
 
     /* ── CONTENT ── */
     .content {
@@ -115,6 +117,7 @@
       <a class="nav-link" href="learn/" id="nav-learn">Learn</a>
       <a class="nav-link" href="about/" id="nav-about">About</a>
       <button class="lang-btn" id="lang-btn" type="button" aria-label="Change language">🌐 <span id="lang-label">ES</span></button>
+      <a class="nav-kofi" href="https://ko-fi.com/mygeochallenge" target="_blank" rel="noopener">☕ Support</a>
       <a class="nav-play" href="play/" id="nav-play">Play Free</a>
     </div>
   </nav>

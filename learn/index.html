@@ -38,6 +38,8 @@
     .nav-link:hover,.nav-link.active{color:var(--gold)}
     .lang-btn{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);color:#fff;font-family:inherit;font-size:.82rem;font-weight:800;padding:6px 13px;border-radius:50px;cursor:pointer;transition:background .2s;letter-spacing:.5px}
     .lang-btn:hover{background:rgba(255,255,255,.22)}
+    .nav-kofi{background:#ff5e5b;color:#fff;font-weight:800;font-size:.85rem;padding:8px 16px;border-radius:50px;text-decoration:none;transition:background .15s,transform .15s;white-space:nowrap}
+    .nav-kofi:hover{background:#e04a47;transform:scale(1.05)}
     .nav-play{background:var(--gold);color:var(--dark);font-weight:900;font-size:.92rem;padding:9px 22px;border-radius:50px;text-decoration:none;transition:transform .15s,background .2s}
     .nav-play:hover{background:var(--gold-dark);color:#fff;transform:scale(1.05)}
 
@@ -235,7 +237,7 @@
 
     .reveal{opacity:0;transform:translateY(26px);transition:opacity .65s ease,transform .65s ease}
     .reveal.visible{opacity:1;transform:translateY(0)}
-    @media(max-width:660px){nav{padding:12px 16px}.nav-link{display:none}.hero-inner{flex-direction:column;padding:80px 20px 60px}.hero-char{width:190px}}
+    @media(max-width:660px){nav{padding:12px 16px}.nav-link{display:none}.nav-kofi{display:none}.hero-inner{flex-direction:column;padding:80px 20px 60px}.hero-char{width:190px}}
   </style>
 </head>
 <body>
@@ -264,6 +266,7 @@
     <a class="nav-link active" href="learn/" data-i18n="nav.learn">Learn</a>
     <a class="nav-link" href="about/" data-i18n="nav.about">About</a>
     <button class="lang-btn" id="lang-btn" type="button">🌐 <span id="lang-label">ES</span></button>
+    <a class="nav-kofi" href="https://ko-fi.com/mygeochallenge" target="_blank" rel="noopener">☕ Support</a>
     <a class="nav-play" href="play/" data-i18n="nav.play">Play Free</a>
   </div>
 </nav>
