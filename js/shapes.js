@@ -1046,6 +1046,8 @@ function showShapesMode() {
   document.getElementById('loading-screen').style.display = 'none';
   const scoreDisplay = document.getElementById('score-display');
   if (scoreDisplay) scoreDisplay.style.display = 'block';
+  const shapesSbt = document.getElementById('speed-bonus-text');
+  if (shapesSbt) shapesSbt.style.display = '';
   const rightPanel = document.getElementById('right-panel');
   if (rightPanel) { rightPanel.style.display = 'flex'; rightPanel.style.zIndex = '120'; }
 

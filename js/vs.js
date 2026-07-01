@@ -245,6 +245,9 @@ window.VS = (() => {
     const winnerId = m.host_score >= m.guest_score ? m.host_id : m.guest_id;
     await window.sb.from('matches')
       .update({ status: 'finished', winner_id: winnerId }).eq('id', _matchId);
+    if (window.Analytics && typeof window.Analytics.logVersus === 'function') {
+      window.Analytics.logVersus(m.mode || null);
+    }
   }
 
   // ── Abandonar (yo me voy → el rival gana) ──────────────────────────────────

@@ -7,6 +7,7 @@
 // API pública:
 //   window.Analytics.logVisit()           -> 1 visita por sesión de navegador
 //   window.Analytics.logGame(mode, score)  -> 1 evento por partida single-player
+//   window.Analytics.logVersus(mode)       -> 1 evento por partida versus terminada
 (function () {
   // ID anónimo estable por dispositivo (reusa el del viejo overlay si existe).
   let visitorId = localStorage.getItem('_devstats_vid');
@@ -64,7 +65,22 @@
     });
   }
 
-  window.Analytics = { logVisit, logGame };
+  // 1 evento por partida versus terminada (llamado por el host al cerrar el match).
+  // Separado de `matches`: esa tabla es estado efímero y sus filas 'finished' se
+  // borran en la limpieza de salas (ver lobby.js _cleanupStale), así que no sirve
+  // como fuente de historial para el panel de stats.
+  async function logVersus(mode) {
+    const cc = (localStorage.getItem('_an_country') || null) || null;
+    insertEvent({
+      type: 'versus',
+      mode: mode || null,
+      visitor_id: visitorId,
+      country_code: cc,
+      user_id: window._sbUserId || null,
+    });
+  }
+
+  window.Analytics = { logVisit, logGame, logVersus };
 
   // Registrar la visita en cuanto el cliente sb esté listo.
   function tryVisit(attempt) {

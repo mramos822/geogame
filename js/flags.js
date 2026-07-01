@@ -103,6 +103,7 @@ function showFlagsMode() {
   flagsWrapper.style.transform       = `translate(-50%, -50%) scale(${escala})`;
   flagsWrapper.style.transformOrigin = 'center center';
   flagsScoreDisplay.style.display = 'block';
+  flagsSpeedBonusText.style.display = '';
   document.getElementById('flags-countdown-widget').style.display = 'block';
   flagsRightPanel.style.display   = 'flex';
   mainRightPanel.style.display    = 'none';

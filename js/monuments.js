@@ -5351,6 +5351,7 @@ function startGame() {
   newHighscoreBanner.style.display = 'none';
   gameWrapper.style.display     = 'block';
   scoreDisplayEl.style.display  = 'block';
+  speedBonusText.style.display  = '';
   const cwEl = document.getElementById('countdown-widget');
   if (cwEl) cwEl.style.display = 'block';
   const rpEl = document.getElementById('right-panel');

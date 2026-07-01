@@ -85,29 +85,38 @@ Deno.serve(async (req) => {
     ] = await Promise.all([
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true })),
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true }).gte('last_active', onlineISO)),
-      cnt(sb.from('profiles').select('*', { count: 'exact', head: true }).eq('is_playing', true)),
+      // is_playing solo, sin chequear last_active, queda pegado en true para siempre
+      // en sesiones que se cerraron a la fuerza (cerrar pestaña, crash, etc.) en vez
+      // de salir por el flujo normal — por eso se exige actividad reciente también.
+      cnt(sb.from('profiles').select('*', { count: 'exact', head: true }).eq('is_playing', true).gte('last_active', onlineISO)),
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true }).gte('created_at', todayISO)),
-      cnt(sb.from('analytics_events').select('*', { count: 'exact', head: true }).eq('type', 'game')),
-      cnt(sb.from('analytics_events').select('*', { count: 'exact', head: true }).eq('type', 'game').gte('created_at', todayISO)),
+      // Total global de partidas: single-player ('game') + versus terminadas ('versus').
+      cnt(sb.from('analytics_events').select('*', { count: 'exact', head: true }).in('type', ['game', 'versus'])),
+      cnt(sb.from('analytics_events').select('*', { count: 'exact', head: true }).in('type', ['game', 'versus']).gte('created_at', todayISO)),
       cnt(sb.from('analytics_events').select('*', { count: 'exact', head: true }).eq('type', 'visit')),
       cnt(sb.from('analytics_events').select('*', { count: 'exact', head: true }).eq('type', 'visit').gte('created_at', todayISO)),
-      cnt(sb.from('matches').select('*', { count: 'exact', head: true }).eq('status', 'finished')),
-      cnt(sb.from('matches').select('*', { count: 'exact', head: true }).eq('status', 'finished').gte('created_at', todayISO)),
+      // Versus: se cuenta desde analytics_events (evento permanente logueado al
+      // terminar el match), NO desde `matches` — esa tabla es estado efímero y sus
+      // filas 'finished' se borran en la limpieza de salas de lobby.js, así que
+      // contar ahí subestima el total real de partidas versus jugadas.
+      cnt(sb.from('analytics_events').select('*', { count: 'exact', head: true }).eq('type', 'versus')),
+      cnt(sb.from('analytics_events').select('*', { count: 'exact', head: true }).eq('type', 'versus').gte('created_at', todayISO)),
     ]);
 
     // ── Filas crudas de la ventana de 30 días (para series y breakdowns) ──────
-    const [regsRes, gamesRes, visitsRes, versusRes, topRes] = await Promise.all([
+    // gamesRes trae 'game' (single-player) + 'versus' juntos: la serie "Partidas"
+    // del gráfico de actividad debe ser el total global, no solo single-player.
+    const [regsRes, gamesRes, visitsRes, topRes] = await Promise.all([
       sb.from('profiles').select('created_at').gte('created_at', windowISO).limit(50000),
-      sb.from('analytics_events').select('created_at, mode').eq('type', 'game').gte('created_at', windowISO).limit(50000),
+      sb.from('analytics_events').select('created_at, type, mode').in('type', ['game', 'versus']).gte('created_at', windowISO).limit(50000),
       sb.from('analytics_events').select('created_at, visitor_id, country_code').eq('type', 'visit').gte('created_at', windowISO).limit(50000),
-      sb.from('matches').select('created_at').eq('status', 'finished').gte('created_at', windowISO).limit(50000),
       sb.from('profiles').select('username, hs_total').order('hs_total', { ascending: false }).limit(10),
     ]);
 
     const regRows   = regsRes.data   || [];
     const gameRows  = gamesRes.data  || [];
     const visitRows = visitsRes.data || [];
-    const versRows  = versusRes.data || [];
+    const versRows  = gameRows.filter((r: any) => r.type === 'versus');
 
     // Series por día
     const seriesRegs   = bucketByDay(regRows, labels);
@@ -122,9 +131,10 @@ Deno.serve(async (req) => {
     }
     const seriesVisitors = labels.map((l) => (visMap[l] ? visMap[l].size : 0));
 
-    // Partidas por modo
+    // Partidas por modo (solo single-player: versus no tiene un "modo" propio en el chart)
     const byMode: Record<string, number> = { flags: 0, shapes: 0, cities: 0, monuments: 0 };
     for (const r of gameRows) {
+      if (r.type !== 'game') continue;
       const m = (r.mode as string) || 'otro';
       byMode[m] = (byMode[m] || 0) + 1;
     }
