@@ -3438,7 +3438,7 @@ const SPEED_BONUS_WIN = 3;
 const SPEED_MULT      = 1.25;
 
 // Pixel thresholds on the DISPLAYED canvas
-const PERFECT_PX = 8;
+const PERFECT_PX = 7;
 const GOOD_PX    = 20;
 const FAIR_PX    = 45;
 
@@ -3977,7 +3977,7 @@ function initLeaderboard() {
       const avatarHTML = p.avatar
         ? `<div class="lb-avatar lb-avatar-img-wrap"><img class="lb-avatar-img" src="${p.avatar}" onerror="this.parentNode.innerHTML='${p.initial || '?'}';this.parentNode.style.background='${p.color || '#888'}'"></div>`
         : `<div class="lb-avatar" style="background:${p.color}">${p.initial}</div>`;
-      el.innerHTML = avatarHTML + `<span class="lb-score">${p.score.toLocaleString()}</span>`;
+      el.innerHTML = avatarHTML + `<span class="lb-name">${p.name}</span>` + `<span class="lb-score">${p.score.toLocaleString()}</span>`;
       el.style.transition = 'none';
       el.style.top = '-9999px';
       lbElements[el.id] = el;
@@ -4013,7 +4013,9 @@ function initLeaderboard() {
   const playerEl = document.createElement('div');
   playerEl.className = 'lb-entry lb-player';
   playerEl.id = 'lb-player';
+  const _myName = window._sbProfile?.name || localStorage.getItem('playerName') || 'Tú';
   playerEl.innerHTML = `<div class="lb-avatar"><img class="lb-avatar-img" src="${localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png'}"></div>`
+                     + `<span class="lb-name">${_myName}</span>`
                      + `<span class="lb-score" id="lb-player-score">0</span>`;
   playerEl.style.transition = 'none';
   playerEl.style.top = '-9999px';
@@ -4203,6 +4205,23 @@ function latLonToCanvas(lat, lon) {
   return { x, y };
 }
 
+function canvasToLatLon(x, y) {
+  const lon = MAP_LON_LEFT + (x / DISPLAY_W) * (MAP_LON_RIGHT - MAP_LON_LEFT);
+  const mercY = MERC_TOP - (y / DISPLAY_H) * (MERC_TOP - MERC_BOT);
+  const lat = (2 * Math.atan(Math.exp(mercY)) - Math.PI / 2) * (180 / Math.PI);
+  return { lat, lon };
+}
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2
+          + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180)
+          * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.asin(Math.sqrt(a));
+}
+
 
 function dist(ax, ay, bx, by) {
   return Math.sqrt((ax - bx) ** 2 + (ay - by) ** 2);
@@ -4273,7 +4292,7 @@ function slideTagIn(cityName, countryCode) {
       slideTagIn._hintShown = true;
       const countryName = (typeof getCityCountryName === 'function') ? getCityCountryName(countryCode) : countryCode;
       setTagText(`${dispCity}, ${countryName}`);
-    }, 5000);
+    }, 3000);
   }
 
   cityTagEl.style.visibility = 'hidden';
@@ -4627,8 +4646,14 @@ canvas.addEventListener('click', (e) => {
     }
   }
 
+  const clickLL  = canvasToLatLon(clickX, clickY);
+  const correctLL = { lat: state.currentCity.lat, lon: state.currentCity.lon };
+  const distKm = haversineKm(clickLL.lat, clickLL.lon, correctLL.lat, correctLL.lon);
   state.pin1Anim = { x: clickX, y: clickY,
+                    targetX: correct.x, targetY: correct.y,
+                    distKm, grade,
                     progress: 0,
+                    lineProgress: 0,
                     opacity: 1,
                     fading: false,
                     wobbleTime: 0,
@@ -4854,6 +4879,76 @@ if (state.sunburst) {
     ctx.drawImage(img, -curW * tip.x, -curH * tip.y, curW, curH);
     ctx.restore();
     ctx.globalAlpha = 1;
+  }
+
+  // ── Línea animada entre pin del jugador y pin correcto (crece dash a dash) ───
+  if (state.pin1Anim && state.pin1Anim.progress >= 1 && state.pin1Anim.grade === 'wayoff') {
+    const p1 = state.pin1Anim;
+    const p2 = state.pin2Anim;
+    if (!p1.fading) p1.lineProgress = Math.min(1, p1.lineProgress + dt / 0.45);
+    const lp = p1.lineProgress;
+    const destX = p2 ? p2.x : p1.targetX;
+    const destY = p2 ? p2.y : p1.targetY;
+    const toX = p1.x + lp * (destX - p1.x);
+    const toY = p1.y + lp * (destY - p1.y);
+    const lineAlpha = p2 ? Math.min(p1.opacity, p2.opacity) : p1.opacity;
+    if (lp > 0.001 && lineAlpha > 0.01) {
+      const DASH = 14, GAP = 9, PERIOD = DASH + GAP;
+      const offset = -(Date.now() * 0.06 % PERIOD);
+      ctx.save();
+      ctx.globalAlpha = lineAlpha;
+      ctx.lineCap = 'round';
+      // borde blanco
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(toX, toY);
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+      ctx.lineWidth = 4;
+      ctx.setLineDash([DASH, GAP]);
+      ctx.lineDashOffset = offset;
+      ctx.stroke();
+      // línea negra encima
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(toX, toY);
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([DASH, GAP]);
+      ctx.lineDashOffset = offset;
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Label de distancia — solo en "muy lejos", punto medio fijo rotado
+      const labelAlpha = Math.max(0, (lp - 0.75) / 0.25);
+      if (labelAlpha > 0.01 && p1.grade === 'wayoff' && p1.distKm !== undefined) {
+        const km = p1.distKm;
+        const label = km < 1
+          ? '< 1 km'
+          : Math.round(km).toLocaleString() + ' km';
+        const midX = (p1.x + destX) / 2;
+        const midY = (p1.y + destY) / 2;
+        let angle = Math.atan2(destY - p1.y, destX - p1.x);
+        // Mantener el texto siempre legible (nunca boca abajo)
+        if (angle > Math.PI / 2 || angle < -Math.PI / 2) angle += Math.PI;
+        const fs = Math.round(DISPLAY_W * 0.014);
+        ctx.save();
+        ctx.globalAlpha = lineAlpha * labelAlpha;
+        ctx.translate(midX, midY);
+        ctx.rotate(angle);
+        ctx.font = `bold ${fs}px "VAGRoundBold", "Arial Black", sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.lineWidth = fs * 0.28;
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        ctx.lineJoin = 'round';
+        ctx.strokeText(label, 0, -6);
+        ctx.fillStyle = '#000000';
+        ctx.fillText(label, 0, -6);
+        ctx.restore();
+      }
+
+      ctx.restore();
+    }
   }
 
   if (state.pin1Anim) {

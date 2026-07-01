@@ -475,6 +475,7 @@ function initFlagsLeaderboard() {
         + (p.avatar
           ? `<div class="lb-avatar lb-avatar-img-wrap"><img class="lb-avatar-img" src="${p.avatar}" onerror="this.parentNode.innerHTML='${p.initial}';this.parentNode.style.background='${p.color}'"></div>`
           : `<div class="lb-avatar" style="background:${p.color}">${p.initial}</div>`)
+        + `<span class="lb-name">${p.name}</span>`
         + `<span class="lb-score">${p.score.toLocaleString()}</span>`;
       el.style.transition = 'none';
       el.style.top = '-9999px';
@@ -486,8 +487,10 @@ function initFlagsLeaderboard() {
   const playerEl = document.createElement('div');
   playerEl.className = 'lb-entry lb-player';
   playerEl.id = 'flags-lb-player';
+  const _myNameFlags = window._sbProfile?.name || localStorage.getItem('playerName') || 'Tú';
   playerEl.innerHTML = `<span class="lb-rank rank-other"></span>`
                      + `<div class="lb-avatar"><img class="lb-avatar-img" src="${localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png'}"></div>`
+                     + `<span class="lb-name">${_myNameFlags}</span>`
                      + `<span class="lb-score" id="flags-lb-player-score">0</span>`;
   playerEl.style.transition = 'none';
   playerEl.style.top = '-9999px';
