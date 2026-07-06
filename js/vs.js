@@ -573,7 +573,20 @@ window.VS = (() => {
     listenForInvites,
     stopListeningForInvites,
     cleanup,
-    onStart:   cb => { _onStart = cb; },
+    onStart:   cb => {
+      _onStart = cb;
+      // invite() llama a _subscribe() de forma NO bloqueante (no espera a que
+      // el canal quede 'SUBSCRIBED') y recién DESPUÉS quien invitó registra
+      // este callback — con latencia de red real (ej. rival en Chile
+      // aceptando casi al instante), el 'SUBSCRIBED'/catch-up de _subscribe()
+      // podía llegar y encontrar _onStart TODAVÍA null, perdiendo la única
+      // notificación real de que el duelo arrancó — el host se quedaba sin
+      // entrar nunca a la partida mientras al guest (que arranca por su
+      // propio accept(), sin depender de Realtime) sí le funcionaba siempre
+      // (reportado). Cierra la otra mitad de esa carrera: si para cuando
+      // esto se registra el match YA está activo, disparar ya mismo.
+      if (_match && _match.status === 'active' && !_started) { _started = true; cb(_match); }
+    },
     onScore:   cb => { _onScore = cb; },
     onEnd:     cb => { _onEnd = cb; },
     onOppLeft: cb => { _onOppLeft = cb; },

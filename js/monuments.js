@@ -4441,6 +4441,10 @@ window.citiesSpectatorShowPregame = function (payload) {
 // payload = { mode:'game', index, cityName, countryCode, lat, lon, timeLeft }
 window.citiesSpectatorShowRound = function (payload) {
   if (!_citiesSpecMode || !state) return;
+  // Mismo círculo de espera que flags.js/shapes.js apagan acá (ver
+  // _showVsWaitSpinner/_hideVsWaitSpinner en vs.js) — cities/monuments no lo
+  // tenían, así que en sala grupal se quedaba pegado hasta un timeout aparte.
+  if (typeof window._hideVsWaitSpinner === 'function') window._hideVsWaitSpinner();
   // OJO: NO se tocan pin1Anim/pin2Anim/resultLabel acá — el nextCity() REAL
   // tampoco los toca. El jugador real llama a nextCity() ~750ms después del
   // click (300ms hasta que aparece pin2 + ~100ms hasta que "aterriza" +
@@ -5034,6 +5038,7 @@ window.monumentsSpectatorShowPregame = function (payload) {
 // payload = { mode:'monuments', index, monumentName, img, lat, lon, timeLeft }
 window.monumentsSpectatorShowRound = function (payload) {
   if (!_monumentsSpecMode || !state) return;
+  if (typeof window._hideVsWaitSpinner === 'function') window._hideVsWaitSpinner();
   // Mismo motivo que citiesSpectatorShowRound: no tocar pin1Anim/pin2Anim acá,
   // se limpian solos cuando su propio fade termina (ver render()).
   state.phase = 'waiting';

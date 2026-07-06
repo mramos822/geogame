@@ -2412,6 +2412,12 @@ window.GroupSpectate = (() => {
     // que la ventana sin esto era chica, pero no hay razón para dejarla).
     window._isSpectating = true;
     if (typeof window.refreshIngamePower === 'function') window.refreshIngamePower();
+    // instant: el círculo de espera (#vs-wait-spinner) ya lo prendió
+    // _vsHandleGameEnd (vs.js) apenas terminó mi propio cronómetro, ANTES de
+    // llegar acá — y flags.js/shapes.js ya lo apagan solos en el mismo punto
+    // donde revelan la ronda real del rival. No hace falta tocar nada más
+    // acá, solo evitar el "Cargando partida..." de pantalla completa (se
+    // sentía como un salto/reset — ver comentario más arriba).
     if (!instant) _showLoading();
 
     window.Spectate.onSnapshot(match => {
@@ -3189,6 +3195,13 @@ window.GroupSpectate = (() => {
     window._isSpectating = true;
     if (typeof window.refreshIngamePower === 'function') window.refreshIngamePower();
     if (!instant) _showLoading();
+    // instant: mismo círculo de espera que usa el 1v1 (#vs-wait-spinner, ver
+    // _showVsWaitSpinner/_hideVsWaitSpinner en vs.js) en vez del cartel de
+    // "Cargando partida..." de pantalla completa (se sentía como un
+    // salto/reset acá también) — flags.js/shapes.js ya lo apagan solos,
+    // incondicionalmente, en el mismo punto donde revelan la ronda real del
+    // compañero, así que alcanza con prenderlo acá.
+    else if (typeof window._showVsWaitSpinner === 'function') window._showVsWaitSpinner();
     _wireGroupCallbacks();
     window.GroupSpectate.watch(lobbyId, initialMember && initialMember.id, opts).then(() => {
       if (!window.GroupSpectate.getMembers().length) throw new Error('empty_lobby');
