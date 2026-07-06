@@ -29,6 +29,7 @@ async function loadFriends() {
       id: f.id, name: f.name, score: f.score,
       avatar: f.avatar || '', last_active: f.last_active || null,
       is_playing: f.is_playing || false,
+      is_practicing: f.is_practicing || false,
     }));
   } catch (e) {
     console.warn('[friends] error cargando:', e.message);

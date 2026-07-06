@@ -445,6 +445,16 @@
       </div>
     </div>
 
+    <!-- Popup: duelo aceptado (se muestra a AMBOS jugadores en el margen entre
+         "el guest aceptó" y "arranca el 3-2-1", ver START_DELAY_MS en vs.js) -->
+    <div id="vs-duel-accepted-popup" class="vs-popup-overlay" style="display:none">
+      <div class="vs-popup-box">
+        <img class="vs-popup-pic" id="vs-duel-accepted-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
+        <span class="vs-popup-name" id="vs-duel-accepted-name"></span>
+        <span class="vs-popup-sub" data-i18n="vs.duelAccepted">¡Duelo aceptado! Redirigiéndote a la partida…</span>
+      </div>
+    </div>
+
     <!-- ── PANEL 3: PRACTICE TOUR ─────────────────────────────────────────── -->
     <div id="loading-practice-group" style="display:none">
       <!-- Mesa (igual posición/tamaño que el panel de perfil) -->
@@ -1075,7 +1085,7 @@
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
     </div>
-    <div id="loading-version">Ver. 3.1.4</div>
+    <div id="loading-version">Ver. 3.2.0</div>
   </div>
 
   <!-- Pantalla de resultado versus (W/L) — fuera del loading-screen para verse tras la partida -->
@@ -1100,6 +1110,68 @@
         <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
+    </div>
+  </div>
+
+  <!-- Modo espectador: transición de carga (mismos assets que el loading inicial
+       de la página) mientras nos conectamos al canal en vivo del amigo -->
+  <div id="spectator-loading" style="display:none">
+    <img class="spectator-loading-plane" src="images/plane.png" alt="" draggable="false" oncontextmenu="return false">
+    <img class="spectator-loading-logo" src="images/logo.png" alt="" draggable="false" oncontextmenu="return false">
+    <div class="spectator-loading-text" id="spectator-loading-text" data-i18n="spectator.loading">Cargando partida...</div>
+    <div class="spectator-loading-bar-track">
+      <div class="spectator-loading-bar-fill" id="spectator-loading-bar-fill"></div>
+    </div>
+  </div>
+
+  <!-- Modo espectador: barra abajo estilo Fortnite (avatar + nombre + tag) cuando
+       se reusa la pantalla REAL del juego (flags-wrapper) en vez del panelcito
+       genérico de abajo -->
+  <div id="spectator-mini-hud" style="display:none">
+    <span class="spectator-mini-tag" id="spectator-mini-tag" data-i18n="spectator.watchingTag">ESPECTANDO</span>
+    <div class="spectator-mini-row" id="spectator-mini-row">
+      <!-- Flechas de POV: SOLO para espectador grupal (ver openSpectatorGroup
+           en spectate.js) — 1v1/solo tienen un único jugador que mirar, así
+           que quedan display:none siempre en esos casos. -->
+      <div class="spectator-mini-pov-arrow spectator-mini-pov-prev" id="spectator-mini-pov-prev" style="display:none">‹</div>
+      <img class="spectator-mini-avatar" id="spectator-mini-avatar" src="images/profilepic/ppdefault.png" alt="">
+      <span class="spectator-mini-name" id="spectator-mini-name"></span>
+      <div class="spectator-mini-pov-arrow spectator-mini-pov-next" id="spectator-mini-pov-next" style="display:none">›</div>
+    </div>
+  </div>
+
+  <!-- Versus: se muestra mientras un jugador espera a que lleguen los datos
+       del rival (canal soltado + reconexión como espectador, ver
+       _enterWaitAsSpectator en vs.js) — sin esto esos ~1s de transición se
+       veían como una pantalla en blanco sin ninguna señal de que algo sigue
+       en curso. -->
+  <div id="vs-wait-spinner" style="display:none">
+    <div class="vs-wait-spinner-circle"></div>
+  </div>
+
+  <!-- Modo espectador: mirar en vivo la partida versus de un amigo -->
+  <div id="spectator-screen" class="vs-popup-overlay" style="display:none">
+    <div class="vs-popup-box spectator-box">
+      <div class="spectator-header">
+        <span class="spectator-title" id="spectator-title"></span>
+        <div class="spectator-close" id="spectator-close">✕</div>
+      </div>
+      <div class="vs-result-scores">
+        <div class="vs-result-side">
+          <img class="vs-result-pic" id="spectator-host-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="vs-result-name" id="spectator-host-name"></span>
+          <span class="vs-result-score" id="spectator-host-score">0</span>
+        </div>
+        <span class="vs-result-vs">VS</span>
+        <div class="vs-result-side">
+          <img class="vs-result-pic" id="spectator-guest-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="vs-result-name" id="spectator-guest-name"></span>
+          <span class="vs-result-score" id="spectator-guest-score">0</span>
+        </div>
+      </div>
+      <span class="spectator-prompt" id="spectator-prompt"></span>
+      <div class="spectator-options" id="spectator-options"></div>
+      <span class="spectator-status" id="spectator-status"></span>
     </div>
   </div>
 
@@ -1435,6 +1507,7 @@
     <img src="images/points.png" alt="">
     <div id="score-value">0</div>
   </div>
+  <div id="vs-spectator-badge" style="display:none"><span class="spectator-badge-eye"><img class="spectator-badge-eye-img" src="images/eye1.png" alt="" draggable="false" oncontextmenu="return false"><img class="spectator-badge-eye-img spectator-badge-eye-pupil" src="images/eye2.png" alt="" draggable="false" oncontextmenu="return false"></span> <span id="vs-spectator-count">0</span></div>
 
   <!-- Barra celeste pegada al borde derecho visible, detrás del panel de amigos -->
   <div id="right-edge-bar"></div>
@@ -1460,7 +1533,13 @@
   </div>
   <div id="fs-btn">⛶</div>
 
-  <img id="ingame-power" src="images/power.png" alt="" draggable="false" oncontextmenu="return false" style="display:none">
+  <div id="ingame-power" style="display:none">
+    <img id="ingame-power-icon" src="images/power.png" alt="" draggable="false" oncontextmenu="return false">
+    <div id="ingame-back-icon" style="display:none">
+      <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+      <img class="loading-play-confirm2 ingame-back-arrow" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+    </div>
+  </div>
 
   <div id="ingame-quit-popup" style="display:none">
     <div class="ingame-quit-box">
@@ -1509,6 +1588,7 @@
     <img src="images/points.png" alt="">
     <div id="flags-score-value">0</div>
   </div>
+  <div id="flags-vs-spectator-badge" style="display:none"><span class="spectator-badge-eye"><img class="spectator-badge-eye-img" src="images/eye1.png" alt="" draggable="false" oncontextmenu="return false"><img class="spectator-badge-eye-img spectator-badge-eye-pupil" src="images/eye2.png" alt="" draggable="false" oncontextmenu="return false"></span> <span id="flags-vs-spectator-count">0</span></div>
 
   <div id="flags-right-panel" style="display:none">
     <div id="flags-leaderboard"></div>
@@ -1642,6 +1722,7 @@
   <script src="js/places.js"></script>
   <script src="js/friends.js"></script>
   <script src="js/vs.js"></script>
+  <script src="js/spectate.js"></script>
   <script src="js/lobby.js"></script>
   <script src="js/monuments.js"></script>
   <script src="js/flags.js"></script>

@@ -159,7 +159,7 @@ function buildFriendClouds(ranking, playerPos) {
       `<span class="final2-position">${realPos}</span>` +
       `<span class="final2-player-name">${entry.name}</span>` +
       `<span class="final2-rank-label" id="${labelId}">${rk ? rk.name : ''}</span>` +
-      `<div class="final2-avatar"><img class="final2-avatar-img" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false"></div>` +
+      `<div class="final2-avatar"><img class="final2-avatar-img" src="${entry.avatar || 'images/profilepic/ppdefault.png'}" alt="" draggable="false" oncontextmenu="return false"></div>` +
       `<div class="final2-points-wrap">` +
         `<img class="final2-points-img" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">` +
         `<span class="final2-points-score">${entry.score.toLocaleString()}</span>` +

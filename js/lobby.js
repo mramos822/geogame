@@ -16,6 +16,34 @@ window.LB = (() => {
   let _publicSignalCh = null;      // canal para ENVIAR señales a viewers del panel público (host)
   let _publicSignalChReady = false; // true cuando el canal está en estado SUBSCRIBED
 
+  // Reconectar al volver de 2do plano — los navegadores throttlean los
+  // timers de una pestaña en background (a veces a 1/min), de los que
+  // depende el heartbeat que la librería de Realtime manda para mantener
+  // vivo el WebSocket; si se demora demasiado, el servidor puede cerrar el
+  // socket o la presencia de este cliente parece "caerse" para los demás
+  // (el "me kickeó de la nada" reportado, mismo origen). En vez de esperar
+  // a que Realtime lo note solo (puede tardar o no pasar), se chequea el
+  // estado del canal apenas la pestaña vuelve a primer plano y se fuerza un
+  // resubscribe si no está realmente conectado.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    if (!_lobbyId) return;
+    if (!(_channel && _channel.state === 'joined')) _subscribe();
+    // Cuenta regresiva de arranque: el countdown en sí ya se calcula contra
+    // el reloj real (until - Date.now()), no contando ticks, así que el
+    // NÚMERO mostrado siempre se corrige solo apenas el setInterval vuelve a
+    // disparar. El problema es OTRO: el disparo real de la partida
+    // (window.LB.start()) solo lo hace el HOST, y solo puede pasar DENTRO de
+    // ese mismo _cdInterval — si la pestaña del host está en 2do plano, el
+    // navegador puede throttlear ese timer a mucho más de 200ms, así que
+    // start() no llega a llamarse hasta que el timer por fin dispare (podía
+    // tardar bastante) aunque para el resto ya pasó de sobra el tiempo — el
+    // "se descoordina con el resto" reportado: todos los demás ya llegaron a
+    // 0 y quedan esperando a que el host, atrasado, recién ahí arranque.
+    // Forzar el chequeo YA al volver a primer plano evita esa espera.
+    if (_counting && _cdTick) _cdTick();
+  });
+
   // Envía un room-update al canal público; si el canal aún no está listo, reintenta hasta 3s
   function _sendRoomUpdate(payload) {
     if (!_publicSignalCh) return;
@@ -42,13 +70,41 @@ window.LB = (() => {
   let _onName       = null;  // host cambió el nombre de la sala
   let _onModes      = null;  // host cambió el modo de juego
   let _onFinished   = null;  // un miembro terminó su partida → coordinación fin grupal
+  let _onReveal     = null;  // {revealAt, isFinal} — reloj de pared compartido para mostrar resultados TODOS a la vez (ver _checkAllFinished)
   let _onScore      = null;  // score en vivo de otro miembro → actualizar leaderboard
   let _onPlayerGone = null;  // miembro perdió presencia durante partida activa
   let _onPlayerBack = null;  // miembro recuperó presencia durante partida activa
   let _onAlone      = null;  // todos los demás se fueron durante partida activa → quedé solo
   let _aloneCalledThisGame = false; // guard: _onAlone sólo dispara una vez por partida
+  // ── Broadcast ronda-a-ronda para el modo espectador GRUPAL (ver GroupSpectate
+  // en spectate.js) — mismo mecanismo que ya usa VS para 1v1 (reportRound/
+  // reportTick/reportPregame/reportPostgame/reportAnswer), pero acá cada
+  // miembro manda SU propio uid en vez de un rol binario host/guest, porque
+  // puede haber hasta 10 jugadores en la misma sala. Antes esto no existía:
+  // _specReportRound/etc (spectate.js) no tenían ninguna rama para
+  // window._lobbyActive, así que un espectador de grupo solo podía ver el
+  // score acumulado (lbscore), nunca la ronda/tablero real de cada miembro.
+  let _onRound      = null;  // {uid, ...payload} — un miembro arrancó una ronda nueva
+  let _onTick       = null;  // {uid, timeLeft}
+  let _onPregame    = null;  // {uid, ...payload} — 3-2-1 de un miembro
+  let _onPostgame   = null;  // {uid, ...payload} — resultados de un miembro
+  let _onAnswer     = null;  // {uid, ...detail} — un miembro respondió
+  let _onTimesUp    = null;  // {uid}
+  let _onSplash     = null;  // {uid, ...payload} — un miembro está en instrucciones
+  let _onAdvancing  = null;  // {uid} — un miembro confirmó salir del postgame hacia el siguiente modo
   let _resubTime    = 0;     // timestamp del último _subscribe(); guard contra kicks falsos
   const _pendingKicks = new Set(); // miembros que se desconectaron durante la partida
+  // uids cuyo PRÓXIMO 'leave' de presence es esperado/intencional (ver
+  // markExpectedLeave, llamado desde _enterGroupWaitAsSpectator en lobby.js
+  // justo antes de soltar su propio canal para espectar de prestado a los
+  // que siguen jugando) — sin esto, el 'leave' handler de más abajo trataba
+  // esa desconexión temporal como si el miembro hubiera abandonado la
+  // partida DE VERDAD: lo sumaba a _pendingKicks, y _checkAllFinished()
+  // (window.Lobby) resta pendingKicksCount del total de gente a esperar —
+  // con un jugador todavía jugando restado del total sin querer, la sala
+  // podía terminar (mostrar el ranking) ANTES de que ese jugador de verdad
+  // terminara (el "le quedaba tiempo y saltó GANASTE de una" reportado).
+  const _expectedLeaves = new Set();
 
   function _myId() { return window._sbUserId || null; }
   function isHost()      { return !!_hostId && _hostId === _myId(); }
@@ -78,6 +134,7 @@ window.LB = (() => {
       score:     m.score || 0,
       isHost:    m.user_id === _hostId,
       is_playing: !!(m.p && m.p.is_playing),
+      joined_at: m.joined_at,
     }));
     // Si la sala quedó totalmente vacía (todos se fueron sin avisar), cerrarla.
     if (_members.length === 0 && _lobbyId && !window._lobbyActive) {
@@ -117,8 +174,34 @@ window.LB = (() => {
       .subscribe();
   }
 
-  function _subscribe() {
-    if (_channel) _channel.unsubscribe();
+  // Purga CUALQUIER canal (de este cliente) con el mismo topic 'lobby-{id}'
+  // que haya quedado registrado — no solo nuestra propia referencia _channel.
+  // GroupSpectate (spectate.js) se suscribe al MISMO topic mientras este
+  // jugador espectea de prestado (ver _enterGroupWaitAsSpectator en este
+  // archivo); aun llamando GroupSpectate.stop()→removeChannel() y esperando
+  // su promesa, supabase-js puede tardar en reflejar la baja en su registro
+  // interno de canales — si _subscribe() crea un canal nuevo para ese mismo
+  // topic ANTES de que el registro se limpie de verdad, el SDK devuelve la
+  // instancia VIEJA (ya suscripta una vez) en vez de una nueva, y cualquier
+  // `.on('postgres_changes', ...)` sobre ella explota ("cannot add
+  // postgres_changes callbacks ... after subscribe()") — dejando el canal
+  // roto para el resto del modo (scores/wrong nunca llegaban a nadie,
+  // reportado). Se purga TODO lo que matchee el topic, con reintento breve,
+  // antes de crear el canal real.
+  async function _purgeStaleChannel(lid) {
+    const topic = 'realtime:lobby-' + lid;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const stale = (typeof window.sb.getChannels === 'function' ? window.sb.getChannels() : [])
+        .filter(c => c && c.topic === topic);
+      if (!stale.length) return;
+      await Promise.all(stale.map(c => { try { return window.sb.removeChannel(c); } catch (e) { return Promise.resolve(); } }));
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  }
+
+  async function _subscribe() {
+    if (_channel) { try { await window.sb.removeChannel(_channel); } catch (e) {} _channel = null; }
+    await _purgeStaleChannel(_lobbyId);
     // Suscribirse al canal público para poder emitir señales de actualización a los viewers
     if (_publicSignalCh) { try { _publicSignalCh.unsubscribe(); } catch(e) {} }
     // Nombre diferente a 'public-lobbies-watch' para no interferir con _publicChannel del viewer
@@ -129,6 +212,9 @@ window.LB = (() => {
     const lid = _lobbyId;
     const uid = _myId();
     _channel = window.sb.channel('lobby-' + lid, { config: { broadcast: { self: true }, presence: { key: uid || 'anon' } } })
+      // Ver comentario largo en markExpectedLeave — hay que registrarlo ANTES
+      // de que llegue el 'leave' real de presence de ese mismo uid.
+      .on('broadcast', { event: 'expectleave' }, ({ payload }) => { if (payload && payload.uid) _expectedLeaves.add(payload.uid); })
       // Cuenta regresiva sincronizada (efímera, sin tocar la DB)
       .on('broadcast', { event: 'cd' },       ({ payload }) => { if (_onCountdown) _onCountdown(payload || {}); })
       .on('broadcast', { event: 'cancel' },   () => { if (_onCancel) _onCancel(); })
@@ -152,9 +238,31 @@ window.LB = (() => {
       .on('broadcast', { event: 'finished' }, ({ payload }) => {
         if (_onFinished) _onFinished(payload?.uid, payload?.score);
       })
+      // Reloj de pared compartido para el ranking de fin de ronda — ver
+      // comentario largo en _checkAllFinished/lobby.js. Sin esto, cada
+      // cliente presentaba el resultado apenas SE ENTERABA (localmente) de
+      // que todos terminaron, y quien se enteraba por un camino más lento
+      // (ej. un espectador de prestado, con más saltos de por medio) lo
+      // veía tarde — "antes funcionaba, al meter el espectador se
+      // estropeó" reportado.
+      .on('broadcast', { event: 'reveal' }, ({ payload }) => {
+        if (_onReveal && payload && typeof payload.revealAt === 'number') _onReveal(payload.revealAt, !!payload.isFinal);
+      })
       .on('broadcast', { event: 'lbscore' }, ({ payload }) => {
         if (_onScore && payload?.uid !== _myId()) _onScore(payload?.uid, payload?.score ?? 0);
       })
+      // Ver comentario largo en los _on* declarados arriba — mismo mecanismo
+      // que VS (vs.js) pero taggeado por uid en vez de role host/guest, para
+      // que GroupSpectate (spectate.js) pueda mostrar el tablero real de
+      // CUALQUIER miembro, no solo su score acumulado.
+      .on('broadcast', { event: 'round' },     ({ payload }) => { if (payload && _onRound) _onRound(payload); })
+      .on('broadcast', { event: 'gtick' },     ({ payload }) => { if (payload && _onTick) _onTick(payload); })
+      .on('broadcast', { event: 'pregame' },   ({ payload }) => { if (payload && _onPregame) _onPregame(payload); })
+      .on('broadcast', { event: 'postgame' },  ({ payload }) => { if (payload && _onPostgame) _onPostgame(payload); })
+      .on('broadcast', { event: 'ganswer' },   ({ payload }) => { if (payload && _onAnswer) _onAnswer(payload); })
+      .on('broadcast', { event: 'timesup' },   ({ payload }) => { if (payload && _onTimesUp) _onTimesUp(payload); })
+      .on('broadcast', { event: 'splash' },    ({ payload }) => { if (payload && _onSplash) _onSplash(payload); })
+      .on('broadcast', { event: 'advancing' }, ({ payload }) => { if (payload && _onAdvancing) _onAdvancing(payload); })
       // Cualquier cambio de miembros (alta/baja/score) → re-consultar a la sala.
       // _fetchMembers detecta si me kickearon (ya no figuro en la lista). No filtramos
       // por lobby_id en cliente porque el payload de DELETE no siempre trae las columnas.
@@ -172,47 +280,80 @@ window.LB = (() => {
         else { _fetchMembers(); } // cambió el host (u otro campo) → re-render con el nuevo host
       })
       // Presencia: si alguien refresca o cierra la pestaña, su presencia "cae".
+      // key.indexOf('spectator-')===0: un ESPECTADOR externo (GroupSpectate,
+      // ver spectate.js) se desconectó/cambió de sala — nunca un miembro real
+      // de ESTA sala. Sin este filtro, cerrar una sesión de espectador
+      // disparaba toda la lógica de "un miembro se fue" (kick, herencia de
+      // host, chequeo de "quedé solo") como si un JUGADOR real hubiera
+      // abandonado — bug expuesto recién ahora que hay espectadores
+      // compartiendo este mismo canal 'lobby-{id}'.
       .on('presence', { event: 'leave' }, ({ key }) => {
-        if (!key || key === uid) return;
+        if (!key || key === uid || key.indexOf('spectator-') === 0) return;
+        if (_expectedLeaves.delete(key)) return; // desconexión intencional (ver markExpectedLeave) — no es un abandono real
         clearTimeout(_graceTimers[key]);
         if (window._lobbyActive || window._lobbyInTransition) {
-          // Durante partida activa: reaccionar inmediatamente sin esperar el grace timer
-          _pendingKicks.add(key);
-          if (_onPlayerGone) _onPlayerGone(key);
-          // Si el HOST se fue, promover al heredero (mismo algoritmo que _handleMemberGone)
-          if (key === _hostId) {
-            const myId2 = _myId();
-            const heir = _members.find(m => m.id !== key && !_pendingKicks.has(m.id));
-            if (heir && heir.id === myId2) {
-              // Solo el heredero hace el UPDATE para evitar race conditions
-              _hostId = myId2;
-              window.sb.from('lobbies').update({ host_id: myId2 }).eq('id', _lobbyId).then(() => {}).catch(() => {});
-            } else if (!heir) {
-              // Quedé solo — el alone check lo maneja abajo
+          // Margen corto antes de tratar esto como abandono real. El
+          // broadcast 'expectleave' (ver markExpectedLeave) y este 'leave'
+          // real de presence viajan por canales separados (broadcast vs.
+          // presence) sin orden garantizado entre sí — si el 'leave' llega
+          // ANTES de que este cliente haya procesado su 'expectleave' (pura
+          // carrera de red), una desconexión INTENCIONAL (alguien pasando a
+          // espectar de prestado tras terminar su modo) se trataba como
+          // abandono real: pendingKick + _onPlayerGone marcaba al jugador
+          // como desconectado en el leaderboard de TODOS hasta que su
+          // siguiente 'join' (al reconectar tras espectar) lo revertía — el
+          // "desaparece y reaparece en el leaderboard" reportado. Re-chequear
+          // _expectedLeaves un toque después le da tiempo a ese broadcast
+          // tardío de llegar antes de comprometerse a la baja.
+          setTimeout(() => {
+            if (_expectedLeaves.delete(key)) return; // llegó tarde pero llegó — no es abandono real
+            _pendingKicks.add(key);
+            if (_onPlayerGone) _onPlayerGone(key);
+            // Si el HOST se fue, promover al heredero (mismo algoritmo que _handleMemberGone)
+            if (key === _hostId) {
+              const myId2 = _myId();
+              const heir = _members.find(m => m.id !== key && !_pendingKicks.has(m.id));
+              if (heir && heir.id === myId2) {
+                // Solo el heredero hace el UPDATE para evitar race conditions
+                _hostId = myId2;
+                window.sb.from('lobbies').update({ host_id: myId2 }).eq('id', _lobbyId).then(() => {}).catch(() => {});
+              }
             }
-          }
-          // Verificar si quedé solo — dos métodos complementarios:
-          // 1) presenceState: clave de presencia ES el uid, usar Object.keys directamente
-          const state = _channel?.presenceState?.() || {};
-          const presentNow = new Set(Object.keys(state));
-          presentNow.delete(key); // ya salió
-          presentNow.delete(uid); // yo mismo no cuento
-          // 2) pendingKicks como fallback: todos los demás ya en la lista de bajas
-          const myId = _myId();
-          const othersKicked = _members.length > 0 && _members.filter(m => m.id !== myId)
-            .every(m => m.id === key || _pendingKicks.has(m.id));
-          if (!_aloneCalledThisGame && (presentNow.size === 0 || othersKicked)) {
-            _aloneCalledThisGame = true;
-            if (_onAlone) _onAlone();
-          }
+            // Verificar si quedé solo — dos métodos complementarios:
+            // 1) presenceState: clave de presencia ES el uid, usar Object.keys directamente
+            const state = _channel?.presenceState?.() || {};
+            const presentNow = new Set(Object.keys(state));
+            presentNow.delete(key); // ya salió
+            presentNow.delete(uid); // yo mismo no cuento
+            // 2) pendingKicks como fallback: todos los demás ya en la lista de bajas
+            const myId = _myId();
+            const othersKicked = _members.length > 0 && _members.filter(m => m.id !== myId)
+              .every(m => m.id === key || _pendingKicks.has(m.id));
+            if (!_aloneCalledThisGame && (presentNow.size === 0 || othersKicked)) {
+              _aloneCalledThisGame = true;
+              if (_onAlone) _onAlone();
+            }
+          }, 300);
           return; // sin grace timer durante partida activa
         }
         _graceTimers[key] = setTimeout(() => _handleMemberGone(key), GRACE_MS);
       })
       .on('presence', { event: 'join' }, ({ key }) => {
-        if (!key || key === uid) return;
+        if (!key || key === uid || key.indexOf('spectator-') === 0) return;
         if (_graceTimers[key]) { clearTimeout(_graceTimers[key]); delete _graceTimers[key]; }
         if (window._lobbyActive && _onPlayerBack) _onPlayerBack(key);
+      })
+      // Contador de espectadores GLOBAL de la sala — en grupo los espectados
+      // se tratan como algo global: el símbolo de "te están espectando"
+      // aparece en TODOS los miembros por igual mientras haya al menos un
+      // espectador mirando la sala, y desaparece en todos cuando se van. Se
+      // cuenta cada clave de presencia 'spectator-*', sin filtrar por a quién
+      // mira (antes se filtraba por pov===mi uid, lo que además obligaba al
+      // espectador a re-trackear en cada cambio de POV — eso desconectaba el
+      // canal, ver GroupSpectate). Ahora el espectador trackea su presencia
+      // UNA sola vez y no toca nada más al cambiar de POV.
+      .on('presence', { event: 'sync' }, () => {
+        try { _applySpectatorBadge(); } catch (e) {}
       })
       .subscribe(async (status) => {
         if (status !== 'SUBSCRIBED') return;
@@ -224,11 +365,24 @@ window.LB = (() => {
           const state = _channel.presenceState();
           const presentIds = new Set(Object.values(state).flat().map(p => p.uid).filter(Boolean));
           if (!presentIds.size) return; // presencia todavía no recibida
-          const absent = _members.filter(m => m.id !== uid && !presentIds.has(m.id));
+          // Excluir a quien se unió hace muy poco (< 10s): su presencia puede
+          // no haber llegado TODAVÍA a la foto de este cliente en particular
+          // (propagación no es instantánea, y este chequeo puede dispararse
+          // por una re-suscripción de ESTE cliente —p.ej. al volver de 2do
+          // plano— justo mientras alguien más recién se está uniendo) — sin
+          // este margen, un amigo que entraba en ese instante podía quedar
+          // marcado "ausente" y ser expulsado de la sala casi al segundo de
+          // haber entrado (reportado).
+          const now = Date.now();
+          const absent = _members.filter(m => {
+            if (m.id === uid || presentIds.has(m.id)) return false;
+            const joinedMs = m.joined_at ? new Date(m.joined_at).getTime() : 0;
+            return !joinedMs || (now - joinedMs) > 10000;
+          });
           if (!absent.length) return;
           await Promise.all(absent.map(m =>
-            window.sb.from('lobby_members').delete()
-              .eq('lobby_id', snapLobbyId).eq('user_id', m.id).catch(() => {})
+            Promise.resolve(window.sb.from('lobby_members').delete()
+              .eq('lobby_id', snapLobbyId).eq('user_id', m.id)).catch(() => {})
           ));
           _fetchMembers();
         }, 5000);
@@ -243,6 +397,20 @@ window.LB = (() => {
     if (window._lobbyActive) { _pendingKicks.add(goneId); return; } // presence.leave ya lo manejó
     if (!_lobbyId) return;
     if (!_lobby || _lobby.status !== 'waiting') return;
+    // No expulsar en plena cuenta regresiva de arranque (sendCountdown, 10s
+    // antes de pasar a 'active') — un simple blip de presencia (wifi,
+    // pestaña que pasa a 2do plano y throttlea el heartbeat) de apenas más
+    // de GRACE_MS bastaba para que el host lo borrara de lobby_members DE
+    // VERDAD aunque su conexión real estuviera bien y volviera enseguida
+    // (el "me kickeó de la nada en plena cuenta regresiva" reportado).
+    // Reintentar el mismo chequeo más adelante en vez de decidir ahora —
+    // cuando la cuenta termine (arranca la partida → _lobbyActive lo agarra
+    // arriba; o se cancela → vuelve al flujo normal de espera) esto se
+    // resuelve solo con el criterio de siempre.
+    if (window._lobbyCountingDown) {
+      _graceTimers[goneId] = setTimeout(() => _handleMemberGone(goneId), GRACE_MS);
+      return;
+    }
     if (Date.now() - _resubTime < 9000) return;            // ignorar drops falsos post-resubscripción
     // Si el miembro tiene presencia activa, se reingresó antes de expirar el timer → no expulsar
     if (_channel) {
@@ -286,11 +454,16 @@ window.LB = (() => {
         let q = window.sb.from('lobbies').delete().eq('host_id', uid).in('status', ['waiting', 'closed', 'active']);
         if (_lobbyId) q = q.neq('id', _lobbyId);
         await q;
-        // Borrar matches propios terminales
+        // Borrar matches propios terminales (con el mismo cutoff de 30 min que el
+        // fallback global de abajo, para no destruir el historial reciente apenas
+        // se crea la próxima sala — los conteos de stats ya no dependen de esta
+        // tabla, pero conviene no seguir siendo más agresivos de lo necesario).
         await window.sb.from('matches').delete().eq('player1_id', uid)
-          .in('status', ['abandoned', 'declined', 'expired', 'finished', 'cancelled']);
+          .in('status', ['abandoned', 'declined', 'expired', 'finished', 'cancelled'])
+          .lt('created_at', cutoff30m);
         await window.sb.from('matches').delete().eq('player2_id', uid)
-          .in('status', ['abandoned', 'declined', 'expired', 'finished', 'cancelled']);
+          .in('status', ['abandoned', 'declined', 'expired', 'finished', 'cancelled'])
+          .lt('created_at', cutoff30m);
       }
       // Intentar borrado global vía RPC (SECURITY DEFINER, bypasea RLS)
       try { await window.sb.rpc('cleanup_stale_lobbies'); } catch (_) {}
@@ -456,9 +629,30 @@ window.LB = (() => {
     try { await window.sb.from('lobby_members').update({ score }).eq('lobby_id', _lobbyId).eq('user_id', _myId()); } catch (e) {}
   }
 
+  // Cuenta los espectadores GLOBALES (claves de presencia 'spectator-*') y
+  // aplica el badge de "te están espectando". Se llama en cada 'sync' de
+  // presence Y explícitamente al arrancar cada modo (refreshSpectatorCount,
+  // más abajo) — porque refreshVsSpectatorBadge apunta al badge del modo
+  // ACTIVO, y en una transición de modo no hay ningún 'sync' que lo vuelva a
+  // aplicar, así que el badge del modo nuevo arrancaba apagado aunque hubiera
+  // espectadores (reportado, "en cada transición se les quita el símbolo").
+  function _applySpectatorBadge() {
+    if (!_channel) return;
+    const state = _channel.presenceState();
+    let n = 0;
+    Object.keys(state).forEach(k => { if (k.indexOf('spectator-') === 0) n++; });
+    if (typeof window.refreshVsSpectatorBadge === 'function') window.refreshVsSpectatorBadge(n);
+  }
+
   // ── Broadcast efímero (cuenta regresiva / no estoy listo) ──────────────────────
   function _bcast(event, payload) {
-    if (_channel) { try { _channel.send({ type: 'broadcast', event, payload: payload || {} }); } catch (e) {} }
+    // Devuelve la promesa de send() (en vez de fire-and-forget) — necesario
+    // para markExpectedLeave/'expectleave', que tiene que terminar de
+    // encolarse en el socket ANTES de que releaseChannel() lo desuscriba
+    // (ver comentario largo ahí). Para el resto de los usos de _bcast (que
+    // nunca esperan el resultado), no cambia nada.
+    if (_channel) { try { return _channel.send({ type: 'broadcast', event, payload: payload || {} }); } catch (e) { return Promise.resolve(); } }
+    return Promise.resolve();
   }
   function sendCountdown(until) { _bcast('cd', { until }); }
   function sendCancel()         { _bcast('cancel'); }
@@ -467,8 +661,78 @@ window.LB = (() => {
   function sendVisibility(pub)  { _bcast('visibility', { isPublic: !!pub }); }
   function sendName(name)       { _bcast('name', { name }); }
   function sendFinished(score)  { _bcast('finished', { uid: _myId(), score }); }
+  function sendReveal(revealAt, isFinal) { _bcast('reveal', { revealAt, isFinal: !!isFinal }); }
   function sendScore(score)     { _bcast('lbscore',  { uid: _myId(), score }); }
   function sendModes(modes, changed = true) { _bcast('modes', { modes, mode: modes && modes.length > 1 ? modes.join('+') : ((modes && modes[0]) || 'flags'), changed: !!changed }); }
+
+  // ── Estado en vivo persistido (ver group_live_state.sql) ────────────────────
+  // Mismo mecanismo que _persistLiveState en vs.js (1v1): sin esto, un
+  // espectador que recién se conecta a GroupSpectate O que cambia de POV con
+  // las flechas no tenía forma de saber en qué fase está CADA miembro hasta
+  // que le llegara su PRÓXIMO broadcast en vivo — se quedaba viendo nada/lo
+  // viejo hasta que esa persona hiciera algo (el "recién funciona cuando
+  // cometen una acción, tiene que ser al instante como en el 1v1" reportado).
+  let _lastPhase          = null; // 'round' | 'pregame' | 'postgame' | 'splash' | 'timesup'
+  let _lastRoundPayload   = null;
+  let _lastPregamePayload = null;
+  let _lastPostgamePayload = null;
+  // Separado de _lastPhase a propósito — ver comentario largo en
+  // _persistLiveState. sendPostgame() TAMBIÉN se usa para el ranking de
+  // TODA la sala (kind:'intermediate'/'final', ver _showLobbyResult), que se
+  // manda DESPUÉS de mi propio sendTimesUp() — si "finished" saliera de
+  // `_lastPhase === 'timesup'` en cada persistencia, ESE sendPostgame
+  // posterior pisaba _lastPhase a 'postgame' y el finished:true recién
+  // guardado volvía a false en la DB, justo cuando el poll de respaldo
+  // (_startGroupWaitPoll en lobby.js) más lo necesitaba — el "se quedan
+  // congelados, nunca sale el panel" seguía pasando incluso con el poll ya
+  // agregado.
+  let _finishedFlag = false;
+  function _persistLiveState() {
+    if (!_lobbyId) return;
+    // finished:true es lo que le permite a GroupSpectate (spectate.js
+    // _fetchMembers) Y al poll de respaldo (lobby.js) saber, desde una sola
+    // consulta REST, que este miembro YA NO tiene nada que espectar hasta el
+    // próximo modo — sin esto, si el broadcast efímero de 'timesup' se
+    // perdía (ventana de reconexión al entrar/salir de espectar de prestado,
+    // ver _enterGroupWaitAsSpectator en lobby.js), las flechas de otro
+    // espectador seguían ofreciendo mirarlo indefinidamente (el "aun les
+    // permite cambiar a POVs de gente que ya terminó" reportado).
+    const snapshot = {
+      phase: _lastPhase, round: _lastRoundPayload, pregame: _lastPregamePayload, postgame: _lastPostgamePayload,
+      finished: _finishedFlag, ts: Date.now(),
+    };
+    window.sb.from('lobby_members').update({ live_state: snapshot }).eq('lobby_id', _lobbyId).eq('user_id', _myId()).then(() => {}, () => {});
+  }
+
+  // ── Broadcast ronda-a-ronda para GroupSpectate (ver _on* de más arriba) ────────
+  // Mismo patrón que VS.reportRound/reportTick/etc (vs.js), pero taggeado por
+  // uid en vez de role — cualquier miembro puede estar siendo mirado.
+  function sendRound(payload)     { _lastPhase = 'round'; _lastRoundPayload = payload; _finishedFlag = false; _bcast('round', { uid: _myId(), ...(payload || {}) }); _persistLiveState(); }
+  function sendTick(timeLeft)     { _bcast('gtick',      { uid: _myId(), timeLeft }); }
+  function sendPregame(payload)   { _lastPhase = 'pregame'; _lastPregamePayload = payload || {}; _finishedFlag = false; _bcast('pregame', { uid: _myId(), ...(payload || {}) }); _persistLiveState(); }
+  // NO toca _finishedFlag — ver comentario largo más arriba (sendPostgame
+  // también transporta el ranking de sala, que se manda DESPUÉS de terminar).
+  function sendPostgame(payload)  {
+    _lastPhase = 'postgame'; _lastPostgamePayload = payload;
+    const full = { uid: _myId(), ...(payload || {}) };
+    _bcast('postgame', full);
+    _persistLiveState();
+    // El ranking de sala (kind intermediate/final) es lo ÚNICO que le dice al
+    // espectador EXTERNO que muestre la tabla — y lo recibe por un solo
+    // broadcast. Si el canal del espectador tenía un blip justo en ese
+    // instante, lo perdía y se quedaba CONGELADO sin tabla (reportado, "esa
+    // vez no se le mostró"). Los jugadores no dependen de esto (calculan su
+    // resultado local). Reenviarlo un par de veces más sube muchísimo la
+    // probabilidad de que llegue, sin lógica de fallback compleja.
+    if (payload && (payload.kind === 'intermediate' || payload.kind === 'final')) {
+      setTimeout(() => _bcast('postgame', full), 500);
+      setTimeout(() => _bcast('postgame', full), 1500);
+    }
+  }
+  function sendAnswer(detail)     { _bcast('ganswer',    { uid: _myId(), ...(detail || {}) }); }
+  function sendTimesUp()          { _lastPhase = 'timesup'; _finishedFlag = true; _bcast('timesup', { uid: _myId() }); _persistLiveState(); }
+  function sendSplash(payload)    { _lastPhase = 'splash'; _finishedFlag = false; _bcast('splash', { uid: _myId(), ...(payload || {}) }); _persistLiveState(); }
+  function sendAdvancing()        { _bcast('advancing', { uid: _myId() }); }
 
   async function setModes(modes) {
     if (!isHost() || !_lobbyId) return;
@@ -557,15 +821,15 @@ window.LB = (() => {
     }));
     // Borrar salas vacías (todos se desconectaron sin cerrar) de forma silenciosa
     const emptyIds = result.filter(l => l.count === 0).map(l => l.id);
-    if (emptyIds.length) window.sb.from('lobbies').delete().in('id', emptyIds).catch(() => {});
+    if (emptyIds.length) Promise.resolve(window.sb.from('lobbies').delete().in('id', emptyIds)).catch(() => {});
     return result.filter(l => l.count > 0 && l.count < l.max);
   }
 
   function cleanup() {
     window._lobbyCountingDown = false;
     if (_memberProfilesChannel) { try { window.sb.removeChannel(_memberProfilesChannel); } catch (e) {} _memberProfilesChannel = null; }
-    if (_channel) { _channel.unsubscribe(); _channel = null; }
-    if (_publicSignalCh) { try { _publicSignalCh.unsubscribe(); } catch(e) {} _publicSignalCh = null; _publicSignalChReady = false; }
+    if (_channel) { try { window.sb.removeChannel(_channel); } catch (e) {} _channel = null; }
+    if (_publicSignalCh) { try { window.sb.removeChannel(_publicSignalCh); } catch(e) {} _publicSignalCh = null; _publicSignalChReady = false; }
     Object.values(_graceTimers).forEach(clearTimeout);
     for (const k in _graceTimers) delete _graceTimers[k];
     _pendingKicks.clear();
@@ -575,13 +839,59 @@ window.LB = (() => {
     _onMembers = _onStart = _onClosed = _onCountdown = _onCancel = _onNotReady = _onWrong = _onVisibility = _onName = _onModes = _onFinished = _onScore = _onPlayerGone = _onPlayerBack = _onAlone = null;
   }
 
+  // Libera SOLO la conexión realtime de este cliente al canal 'lobby-{id}',
+  // sin tocar _lobbyId/_members/etc — usado por _enterGroupWaitAsSpectator
+  // (lobby.js) antes de que GroupSpectate.watch() se suscriba al MISMO tema
+  // desde este mismo cliente: Supabase Realtime no deja dos canales
+  // suscriptos al mismo tema desde el mismo cliente (mismo motivo que
+  // VS.releaseChannel en vs.js, 1v1). resubscribeChannel() ya existente es
+  // la contraparte para recuperar la conexión al volver.
+  async function releaseChannel() {
+    if (_channel) {
+      const ch = _channel;
+      _channel = null;
+      try { await window.sb.removeChannel(ch); } catch (e) {}
+    }
+  }
+
+  // Ver comentario largo en _expectedLeaves — llamar SIEMPRE justo antes de
+  // releaseChannel() cuando el motivo es "voy a espectar de prestado", no un
+  // abandono real. _expectedLeaves es una variable LOCAL de cada cliente —
+  // agregar acá el propio uid no le sirve de nada a los DEMÁS clientes, que
+  // son los que en realidad van a recibir y evaluar MI 'leave' de presence.
+  // Por eso esto también broadcastea el aviso: todos (incluido yo mismo,
+  // broadcast self:true) lo agregan a su propio _expectedLeaves antes de que
+  // llegue el 'leave' real — sin este broadcast, cada jugador que entraba a
+  // espectar de prestado hacía que el que quedaba jugando viera "todos
+  // abandonaron la partida" (el _onAlone disparándose en falso, reportado).
+  // Async a propósito: el broadcast tiene que terminar de encolarse en el
+  // socket ANTES de que quien llama a esto pase a releaseChannel() —
+  // marcado con `await` (ver _enterGroupWaitAsSpectator en lobby.js). Antes
+  // era fire-and-forget: si el broadcast todavía no había salido cuando el
+  // canal se desuscribía un instante después (síncrono, la línea
+  // siguiente), el aviso se perdía en silencio — los DEMÁS clientes nunca
+  // agregaban este uid a su propio _expectedLeaves, así que veían su 'leave'
+  // de presence como un abandono REAL. Con varios jugadores terminando casi
+  // juntos (todos entrando a espectar de prestado a la vez, ver el margen de
+  // 600ms en _lobbyHandleGameEnd), esta carrera se perdía para varios a la
+  // vez — inflando _pendingKicks de más, lo que corrompía el total de
+  // _checkAllFinished (o directamente disparaba el "quedé solo" de
+  // _onAlone, tapando toda la partida) — el "no salieron los paneles a
+  // nadie" reportado.
+  async function markExpectedLeave(memberUid) {
+    _expectedLeaves.add(memberUid);
+    await _bcast('expectleave', { uid: memberUid });
+  }
+
   return {
-    create, joinByCode, joinById, leave, kick, start, reportScore, listPublic, cleanup,
-    sendCountdown, sendCancel, sendNotReady, sendWrong, sendVisibility, sendName, sendFinished, sendScore, setPublic, isPublic, restoreActive, transferHost, cleanupMine,
+    create, joinByCode, joinById, leave, kick, start, reportScore, listPublic, cleanup, releaseChannel, markExpectedLeave,
+    sendCountdown, sendCancel, sendNotReady, sendWrong, sendVisibility, sendName, sendFinished, sendReveal, sendScore, setPublic, isPublic, restoreActive, transferHost, cleanupMine,
+    sendRound, sendTick, sendPregame, sendPostgame, sendAnswer, sendTimesUp, sendSplash, sendAdvancing,
     sendInvite, listenForInvites, setName, getName, setModes, getModes, sendModes,
     isHost, getMembers, getLobby, getCode, getId, getSeed,
     refreshMembers: () => _fetchMembers(),
     resubscribeChannel: () => { if (_lobbyId) _subscribe(); },
+    refreshSpectatorCount: () => { try { _applySpectatorBadge(); } catch (e) {} },
     getPendingKicksCount: () => _pendingKicks.size,
     clearPendingKicks: () => { _pendingKicks.clear(); },
     processPendingKicks: async () => {
@@ -616,11 +926,20 @@ window.LB = (() => {
     onName:       cb => { _onName = cb; },
     onModes:      cb => { _onModes = cb; },
     onFinished:   cb => { _onFinished = cb; },
+    onReveal:     cb => { _onReveal = cb; },
     onScore:      cb => { _onScore = cb; },
     onPlayerGone: cb => { _onPlayerGone = cb; },
     onPlayerBack: cb => { _onPlayerBack = cb; },
     onAlone:      cb => { _onAlone = cb; if (cb) _aloneCalledThisGame = false; },
     resetAloneGuard: () => { _aloneCalledThisGame = false; },
+    onRound:      cb => { _onRound = cb; },
+    onTick:       cb => { _onTick = cb; },
+    onPregame:    cb => { _onPregame = cb; },
+    onPostgame:   cb => { _onPostgame = cb; },
+    onAnswer:     cb => { _onAnswer = cb; },
+    onTimesUp:    cb => { _onTimesUp = cb; },
+    onSplash:     cb => { _onSplash = cb; },
+    onAdvancing:  cb => { _onAdvancing = cb; },
   };
 })();
 
@@ -746,6 +1065,14 @@ window.Lobby = (() => {
   let _lobbyModes      = [];  // secuencia de modos para la sesión de juego actual
   let _baseSeed        = null;
   let _modeAccScore    = 0;   // puntaje acumulado de todos los modos del jugador local
+  // La campaña de UN JUGADOR usa window.campaignBase (definida en monuments.js:
+  // devuelve window.campaign.base). El modo grupo la PISA con () => _modeAccScore
+  // mientras dura la partida de sala, y al terminar la restaura a ESTA función
+  // original — antes la seteaba en null, DESTRUYENDO la de monuments.js, así que
+  // después de un versus de grupo el campaign de un jugador se quedaba sin base
+  // y el score se reiniciaba entre modos (reportado). Se captura la primera vez
+  // que se pisa (ahí todavía es la de monuments.js).
+  let _origCampaignBase = null;
   let _intermediateTimer = null;
   let _pendingModesOrder = []; // estado del picker antes de guardar
   let _savedLobbyModes  = []; // modos confirmados por broadcast; más fiable que el DB al arrancar
@@ -753,6 +1080,8 @@ window.Lobby = (() => {
   // ── Cuenta regresiva de inicio (10s, cancelable) ───────────────────────────────
   let _counting = false;
   let _cdInterval = null;
+  let _cdUntil = null;
+  let _cdTick = null; // referencia al tick actual, para poder forzar un chequeo inmediato (ver visibilitychange)
 
   function _applyCountdownButtons(active) {
     const host    = window.LB.isHost();
@@ -796,10 +1125,11 @@ window.Lobby = (() => {
 
   function _startCountdown(until) {
     _counting = true;
+    _cdUntil = until;
     window._lobbyCountingDown = true;
     _applyCountdownButtons(true);
     clearInterval(_cdInterval);
-    const tick = () => {
+    _cdTick = () => {
       const remain = Math.ceil((until - Date.now()) / 1000);
       const text = T('lobby.starting', 'Empezando en') + ' ' + Math.max(0, remain) + '…';
       const cd = document.getElementById('lobby-countdown');
@@ -809,17 +1139,18 @@ window.Lobby = (() => {
       if (!lobbyPanelVisible) _showGlobalCdBar(text);
       else _hideGlobalCdBar();
       if (remain <= 0) {
-        clearInterval(_cdInterval); _cdInterval = null;
+        clearInterval(_cdInterval); _cdInterval = null; _cdTick = null;
         // No iniciar si el host está en otro juego (versus 1v1 o cualquier otro modo)
         if (window.LB.isHost() && !window._isPlaying) window.LB.start();
       }
     };
-    tick();
-    _cdInterval = setInterval(tick, 200);
+    _cdTick();
+    _cdInterval = setInterval(_cdTick, 200);
   }
 
   function _stopCountdown() {
     _counting = false;
+    _cdUntil = null; _cdTick = null;
     window._lobbyCountingDown = false;
     clearInterval(_cdInterval); _cdInterval = null;
     _hideGlobalCdBar();
@@ -976,6 +1307,16 @@ window.Lobby = (() => {
   function _launchLobbyGame(seed, modeIdx) {
     modeIdx = modeIdx !== undefined ? modeIdx : 0;
     _currentModeIdx = modeIdx;
+    // Limpiar SIEMPRE, antes de arrancar CUALQUIER modo (primero o siguiente,
+    // juego nuevo o transición) — así no queda NUNCA nada del modo/juego
+    // anterior pegado, sin importar la combinación (monuments→banderas,
+    // banderas del juego previo mezcladas, etc. — todo reportado). Resetear
+    // window._vsShowingResult PRIMERO para que los hardReset (gameStoppers =
+    // todos los modos) sí oculten los assets (algunos los preservan mientras
+    // ese flag está en true). _modeAccScore/campaignBase NO se tocan acá, así
+    // que el puntaje acumulado entre modos se preserva.
+    window._vsShowingResult = false;
+    if (Array.isArray(window.gameStoppers)) window.gameStoppers.forEach(fn => { try { fn(); } catch (e) {} });
     if (modeIdx === 0) {
       // _savedLobbyModes viene del broadcast y es más fiable que el DB (que puede estar desactualizado
       // si el postgres_changes de start() llegó antes que el de setModes, pisando _lobby.mode)
@@ -1004,6 +1345,20 @@ window.Lobby = (() => {
     window._lobbyActive = true;
     _finishedPlayers = new Map();
     _resultPresented = false;
+    // _revealAt/_revealTimer (reloj de pared compartido, ver
+    // _checkAllFinished) son variables de módulo que sobreviven entre
+    // partidas — el único otro lugar donde se limpian es en el paso al
+    // SIGUIENTE modo dentro de la MISMA sala (_currentModeIdx = nextIdx) y
+    // en _returnFromLobbyResult/_lobbyAbandon. Si por lo que sea quedaban
+    // con un valor de una partida ANTERIOR sin pasar por esos caminos,
+    // _checkAllFinished() se auto-bloqueaba para siempre en la partida
+    // NUEVA (su guard de arriba es `if (_resultPresented || _revealTimer)
+    // return`) — nadie recibía nunca el panel de resultados, coincidiendo
+    // con el "ahora a NINGUNO le sale la tabla" reportado. Acá, en el
+    // arranque de CUALQUIER modo (primero o siguiente), es el lugar más
+    // seguro para garantizar un estado limpio pase lo que pase antes.
+    _revealAt = null;
+    if (_revealTimer) { clearTimeout(_revealTimer); _revealTimer = null; }
     if (_waitingTimeout) { clearTimeout(_waitingTimeout); _waitingTimeout = null; }
     // Al inicio de una nueva campaña forzar scores a 0 en la caché local para no mostrar
     // valores residuales de la partida anterior mientras llega el primer _fetchMembers
@@ -1022,6 +1377,8 @@ window.Lobby = (() => {
       if (uid) _finishedPlayers.set(uid, score ?? 0);
       _checkAllFinished();
     });
+    // Reloj de pared compartido — ver comentario largo en _checkAllFinished.
+    window.LB.onReveal((revealAt, isFinal) => _handleRevealBroadcast(revealAt, isFinal));
     // Score en vivo de otro jugador → actualizar leaderboard inmediatamente
     window.LB.onScore((uid, score) => {
       const lm = (window._lobbyMembers || []).find(m => m.id === uid);
@@ -1033,6 +1390,13 @@ window.Lobby = (() => {
     window.LB.onWrong(uid => {
       const wrongFn = mode === 'monuments' ? window.monumentsSetLobbyWrongFor : mode === 'shapes' ? window.shapesSetLobbyWrongFor : mode === 'cities' ? window.citiesSetLobbyWrongFor : window.flagsTriggerLobbyWrongFor;
       if (typeof wrongFn === 'function') wrongFn(uid);
+    });
+    // A alguien en la sala se le acabó el tiempo → temblor + cronómetro en su
+    // tarjeta (MISMO sistema que el 'wrong', ver _applyTimesUpEffect).
+    window.LB.onTimesUp(payload => {
+      const uid = payload && payload.uid;
+      const tuFn = mode === 'monuments' ? window.monumentsSetLobbyTimesUpFor : mode === 'shapes' ? window.shapesSetLobbyTimesUpFor : mode === 'cities' ? window.citiesSetLobbyTimesUpFor : window.flagsTriggerLobbyTimesUpFor;
+      if (typeof tuFn === 'function') tuFn(uid);
     });
     // Alguien perdió/recuperó presencia → mostrar/ocultar estado desconectado en su tarjeta
     window.LB.onPlayerGone(uid => {
@@ -1073,7 +1437,7 @@ window.Lobby = (() => {
       _resultPresented = false;
       _currentModeIdx = 0; _lobbyModes = []; _baseSeed = null; _modeAccScore = 0;
       _savedLobbyModes = [];
-      window.campaignBase = null;
+      if (_origCampaignBase) window.campaignBase = _origCampaignBase; // restaurar la de monuments.js (campaña 1 jugador), NO destruirla
       if (_waitingTimeout) { clearTimeout(_waitingTimeout); _waitingTimeout = null; }
       // Restaurar lobby a estado de espera: eliminar kicks pendientes + status→waiting
       window.LB.reportScore?.(0).catch?.(() => {});
@@ -1097,6 +1461,9 @@ window.Lobby = (() => {
     });
 
     // Base acumulada de modos previos: permite mostrar puntaje total en pantalla desde el inicio del modo
+    // Capturar la campaignBase ORIGINAL (monuments.js) la primera vez, para
+    // poder restaurarla al terminar (ver _origCampaignBase).
+    if (_origCampaignBase === null && typeof window.campaignBase === 'function') _origCampaignBase = window.campaignBase;
     window.campaignBase = () => _modeAccScore;
 
     if (mode === 'shapes') {
@@ -1112,6 +1479,13 @@ window.Lobby = (() => {
       if (typeof window.flagsSetSeed === 'function') window.flagsSetSeed(modeSeed);
       if (typeof showFlagsMode === 'function') showFlagsMode();
     }
+    // Re-aplicar el badge de espectadores para el modo recién arrancado — el
+    // badge apunta al modo ACTIVO (window.pendingGameMode) y solo se refresca
+    // solo en eventos de presence 'sync'; en una transición de modo no hay
+    // ninguno, así que el badge del modo nuevo arrancaba apagado aunque
+    // hubiera espectadores (reportado, "en cada transición se les quita el
+    // símbolo"). Pequeño delay para que el HUD del modo termine de montar.
+    setTimeout(() => { try { window.LB.refreshSpectatorCount?.(); } catch (e) {} }, 300);
   }
 
   // Construye window._lobbyMembers = rivales (todos menos yo)
@@ -1150,17 +1524,82 @@ window.Lobby = (() => {
     if (el) el.style.display = 'none';
   }
 
+  // Reloj de pared compartido para el ranking de fin de ronda — antes cada
+  // cliente presentaba el resultado apenas SE ENTERABA (localmente) de que
+  // todos terminaron, sin coordinarse con nadie más. Eso ya funcionaba
+  // "bien" cuando todos estaban conectados normalmente (los 'finished' les
+  // llegan a todos casi al mismo tiempo), pero con el espectador de
+  // prestado (que se entera por caminos más lentos: bridge de
+  // GroupSpectate, poll de 3s) alguien podía terminar viendo el panel
+  // varios segundos después que el resto — "antes funcionaba, al meter el
+  // espectador se estropeó" reportado. Ahora, quien PRIMERO detecta que
+  // todos terminaron calcula un instante futuro compartido (revealAt) y lo
+  // manda a todos (por LB Y por GroupSpectate, para que le llegue incluso a
+  // quien esté espectando de prestado con su canal propio suelto) — cada
+  // cliente programa su propio _presentIntermediateResult/_presentFinalResult
+  // para ESE mismo instante, así el panel les aparece a todos a la vez.
+  const REVEAL_BUFFER_MS = 700;
+  const REVEAL_MAX_WAIT_MS = 2000; // tope de espera por desfasaje de reloj (ver _clampRevealAt) — bajado de 4s: el margen real es 700ms + latencia, 4s se sentía "tarde"
+  let _revealAt = null;
+  let _revealTimer = null;
+  // El revealAt que llega de OTRO cliente (LB.onReveal/GroupSpectate.onReveal)
+  // se calculó con el reloj de ESA máquina — si los relojes de sistema no
+  // están bien sincronizados entre dispositivos, un revealAt ajeno podía
+  // caer varios segundos (o más) en el futuro respecto al reloj de acá,
+  // haciendo que este cliente esperara ese desfasaje entero antes de mostrar
+  // nada — se sentía como "congelado para siempre" sin serlo técnicamente.
+  // Ningún reveal legítimo debería necesitar más que REVEAL_BUFFER_MS de
+  // margen de sobra por la latencia de red — si el valor recibido implica
+  // esperar más que eso, se lo recorta a un máximo razonable en vez de
+  // confiar ciegamente en el reloj de otra máquina.
+  function _clampRevealAt(revealAt) {
+    const now = Date.now();
+    if (typeof revealAt !== 'number' || !isFinite(revealAt)) return now + REVEAL_BUFFER_MS;
+    return Math.min(revealAt, now + REVEAL_MAX_WAIT_MS);
+  }
   function _checkAllFinished() {
-    if (_resultPresented) return;
-    const total = Math.max(1, window.LB.getMembers().length - (window.LB.getPendingKicksCount?.() || 0));
-    if (!total) return;
-    if (_finishedPlayers.size >= total) {
-      if (_currentModeIdx < _lobbyModes.length - 1) {
-        _presentIntermediateResult();
-      } else {
-        _presentFinalResult();
+    try {
+      if (_resultPresented || _revealTimer) return; // ya presentado o ya programado
+      const total = Math.max(1, window.LB.getMembers().length - (window.LB.getPendingKicksCount?.() || 0));
+      if (!total) return;
+      if (_finishedPlayers.size >= total) {
+        const isFinal = _currentModeIdx >= _lobbyModes.length - 1;
+        if (!_revealAt) {
+          _revealAt = Date.now() + REVEAL_BUFFER_MS;
+          window.LB.sendReveal(_revealAt, isFinal);
+          if (window.GroupSpectate && typeof window.GroupSpectate.sendReveal === 'function') window.GroupSpectate.sendReveal(_revealAt, isFinal);
+        }
+        _scheduleReveal(isFinal);
+      }
+    } catch (e) {
+      // Red de seguridad: si CUALQUIER cosa de acá arriba tira una excepción
+      // (geometría/estado inesperado), forzar el resultado en vez de dejar
+      // la sala congelada sin panel ni assets — _presentFinalResult/
+      // _presentIntermediateResult ya son idempotentes (_resultPresented).
+      console.warn('[LB] _checkAllFinished failed, forzando resultado:', e);
+      if (!_resultPresented) {
+        if (_currentModeIdx >= _lobbyModes.length - 1) _presentFinalResult(); else _presentIntermediateResult();
       }
     }
+  }
+  function _scheduleReveal(isFinal) {
+    if (_revealTimer || _resultPresented) return;
+    const delay = Math.max(0, (_revealAt || Date.now()) - Date.now());
+    _revealTimer = setTimeout(() => {
+      _revealTimer = null;
+      try {
+        if (isFinal) _presentFinalResult(); else _presentIntermediateResult();
+      } catch (e) {}
+    }, delay);
+  }
+  // Llamado cuando llega el revealAt de OTRO cliente (por LB.onReveal o
+  // GroupSpectate.onReveal) — el PRIMERO que llega gana (no se pisa un
+  // _revealAt ya calculado localmente), así todos terminan sincronizados al
+  // mismo instante sin importar quién lo haya calculado.
+  function _handleRevealBroadcast(revealAt, isFinal) {
+    if (_resultPresented || _revealTimer) return;
+    if (!_revealAt) _revealAt = _clampRevealAt(revealAt);
+    _scheduleReveal(isFinal);
   }
 
   // Limpia el modo de juego actual (flags o shapes) sin cerrar el lobby
@@ -1187,6 +1626,17 @@ window.Lobby = (() => {
     if (_resultPresented) return;
     _resultPresented = true;
     if (_waitingTimeout) { clearTimeout(_waitingTimeout); _waitingTimeout = null; }
+    // _stopGroupWaitPoll() directo acá TAMBIÉN — _exitGroupWaitAsSpectator
+    // (más abajo) solo lo frena si de verdad se había entrado a espectar de
+    // prestado (_waitingAsGroupSpectator); ahora el poll también corre para
+    // cualquier jugador que solo esté esperando sin espectar a nadie (ver
+    // _startGroupWaitPoll), así que hay que pararlo desde acá para ese caso.
+    _stopGroupWaitPoll();
+    // Si estaba mirando a un compañero de prestado (ver _enterGroupWaitAsSpectator),
+    // sacarlo de ahí ANTES de armar la pantalla de resultados — mismo orden
+    // que _onOpponentAbandoned en vs.js. En try/catch — mismo motivo que en
+    // _presentFinalResult: una falla acá no debe impedir mostrar la tabla.
+    try { _exitGroupWaitAsSpectator(); } catch (e) { console.warn('[LB] exitGroupWait failed:', e); }
     _hideLobbyWaiting();
     if (typeof window._setPlaying === 'function') window._setPlaying(false);
     window._lobbyActive = false;
@@ -1226,6 +1676,21 @@ window.Lobby = (() => {
       score: _finishedPlayers.has(m.id) ? _finishedPlayers.get(m.id) : (m.score || 0),
     }));
     members.sort((a, b) => b.score - a.score);
+    // Avisar a un posible espectador (GroupSpectate en spectate.js) que ESTE
+    // miembro está viendo la pantalla intermedia — sin esto, el espectador se
+    // quedaba sin nada que mostrar en la transición entre modos (el "no sale
+    // nada" reportado). Se llama desde CADA cliente que llega acá (todos lo
+    // hacen independientemente, ver _checkAllFinished) — inofensivo, mismo
+    // patrón que reportPostgame en vs.js. _MODE_NAMES/_MODE_ICONS son
+    // privados de este módulo — se resuelven ACÁ y se mandan ya listos,
+    // porque spectate.js no tiene acceso a esas tablas.
+    window.LB.sendPostgame({
+      kind: 'intermediate', members,
+      currentModeIdx: _currentModeIdx, totalModes: _lobbyModes.length,
+      modeLabel: (_MODE_NAMES[_lobbyModes[_currentModeIdx] || window.pendingGameMode] || (() => ''))(),
+      nextModeName: nextMode ? (_MODE_NAMES[nextMode] || (() => nextMode))() : null,
+      nextModeIcon: nextMode ? (_MODE_ICONS[nextMode] || 'images/game1.png') : null,
+    });
     const myId    = window._sbUserId;
     const medals  = ['🥇', '🥈', '🥉'];
     if (list) {
@@ -1247,11 +1712,22 @@ window.Lobby = (() => {
     if (ls) { ls.style.display = 'flex'; ls.style.opacity = '1'; ls.classList.add('lobby-interim-bg'); }
 
     if (screen) screen.style.display = 'flex';
+    // Ocultar el countdown/timer de la ronda y demás HUD del juego que
+    // quedaba encima del panel intermedio (reportado, "el último que queda ve
+    // el countdown sobre la tabla temporal"). Mismos ids que _showLobbyResult.
+    ['countdown-widget','flags-countdown-widget','shapes-countdown-widget',
+     'pregame-countdown','flags-pregame-countdown','score-display','flags-score-display',
+     'timeup-overlay','flags-timeup-overlay'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.style.display = 'none';
+    });
     try { if (typeof playMusic === 'function' && typeof sfxPostgame !== 'undefined') playMusic(sfxPostgame); } catch(e) {}
 
     // Teardown DESPUÉS de mostrar el overlay para que los assets del juego
-    // permanezcan visibles hasta que la transición los cubra
-    _teardownCurrentMode();
+    // permanezcan visibles hasta que la transición los cubra. En try/catch:
+    // llamado sobre un jugador que estaba espectando de prestado, los
+    // *HardReset asumen estado de juego normal y pueden tirar — la tabla ya
+    // se mostró arriba, así que una falla acá no debe romper nada.
+    try { _teardownCurrentMode(); } catch (e) { console.warn('[LB] intermediate teardown failed:', e); }
 
     // Cuenta regresiva 10s con barra animada
     const bar  = document.getElementById('lobby-intermediate-bar');
@@ -1270,10 +1746,22 @@ window.Lobby = (() => {
       if (remain <= 0) {
         clearInterval(_intermediateTimer); _intermediateTimer = null;
         if (screen) screen.style.display = 'none';
+        // Los assets del modo anterior que el jugador que espectó de prestado
+        // dejó visibles detrás del overlay intermedio (flagsSpectatorExit/etc.
+        // NO los oculta mientras window._vsShowingResult está en true — ver
+        // ese guard, es a propósito para no vaciar el fondo bajo la tabla de
+        // resultados) hay que limpiarlos AHORA, antes de arrancar el siguiente
+        // modo — si no, quedan pegados atrás (reportado, "justo en los 2 que
+        // pasaron a espectador"). Resetear el flag y re-hacer el teardown del
+        // modo VIEJO (acá _currentModeIdx todavía apunta a él, antes de
+        // avanzar) — ahora sí oculta los assets.
+        // La limpieza de assets del modo anterior la hace ahora _launchLobbyGame
+        // (corre gameStoppers SIEMPRE al arrancar cualquier modo) — ver ahí.
         // Arrancar el siguiente modo
         _currentModeIdx = nextIdx;
         _finishedPlayers = new Map();
         _resultPresented = false;
+        _revealAt = null; _revealTimer = null;
         _launchLobbyGame(_baseSeed, _currentModeIdx);
       }
     }, 200);
@@ -1283,27 +1771,46 @@ window.Lobby = (() => {
     if (_resultPresented) return;
     _resultPresented = true;
     if (_waitingTimeout) { clearTimeout(_waitingTimeout); _waitingTimeout = null; }
-    _hideLobbyWaiting();
-    _teardownCurrentMode();
-    if (typeof window._setPlaying === 'function') window._setPlaying(false);
+    _stopGroupWaitPoll();
+    // CADA paso de teardown en su propio try/catch — CRÍTICO. Antes esto
+    // corría todo seguido y _showLobbyResult (mostrar la TABLA) recién al
+    // final. _teardownCurrentMode() llama a flagsHardReset/monumentsHardReset,
+    // que asumen estado de JUEGO normal — llamado sobre un jugador que estaba
+    // espectando de prestado a otro (A/B que terminaron antes, ver
+    // _enterGroupWaitAsSpectator), tiraba una excepción, y como
+    // _resultPresented ya estaba en true y la tabla se mostraba DESPUÉS,
+    // nunca llegaba a mostrarse: freeze permanente sin tabla (el "los que
+    // terminan antes se quedan congelados, solo el último y el espectador
+    // reciben la tabla" reportado — el último y el externo nunca pasan por
+    // este estado de "espectando de prestado"). Ahora una falla en cualquier
+    // paso se loguea pero NO impide llegar a _showLobbyResult.
+    try { _exitGroupWaitAsSpectator(); } catch (e) { console.warn('[LB] exitGroupWait failed:', e); }
+    try { _hideLobbyWaiting(); } catch (e) {}
+    try { _teardownCurrentMode(); } catch (e) { console.warn('[LB] final teardown failed:', e); }
+    try { if (typeof window._setPlaying === 'function') window._setPlaying(false); } catch (e) {}
     window._lobbyActive = false;
     _lobbyInTransition = false;
     window._lobbyMembers = [];
-    // Procesar desconexiones que ocurrieron durante la partida (usa LB API para acceder a _pendingKicks)
-    window.LB.processPendingKicks?.();
-    window.LB.onFinished(null);
-    window.LB.onScore(null);
-    window.LB.onPlayerGone(null);
-    window.LB.onPlayerBack(null);
-    window.LB.resetToWaiting?.();
+    try {
+      // Procesar desconexiones que ocurrieron durante la partida (usa LB API para acceder a _pendingKicks)
+      window.LB.processPendingKicks?.();
+      window.LB.onFinished(null);
+      window.LB.onScore(null);
+      window.LB.onPlayerGone(null);
+      window.LB.onPlayerBack(null);
+      window.LB.resetToWaiting?.();
+    } catch (e) { console.warn('[LB] final cleanup failed:', e); }
     // Resetear estado multi-modo para la próxima partida
     _currentModeIdx = 0; _lobbyModes = []; _baseSeed = null; _modeAccScore = 0;
-    // Fondo loading screen
-    const ls = document.getElementById('loading-screen');
-    if (ls) { ls.style.display = 'flex'; ls.style.opacity = '1'; ls.classList.add('table-shown'); }
-    if (typeof window.showVersusPanel === 'function') window.showVersusPanel();
-    if (typeof window.versusGoTo === 'function') window.versusGoTo('lobby');
-    const members = window.LB.getMembers().map(m => ({
+    try {
+      // Fondo loading screen
+      const ls = document.getElementById('loading-screen');
+      if (ls) { ls.style.display = 'flex'; ls.style.opacity = '1'; ls.classList.add('table-shown'); }
+      if (typeof window.showVersusPanel === 'function') window.showVersusPanel();
+      if (typeof window.versusGoTo === 'function') window.versusGoTo('lobby');
+    } catch (e) { console.warn('[LB] final nav failed:', e); }
+    // El paso crítico — fuera de todos los try de arriba, garantizado de correr.
+    const members = (window.LB.getMembers() || []).map(m => ({
       ...m,
       score: _finishedPlayers.has(m.id) ? _finishedPlayers.get(m.id) : (m.score || 0),
     }));
@@ -1318,21 +1825,275 @@ window.Lobby = (() => {
     if (window.LB.getId()) window.LB.reportScore(_modeAccScore);
     _finishedPlayers.set(myId, _modeAccScore);
     window.LB.sendFinished(_modeAccScore);
-    // Timeout de seguridad: si alguien se desconecta y no reporta, avanzar igual
-    const isFinal = _currentModeIdx >= _lobbyModes.length - 1;
+    // Timeout de seguridad: si alguien se desconecta y no reporta, avanzar
+    // igual. Bajado de 30s a 12s — ahora hay DOS caminos redundantes para
+    // enterarse de que todos terminaron mientras se espectea de prestado
+    // (ver GroupSpectate.onFinished y _lobbyReceiveGroupResult, ambos en
+    // _enterGroupWaitAsSpectator), así que este salvavidas casi nunca debería
+    // llegar a disparar de verdad — 30s se sentía como "nunca" si por algún
+    // motivo los dos caminos fallaban a la vez (el "se quedan congelados"
+    // reportado).
+    _armGroupWaitFallback();
+    _showLobbyWaiting();
+    _startGroupWaitPoll();
+    _checkAllFinished();
+    // Si _checkAllFinished ya determinó que todos terminaron (era el
+    // último en terminar, o todos terminaron casi juntos), no hay nadie más
+    // jugando a quien mirar — no entrar a espectar. Antes esto chequeaba
+    // SOLO _resultPresented, pero desde que _checkAllFinished pasó a
+    // PROGRAMAR el resultado para un instante futuro compartido (revealAt,
+    // ver _scheduleReveal) en vez de mostrarlo ya mismo, _resultPresented
+    // seguía en false en este mismo instante SIEMPRE (recién se pone true
+    // cuando el timer programado dispara, ms después) — este chequeo nunca
+    // frenaba nada, así que se entraba a espectar de prestado incluso
+    // cuando ya se sabía que todos habían terminado (típicamente cuando
+    // terminan casi juntos, ver _revealTimer). Ahí adentro no quedaba nadie
+    // vivo a quien mirar y las flechas no tenían a dónde saltar — se
+    // quedaba trabado esperando indefinidamente en vez de mostrar la tabla
+    // (el "si todos acaban al mismo tiempo no muestra tabla ni acaba la
+    // sesión" reportado).
+    //
+    // Margen corto (600ms) antes de comprometerse a espectar — MISMO patrón
+    // que _vsHandleGameEnd en vs.js (1v1), que funciona bien: ahí, si el
+    // chequeo de "el rival también terminó" se hacía DE UNA (sin esperar
+    // nada), un final casi simultáneo entre AMBOS jugadores hacía que los
+    // DOS soltaran su canal para espectarse mutuamente al mismo tiempo —
+    // ninguno quedaba generando tick/round real, y se quedaban
+    // mutuamente esperándose sin ninguna señal (documentado ahí como "los
+    // dos quieren espectear al otro"). En grupo pasa EXACTAMENTE lo mismo
+    // pero con más de dos: si 3+ jugadores terminan casi juntos, cada uno
+    // ve (en el instante síncrono de su propio _checkAllFinished, ANTES de
+    // que lleguen los 'finished' de los demás por la red) que TODAVÍA hay
+    // "alguien más jugando" — en realidad ya terminó también, solo que su
+    // broadcast no llegó todavía — y entra a espectarlo. Si TODOS hacen
+    // esto a la vez, nadie queda jugando de verdad y todos quedan
+    // mutuamente a la espera sin ningún asset ni resultado (el "todos
+    // quedan congelados sin ningún asset" reportado). Esperar este margen
+    // le da tiempo a los 'finished' de los demás (y al _revealTimer que
+    // eso dispara) de llegar ANTES de comprometerse a espectar a nadie.
+    setTimeout(() => {
+      if (!_resultPresented && !_revealTimer) _enterGroupWaitAsSpectator();
+    }, 600);
+  };
+
+  // ── Espectar de prestado a los compañeros que siguen jugando ────────────────
+  // Mismo mecanismo que _enterWaitAsSpectator en vs.js (1v1), pero mirando a
+  // CUALQUIERA de los miembros que todavía no terminaron esta ronda de modos,
+  // con flechas para rotar entre ellos (GroupSpectate ya excluye de la
+  // rotación a quien tenga su propio 'timesup', ver _finishedUids). Al
+  // terminar todos, _presentIntermediateResult/_presentFinalResult sacan a
+  // este jugador de acá ANTES de mostrar la tabla de resultados.
+  let _waitingAsGroupSpectator = false;
+  async function _enterGroupWaitAsSpectator() {
+    if (_waitingAsGroupSpectator || _resultPresented) return;
+    if (typeof window.openSpectatorGroup !== 'function') return;
+    const lobbyId = window.LB.getId();
+    if (!lobbyId) return;
+    const myId = window._sbUserId;
+    // Cualquier miembro que no sea yo y que todavía no figure en
+    // _finishedPlayers (los que ya terminaron ANTES que yo) — GroupSpectate
+    // necesita esta lista de entrada (preFinishedUids) porque recién se está
+    // conectando ahora, nunca vio esos 'timesup' pasados.
+    const stillPlaying = window.LB.getMembers().filter(m => m.id !== myId && !_finishedPlayers.has(m.id));
+    if (!stillPlaying.length) return; // nadie más jugando (no debería pasar, _checkAllFinished ya lo habría resuelto)
+    _waitingAsGroupSpectator = true;
+    // Soltar MI conexión al canal 'lobby-{id}' ANTES de que GroupSpectate se
+    // suscriba al MISMO tema (ver releaseChannel en LB, mismo motivo que
+    // VS.releaseChannel en vs.js/1v1: Supabase Realtime no deja dos canales
+    // suscriptos al mismo tema desde el mismo cliente). markExpectedLeave
+    // PRIMERO es crítico: sin eso, mi propio 'leave' de presence se
+    // interpretaba como un abandono REAL — quedaba en _pendingKicks, y
+    // _checkAllFinished() resta ese conteo del total de gente a esperar, así
+    // que la sala podía mostrar resultados con OTRO jugador todavía jugando
+    // de verdad (el "le quedaba tiempo y saltó GANASTE" reportado). Con
+    // markExpectedLeave, ese 'leave' puntual se descarta sin tocar
+    // _pendingKicks ni ningún estado de "se fue".
+    await window.LB.markExpectedLeave(myId);
+    // Margen extra chico: await arriba solo garantiza que el broadcast se
+    // terminó de ENCOLAR en el socket local, no que el servidor ya lo
+    // propagó a los demás clientes — con varios jugadores terminando casi
+    // juntos (todos soltando su canal a la vez), más vale un poco de
+    // margen de sobra acá que arriesgarse a que este 'leave' llegue a
+    // alguien ANTES que su 'expectleave', que es justo la carrera que
+    // rompía todo (ver comentario largo en markExpectedLeave/lobby.js).
+    await new Promise(resolve => setTimeout(resolve, 150));
+    await window.LB.releaseChannel();
+    if (_resultPresented) return; // se resolvió mientras esperaba
+    window.openSpectatorGroup(lobbyId, stillPlaying[0], {
+      instant: true,
+      preFinishedUids: Array.from(_finishedPlayers.keys()),
+    });
+    // Mientras dure el "de prestado", este es el camino PRINCIPAL para
+    // enterarme de que alguien más terminó — mi propio canal de LB está
+    // suelto, así que _onFinished normal (registrado más abajo en
+    // _launchGroupGame) nunca dispara para mí. GroupSpectate reenvía el
+    // mismo evento 'finished' por su canal separado — alimentando
+    // _finishedPlayers y _checkAllFinished() acá, igual que lo haría un
+    // cliente conectado normal, en vez de depender ÚNICAMENTE de que otro
+    // jugador me mande el ranking ya armado (kind:'intermediate'/'final',
+    // ver _lobbyReceiveGroupResult) — si ESE broadcast puntual se perdía,
+    // antes no había ningún otro camino hasta el salvavidas de 30s (el "se
+    // quedan congelados, nunca les sale el panel" reportado).
+    // Enganchar el latido: cada tick/ronda de CUALQUIER miembro que siga
+    // jugando (no solo el que miro — ver onAnyActivity en spectate.js)
+    // reprograma el salvavidas de 12s hacia adelante — ver comentario largo
+    // en _armGroupWaitFallback. CRÍTICO que sea "cualquier miembro" y no solo
+    // el POV: si terminé casi junto con otro y quedé mirándolo a ÉL (que ya
+    // acabó, no manda nada) en vez del que sigue jugando, el POV no genera
+    // ningún latido — pero el que SÍ sigue jugando manda ticks que igual
+    // llegan a GroupSpectate, y así el salvavidas no dispara antes de tiempo
+    // (el "los 2 que terminan antes se congelan" reportado).
+    window._groupSpectatorHeartbeat = _armGroupWaitFallback;
+    window.GroupSpectate.onAnyActivity(() => { if (_waitingAsGroupSpectator && !_resultPresented) _armGroupWaitFallback(); });
+    window.GroupSpectate.onFinished((finishedUid, score) => {
+      if (!_waitingAsGroupSpectator || _resultPresented) return;
+      _finishedPlayers.set(finishedUid, score || 0);
+      _checkAllFinished();
+    });
+    // Reloj de pared compartido — ver comentario largo en _checkAllFinished.
+    // Necesario acá TAMBIÉN (no solo LB.onReveal): mientras se espectea de
+    // prestado, el canal propio de LB está suelto, así que ese broadcast
+    // nunca llegaría por esa vía — GroupSpectate lo reenvía por su propio
+    // canal (mismo topic).
+    window.GroupSpectate.onReveal((revealAt, isFinal) => {
+      if (!_waitingAsGroupSpectator) return;
+      _handleRevealBroadcast(revealAt, isFinal);
+    });
+    // Respaldo por REST, independiente de cualquier broadcast en tiempo
+    // real — ambos caminos de arriba (onFinished reenviado y
+    // _lobbyReceiveGroupResult) dependen de que un mensaje efímero llegue
+    // bien, y en la práctica seguían sin disparar a veces (el "se quedan
+    // congelados, nunca sale el panel" reportado, incluso después de agregar
+    // esos dos caminos). Este poll consulta directo la tabla cada 3s — sin
+    // depender de NINGÚN canal realtime — y usa live_state.finished (mismo
+    // campo que ya persiste LB.sendTimesUp) para saber quién más terminó.
+    _startGroupWaitPoll();
+  }
+
+  // Salvavidas de 12s — REARMABLE (mismo patrón que _armGameEndFallback en
+  // vs.js/1v1, que ya resolvió exactamente este bug). Antes se armaba UNA
+  // sola vez, fijo, contado desde el instante en que YO terminé, sin importar
+  // cuánto le quedara de verdad al que sigo mirando de prestado. Si a ese
+  // jugador todavía le quedaban, digamos, 15s (rachas de bonus +5s alargan
+  // bastante una ronda), a los 12s este salvavidas disparaba igual —
+  // llamando a _presentFinalResult ANTES de que el otro terminara de verdad,
+  // que con el canal propio suelto y GroupSpectate a mitad de camino dejaba
+  // la pantalla trabada sin tabla (el "2s antes del times up del que sigue
+  // jugando se les congela todo y nunca sale la tabla" reportado). Ahora
+  // cada tick/ronda REAL del jugador que miro de prestado (ver el latido en
+  // los callbacks de grupo de spectate.js) reprograma este mismo timer 12s
+  // hacia adelante — así solo dispara si ese jugador de verdad se quedó en
+  // silencio 12s seguidos (glitch de red/desconexión real), no simplemente
+  // porque le quedaba más tiempo de juego que el salvavidas original.
+  function _armGroupWaitFallback() {
+    clearTimeout(_waitingTimeout);
     _waitingTimeout = setTimeout(() => {
       _waitingTimeout = null;
       if (!window._lobbyActive && !_resultPresented) return; // ya se procesó
       if (window._lobbyActive) {
-        if (isFinal) _presentFinalResult(); else _presentIntermediateResult();
+        if (_currentModeIdx >= _lobbyModes.length - 1) _presentFinalResult(); else _presentIntermediateResult();
       }
-    }, 30000);
-    _showLobbyWaiting();
+    }, 12000);
+  }
+
+  let _groupWaitPollTimer = null;
+  // Antes este poll solo corría para quien estuviera espectando de prestado
+  // (_waitingAsGroupSpectator) — un jugador que YA sabía (localmente) que no
+  // quedaba nadie más jugando (y por eso nunca entraba a espectar, ver el
+  // margen de 600ms en _lobbyHandleGameEnd) dependía ENTERAMENTE de recibir
+  // el broadcast 'reveal'/'finished' de otro por su canal de LB normal — si
+  // ESE mensaje puntual se perdía por cualquier motivo de red, no tenía
+  // NINGÚN otro camino hasta el salvavidas de 12s (bastante más lento que
+  // los demás jugadores, que si entraban a espectar tenían este mismo poll
+  // de 3s de respaldo) — el "hubo uno que se descoordinó y no le salió la
+  // pantalla" reportado. Ahora corre para CUALQUIER jugador que esté
+  // esperando (lo arranca _lobbyHandleGameEnd para todos, no solo para quien
+  // entra a espectar), y solo se frena cuando el resultado ya se presentó.
+  function _startGroupWaitPoll() {
+    clearInterval(_groupWaitPollTimer);
+    _groupWaitPollTimer = setInterval(async () => {
+      if (_resultPresented) { clearInterval(_groupWaitPollTimer); _groupWaitPollTimer = null; return; }
+      try {
+        const lobbyId = window.LB.getId();
+        if (!lobbyId) return;
+        const { data, error } = await window.sb.from('lobby_members').select('user_id, score, live_state').eq('lobby_id', lobbyId);
+        if (error || !data) return;
+        data.forEach(m => {
+          if (m.live_state && m.live_state.finished) _finishedPlayers.set(m.user_id, m.score || 0);
+        });
+        _checkAllFinished();
+      } catch (e) {}
+    }, 3000);
+  }
+  function _stopGroupWaitPoll() {
+    clearInterval(_groupWaitPollTimer);
+    _groupWaitPollTimer = null;
+  }
+  async function _exitGroupWaitAsSpectator() {
+    if (!_waitingAsGroupSpectator) return;
+    _waitingAsGroupSpectator = false;
+    if (window._groupSpectatorHeartbeat === _armGroupWaitFallback) window._groupSpectatorHeartbeat = null;
+    _stopGroupWaitPoll();
+    // Mismo flag que ya respeta flagsSpectatorExit/shapesSpectatorExit/etc
+    // (ver _vsShowingResult en vs.js/spectate.js) — no hay que borrar los
+    // assets de fondo del juego antes de que la pantalla de resultados los
+    // tape, _teardownCurrentMode() ya se encarga del reset real después.
+    window._vsShowingResult = true;
+    // Teardown VISUAL del espectador PRIMERO y SÍNCRONO — CRÍTICO. Esta
+    // función se llama (sin await) al principio de _presentFinalResult/
+    // _presentIntermediateResult, que ACTO SEGUIDO muestran la tabla de
+    // resultados. Antes acá se hacía `await GroupSpectate.stop()` ANTES de
+    // closeSpectator — ese await cedía el hilo, así que _presentFinalResult
+    // seguía y mostraba la tabla, y RECIÉN DESPUÉS (cuando el await resolvía)
+    // corría closeSpectator, desmontando la UI de espectador ENCIMA de la
+    // tabla ya mostrada — la tapaba, y el jugador quedaba "congelado" sin ver
+    // el panel (confirmado por logs: `_presentFinalResult called` salía ANTES
+    // que `channel CLOSED`). El 1v1 (vs.js _exitWaitAsSpectator) hace
+    // closeSpectator SÍNCRONO primero, por eso ahí nunca falló. closeSpectator
+    // (rama silent, _groupMode) ya llama a GroupSpectate.stop() internamente.
+    if (typeof window.closeSpectator === 'function') window.closeSpectator(null, true);
+    // El release REAL del canal + reconexión del propio va async (no bloquea
+    // lo visual) — esperar que GroupSpectate suelte de verdad su canal ANTES
+    // de resubscribeChannel evita la carrera de "dos canales al mismo tema".
+    if (window.GroupSpectate) { try { await window.GroupSpectate.stop(); } catch (e) {} }
+    window.LB.resubscribeChannel?.();
+  }
+
+  // Llamado desde spectate.js (GroupSpectate.onPostgame) cuando ESTE mismo
+  // jugador está mirando de prestado y llega el ranking real de fin de
+  // ronda (kind:'intermediate'/'final') — reemplaza al salvavidas de 30s
+  // (_waitingTimeout, más abajo en _lobbyHandleGameEnd) como forma de
+  // enterarse de que todos terminaron: mientras dura el "de prestado", el
+  // canal propio de LB está SUELTO (ver releaseChannel en
+  // _enterGroupWaitAsSpectator), así que el 'finished' que dispararía
+  // _checkAllFinished() por su cuenta nunca le llega — sin este puente, este
+  // jugador se quedaba viendo el mirror NEUTRAL de spectate.js hasta que el
+  // salvavidas de 30s recién ahí mostrara su resultado real (el "reciben
+  // GANA USUARIO como espectadores, su resultado real tarda 10-15s más"
+  // reportado). Se sincroniza _finishedPlayers con los scores que ya vienen
+  // en el payload (calculados por quien mandó el broadcast) para que el
+  // cálculo de "mi puesto" salga bien, y se llama a la función real
+  // correspondiente — misma pantalla personalizada que ve cualquier jugador.
+  window._lobbyReceiveGroupResult = function (payload) {
+    if (!_waitingAsGroupSpectator || _resultPresented || !payload) return;
+    (payload.members || []).forEach(m => { if (m && m.id) _finishedPlayers.set(m.id, m.score || 0); });
+    // NO llamar a _presentFinalResult/_presentIntermediateResult DIRECTO acá
+    // — eso mostraba el resultado apenas llegaba ESTE broadcast puntual, sin
+    // coordinarse con el reloj de pared compartido (_revealAt, ver
+    // _checkAllFinished/_scheduleReveal) que sí respetan los otros dos
+    // caminos (GroupSpectate.onFinished y el poll de respaldo). Con eso,
+    // este jugador podía terminar viendo el panel en un instante DISTINTO
+    // (antes o después) que el resto de la sala — justo el "tienen que
+    // recibirlo TODOS al mismo tiempo" reportado. _checkAllFinished() ya
+    // tiene la misma guarda de "recién programar si no hay uno ya en curso".
     _checkAllFinished();
   };
 
   function _showLobbyResult(members) {
     _hideLobbyWaiting();
+    // Ver comentario largo en _presentIntermediateResult — mismo aviso, esta
+    // vez para el ranking FINAL de la sala.
+    window.LB.sendPostgame({ kind: 'final', members });
     const myId   = window._sbUserId;
     const screen = document.getElementById('lobby-result-screen');
     const list   = document.getElementById('lobby-result-list');
@@ -1358,17 +2119,43 @@ window.Lobby = (() => {
       list.appendChild(row);
     });
     screen.style.display = 'flex';
+    // Ocultar el widget de countdown/timer de la ronda (y demás HUD del
+    // juego) que _teardownCurrentMode/hardReset no siempre limpia — sin esto
+    // el countdown quedaba visible ENCIMA de la tabla final y seguía pegado
+    // incluso al volver al menú de inicio (reportado por el ÚLTIMO jugador en
+    // terminar, que va por este camino real, no por el desmontaje de
+    // espectador). Mismos ids que oculta _lobbyAbandon.
+    ['countdown-widget','flags-countdown-widget','shapes-countdown-widget',
+     'pregame-countdown','flags-pregame-countdown','score-display','flags-score-display',
+     'timeup-overlay','flags-timeup-overlay'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.style.display = 'none';
+    });
     try { if (typeof playMusic === 'function' && typeof sfxPostgame !== 'undefined') playMusic(sfxPostgame); } catch (e) {}
   }
 
   function _returnFromLobbyResult() {
     const screen = document.getElementById('lobby-result-screen');
     if (screen) screen.style.display = 'none';
+    // Seguro extra al volver al menú: ocultar cualquier HUD de juego que
+    // haya quedado (countdown/timer, etc.) — reportado que el countdown se
+    // veía incluso en el menú de inicio.
+    ['countdown-widget','flags-countdown-widget','shapes-countdown-widget',
+     'pregame-countdown','flags-pregame-countdown','score-display','flags-score-display',
+     'timeup-overlay','flags-timeup-overlay'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.style.display = 'none';
+    });
+    // Mismo reset que _vsReturnToMenu (vs.js, 1v1) — _exitGroupWaitAsSpectator
+    // lo pone en true y nada más en el flujo grupal lo devolvía a false,
+    // así que quedaba pegado para siempre (bloqueando de más el mirror de
+    // resultados de la PRÓXIMA sala, o incluso el hardReset normal de un
+    // modo solo/campaña en esta misma pestaña).
+    window._vsShowingResult = false;
     _finishedPlayers = new Map();
     _resultPresented = false;
+    _revealAt = null; if (_revealTimer) { clearTimeout(_revealTimer); _revealTimer = null; }
     _currentModeIdx = 0; _lobbyModes = []; _baseSeed = null; _modeAccScore = 0;
     _savedLobbyModes = [];
-    window.campaignBase = null;
+    if (_origCampaignBase) window.campaignBase = _origCampaignBase; // restaurar la de monuments.js (campaña 1 jugador), NO destruirla
     clearInterval(_intermediateTimer); _intermediateTimer = null;
     if (_waitingTimeout) { clearTimeout(_waitingTimeout); _waitingTimeout = null; }
     const lid = window.LB.getId();
@@ -1386,15 +2173,18 @@ window.Lobby = (() => {
     const intScreen = document.getElementById('lobby-intermediate-screen');
     if (intScreen) intScreen.style.display = 'none';
     clearInterval(_intermediateTimer); _intermediateTimer = null;
+    _stopGroupWaitPoll();
+    window._vsShowingResult = false; // ver comentario largo en _returnFromLobbyResult
     _finishedPlayers = new Map();
     _resultPresented = false;
+    _revealAt = null; if (_revealTimer) { clearTimeout(_revealTimer); _revealTimer = null; }
     _currentModeIdx = 0; _lobbyModes = []; _baseSeed = null; _modeAccScore = 0;
     if (_waitingTimeout) { clearTimeout(_waitingTimeout); _waitingTimeout = null; }
     window._lobbyActive = false;
     window._lobbyMembers = [];
     window.LB.clearPendingKicks?.();
     _savedLobbyModes = [];
-    window.campaignBase = null;
+    if (_origCampaignBase) window.campaignBase = _origCampaignBase; // restaurar la de monuments.js (campaña 1 jugador), NO destruirla
     if (typeof window.flagsClearSeed === 'function') window.flagsClearSeed();
     if (typeof window.shapesClearSeed === 'function') window.shapesClearSeed();
     if (typeof window.monumentsClearSeed === 'function') window.monumentsClearSeed();
@@ -1438,8 +2228,16 @@ window.Lobby = (() => {
     document.getElementById('lobby-name-input')?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); _confirmEditName(); }
     });
+    // Mismo botón reusado para el espectador (ver _showGroupResultMirror en
+    // spectate.js, mismo patrón que #vs-result-back en vs.js): si está
+    // espectando, cierra ESA sesión en vez de _returnFromLobbyResult() (que
+    // resetearía el estado de una sala REAL que este cliente no tiene).
     document.getElementById('lobby-result-back')?.addEventListener('click', () => {
       if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+      if (window._isSpectating) {
+        if (typeof window.closeSpectator === 'function') window.closeSpectator();
+        return;
+      }
       _returnFromLobbyResult();
     });
     document.getElementById('lobby-alone-back')?.addEventListener('click', () => {
@@ -1447,6 +2245,7 @@ window.Lobby = (() => {
       document.getElementById('lobby-alone-screen').style.display = 'none';
     });
     const _copyCode = () => {
+      if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
       const code = window.LB.getCode();
       if (code && navigator.clipboard) navigator.clipboard.writeText(code).catch(() => {});
       if (typeof window.showVersusToast === 'function') window.showVersusToast(T('lobby.copied', '¡Código copiado!'));

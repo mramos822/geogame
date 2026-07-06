@@ -227,9 +227,9 @@ window.sbUpdateLastActive = async function(userId) {
   await sb.from('profiles').update({ last_active: new Date().toISOString() }).eq('id', userId);
 };
 
-window.sbSetPlaying = async function(userId, playing) {
+window.sbSetPlaying = async function(userId, playing, practicing) {
   await sb.from('profiles')
-    .update({ is_playing: playing, last_active: new Date().toISOString() })
+    .update({ is_playing: playing, is_practicing: !!practicing, last_active: new Date().toISOString() })
     .eq('id', userId);
 };
 
@@ -249,8 +249,8 @@ window.sbUploadAvatar = async function(userId, blob) {
 window.sbLoadSocialData = async function(userId) {
   const { data, error } = await sb.from('friendships')
     .select(`id, status, initiated_by, user_a, user_b,
-      pa:user_a(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing,vs_wins,vs_losses,is_supporter,avg_sum_flags,avg_sum_shapes,avg_sum_cities,avg_sum_monuments,play_count_flags,play_count_shapes,play_count_cities,play_count_monuments),
-      pb:user_b(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing,vs_wins,vs_losses,is_supporter,avg_sum_flags,avg_sum_shapes,avg_sum_cities,avg_sum_monuments,play_count_flags,play_count_shapes,play_count_cities,play_count_monuments)`)
+      pa:user_a(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing,is_practicing,vs_wins,vs_losses,is_supporter,avg_sum_flags,avg_sum_shapes,avg_sum_cities,avg_sum_monuments,play_count_flags,play_count_shapes,play_count_cities,play_count_monuments),
+      pb:user_b(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing,is_practicing,vs_wins,vs_losses,is_supporter,avg_sum_flags,avg_sum_shapes,avg_sum_cities,avg_sum_monuments,play_count_flags,play_count_shapes,play_count_cities,play_count_monuments)`)
     .or(`user_a.eq.${userId},user_b.eq.${userId}`);
   if (error) throw error;
   function toEntry(row) {
@@ -269,6 +269,7 @@ window.sbLoadSocialData = async function(userId) {
       play_count: p.play_count||0,
       last_active: p.last_active || null,
       is_playing: p.is_playing || false,
+      is_practicing: p.is_practicing || false,
       vs_wins: p.vs_wins||0, vs_losses: p.vs_losses||0,
       is_supporter: p.is_supporter || false,
     };
@@ -412,11 +413,14 @@ sb.auth.onAuthStateChange((event, session) => {
     }
   } catch(e) {}
   window.sbUpdateLastActive(session.user.id).catch(() => {});
-  // Session guard: registrar token único para esta sesión (kickea otros dispositivos)
-  const _sTok = crypto.randomUUID();
-  localStorage.setItem('_sbSessionToken', _sTok);
-  window.sbSetSessionToken(session.user.id, _sTok);
-  window.sbStartSessionGuard(session.user.id);
+  // Session guard DESACTIVADO — la cuenta debe poder usarse en varios
+  // dispositivos a la vez sin cerrar sesión entre sí (decisión del producto).
+  // Quedan sbSetSessionToken/sbStartSessionGuard definidas en este archivo
+  // por si se retoma más adelante, pero ya no se llaman desde ningún lado.
+  // const _sTok = crypto.randomUUID();
+  // localStorage.setItem('_sbSessionToken', _sTok);
+  // window.sbSetSessionToken(session.user.id, _sTok);
+  // window.sbStartSessionGuard(session.user.id);
   // Notificar a monuments.js que la sesión está lista (sync de datos locales, etc.)
   window._sessionReady = true;
   document.dispatchEvent(new CustomEvent('sbSessionReady', { detail: { userId: session.user.id } }));

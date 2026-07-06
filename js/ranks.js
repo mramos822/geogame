@@ -51,7 +51,7 @@ const RANKS = [
 const RANKS_EN = [
   { name: 'Agoraphobe', desc: "It seems the world still feels like a very big place to you. Don't worry — with practice you'll lose your fear of exploring it!" },
   { name: 'Backyard Explorer', desc: 'Your geographic adventure is just beginning. The world is big, but with every step you take you get to know it a little better.' },
-  { name: 'School kid', desc: 'You\'re learning the basics of the world. With the same dedication as in the classroom, you\'ll soon master the whole map.' },
+  { name: 'School kid', desc: 'You have potential but with still a way to go, and so far roaming the schoolyard is as close as you get to an adventure.' },
   { name: 'Bus Driver', desc: 'You know the routes better than anyone. Although your run is local, your curiosity about the world will take you much further.' },
   { name: 'Hotel Receptionist', desc: 'You welcome travelers from all over the world with a smile. Your geographic knowledge helps you connect with every guest who arrives at your desk.' },
   { name: 'Baggage Handler', desc: 'You carry the weight of the world in your hands, and you do it well. Every suitcase you move brings you one step closer to knowing it all.' },
@@ -74,7 +74,7 @@ const RANKS_EN = [
   { name: 'Globe Trotter', desc: 'The world is your home. You know so many corners of the planet that it would be hard to find a place that surprises you.' },
   { name: 'Tracker', desc: 'Your geographic instinct lets you find any place on the map. You could track down any destination without getting lost!' },
   { name: 'Apprentice Pilot', desc: 'You\'re learning to navigate the world skillfully. With a little more practice, you\'ll be ready to take off toward new horizons.' },
-  { name: 'Surveyor', desc: 'Pinpointing precise geographic spots is very important for a surveyor, and that\'s exactly what you\'ve got.' },
+  { name: 'Surveyor', desc: 'Pin point geographical accuracy is important for a surveyor, and that\'s exactly what you have.' },
   { name: 'Cartographer', desc: 'You could create a map of the world from memory alone. Not many people can do that!' },
   { name: 'Co-Pilot', desc: 'You\'re just one step from command. Your geographic knowledge is already worthy of the skies — keep it up and you\'ll soon lead the route!' },
   { name: 'Airline Pilot', desc: 'Airline pilots are extremely good travelers with excellent knowledge of the world around them — just like you!' },

@@ -429,11 +429,18 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   width: 83.6cqmin;
   animation: cloud1-move 10s linear infinite;
   z-index: -1;
+  will-change: transform;
 }
 
+/* Animar transform en vez de right: "right" es layout (fuerza reflow del
+   documento en cada frame, uno de los principales causantes de lag/FPS bajo
+   reportado en el juego); transform lo maneja el compositor sin tocar layout.
+   146cqw = mismo recorrido total que -26% → 120% (146% del ancho del
+   contenedor), porque right/left son siempre % del ancho del containing
+   block — cqw es exactamente esa misma unidad. */
 @keyframes cloud1-move {
-  from { right: -26%; }
-  to   { right: 120%; }
+  from { transform: translateX(0); }
+  to   { transform: translateX(-146cqw); }
 }
 
 .game-bg-cloud2 {
@@ -441,11 +448,12 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   right: 5%;
   width: 44.8cqmin;
   animation: cloud2-move 12s linear 3s infinite;
+  will-change: transform;
 }
 
 @keyframes cloud2-move {
-  from { right: 5%; }
-  to   { right: 120%; }
+  from { transform: translateX(0); }
+  to   { transform: translateX(-115cqw); }
 }
 
 .game-bg-people {
@@ -728,6 +736,22 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 .splash-confirm-wrap.confirm-ready {
   opacity: 1;
   pointer-events: auto;
+}
+/* Espectador (mirror de solo-lectura del splash real, ver _showSplashMirror
+   en spectate.js): !important le gana a .confirm-ready de arriba pase lo que
+   pase después (otro código puede seguir tocando la clase confirm-ready o
+   el estilo inline sin que esto se pierda) — un estilo inline sin !important
+   no alcanza, .confirm-ready ya es más específica y puede reaplicarse más
+   tarde (ej. el video de instrucciones del modo siguiente termina de cargar
+   y showSplashConfirm() la vuelve a poner). */
+.splash-confirm-wrap.spectator-locked {
+  pointer-events: none !important;
+  /* No solo bloqueado — invisible. Antes se veía el botón dibujado (a veces
+     hasta con el estado "ready" con su animación/glow) pero sin reaccionar
+     al click, lo cual confunde más que ayuda — si no se puede usar, mejor
+     que no se vea. visibility (no display) para no alterar el layout del
+     resto del splash ni pisar transiciones que dependan de su tamaño. */
+  visibility: hidden !important;
 }
 
 .splash-confirm1 {
@@ -1595,12 +1619,23 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   min-width: 0;
   flex: 1;
 }
+.loading-social-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.9cqmin;
+  min-width: 0;
+}
 .loading-social-name {
   font-size: 2.6cqmin;
   color: #4a3b00;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+  flex: 0 1 auto;
+  /* Tope de ancho: sin esto un nombre largo empuja el ojo hasta pisar el
+     puntaje (position:absolute, arranca ~43cqmin de la fila). */
+  max-width: 26cqmin;
 }
 .loading-social-status {
   font-size: 1.8cqmin;
@@ -1666,6 +1701,62 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   transform: translate(-50%, -50%);
   width: 20cqmin;
   height: 6cqmin;
+}
+.social-spectate-eye {
+  /* Vive DENTRO de .loading-social-score (que ya es position:absolute, así
+     que arma su propio contexto de posicionamiento para esto) — pegado a la
+     izquierda de points.png, no al lado del nombre. */
+  position: absolute;
+  left: -5.5cqmin;
+  top: 50%;
+  margin-top: -1.7cqmin;
+  width: 3.4cqmin;
+  height: 3.4cqmin;
+  border-radius: 50%;
+  cursor: pointer;
+  transform: scale(1.35);
+  transition: transform 0.15s;
+  z-index: 5;
+}
+.social-spectate-eye:hover { transform: scale(1.55); }
+
+/* Mismo ojo (círculo rojo + óvalo blanco + pupila) pero para el indicador de
+   espectadores en el HUD del jugador — versión chica, tamaños en px fijos
+   porque este badge no vive dentro del contenedor cqmin del juego. */
+.spectator-badge-eye {
+  position: relative;
+  display: inline-block;
+  width: 1.6em;
+  height: 1.6em;
+  vertical-align: middle;
+  transform-origin: center;
+  transition: transform 0.09s ease;
+}
+/* Parpadeo — aplasta el ojo entero (eye1+eye2 juntos, mismo contenedor) en
+   vez de ocultarlo, más natural que un display:none/block de golpe. */
+.spectator-badge-eye.blinking {
+  transform: scaleY(0.08);
+}
+/* eye1.png y eye2.png van superpuestos en el mismo lugar (mismo tamaño,
+   mismo origen) — apiladas una sobre otra, no una animación de parpadeo. */
+.spectator-badge-eye-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+/* eye2.png hace de pupila — spectatorEyeBlink() (monuments.js) le agrega/
+   saca esta clase en loop con timing aleatorio para el efecto de "mirar a
+   la derecha" de a ratos. */
+.spectator-badge-eye-pupil {
+  transition: transform 0.1s ease;
+}
+.spectator-badge-eye-pupil.looking-right {
+  transform: translateX(12%);
 }
 .loading-social-points {
   position: absolute;
@@ -4070,6 +4161,28 @@ body.is-mobile #screen-warning-icon {
   object-fit: contain;
 }
 
+/* Ícono de cronómetro que aparece encima de la cartilla del jugador cuando se
+   le acaba el tiempo (universal: versus 1v1/grupo, espectador 1v1/grupo) —
+   mismo espíritu que el emote de "wrong", ver _applyTimesUpEffect. Fade in +
+   fade out por JS (clase .show). */
+.lb-timesup-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  font-size: 9cqmin;
+  line-height: 1;
+  pointer-events: none;
+  z-index: 200;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.55);
+  transition: opacity 0.35s ease, transform 0.4s cubic-bezier(0.22,1,0.36,1);
+  filter: drop-shadow(0 0.35cqmin 0.45cqmin rgba(0,0,0,0.55));
+}
+.lb-timesup-icon.show {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
 
 @keyframes emote-pop {
   0%   { opacity: 0; transform: scale(0.3) translateY(10px); }
@@ -4167,6 +4280,30 @@ body.is-mobile #screen-warning-icon {
   z-index: 10;
 }
 
+/* Espectador de versus (citiesSpectatorSetPlayerCard etc.): la fila del
+   rival no tenía z-index propio, así que quedaba SIEMPRE por debajo de
+   .lb-player en la pila de apilamiento — un hijo con z-index alto (el
+   emote-bubble de wrongEffect, z-index:200) no puede "atravesar" un
+   contexto de apilamiento de menor jerarquía que el de un hermano con
+   z-index mayor. Se notaba sobre todo durante la animación de reordenar
+   puestos (transition:top), cuando las dos filas se superponen un
+   instante: el emoji del rival aparecía tapado hasta que el intercambio de
+   posiciones terminaba. Mismo valor que .lb-player para que ninguna de las
+   dos gane por casualidad — quien tenga el emoji activo debe poder verse
+   sin importar cuál esté "arriba" en pantalla en ese momento. */
+.lb-entry.lb-vsopp {
+  z-index: 10;
+}
+
+/* Espectador GRUPAL (ver _renderGroupLeaderboard en spectate.js): resalta la
+   fila del miembro que las flechas de POV están mirando ahora mismo, entre
+   las N de la sala. */
+.lb-entry.lb-group-pov {
+  border: 1.5px solid #ffe066;
+  z-index: 10;
+}
+.lb-entry.lb-group-pov .lb-name { color: #ffe066; }
+
 .lb-entry.lb-best {
   border: 1.5px solid #f0c040;
   background: #2a1060;
@@ -4245,7 +4382,8 @@ body.is-mobile #screen-warning-icon {
   user-select: none;
   display: none;
 }
-#flags-leaderboard.vs-active .lb-rank {
+#flags-leaderboard.vs-active .lb-rank,
+#leaderboard.vs-active .lb-rank {
   display: block;
 }
 .lb-rank.rank-1     { -webkit-text-stroke: 0.38cqmin #d4af37; }
@@ -4269,8 +4407,12 @@ body.is-mobile #screen-warning-icon {
   left: 74%;
   transform: translateX(-50%);
   height: 6.5cqmin;
-  width: auto;
-  z-index: 990;
+  width: 6.5cqmin;
+  /* Por encima de #spectator-loading (1500, ver también vol-btn/fs-btn) — el
+     aviso de inactividad del espectador usa esa misma pantalla de carga como
+     overlay, y sin esto tapaba el botón de back por completo: no había forma
+     de salir de "espectando" mientras el aviso estaba en pantalla. */
+  z-index: 1600;
   pointer-events: auto;
   cursor: pointer;
   transition: transform 0.12s ease;
@@ -4278,6 +4420,16 @@ body.is-mobile #screen-warning-icon {
   -webkit-user-drag: none;
 }
 #ingame-power:hover { transform: translateX(-50%) scale(1.15); }
+#ingame-power-icon { display: block; width: 100%; height: 100%; }
+#ingame-back-icon { position: relative; width: 100%; height: 100%; }
+/* Mismo comportamiento que cualquier otro back del juego (loading-play-confirm-wrap,
+   loading-panel2-back, etc.): la flecha (back2) arranca invisible y aparece con
+   hover/press — .loading-play-confirm2 ya trae opacity:0 por defecto. */
+#ingame-power:hover #ingame-back-icon .loading-play-confirm2 { opacity: 1; }
+#ingame-back-icon.confirm-pressed .loading-play-confirm2 { opacity: 0; }
+/* El 118% default de .loading-play-confirm2 queda desproporcionado acá porque
+   #ingame-power es chico (6.5cqmin) — se achica a un tamaño más razonable. */
+#ingame-back-icon .loading-play-confirm2 { width: 100%; }
 
 /* Pestañita de confirmación para abandonar la partida */
 #ingame-quit-popup {
@@ -4338,6 +4490,25 @@ body.is-mobile #screen-warning-icon {
   left: 37.3cqmin;
   width: 17.6cqmin;
   height: 5.3cqmin;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+#vs-spectator-badge,
+#flags-vs-spectator-badge {
+  display: none;
+  align-items: center;
+  gap: 0.5cqmin;
+  position: absolute;
+  bottom: 12cqmin;
+  left: 33cqmin;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2.2cqmin;
+  color: #fffbe6;
+  -webkit-text-stroke: 0.1cqmin #1a3a6b;
+  background: rgba(8,30,55,0.6);
+  border-radius: 1cqmin;
+  padding: 0.4cqmin 1cqmin;
   pointer-events: none;
   z-index: 1000;
 }
@@ -5122,7 +5293,9 @@ body.is-mobile #screen-warning-icon {
   top: 3.5%;
   left: 17%;
   transform: translate(-50%, -50%);
-  z-index: 990;
+  /* Por encima de #spectator-loading (1500): silenciar/pantalla completa
+     tienen que seguir accesibles incluso durante la transición de carga. */
+  z-index: 1600;
   cursor: pointer;
   width: 6cqmin;
 }
@@ -5141,7 +5314,7 @@ body.is-mobile #screen-warning-icon {
   top: 3.5%;
   left: calc(17% + 7cqmin);
   transform: translate(-50%, -50%);
-  z-index: 990;
+  z-index: 1600;
   cursor: pointer;
   width: 6cqmin;
   height: 6cqmin;
@@ -5198,12 +5371,13 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
 #splash-screen:not(.mode-flags):not(.mode-shapes):not(.mode-monuments) .game-bg-sky,
 #gameover-screen:not(.mode-flags):not(.mode-shapes):not(.mode-monuments) .game-bg-sky { bottom: 28%; transform: translateX(-50%) scaleY(0.666); }
 
-.mode-flags.mode-shapes .game-bg-cloud2 { right: -5%; animation: cloud2-move-shapes 12s linear 3s infinite; }
+.mode-flags.mode-shapes .game-bg-cloud2 { right: -5%; animation: cloud2-move-shapes 12s linear 3s infinite; will-change: transform; }
 .mode-flags.mode-shapes .game-bg-plane7 { right: -5%; top: 46%; }
 
+/* transform en vez de right — ver comentario en cloud1-move. */
 @keyframes cloud2-move-shapes {
-  from { right: -5%; }
-  to   { right: 120%; }
+  from { transform: translateX(0); }
+  to   { transform: translateX(-125cqw); }
 }
 
 .mode-flags.mode-shapes .game-bg-girl,
@@ -7078,9 +7252,9 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   position: fixed;
   inset: 0;
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: center;
-  padding-bottom: 7cqmin;
+  padding-top: 7cqmin;
   z-index: 390;
   pointer-events: none;
 }
@@ -7419,6 +7593,267 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   color: #fffbe6;
   opacity: 0.7;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   MODO ESPECTADOR
+   ═══════════════════════════════════════════════════════════════ */
+#spectator-screen { z-index: 401; }
+.spectator-box { min-width: 62cqmin; gap: 2.5cqmin; padding-top: 2cqmin; }
+#spectator-screen.spectator-solo #spectator-guest-pic,
+#spectator-screen.spectator-solo #spectator-guest-name,
+#spectator-screen.spectator-solo #spectator-guest-score,
+#spectator-screen.spectator-solo .vs-result-vs { display: none; }
+.spectator-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+.spectator-title {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2.8cqmin;
+  color: #fffbe6;
+  -webkit-text-stroke: 0.12cqmin #1a3a6b;
+}
+.spectator-close {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2.6cqmin;
+  color: #fffbe6;
+  cursor: pointer;
+  padding: 0.5cqmin 1cqmin;
+}
+.spectator-close:hover { color: #ff5a5a; }
+.spectator-prompt {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 3.2cqmin;
+  color: #fff700;
+  -webkit-text-stroke: 0.18cqmin #1a3a6b;
+  text-align: center;
+  min-height: 3.6cqmin;
+}
+.spectator-options {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1.4cqmin;
+  max-width: 56cqmin;
+}
+.spectator-option {
+  display: flex;
+  align-items: center;
+  gap: 0.8cqmin;
+  background: #0a3a63;
+  border: 0.3cqmin solid #fffbe6;
+  border-radius: 1.2cqmin;
+  padding: 0.8cqmin 1.6cqmin;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2.2cqmin;
+  color: #fffbe6;
+  transition: background 0.2s, border-color 0.2s;
+}
+.spectator-option img { width: 4.5cqmin; height: auto; border-radius: 0.3cqmin; }
+.spectator-option.picked-correct { background: #1a5c2a; border-color: #4cff72; }
+.spectator-option.picked-wrong   { background: #5c1a1a; border-color: #ff5a5a; }
+.spectator-status {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2.4cqmin;
+  color: #cce0ff;
+  min-height: 2.8cqmin;
+  text-align: center;
+}
+
+/* Transición de carga al abrir el espectador — mismos assets (logo/planeta/
+   barra) que el loading inicial de la página, tipo Clash Royale: aparece al
+   tocar el ojo, se llena mientras nos conectamos al canal en vivo, y se
+   desvanece revelando la partida. */
+#spectator-loading {
+  position: absolute;
+  inset: 0;
+  /* Por encima del countdown (1000) y del back/power (990) — si no, esos
+     widgets del HUD se ven asomando arriba de la transición de carga. */
+  z-index: 1500;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3cqmin;
+  background: radial-gradient(circle at 50% 40%, #123a63 0%, #061625 75%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+#spectator-loading.visible { opacity: 1; pointer-events: auto; }
+/* Mismo avión + animación (plane-float) que el loading inicial de la página,
+   en vez del planeta rotando. */
+.spectator-loading-plane {
+  width: clamp(20cqmin, 34cqmin, 40cqmin);
+  height: auto;
+  user-select: none;
+  -webkit-user-drag: none;
+  animation: plane-float 2s ease-in-out infinite;
+}
+.spectator-loading-logo { width: 34cqmin; height: auto; }
+.spectator-loading-text {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2.4cqmin;
+  color: #cce0ff;
+}
+.spectator-loading-bar-track {
+  width: clamp(20cqmin, 40cqmin, 50cqmin);
+  height: 2cqmin;
+  background: rgba(0,0,0,0.2);
+  border-radius: 999px;
+  overflow: hidden;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+}
+.spectator-loading-bar-fill {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #ffe066, #ffb300);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+/* Barra abajo cuando el espectador ve la pantalla REAL del juego (flags) en vez
+   del panel genérico — estilo "SPECTATING" de Fortnite: sin panel/fondo, solo
+   el tag arriba y el avatar+nombre debajo, flotando sobre el juego. Cerrar se
+   hace desde el botón de back arriba (ver #ingame-power), no hay X acá. */
+#spectator-mini-hud {
+  position: absolute;
+  bottom: 2.5cqmin;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7cqmin;
+  z-index: 500;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  pointer-events: none;
+}
+.spectator-mini-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1cqmin;
+}
+/* Modo GRUPAL (flechas visibles, ver _showGroupPovArrows en spectate.js):
+   las flechas se anclan por POSICIÓN ABSOLUTA a los bordes de un ancho FIJO
+   en vez de fluir en el flex — así nunca se corren según cuánto mida el
+   nombre (el "las flechas van cambiando de posición" reportado). El nombre
+   queda con max-width + ellipsis para que, al revés, tampoco pueda crecer
+   tanto como para meterse debajo de las flechas. */
+.spectator-mini-row.group-pov {
+  position: relative;
+  min-width: 50cqmin;
+  padding: 0 8.5cqmin;
+  /* Altura FIJA (igual al avatar, que no cambia) — sin esto, la altura de
+     esta fila la definía el hijo más alto en el flex (normalmente el
+     line-height del nombre, no el avatar), y _fitGroupPovName() encoge el
+     font-size del nombre según su largo — con #spectator-mini-hud anclado
+     por `bottom` (no `top`), cualquier cambio de altura de esta fila corría
+     verticalmente TODO el bloque (tag + flechas), distinto para cada
+     miembro según el largo de su nombre (el "las posiciones en Y del
+     espectando y las flechas cambian" reportado).
+  */
+  height: 6.5cqmin;
+}
+.spectator-mini-row.group-pov .spectator-mini-name {
+  /* max-width fijo para que el nombre nunca empuje a las flechas (ver
+     _fitGroupPovName en spectate.js, que encoge el font-size para que el
+     nombre COMPLETO entre acá en vez de cortarlo con ellipsis). overflow:
+     hidden queda solo de salvavidas por si un nombre extremo no encoge lo
+     suficiente. */
+  max-width: 24cqmin;
+  overflow: hidden;
+}
+/* Flechas para cambiar de POV entre los miembros de un duelo grupal — ver
+   openSpectatorGroup en spectate.js. #spectator-mini-hud tiene
+   pointer-events:none general (es un overlay flotante sobre el juego), así
+   que estas SÍ necesitan pointer-events:auto explícito para ser clickeables. */
+.spectator-mini-pov-arrow {
+  pointer-events: auto;
+  cursor: pointer;
+  font-size: 7cqmin;
+  line-height: 1;
+  color: #fffbe6;
+  -webkit-text-stroke: 0.35cqmin #1a3a6b;
+  paint-order: stroke fill;
+  user-select: none;
+  -webkit-user-select: none;
+  padding: 0 1cqmin;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.spectator-mini-row.group-pov .spectator-mini-pov-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.spectator-mini-row.group-pov .spectator-mini-pov-arrow:active { transform: translateY(-50%) scale(0.85); }
+.spectator-mini-row.group-pov .spectator-mini-pov-prev { left: 0; }
+.spectator-mini-row.group-pov .spectator-mini-pov-next { right: 0; }
+.spectator-mini-pov-arrow:active { transform: scale(0.85); }
+.spectator-mini-pov-arrow.disabled { opacity: 0.35; pointer-events: none; }
+.spectator-mini-avatar {
+  width: 6.5cqmin;
+  height: 6.5cqmin;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 0.25cqmin solid #fffbe6;
+  box-shadow: 0 0.2cqmin 0.6cqmin rgba(0,0,0,0.5);
+}
+/* Mismo tamaño que .loading-player-name (panel de perfil). */
+.spectator-mini-name {
+  font-size: 6.3cqmin;
+  color: #fffbe6;
+  -webkit-text-stroke: 0.4cqmin #1a3a6b;
+  paint-order: stroke fill;
+  white-space: nowrap;
+}
+/* Mismo estilo que .results-rank-label (cartel de rango en results.js):
+   amarillo con contorno grueso azul marino. */
+.spectator-mini-tag {
+  font-size: 3.4cqmin;
+  font-weight: bold;
+  letter-spacing: -0.5px;
+  color: #FFFF00;
+  -webkit-text-stroke: 0.5cqmin #000080;
+  paint-order: stroke fill;
+  /* Pensado originalmente solo para "ESPECTANDO" (corto, fijo) — vs.js
+     (_enterWaitAsSpectator) reusa este mismo elemento para el mensaje de
+     "Esperando a los otros jugadores..." bastante más largo, y sin límite de
+     ancho se estiraba de más sin ajustarse al viewport (el #spectator-mini-hud
+     que lo contiene no tiene ancho propio, crece con el contenido). Se le da
+     un techo relativo al stage y se permite ajustar en 2 líneas en vez de
+     seguir creciendo horizontal. */
+  max-width: 55cqw;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.15;
+}
+
+/* Ver comentario largo en index.html — cubre el hueco entre "mi cronómetro
+   terminó" (assets propios ya limpiados) y "llegaron los datos del rival"
+   (canal soltado + reconexión + resend, con latencia de red real de por
+   medio) para que no se sienta como una pantalla congelada. */
+#vs-wait-spinner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 150;
+  pointer-events: none;
+}
+.vs-wait-spinner-circle {
+  width: 9cqmin;
+  height: 9cqmin;
+  border: 0.9cqmin solid rgba(255,255,255,0.35);
+  border-top-color: #ffe066;
+  border-radius: 50%;
+  animation: vs-wait-spin 0.8s linear infinite;
+}
+@keyframes vs-wait-spin { to { transform: rotate(360deg); } }
 
 /* ═══════════════════════════════════════════════════════════════
    PRACTICE TOUR PANEL

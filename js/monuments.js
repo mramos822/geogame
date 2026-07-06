@@ -37,7 +37,7 @@
   ];
 
   const AUDIO = [
-    'sfx/check.mp3','sfx/postgameloop.mp3','sfx/menuloop.mp3','sfx/pin.mp3',
+    'sfx/check.mp3','sfx/postgameloop.mp3','sfx/pregameloop.mp3','sfx/menuloop.mp3','sfx/pin.mp3',
     'sfx/countdown.mp3','sfx/cuentaregresiva.mp3','sfx/error.mp3',
     'sfx/acertar.mp3','sfx/verynice.mp3','sfx/tag.mp3',
     'sfx/bonus.mp3','sfx/timesup.mp3','sfx/gamemusic.mp3','sfx/select.mp3',
@@ -365,6 +365,10 @@ window.refreshProfileStats = function () {
 const sfxCheck     = new Audio('sfx/check.mp3');
 const sfxPostgame  = new Audio('sfx/postgameloop.mp3');
 sfxPostgame.loop   = true;
+// Splash/pre-ronda (antes de jugar) — distinto de sfxPostgame (pantalla de
+// resultados); antes ambos reusaban postgameloop.mp3 para las dos cosas.
+const sfxPregame   = new Audio('sfx/pregameloop.mp3');
+sfxPregame.loop    = true;
 const sfxGameMusic = new Audio('sfx/gamemusic.mp3');
 sfxGameMusic.loop  = true;
 const sfxMenuMusic = new Audio('sfx/menuloop.mp3');
@@ -393,7 +397,7 @@ window.startMenuMusic = function () {
   }
 };
 const sfxSelect    = new Audio('sfx/select.mp3');
-if (localStorage.getItem('muted') === 'true') { sfxCheck.volume = 0; sfxPostgame.volume = 0; sfxGameMusic.volume = 0; sfxMenuMusic.volume = 0; sfxSelect.volume = 0; }
+if (localStorage.getItem('muted') === 'true') { sfxCheck.volume = 0; sfxPostgame.volume = 0; sfxPregame.volume = 0; sfxGameMusic.volume = 0; sfxMenuMusic.volume = 0; sfxSelect.volume = 0; }
 [sfxCheck, sfxSelect].forEach(sfx => { sfx.load(); });
 
 // ── MÚSICA EN LOOP: motor Web Audio SOLO en iOS ───────────────────────────────
@@ -494,6 +498,7 @@ window.nudgeRepaint = function () {
 const _iosMusicURL = new Map([
   [sfxGameMusic, 'sfx/gamemusic.mp3'],
   [sfxPostgame,  'sfx/postgameloop.mp3'],
+  [sfxPregame,   'sfx/pregameloop.mp3'],
   [sfxMenuMusic, 'sfx/menuloop.mp3'],
 ]);
 let _iosCtx    = null;
@@ -565,7 +570,7 @@ function playMusicIOS(track) {
   }
   _iosWanted = track;
   // que ningún <audio> de música suene en paralelo al motor
-  [sfxPostgame, sfxGameMusic, sfxMenuMusic].forEach(t => t.pause());
+  [sfxPostgame, sfxPregame, sfxGameMusic, sfxMenuMusic].forEach(t => t.pause());
   if (ctx.state === 'suspended') ctx.resume().catch(() => {});
 
   if (!track) { iosStopMusic(); return; }                       // corte inmediato
@@ -612,13 +617,28 @@ window.showGlobalToast = function(msg) {
 // Helper global: actualiza is_playing en Supabase si hay sesión activa
 window._setPlaying = function(playing) {
   window._isPlaying = !!playing;
-  if (window._sbUserId) window.sbSetPlaying(window._sbUserId, playing).catch(() => {});
+  const isPracticing = !!(window.practiceConfig && window.practiceConfig.active);
+  if (window._sbUserId) window.sbSetPlaying(window._sbUserId, playing, playing && isPracticing).catch(() => {});
   if (playing) {
     window._scoresUploadedThisGame = false;
     window._gameSessionId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
+    // Diferido a un microtask: quien nos llamó (vs.js/lobby.js) recién termina de
+    // setear _vsActive/_lobbyActive unas líneas después de llamar _setPlaying(true)
+    // en la MISMA función síncrona — si decidiéramos acá mismo, siempre veríamos
+    // esos flags todavía en false y abriríamos un canal de espectador "solo" aunque
+    // en realidad sea versus/lobby. Tampoco tiene sentido abrir el canal en modo
+    // práctica: no hay ojo para clickear (is_practicing lo oculta) y la sesión
+    // no es una partida "real" para mostrarle a nadie.
+    Promise.resolve().then(() => {
+      if (window._isPlaying && !window._vsActive && !window._lobbyActive && !isPracticing && typeof window.SoloSpectate !== 'undefined') {
+        window.SoloSpectate.start();
+      }
+    });
+  } else {
+    if (typeof window.SoloSpectate !== 'undefined') window.SoloSpectate.stop();
+    // Al volver de una partida, entregar invitaciones que llegaron mientras jugaba
+    if (typeof window.flushQueuedInvite === 'function') window.flushQueuedInvite();
   }
-  // Al volver de una partida, entregar invitaciones que llegaron mientras jugaba
-  else if (typeof window.flushQueuedInvite === 'function') window.flushQueuedInvite();
 };
 
 document.getElementById('loading-play-btn').addEventListener('click', () => {
@@ -626,6 +646,15 @@ document.getElementById('loading-play-btn').addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   window._setPlaying(true);
   window.pendingGameMode = 'game';
+  // Avisar a un posible espectador que entramos a las instrucciones de este
+  // modo — ver comentario largo (con la explicación del defer a microtask)
+  // en el mismo punto de flags.js. Cities todavía no tiene UI real de
+  // espectador (REAL_UI_MODES no lo lista), así que esto solo evita que se
+  // quede viendo la pantalla de "Conectando..." trabada — no podrá ver la
+  // ronda en sí hasta que se integre ese modo.
+  Promise.resolve().then(() => {
+    if (typeof window._specReportSplash === 'function') window._specReportSplash({ mode: 'game' });
+  });
   window.resetSplashEntry?.();
   // Transición visual inmediata — ocultar loading y mostrar splash en este frame
   document.getElementById('loading-screen').style.display = 'none';
@@ -636,7 +665,7 @@ document.getElementById('loading-play-btn').addEventListener('click', () => {
   animElsCity.forEach(el => el.classList.remove('animate-in'));
   void splashElCity.offsetWidth;
   animElsCity.forEach(el => el.classList.add('animate-in'));
-  playMusic(sfxPostgame);
+  playMusic(sfxPregame);
   // Setup no visual diferido al siguiente frame para no bloquear la transición
   requestAnimationFrame(() => {
     document.getElementById('splash-screen').classList.remove('mode-flags', 'mode-shapes', 'mode-monuments');
@@ -993,11 +1022,8 @@ window.startCampaign = function () {
             if (typeof loadFriends === 'function') loadFriends();
             if (typeof window.sbUpdateLastActive === 'function') window.sbUpdateLastActive(data.user.id).catch(() => {});
             // Escuchar invitaciones versus en tiempo real
-            // Session guard: token único → kickea la misma cuenta en otro dispositivo
-            const _sTok = crypto.randomUUID();
-            localStorage.setItem('_sbSessionToken', _sTok);
-            window.sbSetSessionToken?.(data.user.id, _sTok);
-            window.sbStartSessionGuard?.(data.user.id);
+            // Session guard DESACTIVADO (ver mismo comentario en sb.js) — la
+            // cuenta debe poder usarse en varios dispositivos a la vez.
             if (typeof window._vsStartListening === 'function') window._vsStartListening();
             if (window.LB && typeof window.LB.listenForInvites === 'function') {
               window.LB.listenForInvites(p => { if (typeof window.showLobbyIncomingInvite === 'function') window.showLobbyIncomingInvite(p); });
@@ -1637,6 +1663,29 @@ function _patchFriendStatusInDOM(friendId) {
     if (rankName && rk) rankName.textContent = rk.name;
     const rankImg = row.querySelector('.loading-social-emote');
     if (rankImg && rk) rankImg.src = rk.img;
+    // Ojo de espectar: agregar/quitar en vivo si cambia is_playing/is_practicing
+    // mientras la fila ya está en pantalla (si no, quedaba desactualizado hasta
+    // el próximo renderSocialFriends() completo). Vive DENTRO de
+    // .loading-social-score (a la izquierda de points.png, ver CSS) en vez
+    // de al lado del nombre.
+    const scoreBox = row.querySelector('.loading-social-score');
+    if (scoreBox) {
+      const shouldShowEye = st.cls === 'playing' && !f.is_practicing;
+      let eyeEl = scoreBox.querySelector('.social-spectate-eye');
+      if (shouldShowEye && !eyeEl) {
+        eyeEl = document.createElement('img');
+        eyeEl.className = 'social-spectate-eye';
+        eyeEl.src = 'images/spectate.png';
+        eyeEl.alt = '';
+        eyeEl.draggable = false;
+        eyeEl.oncontextmenu = () => false;
+        eyeEl.title = 'Ver partida';
+        eyeEl.addEventListener('click', (e) => { e.stopPropagation(); openSpectatorForFriend(f); });
+        scoreBox.insertBefore(eyeEl, scoreBox.firstChild);
+      } else if (!shouldShowEye && eyeEl) {
+        eyeEl.remove();
+      }
+    }
   });
   // Si el panel de detalle de ese amigo está abierto, actualizarlo también
   if (currentFriendProfile?.id === friendId) {
@@ -1662,12 +1711,13 @@ function _subscribeFriendStatuses(friendIds) {
       const updated = payload.new;
       const f = socialData.friends.find(x => x.id === updated.id);
       if (!f) return;
-      f.last_active  = updated.last_active;
-      f.is_playing   = updated.is_playing;
+      f.last_active   = updated.last_active;
+      f.is_playing    = updated.is_playing;
+      f.is_practicing = updated.is_practicing;
       // Sincronizar caché de friends.js (usada por el panel de invitar del lobby)
       if (typeof getFriends === 'function') {
         const fc = getFriends().find(x => x.id === updated.id);
-        if (fc) { fc.last_active = updated.last_active; fc.is_playing = updated.is_playing; }
+        if (fc) { fc.last_active = updated.last_active; fc.is_playing = updated.is_playing; fc.is_practicing = updated.is_practicing; }
       }
       // Refrescar en vivo el panel de amigos de la sala si está abierto
       window._refreshLobbyInviteList?.();
@@ -1693,7 +1743,15 @@ function _subscribeFriendStatuses(friendIds) {
         }
       }
       // Actualizar score si cambió (amigo terminó partida)
-      const newScore = updated.hs_total || 0;
+      // hs_total (columna) nunca queda seteada server-side para algunas
+      // cuentas (queda en 0 aunque hs_flags/hs_shapes/hs_cities/hs_monuments
+      // sí tengan puntaje real) — mismo fallback que toEntry() (sb.js) y el
+      // helper de más abajo en este archivo (línea ~1868, Math.max). Sin
+      // este fallback ACÁ, cualquier UPDATE de perfil del amigo (is_playing,
+      // avatar, lo que sea — no hace falta que cambie el score) pisaba el
+      // valor correcto con 0 hasta el próximo refetch completo — el "los
+      // datos van cambiando entre 0 y el detalle actual" reportado.
+      const newScore = updated.hs_total || ((updated.hs_flags||0)+(updated.hs_shapes||0)+(updated.hs_cities||0)+(updated.hs_monuments||0));
       if (newScore !== f.score) {
         f.score       = newScore;
         f.hs_flags    = updated.hs_flags    || 0;
@@ -2309,6 +2367,68 @@ function respondRequest(friend, accepted) {
   op.then(() => loadSocialData(false)).catch(e => console.warn('[social] respondRequest:', e));
 }
 
+// Click en el ojo de un amigo "Jugando": busca su match versus activo y, si es
+// de un modo soportado (flags/shapes en v1), abre el panel de espectador. La
+// policy RLS "matches_select_friends" es la que realmente decide si puedo leer
+// esa fila — si no somos amigos aceptados, el select no devuelve nada.
+// Ninguna partida versus (flags/shapes, rondas cortas con timer propio) tiene
+// sentido seguir "active" más de esto — si el cierre normal (fin de partida /
+// abandono de un jugador) no llegó a marcarla como tal (pestaña cerrada de
+// golpe, crash, corte de red), quedaba "active" en la base PARA SIEMPRE. Como
+// openSpectatorForFriend() siempre revisa esto ANTES de ir al espectador de
+// partida individual, una fila así de vieja bloqueaba para siempre poder
+// espectar a esa persona en modo solo — se quedaba colgado intentando abrir
+// una partida versus fantasma que nadie está jugando.
+const STALE_MATCH_MS = 20 * 60 * 1000; // 20 minutos
+
+async function openSpectatorForFriend(f) {
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+  try {
+    const { data, error } = await window.sb
+      .from('matches')
+      .select('id, mode, status, created_at')
+      .or(`host_id.eq.${f.id},guest_id.eq.${f.id}`)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    const isStale = data && (Date.now() - new Date(data.created_at).getTime()) > STALE_MATCH_MS;
+    if (data && isStale) {
+      // Autolimpieza: la primera persona que se topa con esto la corrige para
+      // siempre (no hace falta arreglarla a mano en la base cada vez) — no se
+      // espera la respuesta, no debe demorar el intento de espectar.
+      window.sb.from('matches').update({ status: 'abandoned' }).eq('id', data.id).then(() => {}, () => {});
+    }
+    if (data && !isStale) {
+      // Está en una partida VERSUS — los 4 modos ya tienen UI real de
+      // espectador (REAL_UI_MODES los cubre a todos desde que se integró
+      // Monuments), así que ya no hace falta filtrar por modo acá.
+      if (typeof window.openSpectator === 'function') window.openSpectator(data.id, f);
+      return;
+    }
+    // Sin match 1v1 activo — ¿está en un duelo GRUPAL (lobby de hasta 10)?
+    // Requiere la policy "lobby_members_select_friends"/"lobbies_select_friends"
+    // (ver supabase/group_spectator_mode.sql) para poder leerlo desde afuera.
+    const { data: lobbyRows } = await window.sb
+      .from('lobby_members')
+      .select('lobby_id, l:lobby_id(id, status, created_at)')
+      .eq('user_id', f.id)
+      .limit(5);
+    const activeLobby = (lobbyRows || []).map(r => r.l).find(l => l && l.status === 'active');
+    if (activeLobby) {
+      if (typeof window.openSpectatorGroup === 'function') window.openSpectatorGroup(activeLobby.id, f);
+      return;
+    }
+    // Sin duelo grupal tampoco pero está "Jugando" → asumimos partida
+    // individual (Gira Mundial/modo solo) y nos unimos directo a su canal
+    // 'solo-{id}'.
+    if (typeof window.openSpectatorSolo === 'function') window.openSpectatorSolo(f.id, f);
+  } catch (e) {
+    window.showGlobalToast('No se pudo abrir la partida.');
+  }
+}
+
 function renderSocialFriends(filter = '') {
   const list = document.getElementById('loading-social-list');
   if (!list) return;
@@ -2341,16 +2461,23 @@ function renderSocialFriends(filter = '') {
     row.innerHTML =
       `<img class="loading-social-avatar" src="${f.avatar}" alt="" draggable="false" oncontextmenu="return false">` +
       `<div class="loading-social-info">` +
-        `<span class="loading-social-name">${fav ? '★ ' : ''}${f.name}</span>` +
+        `<div class="loading-social-name-row">` +
+          `<span class="loading-social-name">${fav ? '★ ' : ''}${f.name}</span>` +
+        `</div>` +
         `<span class="loading-social-status"><span class="dot ${st.cls}"></span>${socialStatusText(f)}</span>` +
       `</div>` +
       `<div class="loading-social-score">` +
+        (st.cls === 'playing' && !f.is_practicing ? `<img class="social-spectate-eye" src="images/spectate.png" alt="" draggable="false" oncontextmenu="return false" title="Ver partida">` : '') +
         `<img class="loading-social-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">` +
         `<span class="loading-social-score-val">${f.score.toLocaleString()}</span>` +
       `</div>` +
       `<span class="loading-social-rankname">${(typeof getRank === 'function' ? getRank(f.score).name : '')}</span>` +
       `<img class="loading-social-emote" src="${(typeof getRank === 'function' ? getRank(f.score).img : 'images/ranks/1.png')}" alt="" draggable="false" oncontextmenu="return false">`;
     row.addEventListener('click', () => openFriendProfile(f));
+    const eyeBtn = row.querySelector('.social-spectate-eye');
+    if (eyeBtn) {
+      eyeBtn.addEventListener('click', (e) => { e.stopPropagation(); openSpectatorForFriend(f); });
+    }
     list.appendChild(row);
   });
 
@@ -2982,6 +3109,30 @@ if (typeof onLangChange === 'function') onLangChange(() => {
   try { _updateProfileBtnLabel(); } catch (e) {}
 });
 
+// Efecto UNIVERSAL de "se acabó el tiempo" sobre una cartilla del leaderboard:
+// temblorcito (reusa lb-shake, el mismo del efecto de "wrong") + un ícono de
+// cronómetro encima que hace fade in y fade out unos segundos después. Recibe
+// el elemento de la cartilla ya resuelto — cada contexto (versus 1v1/grupo,
+// espectador 1v1/grupo) lo llama con la celda del jugador que se quedó sin
+// tiempo, igual que el emote de "wrong" pero disparado por el timesup.
+window._applyTimesUpEffect = function (el) {
+  if (!el) return;
+  el.style.animation = 'none'; void el.offsetWidth;
+  el.style.animation = 'lb-shake 0.45s ease-in-out';
+  setTimeout(() => { if (el.style.animation && el.style.animation.indexOf('lb-shake') !== -1) el.style.animation = ''; }, 480);
+  const prev = el.querySelector('.lb-timesup-icon');
+  if (prev) { clearTimeout(prev._t1); clearTimeout(prev._t2); prev.remove(); }
+  const icon = document.createElement('div');
+  icon.className = 'lb-timesup-icon';
+  icon.textContent = '⏱️';
+  el.appendChild(icon);
+  requestAnimationFrame(() => icon.classList.add('show'));
+  icon._t1 = setTimeout(() => {
+    icon.classList.remove('show');
+    icon._t2 = setTimeout(() => { icon.remove(); }, 400);
+  }, 2400);
+};
+
 // Cada modo registra aquí cómo detener sus loops (timers/animaciones)
 window.gameStoppers = window.gameStoppers || [];
 window.gameStoppers.push(() => {
@@ -2999,6 +3150,18 @@ window.gameStoppers.push(() => {
   }
   try { if (typeof pregameCountdownEl !== 'undefined' && pregameCountdownEl) pregameCountdownEl.style.display = 'none'; } catch (e) {}
   try { if (typeof timeupOverlay !== 'undefined' && timeupOverlay) { timeupOverlay.style.display = 'none'; timeupOverlay.classList.remove('timeup-in','timeup-out'); } } catch (e) {}
+  // Ocultar el contenedor del juego de Cities/Monuments (#game-wrapper: canvas,
+  // mapa, cartel de ciudad, nombre de monumento, etc.) — el gameStopper solo
+  // paraba timers, no ocultaba los assets; al encadenar a OTRO modo (ej.
+  // cities→siluetas) esos assets quedaban pegados de fondo (reportado). No se
+  // toca si _vsShowingResult (assets a propósito visibles bajo la tabla de
+  // resultados, igual que respetan los *HardReset).
+  try {
+    if (!window._vsShowingResult) {
+      const gw = document.getElementById('game-wrapper');
+      if (gw) gw.style.display = 'none';
+    }
+  } catch (e) {}
 });
 
 window.resetEntranceElements = function () {
@@ -3236,17 +3399,13 @@ function quitToMenu() {
 
   // Si salimos con power desde modo práctica → score popup + panel práctica
   if (_wasInPractice) {
-    if (typeof window.showEntranceElementsStatic === 'function') window.showEntranceElementsStatic();
-    { const lpg = document.getElementById('loading-practice-group'); lpg.classList.remove('table-gone'); lpg.classList.add('panel-visible'); }
-    document.getElementById('practice-mode-section').style.display = 'none';
-    document.getElementById('practice-config-section').style.display = 'none';
-    if (window._practiceStats) {
-      const _pm = window.pendingGameMode;
-      if (_pm === 'flags')  { window._practiceStats.correct = (typeof flagsCorrectCount  !== 'undefined' ? flagsCorrectCount  : 0); window._practiceStats.wrong = (typeof flagsWrongCount !== 'undefined' ? flagsWrongCount : 0); }
-      else if (_pm === 'shapes') { window._practiceStats.correct = (typeof shapesCorrectCount !== 'undefined' ? shapesCorrectCount : 0); window._practiceStats.wrong = (typeof shapesWrongAnswerCount !== 'undefined' ? shapesWrongAnswerCount : 0); }
-      else { window._practiceStats.correct = correctCount || 0; window._practiceStats.wrong = wrongCount || 0; }
-    }
-    window.showPracticeScore(_practiceScore);
+    const _pm = window.pendingGameMode;
+    const [_prCorrect, _prWrong] = _pm === 'flags'
+      ? [(typeof flagsCorrectCount !== 'undefined' ? flagsCorrectCount : 0), (typeof flagsWrongCount !== 'undefined' ? flagsWrongCount : 0)]
+      : _pm === 'shapes'
+      ? [(typeof shapesCorrectCount !== 'undefined' ? shapesCorrectCount : 0), (typeof shapesWrongAnswerCount !== 'undefined' ? shapesWrongAnswerCount : 0)]
+      : [correctCount || 0, wrongCount || 0];
+    window.endPracticeSession(_practiceScore, _prCorrect, _prWrong);
     return;
   }
   ['loading-table-group','loading-social-group','loading-friend-group','loading-addfriend-group','loading-blocked-group','loading-sent-group']
@@ -3266,8 +3425,16 @@ window.quitToMenu = quitToMenu;
     const el = document.getElementById(id);
     return el && getComputedStyle(el).display !== 'none';
   };
+  const powerIconEl = document.getElementById('ingame-power-icon');
+  const backIconEl  = document.getElementById('ingame-back-icon');
   const refreshIngamePower = () => {
-    const blocked = isVisible('loading-screen') || isVisible('results-screen') || isVisible('final-screen') || isVisible('vs-result-screen');
+    // lobby-result-screen: mismo motivo que vs-result-screen (1v1) — el
+    // ranking FINAL grupal (real o espejo de espectador, ver
+    // _showGroupResultMirror en spectate.js) tiene su PROPIO back
+    // (#lobby-result-back, con el mismo chequeo _isSpectating que
+    // #vs-result-back) — el de arriba sobra y quedaba superpuesto encima
+    // (el "quita el back de arriba" reportado).
+    const blocked = isVisible('loading-screen') || isVisible('results-screen') || isVisible('final-screen') || isVisible('vs-result-screen') || isVisible('lobby-result-screen');
     const prepost = isVisible('splash-screen') || isVisible('gameover-screen');
     // score-display / flags-score-display están visibles durante el juego de
     // cualquier modo (shapes agrega sus piezas al body, no usa game-wrapper).
@@ -3276,13 +3443,28 @@ window.quitToMenu = quitToMenu;
     powerEl.style.display = (ingame && !blocked) ? 'block' : 'none';
     // En pre/postgame va un poco más a la derecha que durante el juego
     powerEl.style.left = prepost ? '82%' : '74%';
+    // Espectando: el power (terminar MI partida) no aplica — se reemplaza por
+    // un back que simplemente cierra el espectador y vuelve al menú.
+    if (powerIconEl) powerIconEl.style.display = window._isSpectating ? 'none' : 'block';
+    if (backIconEl)  backIconEl.style.display  = window._isSpectating ? 'block' : 'none';
   };
   window.refreshIngamePower = refreshIngamePower;
 
   // Click en power: abre la pestañita de confirmación (el juego sigue corriendo)
+  // — salvo en modo espectador, que vuelve derecho al menú sin popup (no hay
+  // partida propia que abandonar).
   const quitPopup = document.getElementById('ingame-quit-popup');
   powerEl.addEventListener('click', () => {
     sfxSelect.currentTime = 0; sfxPlay(sfxSelect);
+    if (window._isSpectating) {
+      // Mismo flash de "press" que el resto de los back del juego.
+      if (backIconEl) {
+        backIconEl.classList.add('confirm-pressed');
+        setTimeout(() => backIconEl.classList.remove('confirm-pressed'), 150);
+      }
+      if (typeof window.closeSpectator === 'function') window.closeSpectator();
+      return;
+    }
     if (quitPopup) quitPopup.style.display = 'flex';
     document.body.classList.add('quit-open');
   });
@@ -3412,7 +3594,7 @@ function loadGameSFX() {
 
 // Camino PC (y fallback): <audio> HTML de siempre. NO TOCAR.
 function playMusicHTML(track) {
-  [sfxPostgame, sfxGameMusic, sfxMenuMusic].forEach(t => { if (t !== track) { t.pause(); t.currentTime = 0; } });
+  [sfxPostgame, sfxPregame, sfxGameMusic, sfxMenuMusic].forEach(t => { if (t !== track) { t.pause(); t.currentTime = 0; } });
   if (!track) return;
   // si el mismo track ya está sonando, dejarlo continuar (no reiniciar el loop)
   if (!track.paused && !track.ended) {
@@ -3639,6 +3821,11 @@ updateSplashHighscore();
 let gradeCounts = { perfect: 0, good: 0, fair: 0 };
 let wrongCount = 0;
 let correctCount = 0;
+// Contador de ronda para el espectador de Cities — correctCount no sirve como
+// identidad única de ronda (solo incrementa en aciertos, así que dos ciudades
+// DISTINTAS tras un error consecutivo compartirían el mismo valor).
+let _citiesSpecRoundIdx = 0;
+let _monumentsSpecRoundIdx = 0;
 
 function setModeCounts(correct, wrong) {
   gradeCounts = { perfect: correct, good: 0, fair: 0 };
@@ -3831,6 +4018,13 @@ window.citiesSetVsDisconnected = function(disconnected) {
 window.citiesSetVsOpponentScore = function(score) {
   window._vsOppScore = score;
   if (typeof window._lbUpdateEntry === 'function') window._lbUpdateEntry('vsopp', score);
+  // Durante el espectador, el leaderboard lo posiciona el renderer de
+  // espectador (_renderGroupLeaderboard / citiesSpectatorReposition), NO el
+  // positionLeaderboard normal anclado ABAJO — llamarlo acá lo hacía pelear
+  // con el de grupo (anclado arriba) y las celdas saltaban de posición (el
+  // "se buguea la posición de las celdas al pasar de jugador a espectador"
+  // reportado). Ver también el render loop y el resize, ya guardados.
+  if (window._isSpectating) { window._refreshGroupSpectatorLeaderboard?.(); return; }
   if (typeof positionLeaderboard === 'function' && state) positionLeaderboard(state.score, true);
 };
 window.citiesTriggerOpponentWrong = function() {
@@ -3839,16 +4033,35 @@ window.citiesTriggerOpponentWrong = function() {
 window.monumentsSetVsOpponentScore = function(score) {
   window._vsOppScore = score;
   if (typeof window._lbUpdateEntry === 'function') window._lbUpdateEntry('vsopp', score);
+  // Ver comentario en citiesSetVsOpponentScore — mismo motivo.
+  if (window._isSpectating) { window._refreshGroupSpectatorLeaderboard?.(); return; }
   if (typeof positionLeaderboard === 'function' && state) positionLeaderboard(state.score, true);
 };
 window.monumentsTriggerOpponentWrong = function() {
   if (typeof window._lbWrongEffect === 'function') window._lbWrongEffect('vsopp');
 };
 
+// ── "Se acabó el tiempo" (timesup) — MISMO sistema que el "wrong", pero
+// disparado cuando a un jugador se le termina el tiempo (temblor + cronómetro,
+// ver window._applyTimesUpEffect). Cities y Monuments comparten #leaderboard.
+window._lbTimesUpEffect = function(id) {
+  if (typeof window._applyTimesUpEffect === 'function' && typeof lbElements !== 'undefined') window._applyTimesUpEffect(lbElements['lb-' + id]);
+};
+window.citiesSetLobbyTimesUpFor = window.monumentsSetLobbyTimesUpFor = function(uid) {
+  const myId = window._sbUserId;
+  const key = (!uid || uid === myId) ? 'player' : ('lob' + uid);
+  window._lbTimesUpEffect(key);
+};
+window.citiesTriggerOpponentTimesUp = window.monumentsTriggerOpponentTimesUp = function() {
+  window._lbTimesUpEffect('vsopp');
+};
+
 // ── Hooks Lobby para modo Cities ──────────────────────────────────────────────
 window.citiesSetLobbyScores = function(members) {
   if (!Array.isArray(members) || typeof window._lbUpdateEntry !== 'function') return;
   members.forEach(m => window._lbUpdateEntry('lob' + m.id, m.score || 0));
+  // Ver comentario en citiesSetVsOpponentScore — mismo motivo.
+  if (window._isSpectating) { window._refreshGroupSpectatorLeaderboard?.(); return; }
   if (typeof positionLeaderboard === 'function' && state) positionLeaderboard(state.score, true);
 };
 window.citiesSetLobbyWrongFor = function(uid) {
@@ -3872,6 +4085,1277 @@ window.citiesHardReset = function() {
   const _tuo = document.getElementById('timeup-overlay');
   if (_tuo) { _tuo.style.display = 'none'; _tuo.classList.remove('timeup-in','timeup-out'); }
 };
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ── MODO ESPECTADOR: CITIES ─────────────────────────────────────────────────
+// A diferencia de flags/shapes (opciones discretas, DOM propio), Cities usa un
+// <canvas> compartido con el jugador real (#game-canvas / ctx / state /
+// render()) — la única forma práctica de "ver" los pines animados es REUSAR
+// esa misma maquinaria (render() ya sabe dibujar pin1Anim/pin2Anim/dots
+// enteramente a partir de `state`, sin importar quién la puebla) en vez de
+// reimplementar un renderer de mapa aparte. Espectar y jugar de verdad son
+// mutuamente excluyentes en una pestaña (mismo supuesto que flags/shapes), así
+// que reasignar `state`/`canvas.style.pointerEvents` acá es seguro.
+//
+// A diferencia de shapes (donde 'round' llega ANTES que 'pregame' en el orden
+// real), en Cities nextCity() —y por lo tanto el 'round'— solo se llama
+// DESPUÉS de que termina el 3-2-1 real (ver runPregameCountdown(...) dentro de
+// startGame()), igual que flags. Como #game-wrapper contiene TODO lo visual
+// (tag+canvas), alcanza con tenerlo oculto durante el 3-2-1 y revelarlo recién
+// en el onDone real — no hace falta el gate explícito
+// (_flagsSpecCountdownDone/_shapesSpecPendingReveal) que sí hizo falta en los
+// otros dos modos: acá "oculto" ya cubre cualquier orden de llegada posible.
+// Reconstruye una fila de íconos (correctas/incorrectas) para el postgame del
+// espectador de Cities/Monuments — replica EXACTO a buildChecksRow()/
+// buildWrongsRow() reales (mismo gap comprimido si hay >12, mismos
+// márgenes/animation-delay/z-index escalonados por ícono, mismo fade del
+// ícono grande + número recién cuando termina de entrar la fila) pero a
+// partir del payload en vez de gradeCounts/wrongCount (estado LOCAL del
+// jugador, que acá no existe). Antes esto era una versión simplificada sin
+// nada de esto — todos los íconos aparecían de golpe, pegados con el gap
+// default de la clase en vez del comprimido, y el ícono grande/número
+// nunca hacían su fade (aparecían ya visibles).
+// startOffset: retraso inicial en segundos (buildWrongsRow real arranca
+// recién cuando termina de entrar la fila de correctas).
+// Devuelve el momento (segundos) en que termina toda la animación de ESTA
+// fila, para poder encadenar la siguiente (igual que checksEndTime real).
+function _specBuildCountRow(rowEl, staticEl, countEl, count, imgSrc, startOffset) {
+  if (!rowEl) return startOffset;
+  rowEl.innerHTML = '';
+  rowEl.style.gap = '0px';
+  const IMG_W = 6.4, BASE_GAP = 0.33; // vmin, igual que .checks-row/.wrongs-row img
+  const MAX_W = 12 * IMG_W + 11 * BASE_GAP;
+  const gap = count > 1 ? (count > 12 ? (MAX_W - count * IMG_W) / (count - 1) : BASE_GAP) : 0;
+
+  if (count === 0) {
+    const none = document.createElement('span');
+    none.textContent = (typeof t === 'function') ? t('profile.none') : 'Ninguna';
+    none.style.cssText = 'color:#ffffff;-webkit-text-stroke:0.77cqmin #132886;paint-order:stroke fill;font-family:VAGRoundBold,"Arial Black",Impact,sans-serif;font-size:4.5cqmin;font-weight:bold;position:relative;left:2.2cqmin;opacity:0;';
+    rowEl.appendChild(none);
+    if (staticEl) staticEl.style.opacity = '0';
+    if (countEl)  countEl.style.opacity  = '0';
+    setTimeout(() => {
+      none.style.opacity = '1';
+      if (staticEl) staticEl.style.opacity = '1';
+      if (countEl)  countEl.style.opacity  = '1';
+    }, startOffset * 1000);
+    return startOffset;
+  }
+
+  for (let i = 0; i < count; i++) {
+    const img = document.createElement('img');
+    img.src = imgSrc;
+    img.alt = '';
+    img.style.animationDelay = `${startOffset + i * 0.1}s`;
+    img.style.zIndex = 16 + i;
+    if (i < count - 1) img.style.marginRight = `${gap}cqmin`;
+    rowEl.appendChild(img);
+  }
+
+  if (staticEl) staticEl.style.opacity = '0';
+  if (countEl)  countEl.style.opacity  = '0';
+  const revealDelay = startOffset + (count - 1) * 0.1 + 0.2 + 0.2;
+  setTimeout(() => {
+    if (staticEl) staticEl.style.opacity = '1';
+    if (countEl)  countEl.style.opacity  = '1';
+  }, revealDelay * 1000);
+  return revealDelay;
+}
+
+let _citiesSpecMode = false;
+let _citiesSpecTimesUpT1 = null, _citiesSpecTimesUpT2 = null;
+// Igual mecanismo que flags.js/shapes.js: la primera ronda tras entrar espera
+// un margen corto para confirmar si de verdad viene un pregame (llega poco
+// después, mismo orden real de broadcasts) — solo se usa para decidir CUÁNDO
+// arrancar sfxGameMusic. Si hay pregame, lo arranca su propio onDone al
+// terminar el 3-2-1; si no aparece en ese margen, es unión a mitad de una
+// partida ya en curso y hay que arrancarlo ACÁ — sin esto, un espectador que
+// se unía a mitad de partida se quedaba con sfxMenuMusic sonando para
+// siempre, porque citiesSpectatorShowPregame() (el único lugar que arrancaba
+// sfxGameMusic) nunca llegaba a correr.
+let _citiesSpecIsFirstRound = true;
+let _citiesSpecPregameSeen  = false;
+// Mismo guard que ya tienen flags.js/shapes.js para sfxTickdown: por VALOR
+// (mismo timeLeft repetido) y por TIEMPO REAL transcurrido (el resend de
+// unión a mitad de partida + el próximo tick en vivo pueden llegar pegados
+// con valores DISTINTOS, ninguno bloqueado por el guard de valor solo) —
+// sin esto el beep de los últimos 10s sonaba repetido/cortado feo al
+// unirse justo en esa ventana.
+let _citiesSpecLastTick = null;
+let _citiesSpecLastTickSoundAt = 0;
+
+window.citiesSpectatorEnter = function () {
+  _citiesSpecMode = true;
+  window._isSpectating = true;
+  _citiesSpecLastTick = null;
+  _citiesSpecLastTickSoundAt = 0;
+  _citiesSpecIsFirstRound = true;
+  _citiesSpecPregameSeen  = false;
+  window.pendingGameMode = 'game';
+  _citiesSpecLastCard = null;
+  const ls = document.getElementById('loading-screen');
+  if (ls) ls.style.display = 'none';
+  if (typeof loadGameSFX === 'function') loadGameSFX();
+  if (typeof loadBadges === 'function') loadBadges();
+  // Restos de otros modos espectados antes en esta misma pestaña sin pasar
+  // por su propio Exit — mismo caso ya resuelto en flags.js/shapes.js.
+  document.querySelectorAll('.shapes-tag').forEach(t => t.remove());
+  document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
+  document.querySelectorAll('.shapes-stage-el').forEach(el => { try { el.remove(); } catch (e) {} });
+  document.getElementById('shapes-countdown-widget')?.remove();
+  document.getElementById('flags-wrapper')?.style.setProperty('display', 'none');
+  document.getElementById('flags-luggage-wrap')?.style.setProperty('display', 'none');
+  document.getElementById('flags-flagid-wrap')?.style.setProperty('display', 'none');
+  ['flags-machine', 'flags-machine2', 'flags-machine3', 'flags-machine3b'].forEach(id => {
+    const m = document.getElementById(id);
+    if (m) { m.style.display = 'none'; m.style.animationPlayState = ''; m.classList.remove('scrolling'); }
+  });
+  document.getElementById('flags-countdown-widget')?.style.setProperty('display', 'none');
+  document.getElementById('flags-right-panel')?.style.setProperty('display', 'none');
+
+  mapGameOver = false;
+  gameAborted = false;
+  clearInterval(timerIntervalId);
+  clearTimeout(pregameTimeout);
+  clearTimeout(_citiesSpecTimesUpT1); clearTimeout(_citiesSpecTimesUpT2);
+  canvas.style.pointerEvents = 'none'; // solo-lectura: no hay click que resolver
+  if (canvas.width < DISPLAY_W) { canvas.width = DISPLAY_W; canvas.height = DISPLAY_H; }
+  if (badgeOverlay.width < DISPLAY_W) { badgeOverlay.width = DISPLAY_W; badgeOverlay.height = DISPLAY_H; }
+
+  scoreDisplayEl.style.display = 'block';
+  scoreValueEl.textContent = '0';
+  speedBonusText.style.display = '';
+  speedBonusText.classList.remove('visible');
+  const cwEl = document.getElementById('countdown-widget');
+  if (cwEl) { cwEl.style.display = 'block'; cwEl.style.visibility = ''; }
+  const rpEl = document.getElementById('right-panel');
+  if (rpEl) { rpEl.style.display = 'flex'; rpEl.style.visibility = ''; }
+  const lb = document.getElementById('leaderboard');
+  if (lb) lb.innerHTML = '';
+  timeupOverlay.style.display = 'none';
+  timeupOverlay.classList.remove('timeup-in', 'timeup-out');
+  resultLabel.className = '';
+  resultLabel.classList.remove('visible');
+
+  // Construye un `state` MÍNIMO propio (no resetState(), que arma pools de
+  // ciudades/monumentos/práctica pensados para partida REAL) — render() solo
+  // necesita estos campos.
+  state = {
+    phase: 'waiting',
+    timeLeft: GAME_DURATION,
+    score: 0, displayedScore: 0, dots: 0,
+    currentCity: null, cityShownAt: 0,
+    placedDots: [], pin1Anim: null, pin2Anim: null,
+    starParticles: [], sunburst: null, badgeAnim: null,
+    lastTimestamp: null, streak: 0, mapDrawn: false,
+  };
+  // updateDotsUI() lee state.dots (recién en 0) para des-rellenar los
+  // puntitos del trencito — sin esto quedaban "filled" con lo último que
+  // dejó otro modo/partida espectada antes en esta misma pestaña, ya que
+  // nada más los toca hasta la PRÓXIMA respuesta correcta. progressContainer
+  // también puede haber quedado con las clases del ciclo de vaciado en curso.
+  progressContainer.classList.remove('train-animation', 'dots-fade-out');
+  updateDotsUI();
+  timerNumberEl.textContent = GAME_DURATION;
+  timerNumberEl.classList.remove('timer-number-infinity');
+  timerNumberEl.style.color = '';
+  countdownImg.src = 'images/countdown.png';
+  countdownImg.style.animationPlayState = 'running';
+
+  // Visible desde ya, haya o no un 3-2-1 en curso — #pregame-countdown es un
+  // overlay TRANSPARENTE (sin background, ver CSS), así que el jugador real
+  // ve el mapa detrás del número desde el primer instante del 3-2-1. Antes
+  // citiesSpectatorShowPregame() lo ocultaba de nuevo pensando que el mapa
+  // debía estar tapado durante la cuenta — dejaba al espectador con pantalla
+  // en blanco hasta que terminaba, a diferencia del jugador real.
+  gameWrapper.style.display = 'block';
+  // redimensionarJuego() se sale de una (no hace NADA) si gameWrapper todavía
+  // tiene display:none — por eso tiene que ir DESPUÉS de mostrarlo, no antes.
+  // Con el orden viejo, esta llamada era un no-op silencioso: el mapa quedaba
+  // con el transform/escala VIEJO (de la última vez que se calculó, o
+  // ninguno) durante todo el 3-2-1, recién corrigiéndose cuando
+  // citiesSpectatorShowPregame() lo volvía a llamar en su onDone — el
+  // "mapimage descolocado durante el 3-2-1-GO, recién se acomoda al empezar
+  // el juego" reportado.
+  redimensionarJuego();
+  cityTagEl.style.visibility = 'hidden';
+  // slideMonumentIn() deja cityTagEl POSICIONADO en su punto de llegada
+  // visible (left:-50/top:-55, ver esa función) — visibility:hidden solo lo
+  // tapa, pero sigue "parado" ahí. slideTagIn() (la entrada real de Ciudades)
+  // anima DESDE la posición actual del elemento HACIA la de llegada — si ya
+  // arranca en la de llegada (la de Monumentos, que coincide visualmente),
+  // no hay nada que recorrer: el tag aparecía de una, ya en su lugar ("al
+  // medio"), en vez de deslizarse de izquierda a derecha como corresponde.
+  // Mismo reset de posición de arranque que hace startGame() real.
+  cityTagEl.style.transition = 'none';
+  cityTagEl.style.left = tpx(-525);
+  cityTagEl.style.top  = tpx(-163);
+  monumentImgEl.style.display = 'none';
+  // Reset del <img> del cartel a tag3.png — slideTagIn() NUNCA lo toca (da
+  // por sentado que ya vale tag3.png, como deja startGame() real); si el
+  // espectador venía de mirar Monumentos en esta misma pestaña, slideMonumentIn
+  // lo había dejado en photo.png y quedaba pegado ahí para siempre en Cities.
+  const _cityTagImg = cityTagEl.querySelector('img');
+  // slideMonumentIn() deja la clase 'monument-appear' (animación de escala,
+  // ver @keyframes en style.css) puesta en este mismo <img> — a diferencia
+  // de startGame() (real, ver más abajo en este archivo), este reset de
+  // espectador nunca la sacaba. Con la clase todavía puesta, el próximo
+  // slideTagIn() de Cities dispara SU animación de entrada (movimiento)
+  // ENCIMA de la de monument-appear que quedó pendiente — dos animaciones de
+  // entrada superpuestas, la vieja (monuments, da la sensación de "zoom out"
+  // al terminar/revertir) y la correcta (el "el tag3 hace dos animaciones de
+  // entrada en modo espectador" reportado — únicamente ahí, porque el
+  // jugador real sí pasa por startGame(), que ya la sacaba).
+  if (_cityTagImg) { _cityTagImg.src = 'images/tag3.png'; _cityTagImg.style.width = ''; _cityTagImg.style.height = ''; _cityTagImg.classList.remove('monument-appear'); }
+  monumentImgEl.classList.remove('monument-appear');
+  cityTagText.style.display = '';
+  // Ocultar/limpiar el nombre del MONUMENTO (monumentNameEl, elemento
+  // DISTINTO de cityTagText) — si el espectador venía de mirar Monumentos,
+  // ese nombre quedaba visible encima del cartel de Cities (el "sigue
+  // mostrando el nombre de monumentos en el tag3 de ciudades" reportado).
+  // CRÍTICO: cancelar también el setTimeout con delay de slideMonumentIn
+  // (_nameTimer) — ese timer setea monumentNameEl.textContent DESPUÉS de un
+  // delay para la animación; si estaba pendiente al transicionar a Cities,
+  // disparaba más tarde y RE-ESCRIBÍA el nombre del monumento encima del
+  // cartel de la ciudad, aunque ya lo hubiéramos limpiado acá.
+  if (typeof slideMonumentIn === 'function' && slideMonumentIn._nameTimer) {
+    clearTimeout(slideMonumentIn._nameTimer); slideMonumentIn._nameTimer = null;
+  }
+  if (monumentNameEl) { monumentNameEl.textContent = ''; monumentNameEl.style.opacity = '0'; }
+  // Sacar cualquier "ghost" del cartel que haya quedado de Monumentos — es un
+  // clon de #city-tag (que incluye un clon de #monument-name con su texto) y
+  // se auto-remueve solo después de ~800ms, pero durante ese rato mostraría
+  // el nombre del monumento encima de Cities.
+  document.querySelectorAll('.city-tag-ghost').forEach(g => g.remove());
+
+  if (animFrameId) cancelAnimationFrame(animFrameId);
+  animFrameId = requestAnimationFrame(render);
+
+  if (typeof window.refreshIngamePower === 'function') window.refreshIngamePower();
+};
+
+// switchingMode=true: la campaña del espectado encadenó a OTRO modo — ver
+// comentario largo en flagsSpectatorExit (mismo mecanismo acá).
+window.citiesSpectatorExit = function (switchingMode) {
+  _citiesSpecMode = false;
+  if (!switchingMode) window._isSpectating = false;
+  // Ver comentario largo en flagsSpectatorExit.
+  document.getElementById('cities-spec-lb-entry')?.remove();
+  document.getElementById('cities-spec-lb-opp')?.remove();
+  // Igual que el quit REAL: sin esto, el showStep() del 3-2-1 seguía
+  // corriendo solo en segundo plano (nunca se abortaba), y eventualmente
+  // llegaba a su onDone() — que arranca sfxGameMusic — PISANDO la música de
+  // menú que closeSpectator() ya había puesto momentos antes. También el
+  // beep del countdown (sfxCountdown) seguía sonando de fondo porque nada
+  // lo pausaba.
+  pregameAborted = true;
+  clearTimeout(pregameTimeout); pregameTimeout = null;
+  if (typeof sfxCountdown !== 'undefined') { try { sfxCountdown.pause(); sfxCountdown.currentTime = 0; } catch (e) {} }
+  _citiesSpecLastCard = null;
+  mapGameOver = true;
+  clearTimeout(_citiesSpecTimesUpT1); clearTimeout(_citiesSpecTimesUpT2);
+  window.citiesSpectatorHidePostgame();
+  if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
+  // window._vsShowingResult (ver _exitWaitAsSpectator en vs.js, mismo guard
+  // en flagsSpectatorExit/shapesSpectatorExit): este exit no es un
+  // espectador EXTERNO cerrando su sesión — es EL PROPIO JUGADOR a punto de
+  // ver SU PROPIO resultado del duelo. Sin este guard, el mapa/estado del
+  // juego desaparecía (gameWrapper oculto + state=null) antes de que
+  // apareciera el overlay de resultado, en vez de quedar congelado de fondo
+  // (el "se quitan los assets de fondo" reportado, mismo bug que en
+  // banderas/siluetas).
+  if (!window._vsShowingResult) {
+    gameWrapper.style.display = 'none';
+    state = null;
+  }
+  scoreDisplayEl.style.display = 'none';
+  const cwEl = document.getElementById('countdown-widget');
+  if (cwEl) cwEl.style.display = 'none';
+  const rpEl = document.getElementById('right-panel');
+  if (rpEl) rpEl.style.display = 'none';
+  const lb = document.getElementById('leaderboard');
+  if (lb) lb.innerHTML = '';
+  cityTagEl.style.visibility = 'hidden';
+  timeupOverlay.style.display = 'none';
+  timeupOverlay.classList.remove('timeup-in', 'timeup-out');
+  pregameCountdownEl.style.display = 'none';
+  if (!switchingMode) {
+    const ls = document.getElementById('loading-screen');
+    if (ls) ls.style.display = 'flex';
+  }
+  if (typeof window.refreshIngamePower === 'function') window.refreshIngamePower();
+};
+
+// Cuenta 3-2-1: reusa el 100% de runPregameCountdown (mismo patrón que
+// runFlagsPregame/runShapesPregame en sus propios archivos).
+window.citiesSpectatorShowPregame = function (payload) {
+  if (!_citiesSpecMode) return;
+  // Sincrónico, apenas llega el broadcast — lo usa el timer de "fallback" de
+  // citiesSpectatorShowRound para decidir si de verdad hay un 3-2-1 en curso
+  // o si nadie va a mandar un pregame (unión a mitad de partida).
+  _citiesSpecPregameSeen = true;
+  window.citiesSpectatorHidePostgame();
+  // NO ocultar gameWrapper acá — ver el comentario largo en
+  // citiesSpectatorEnter(). El mapa debe quedar visible DETRÁS del 3-2-1
+  // desde el primer instante, igual que ve el jugador real.
+  cityTagEl.style.visibility = 'hidden';
+  // NO ocultar #countdown-widget acá — mismo motivo que gameWrapper más
+  // arriba: startGame() real (línea ~6040) lo deja VISIBLE desde el arranque
+  // (solo se oculta en el caso especial de "recording-mode" de Monumentos,
+  // que no aplica a Cities), solo pausa su animación con
+  // animationPlayState — eso sí se replica un poco más abajo.
+  if (payload) {
+    timerNumberEl.classList.toggle('timer-number-infinity', !!payload.infinite);
+    timerNumberEl.textContent = payload.infinite ? '∞' : (payload.duration != null ? payload.duration : '');
+  }
+  timerNumberEl.style.color = '';
+  countdownImg.src = 'images/countdown.png';
+  countdownImg.style.animationPlayState = 'paused';
+  if (typeof playMusic === 'function') playMusic(null);
+  // El jugador real ya muestra su puntaje acumulado de campaña desde el
+  // arranque del 3-2-1 (no arranca en 0 salvo que sea el primer modo) — acá
+  // sin animación, es el estado base antes de la primera respuesta. render()
+  // solo anima displayedScore->score cuando difieren, así que arrancar
+  // ambos iguales no dispara ningún tween de más.
+  if (payload && typeof payload.campaignBaseAtStart === 'number' && state) {
+    state.score = payload.campaignBaseAtStart;
+    state.displayedScore = payload.campaignBaseAtStart;
+    scoreValueEl.textContent = payload.campaignBaseAtStart.toLocaleString();
+  }
+  let elapsedMs = (payload && typeof payload.startedAt === 'number') ? (Date.now() - payload.startedAt) : 0;
+  // Mismo clamp que flags/shapes: sin esto, desfasaje de reloj o un resend
+  // tardío podían inflar elapsedMs más allá de la duración total del 3-2-1 y
+  // saltar DIRECTO a onDone sin mostrar nada del conteo.
+  const _pregameTotalMs = PREGAME_STEPS.reduce((s, x) => s + x.hold, 0);
+  if (elapsedMs > _pregameTotalMs - 400) elapsedMs = Math.max(0, _pregameTotalMs - 400);
+  runPregameCountdown(() => {
+    const cwPost = document.getElementById('countdown-widget');
+    if (cwPost) cwPost.style.visibility = '';
+    countdownImg.style.animationPlayState = 'running';
+    if (typeof playMusic === 'function' && typeof sfxGameMusic !== 'undefined') playMusic(sfxGameMusic);
+    redimensionarJuego();
+    gameWrapper.style.display = 'block';
+  }, elapsedMs);
+};
+
+// payload = { mode:'game', index, cityName, countryCode, lat, lon, timeLeft }
+window.citiesSpectatorShowRound = function (payload) {
+  if (!_citiesSpecMode || !state) return;
+  // OJO: NO se tocan pin1Anim/pin2Anim/resultLabel acá — el nextCity() REAL
+  // tampoco los toca. El jugador real llama a nextCity() ~750ms después del
+  // click (300ms hasta que aparece pin2 + ~100ms hasta que "aterriza" +
+  // ~350ms más en el onLanded), bien ANTES de que los pines empiecen a
+  // fadear solos (eso recién arranca a partir de 1000-1300ms desde el
+  // click, con sus propios setTimeout independientes armados en
+  // citiesSpectatorResolvePick). Si acá los borrábamos de golpe apenas
+  // llegaba la ronda siguiente, les cortábamos el fade a la mitad — se
+  // veían desaparecer de golpe en vez de irse apagando, el "sin animación"
+  // reportado. Dejarlos solos: se limpian de forma natural cuando su propio
+  // fade termina (opacity<=0 → state.pinXAnim=null, ver render()).
+  state.phase = 'waiting';
+  state.cityShownAt = Date.now();
+  state.currentCity = { name: payload.cityName, country: payload.countryCode, lat: payload.lat, lon: payload.lon };
+  // Garantizar que el nombre del MONUMENTO (monumentNameEl, hijo de #city-tag)
+  // quede limpio en CADA ronda de Cities — no solo en el enter. Si el
+  // espectador venía de Monumentos, ese nombre podía quedar con texto/opacidad
+  // (y slideTagIn clona #city-tag para su ghost, arrastrándolo). Cancelar
+  // también el timer con delay de slideMonumentIn por si quedó pendiente.
+  if (slideMonumentIn._nameTimer) { clearTimeout(slideMonumentIn._nameTimer); slideMonumentIn._nameTimer = null; }
+  if (monumentNameEl) { monumentNameEl.textContent = ''; monumentNameEl.style.opacity = '0'; }
+  slideTagIn(payload.cityName, payload.countryCode);
+  if (typeof payload.timeLeft === 'number') {
+    state.timeLeft = payload.timeLeft;
+    timerNumberEl.textContent = payload.timeLeft;
+    timerNumberEl.classList.remove('timer-number-infinity');
+  }
+  // Igual mecanismo que flags.js/shapes.js: solo en la primera ronda tras
+  // entrar, un margen corto para confirmar si de verdad viene un pregame
+  // (llega poco después, mismo orden real de broadcasts). Si no aparece, es
+  // unión a mitad de partida — recién ahí, con la ronda ya mostrada, arranca
+  // la música del juego (si hay pregame, la arranca su propio onDone al
+  // terminar el 3-2-1) — sin esto, un espectador que se unía a mitad de
+  // partida se quedaba con sfxMenuMusic sonando de fondo para siempre.
+  if (_citiesSpecIsFirstRound) {
+    _citiesSpecIsFirstRound = false;
+    setTimeout(() => {
+      if (!_citiesSpecPregameSeen && typeof playMusic === 'function' && typeof sfxGameMusic !== 'undefined') {
+        playMusic(sfxGameMusic);
+      }
+    }, 400);
+  }
+};
+
+// payload = { correct, score, grade, clickX, clickY, correctX, correctY, distKm, totalGained, bonusAmt }
+// Recrea pin1Anim/pin2Anim EXACTAMENTE como el click handler real (línea
+// ~5008 de este archivo) — mismas coordenadas de canvas (portables 1:1, mismo
+// DISPLAY_W/H) — así que render() los anima e interpola solo, sin tocarlo.
+window.citiesSpectatorResolvePick = function (payload) {
+  if (!_citiesSpecMode || !state || !state.currentCity) return;
+  const { grade, clickX, clickY, correctX, correctY, distKm, totalGained, bonusAmt } = payload;
+  if (typeof clickX !== 'number' || typeof correctX !== 'number') return;
+  state.phase = 'animating';
+  if (typeof sfxPin !== 'undefined' && typeof sfxPlay === 'function') { sfxPin.currentTime = 0; sfxPlay(sfxPin); }
+
+  // payload.score YA viene con campaignBase() sumado (ver _specReportAnswer
+  // en el jugador real) — solo hace falta actualizar state.score, render()
+  // anima state.displayedScore hacia ahí solo (línea ~5340), igual que ve
+  // el propio jugador. Antes esto nunca se seteaba acá (el dispatch de
+  // spectate.js solo llama resolvePick, no updateScore, para espectado
+  // solo/campaña) — el marcador quedaba congelado toda la ronda.
+  if (typeof payload.score === 'number') state.score = payload.score;
+
+  // "+puntos" flotante — SOLO lo del acierto, SIN el inRowBonus (que va aparte
+  // en el badge "IN A ROW"), igual que el jugador real.
+  const _acierto = totalGained - (payload.inRowBonus || 0);
+  if (typeof totalGained === 'number' && _acierto > 0 && typeof showScorePopup === 'function') {
+    showScorePopup(_acierto);
+  }
+  // Cartel de bonus de velocidad — mismo toggle que el click handler real.
+  if (typeof bonusAmt === 'number' && bonusAmt > 0) {
+    clearTimeout(speedBonusHideId);
+    speedBonusText.classList.remove('visible');
+    void speedBonusText.offsetWidth;
+    speedBonusText.classList.add('visible');
+    speedBonusHideId = setTimeout(() => speedBonusText.classList.remove('visible'), 1600);
+  }
+
+  let _dotFontSize = 11;
+  ctx.font = `bold ${_dotFontSize}px Georgia`;
+  const _dotLabel = (typeof tCity === 'function') ? tCity(state.currentCity.name) : state.currentCity.name;
+  while (_dotFontSize > 7 && ctx.measureText(_dotLabel).width > 90) {
+    _dotFontSize--;
+    ctx.font = `bold ${_dotFontSize}px Georgia`;
+  }
+  state.placedDots.push({
+    x: correctX, y: correctY, name: state.currentCity.name,
+    labelOpacity: 1, labelBorn: Date.now(),
+    permanent: grade === 'perfect', fontSize: _dotFontSize,
+  });
+
+  // advanceDot() (la misma función que usa el jugador real) hace TODO: suma
+  // el punto, dibuja el trencito, y si llega a 10 dispara el "+5s" con su
+  // popup y la animación de vaciado — reusarla acá evita reimplementar esa
+  // secuencia a mano. payload.dots trae el valor REAL post-incremento del
+  // jugador espectado — se pisa el contador local ANTES de llamar a
+  // advanceDot() (que hace state.dots++ internamente) para que quede
+  // exactamente en payload.dots, así el trencito llena/vacía en el mismo
+  // momento que ve el jugador real, sin importar en qué punto de la partida
+  // se unió el espectador.
+  if (grade !== 'wayoff' && typeof advanceDot === 'function') {
+    if (typeof payload.dots === 'number') state.dots = payload.dots - 1;
+    advanceDot();
+  }
+
+  state.pin1Anim = { x: clickX, y: clickY, targetX: correctX, targetY: correctY,
+    distKm, grade, progress: 0, lineProgress: 0, opacity: 1, fading: false,
+    wobbleTime: 0, sunburstSpawned: false };
+  const capturedPin1 = state.pin1Anim;
+
+  setTimeout(() => {
+    if (!_citiesSpecMode || state.pin1Anim !== capturedPin1) return; // ronda ya cambió
+    state.pin2Anim = { x: correctX, y: correctY, progress: 0, opacity: 1, fading: false,
+      wobbleTime: 0, starsSpawned: false,
+      onLanded: () => {
+        spawnStars(correctX, correctY);
+        setTimeout(() => {
+          if (!_citiesSpecMode) return;
+          showResultLabel(correctX, correctY, grade, 0, 0);
+          // Badge "IN A ROW" — mismo mecanismo que el espectador de Monuments
+          // (ver monumentsSpectatorResolvePick): payload.streak viaja como
+          // número y getBadgeImg lo reconstruye local. Ahora Cities también
+          // manda streak/inRowBonus reales (ver score de Cities), así que el
+          // badge se ve igual que para el jugador.
+          if (typeof payload.streak === 'number' && typeof getBadgeImg === 'function') {
+            const badgeColor = getBadgeImg(payload.streak);
+            if (badgeColor) {
+              state.badgeAnim = { t: 0, img: badgeColor, streak: payload.streak, inRowBonus: payload.inRowBonus || 0 };
+              setTimeout(() => { if (typeof sfxBonus !== 'undefined' && typeof sfxPlay === 'function') { sfxBonus.currentTime = 0; sfxPlay(sfxBonus); } }, 800);
+            }
+          }
+        }, 200);
+      },
+    };
+    const capturedPin2 = state.pin2Anim;
+    setTimeout(() => { if (state.pin2Anim === capturedPin2) capturedPin2.fading = true; }, 1000);
+  }, 300);
+  setTimeout(() => { if (state.pin1Anim === capturedPin1) capturedPin1.fading = true; }, 1000);
+};
+
+window.citiesSpectatorUpdateTimer = function (timeLeft) {
+  if (!_citiesSpecMode || !state) return;
+  state.timeLeft = timeLeft;
+  timerNumberEl.textContent = timeLeft;
+  timerNumberEl.classList.remove('timer-number-infinity');
+  if (timeLeft <= 10) {
+    timerNumberEl.style.color = '#ffffff';
+    countdownImg.src = 'images/countdownred.png';
+    const _nowTick = Date.now();
+    if (timeLeft > 0 && timeLeft !== _citiesSpecLastTick && (_nowTick - _citiesSpecLastTickSoundAt) > 700
+        && typeof sfxTickdown !== 'undefined') {
+      sfxTickdown.currentTime = 0; sfxPlay(sfxTickdown);
+      _citiesSpecLastTickSoundAt = _nowTick;
+    }
+  } else {
+    timerNumberEl.style.color = '';
+    countdownImg.src = 'images/countdown.png';
+  }
+  _citiesSpecLastTick = timeLeft;
+};
+
+// score = puntaje actual del jugador real (viene del broadcast de 'answer').
+// El "conteo subiendo" hasta ahí lo anima render() solo (compara
+// state.displayedScore contra state.score cada frame) — no hace falta nada
+// más acá.
+// Este dispatch (fns.updateScore) se usa para "ponerse al día" al unirse a
+// mitad de ronda (onScoreSync, ver spectate.js), no para una respuesta en
+// vivo (esa pasa por citiesSpectatorResolvePick, que también fija
+// state.score pero deja que render() anime la subida). Acá se fija también
+// displayedScore para que aparezca directo, sin un salto animado desde 0
+// apenas se conecta.
+window.citiesSpectatorUpdateScore = function (score, dots) {
+  if (!_citiesSpecMode || !state) return;
+  state.score = score;
+  state.displayedScore = score;
+  scoreValueEl.textContent = (score + (window.campaignBase ? window.campaignBase() : 0)).toLocaleString();
+  // dots: progreso YA acumulado del trencito de puntitos al momento de
+  // conectarse — sin esto, alguien que se unía a mitad de partida veía el
+  // trencito vacío hasta la PRÓXIMA respuesta correcta del jugador real, en
+  // vez del progreso real que ya llevaba acumulado.
+  if (typeof dots === 'number') {
+    state.dots = Math.max(0, Math.min(dots, DOTS_NEEDED - 1));
+    updateDotsUI();
+  }
+};
+
+// Tarjeta única en #leaderboard con el jugador REAL espectado — mismo patrón
+// que flagsSpectatorSetPlayerCard/shapesSpectatorSetPlayerCard, pero acá el
+// leaderboard real ya viene con el guard `if (window._isSpectating) return;`
+// en initLeaderboard() (puesto ahí mismo pensando en este caso). #leaderboard
+// SÍ es compartido con la lógica normal de resize/zoom de Cities/Monuments
+// (ver window.addEventListener('resize', ...) más abajo en el archivo, que
+// ahora llama a citiesSpectatorReposition() en vez de positionLeaderboard()
+// mientras se espectea) — por eso se cachean name/avatar/score, para poder
+// reaplicar la altura de 1 fila correcta sin necesitar esos datos de nuevo.
+let _citiesSpecLastCard = null;
+// oppName/oppAvatar/oppScore (opcionales): en versus, el rival del amigo
+// espectado — antes esta función solo mostraba al amigo (redundante con el
+// marcador principal, que YA lo muestra), y el rival no aparecía en ningún
+// lado. Ahora arma una SEGUNDA fila (mismo estilo lb-vsopp que usa el
+// jugador real para el suyo), para que el espectador vea las dos casillas
+// actualizándose en vivo, igual que ven los jugadores reales.
+window.citiesSpectatorSetPlayerCard = function (name, avatar, score, oppName, oppAvatar, oppScore) {
+  if (!_citiesSpecMode) return;
+  _citiesSpecLastCard = { name, avatar, score, oppName, oppAvatar, oppScore };
+  const lb = document.getElementById('leaderboard');
+  if (!lb) return;
+  const rowH = getLbRowHeight();
+  const showOpp = !!oppName;
+  // #leaderboard recorta todo lo que quede fuera de su propio alto con
+  // clip-path:inset(0 -300px) (0 arriba/abajo — CSS lo aclara: "corta solo en
+  // vertical, deja pasar el globo a la izquierda"). El emote-bubble de
+  // wrongEffect se dibuja POR ENCIMA de su fila (bottom:calc(80%-...), "encima
+  // del entry" dice el propio CSS) — si la fila de arriba queda pegada
+  // exactamente en top:0 del contenedor (como quedaba acá, sin margen extra),
+  // ese globo nace ya recortado por el clip-path antes de llegar a
+  // mostrarse. TOP_MARGIN reserva aire arriba para que tenga dónde
+  // dibujarse — el leaderboard real no lo sufre porque su ventana de varias
+  // filas normalmente deja margen de sobra arriba de la fila que emota.
+  const TOP_MARGIN = Math.round(rowH * 0.4);
+  lb.style.height = (showOpp ? rowH * 2 + LB_GAP + TOP_MARGIN : rowH + TOP_MARGIN) + 'px';
+  let el = document.getElementById('cities-spec-lb-entry');
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'lb-entry lb-player';
+    el.id = 'cities-spec-lb-entry';
+    el.style.top = TOP_MARGIN + 'px';
+    el.innerHTML = `<div class="lb-avatar"><img class="lb-avatar-img" id="cities-spec-lb-avatar" src="images/profilepic/ppdefault.png"></div>`
+      + `<span class="lb-name" id="cities-spec-lb-name"></span>`
+      + `<span class="lb-score" id="cities-spec-lb-score">0</span>`;
+    lb.appendChild(el);
+  }
+  const nameEl = document.getElementById('cities-spec-lb-name');
+  if (nameEl) nameEl.textContent = name || 'Jugador';
+  const avatarEl = document.getElementById('cities-spec-lb-avatar');
+  if (avatarEl && avatar) avatarEl.src = avatar;
+  const scoreEl = document.getElementById('cities-spec-lb-score');
+  if (scoreEl) scoreEl.textContent = (score || 0).toLocaleString();
+
+  let oppEl = document.getElementById('cities-spec-lb-opp');
+  if (showOpp) {
+    if (!oppEl) {
+      oppEl = document.createElement('div');
+      oppEl.className = 'lb-entry lb-vsopp';
+      oppEl.id = 'cities-spec-lb-opp';
+      oppEl.style.top = (TOP_MARGIN + rowH + LB_GAP) + 'px';
+      oppEl.innerHTML = `<div class="lb-avatar"><img class="lb-avatar-img" id="cities-spec-lb-opp-avatar" src="images/profilepic/ppdefault.png"></div>`
+        + `<span class="lb-name" id="cities-spec-lb-opp-name"></span>`
+        + `<span class="lb-score" id="cities-spec-lb-opp-score">0</span>`;
+      lb.appendChild(oppEl);
+    }
+    const oppNameEl = document.getElementById('cities-spec-lb-opp-name');
+    if (oppNameEl) oppNameEl.textContent = oppName || 'Rival';
+    const oppAvatarEl = document.getElementById('cities-spec-lb-opp-avatar');
+    if (oppAvatarEl && oppAvatar) oppAvatarEl.src = oppAvatar;
+    const oppScoreEl = document.getElementById('cities-spec-lb-opp-score');
+    if (oppScoreEl) oppScoreEl.textContent = (oppScore || 0).toLocaleString();
+    // Reordenar según puesto actual — mismo criterio que positionLeaderboard()
+    // real (mayor puntaje arriba), aprovechando la misma transition:top del
+    // CSS de .lb-entry para que el cambio de puesto se vea animado, no de
+    // golpe. Antes las dos filas quedaban SIEMPRE en el mismo orden fijo
+    // (amigo arriba, rival abajo) sin importar quién iba ganando.
+    const friendOnTop = (score || 0) >= (oppScore || 0);
+    el.style.top    = (TOP_MARGIN + (friendOnTop ? 0 : rowH + LB_GAP)) + 'px';
+    oppEl.style.top = (TOP_MARGIN + (friendOnTop ? rowH + LB_GAP : 0)) + 'px';
+  } else if (oppEl) {
+    oppEl.remove();
+  } else {
+    el.style.top = TOP_MARGIN + 'px';
+  }
+};
+
+// Flash de "wrong" en la fila del espectador — target: 'friend' | 'opponent'.
+// Mismo mecanismo visual que _lbWrongEffect (animación lb-wrong-flash/
+// lb-shake + emote), pero sobre las filas propias del espectador en vez de
+// lbElements (esas ni existen mientras se espectea, initLeaderboard() está
+// bloqueada con el guard window._isSpectating).
+window.citiesSpectatorWrongEffect = function (target) {
+  if (!_citiesSpecMode) return;
+  const el = document.getElementById(target === 'opponent' ? 'cities-spec-lb-opp' : 'cities-spec-lb-entry');
+  if (!el) return;
+  el.style.animation = 'none'; void el.offsetWidth;
+  el.style.animation = 'lb-wrong-flash 0.75s ease-out, lb-shake 0.45s ease-in-out';
+  setTimeout(() => { el.style.animation = ''; }, 820);
+  // z-index elevado mientras dura el emote — ambas filas (.lb-player/
+  // .lb-vsopp) comparten el mismo z-index base, así que cuál queda "arriba"
+  // en un empate depende del orden en el DOM, no de quién tiene el emoji
+  // activo. Sin este boost temporal, la fila con el emoji podía quedar
+  // tapada por la otra durante la animación de reordenar puestos (top
+  // transition), que las hace superponerse un instante.
+  const prevZ = el.style.zIndex;
+  el.style.zIndex = '50';
+  setTimeout(() => { el.style.zIndex = prevZ; }, 1800);
+  if (typeof spawnEmoteBubble === 'function') spawnEmoteBubble(el);
+};
+
+// Reaplica altura/posición de la tarjeta tras un resize/zoom — ver el
+// addEventListener('resize', ...) de más abajo. No hace falta si nunca se
+// llegó a mostrar ninguna tarjeta (_citiesSpecLastCard null).
+window.citiesSpectatorReposition = function () {
+  if (!_citiesSpecMode || !_citiesSpecLastCard) return;
+  window.citiesSpectatorSetPlayerCard(_citiesSpecLastCard.name, _citiesSpecLastCard.avatar, _citiesSpecLastCard.score);
+};
+
+window.citiesSpectatorShowTimesUp = function () {
+  if (!_citiesSpecMode) return;
+  clearTimeout(_citiesSpecTimesUpT1);
+  clearTimeout(_citiesSpecTimesUpT2);
+  if (typeof playMusic === 'function') playMusic(null);
+  if (typeof sfxTimesUp !== 'undefined' && typeof sfxPlay === 'function') { sfxTimesUp.currentTime = 0; sfxPlay(sfxTimesUp); }
+  countdownImg.style.animationPlayState = 'paused';
+  timeupOverlay.style.display = 'flex';
+  timeupOverlay.classList.remove('timeup-out');
+  timeupOverlay.classList.add('timeup-in');
+  _citiesSpecTimesUpT1 = setTimeout(() => {
+    if (!_citiesSpecMode) return;
+    timeupOverlay.classList.remove('timeup-in');
+    timeupOverlay.classList.add('timeup-out');
+    _citiesSpecTimesUpT2 = setTimeout(() => {
+      if (!_citiesSpecMode) return;
+      timeupOverlay.style.display = 'none';
+      timeupOverlay.classList.remove('timeup-out');
+    }, 400);
+  }, 1800);
+};
+
+// Pantalla de resultados (solo camino solo/campaña — versus tiene su propia
+// pantalla W/L, no cubierta acá). Solo-lectura: pointer-events:none + confirm
+// oculto, igual que flags/shapes.
+window.citiesSpectatorShowPostgame = function (payload) {
+  if (!_citiesSpecMode) return;
+  const cwEl = document.getElementById('countdown-widget');
+  if (cwEl) cwEl.style.display = 'none';
+  gameoverScreen.classList.remove('mode-flags', 'mode-shapes', 'mode-monuments');
+  gameoverScreen.style.pointerEvents = 'none';
+  // Mismo swap de sprites que hace loading-play-btn del jugador real —
+  // elementos COMPARTIDOS entre modos.
+  document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men1.png');
+  document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men2.png');
+  document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl1.png');
+  document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl2.png');
+  document.querySelectorAll('.game-bg-women1').forEach(el => el.src = 'images/characters/women1.png');
+  document.querySelectorAll('.game-bg-women2').forEach(el => el.src = 'images/characters/women1.png');
+  document.querySelectorAll('.game-bg-city').forEach(el => el.src = 'images/bg/level3complete.png');
+  // Mismo swap para los íconos grandes de correctas/incorrectas — faltaba
+  // del todo acá (a diferencia de los sprites de arriba, que sí se
+  // actualizaban), así que quedaban con lo último que dejó OTRO modo
+  // (ej. check2/wrong2 de Siluetas) en vez de check3/wrong3 de Ciudades.
+  document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check3.png');
+  document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong3.png');
+  if (typeof window.hideGameoverConfirm === 'function') window.hideGameoverConfirm();
+  const confirmWrap = document.querySelector('.gameover-confirm-wrap');
+  if (confirmWrap) confirmWrap.style.display = 'none';
+  gameoverScreen.style.display = 'flex';
+  const label = gameoverScreen.querySelector('.gameover-text1-label');
+  if (label) label.textContent = (typeof t === 'function') ? t('gameover.cities') : 'City Blitz';
+  if (finalScoreEl) finalScoreEl.textContent = (payload.totalScore || 0).toLocaleString();
+  if (newHighscoreBanner) newHighscoreBanner.style.display = payload.isNewHighscore ? 'flex' : 'none';
+  const rpEl = document.getElementById('right-panel');
+  if (rpEl) rpEl.style.display = 'none';
+  // Reconstruye las filas de íconos individuales (correctas/incorrectas) con
+  // los conteos reales del jugador espectado — buildChecksRow()/
+  // buildWrongsRow() reales usan gradeCounts/wrongCount (estado LOCAL del
+  // jugador, que acá no existe), así que se arma una versión simple propia
+  // reusando getModeCheckImg()/getModeWrongImg() (ya devuelven check3/wrong3
+  // para 'game' vía window.pendingGameMode). Sin esto, las filas quedaban
+  // con la cantidad Y el ícono de la ÚLTIMA vez que se armaron de verdad.
+  {
+    const nCorrect = payload.correctCount || 0;
+    const checksEndTime = _specBuildCountRow(
+      document.getElementById('gameover-checks-row'),
+      gameoverScreen.querySelector('.game-bg-check3'),
+      gameoverScreen.querySelector('.grade-count-total'),
+      nCorrect, (typeof getModeCheckImg === 'function') ? getModeCheckImg() : 'images/check3.png', 0);
+    _specBuildCountRow(
+      document.getElementById('gameover-wrongs-row'),
+      gameoverScreen.querySelector('.game-bg-wrong3'),
+      gameoverScreen.querySelector('.wrong-count-total'),
+      payload.wrongCount || 0, (typeof getModeWrongImg === 'function') ? getModeWrongImg() : 'images/wrong3.png',
+      // Igual que endGame() real: las incorrectas arrancan recién cuando
+      // termina de entrar la fila de correctas, no las dos a la vez.
+      (nCorrect > 0 ? (nCorrect - 1) * 0.1 + 0.2 : 0) + 0.4);
+  }
+  const wrongTotalEl = document.getElementById('gameover-wrong-total');
+  if (wrongTotalEl) wrongTotalEl.textContent = payload.wrongCount || 0;
+  const splashWrongEl = document.getElementById('splash-wrong-total');
+  if (splashWrongEl) splashWrongEl.textContent = payload.wrongCount || 0;
+  // Contraparte de correctas — mismo elemento que actualiza updateGradeCountsUI()
+  // en el jugador real (gradeCounts.perfect+good+fair, estado LOCAL que acá no
+  // existe) — faltaba del todo, se quedaba con el número de la ÚLTIMA partida
+  // real jugada en esta pestaña en vez del conteo del jugador espectado.
+  const correctTotalEl = document.getElementById('gameover-count-total');
+  if (correctTotalEl) correctTotalEl.textContent = payload.correctCount || 0;
+  const splashCorrectEl = document.getElementById('splash-count-total');
+  if (splashCorrectEl) splashCorrectEl.textContent = payload.correctCount || 0;
+  // Igual que endGame() real: el marcador tampoco tiene sentido en la
+  // pantalla de resultados — sin esto quedaba pegado, visible de fondo.
+  scoreDisplayEl.style.display = 'none';
+  if (typeof playMusic === 'function' && typeof sfxPostgame !== 'undefined') playMusic(sfxPostgame);
+};
+
+window.citiesSpectatorHidePostgame = function () {
+  if (gameoverScreen) { gameoverScreen.style.display = 'none'; gameoverScreen.style.pointerEvents = ''; }
+  const confirmWrap = document.querySelector('.gameover-confirm-wrap');
+  if (confirmWrap) confirmWrap.style.display = '';
+};
+// ═════════════════════════════════════════════════════════════════════════════
+
+// ── MONUMENTS SPECTATOR (espectador de partida individual) ────────────────────
+// Mismo patrón exacto que el bloque de Cities de arriba — misma pantalla real
+// (#game-wrapper/canvas/leaderboard), mismo `state` mínimo, misma reutilización
+// de render()/advanceDot(). Lo único que cambia es la revelación de la ronda
+// (slideMonumentIn en vez de slideTagIn — imagen del monumento en vez de
+// nombre de ciudad+bandera), los assets (check4/wrong4/countdown4/
+// countdownred4, fondo level4complete/level4complete2) y el texto de
+// resultados ('gameover.monuments').
+let _monumentsSpecMode = false;
+let _monumentsSpecTimesUpT1 = null, _monumentsSpecTimesUpT2 = null;
+let _monumentsSpecIsFirstRound = true;
+let _monumentsSpecPregameSeen  = false;
+let _monumentsSpecLastTick = null;
+let _monumentsSpecLastTickSoundAt = 0;
+
+window.monumentsSpectatorEnter = function () {
+  _monumentsSpecMode = true;
+  window._isSpectating = true;
+  _monumentsSpecLastTick = null;
+  _monumentsSpecLastTickSoundAt = 0;
+  _monumentsSpecIsFirstRound = true;
+  _monumentsSpecPregameSeen  = false;
+  window.pendingGameMode = 'monuments';
+  _monumentsSpecLastCard = null;
+  const ls = document.getElementById('loading-screen');
+  if (ls) ls.style.display = 'none';
+  if (typeof loadGameSFX === 'function') loadGameSFX();
+  if (typeof loadBadges === 'function') loadBadges();
+  // Restos de otros modos espectados antes en esta misma pestaña sin pasar
+  // por su propio Exit — mismo caso ya resuelto en flags.js/shapes.js/cities.
+  document.querySelectorAll('.shapes-tag').forEach(t => t.remove());
+  document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
+  document.querySelectorAll('.shapes-stage-el').forEach(el => { try { el.remove(); } catch (e) {} });
+  document.getElementById('shapes-countdown-widget')?.remove();
+  document.getElementById('flags-wrapper')?.style.setProperty('display', 'none');
+  document.getElementById('flags-luggage-wrap')?.style.setProperty('display', 'none');
+  document.getElementById('flags-flagid-wrap')?.style.setProperty('display', 'none');
+  ['flags-machine', 'flags-machine2', 'flags-machine3', 'flags-machine3b'].forEach(id => {
+    const m = document.getElementById(id);
+    if (m) { m.style.display = 'none'; m.style.animationPlayState = ''; m.classList.remove('scrolling'); }
+  });
+  document.getElementById('flags-countdown-widget')?.style.setProperty('display', 'none');
+  document.getElementById('flags-right-panel')?.style.setProperty('display', 'none');
+
+  mapGameOver = false;
+  gameAborted = false;
+  clearInterval(timerIntervalId);
+  clearTimeout(pregameTimeout);
+  clearTimeout(_monumentsSpecTimesUpT1); clearTimeout(_monumentsSpecTimesUpT2);
+  canvas.style.pointerEvents = 'none'; // solo-lectura: no hay click que resolver
+  if (canvas.width < DISPLAY_W) { canvas.width = DISPLAY_W; canvas.height = DISPLAY_H; }
+  if (badgeOverlay.width < DISPLAY_W) { badgeOverlay.width = DISPLAY_W; badgeOverlay.height = DISPLAY_H; }
+
+  scoreDisplayEl.style.display = 'block';
+  scoreValueEl.textContent = '0';
+  speedBonusText.style.display = '';
+  speedBonusText.classList.remove('visible');
+  const cwEl = document.getElementById('countdown-widget');
+  if (cwEl) { cwEl.style.display = 'block'; cwEl.style.visibility = ''; }
+  const rpEl = document.getElementById('right-panel');
+  if (rpEl) { rpEl.style.display = 'flex'; rpEl.style.visibility = ''; }
+  const lb = document.getElementById('leaderboard');
+  if (lb) lb.innerHTML = '';
+  timeupOverlay.style.display = 'none';
+  timeupOverlay.classList.remove('timeup-in', 'timeup-out');
+  resultLabel.className = '';
+  resultLabel.classList.remove('visible');
+
+  // Construye un `state` MÍNIMO propio (no resetState(), que arma pools de
+  // ciudades/monumentos/práctica pensados para partida REAL) — render() solo
+  // necesita estos campos.
+  state = {
+    phase: 'waiting',
+    timeLeft: GAME_DURATION,
+    score: 0, displayedScore: 0, dots: 0,
+    currentCity: null, cityShownAt: 0,
+    placedDots: [], pin1Anim: null, pin2Anim: null,
+    starParticles: [], sunburst: null, badgeAnim: null,
+    lastTimestamp: null, streak: 0, mapDrawn: false,
+  };
+  // updateDotsUI() lee state.dots (recién en 0) para des-rellenar los
+  // puntitos del trencito — sin esto quedaban "filled" con lo último que
+  // dejó otro modo/partida espectada antes en esta misma pestaña.
+  progressContainer.classList.remove('train-animation', 'dots-fade-out');
+  updateDotsUI();
+  timerNumberEl.textContent = GAME_DURATION;
+  timerNumberEl.classList.remove('timer-number-infinity');
+  timerNumberEl.style.color = '';
+  countdownImg.src = 'images/countdown4.png';
+  countdownImg.style.animationPlayState = 'running';
+
+  // Visible desde ya, haya o no un 3-2-1 en curso — mismo motivo que en
+  // citiesSpectatorEnter (#pregame-countdown es transparente).
+  gameWrapper.style.display = 'block';
+  // Ver comentario largo en citiesSpectatorEnter: redimensionarJuego() no
+  // hace nada si gameWrapper todavía está en display:none, así que tiene que
+  // ir DESPUÉS de mostrarlo — con el orden viejo el mapa quedaba mal
+  // posicionado durante todo el 3-2-1.
+  redimensionarJuego();
+  cityTagEl.style.visibility = 'hidden';
+  monumentImgEl.style.display = 'none';
+
+  if (animFrameId) cancelAnimationFrame(animFrameId);
+  animFrameId = requestAnimationFrame(render);
+
+  if (typeof window.refreshIngamePower === 'function') window.refreshIngamePower();
+};
+
+// switchingMode=true: la campaña del espectado encadenó a OTRO modo — ver
+// comentario largo en flagsSpectatorExit (mismo mecanismo acá).
+window.monumentsSpectatorExit = function (switchingMode) {
+  _monumentsSpecMode = false;
+  if (!switchingMode) window._isSpectating = false;
+  // Ver comentario largo en flagsSpectatorExit.
+  document.getElementById('monuments-spec-lb-entry')?.remove();
+  document.getElementById('monuments-spec-lb-opp')?.remove();
+  pregameAborted = true;
+  clearTimeout(pregameTimeout); pregameTimeout = null;
+  if (typeof sfxCountdown !== 'undefined') { try { sfxCountdown.pause(); sfxCountdown.currentTime = 0; } catch (e) {} }
+  _monumentsSpecLastCard = null;
+  mapGameOver = true;
+  clearTimeout(_monumentsSpecTimesUpT1); clearTimeout(_monumentsSpecTimesUpT2);
+  if (slideMonumentIn._nameTimer) { clearTimeout(slideMonumentIn._nameTimer); slideMonumentIn._nameTimer = null; }
+  window.monumentsSpectatorHidePostgame();
+  if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
+  // window._vsShowingResult — ver el mismo guard en citiesSpectatorExit/
+  // flagsSpectatorExit/shapesSpectatorExit (el "se quitan los assets de
+  // fondo si pierdo" reportado).
+  if (!window._vsShowingResult) {
+    gameWrapper.style.display = 'none';
+    monumentImgEl.style.display = 'none';
+    state = null;
+  }
+  scoreDisplayEl.style.display = 'none';
+  const cwEl = document.getElementById('countdown-widget');
+  if (cwEl) cwEl.style.display = 'none';
+  const rpEl = document.getElementById('right-panel');
+  if (rpEl) rpEl.style.display = 'none';
+  const lb = document.getElementById('leaderboard');
+  if (lb) lb.innerHTML = '';
+  cityTagEl.style.visibility = 'hidden';
+  timeupOverlay.style.display = 'none';
+  timeupOverlay.classList.remove('timeup-in', 'timeup-out');
+  pregameCountdownEl.style.display = 'none';
+  if (!switchingMode) {
+    const ls = document.getElementById('loading-screen');
+    if (ls) ls.style.display = 'flex';
+  }
+  if (typeof window.refreshIngamePower === 'function') window.refreshIngamePower();
+};
+
+window.monumentsSpectatorShowPregame = function (payload) {
+  if (!_monumentsSpecMode) return;
+  _monumentsSpecPregameSeen = true;
+  window.monumentsSpectatorHidePostgame();
+  cityTagEl.style.visibility = 'hidden';
+  if (payload) {
+    timerNumberEl.classList.toggle('timer-number-infinity', !!payload.infinite);
+    timerNumberEl.textContent = payload.infinite ? '∞' : (payload.duration != null ? payload.duration : '');
+  }
+  timerNumberEl.style.color = '';
+  countdownImg.src = 'images/countdown4.png';
+  countdownImg.style.animationPlayState = 'paused';
+  if (typeof playMusic === 'function') playMusic(null);
+  if (payload && typeof payload.campaignBaseAtStart === 'number' && state) {
+    state.score = payload.campaignBaseAtStart;
+    state.displayedScore = payload.campaignBaseAtStart;
+    scoreValueEl.textContent = payload.campaignBaseAtStart.toLocaleString();
+  }
+  let elapsedMs = (payload && typeof payload.startedAt === 'number') ? (Date.now() - payload.startedAt) : 0;
+  const _pregameTotalMs = PREGAME_STEPS.reduce((s, x) => s + x.hold, 0);
+  if (elapsedMs > _pregameTotalMs - 400) elapsedMs = Math.max(0, _pregameTotalMs - 400);
+  runPregameCountdown(() => {
+    const cwPost = document.getElementById('countdown-widget');
+    if (cwPost) cwPost.style.visibility = '';
+    countdownImg.style.animationPlayState = 'running';
+    if (typeof playMusic === 'function' && typeof sfxGameMusic !== 'undefined') playMusic(sfxGameMusic);
+    redimensionarJuego();
+    gameWrapper.style.display = 'block';
+  }, elapsedMs);
+};
+
+// payload = { mode:'monuments', index, monumentName, img, lat, lon, timeLeft }
+window.monumentsSpectatorShowRound = function (payload) {
+  if (!_monumentsSpecMode || !state) return;
+  // Mismo motivo que citiesSpectatorShowRound: no tocar pin1Anim/pin2Anim acá,
+  // se limpian solos cuando su propio fade termina (ver render()).
+  state.phase = 'waiting';
+  state.cityShownAt = Date.now();
+  state.currentCity = { name: payload.monumentName, img: payload.img, lat: payload.lat, lon: payload.lon };
+  slideMonumentIn(state.currentCity);
+  if (typeof payload.timeLeft === 'number') {
+    state.timeLeft = payload.timeLeft;
+    timerNumberEl.textContent = payload.timeLeft;
+    timerNumberEl.classList.remove('timer-number-infinity');
+  }
+  if (_monumentsSpecIsFirstRound) {
+    _monumentsSpecIsFirstRound = false;
+    setTimeout(() => {
+      if (!_monumentsSpecPregameSeen && typeof playMusic === 'function' && typeof sfxGameMusic !== 'undefined') {
+        playMusic(sfxGameMusic);
+      }
+    }, 400);
+  }
+};
+
+// payload = { correct, score, grade, clickX, clickY, correctX, correctY, distKm, totalGained, bonusAmt }
+window.monumentsSpectatorResolvePick = function (payload) {
+  if (!_monumentsSpecMode || !state || !state.currentCity) return;
+  const { grade, clickX, clickY, correctX, correctY, distKm, totalGained, bonusAmt } = payload;
+  if (typeof clickX !== 'number' || typeof correctX !== 'number') return;
+  state.phase = 'animating';
+  if (typeof sfxPin !== 'undefined' && typeof sfxPlay === 'function') { sfxPin.currentTime = 0; sfxPlay(sfxPin); }
+
+  if (typeof payload.score === 'number') state.score = payload.score;
+
+  // "+puntos" flotante — SOLO lo del acierto, SIN el inRowBonus (que va aparte
+  // en el badge "IN A ROW"), igual que el jugador real (que ya muestra el
+  // popup sin el inRowBonus).
+  const _acierto = totalGained - (payload.inRowBonus || 0);
+  if (typeof totalGained === 'number' && _acierto > 0 && typeof showScorePopup === 'function') {
+    showScorePopup(_acierto);
+  }
+  if (typeof bonusAmt === 'number' && bonusAmt > 0) {
+    clearTimeout(speedBonusHideId);
+    speedBonusText.classList.remove('visible');
+    void speedBonusText.offsetWidth;
+    speedBonusText.classList.add('visible');
+    speedBonusHideId = setTimeout(() => speedBonusText.classList.remove('visible'), 1600);
+  }
+
+  let _dotFontSize = 11;
+  ctx.font = `bold ${_dotFontSize}px Georgia`;
+  const _dotLabel = (typeof tMonument === 'function') ? tMonument(state.currentCity.name) : state.currentCity.name;
+  while (_dotFontSize > 7 && ctx.measureText(_dotLabel).width > 90) {
+    _dotFontSize--;
+    ctx.font = `bold ${_dotFontSize}px Georgia`;
+  }
+  state.placedDots.push({
+    x: correctX, y: correctY, name: state.currentCity.name,
+    labelOpacity: 1, labelBorn: Date.now(),
+    permanent: grade === 'perfect', fontSize: _dotFontSize,
+  });
+
+  // payload.dots trae el valor REAL post-incremento del jugador espectado —
+  // se pisa el contador local antes de advanceDot() (que hace state.dots++
+  // internamente) para que el trencito llene/vacíe en el mismo momento que
+  // ve el jugador real, sin importar en qué punto de la partida se unió.
+  if (grade !== 'wayoff' && typeof advanceDot === 'function') {
+    if (typeof payload.dots === 'number') state.dots = payload.dots - 1;
+    advanceDot();
+  }
+
+  state.pin1Anim = { x: clickX, y: clickY, targetX: correctX, targetY: correctY,
+    distKm, grade, progress: 0, lineProgress: 0, opacity: 1, fading: false,
+    wobbleTime: 0, sunburstSpawned: false };
+  const capturedPin1 = state.pin1Anim;
+
+  setTimeout(() => {
+    if (!_monumentsSpecMode || state.pin1Anim !== capturedPin1) return; // ronda ya cambió
+    state.pin2Anim = { x: correctX, y: correctY, progress: 0, opacity: 1, fading: false,
+      wobbleTime: 0, starsSpawned: false,
+      onLanded: () => {
+        spawnStars(correctX, correctY);
+        setTimeout(() => {
+          if (!_monumentsSpecMode) return;
+          showResultLabel(correctX, correctY, grade, 0, 0);
+          // Racha ("in row") — badgeColor real es un <img> del jugador, no
+          // serializable por broadcast; payload.streak sí viaja (número), y
+          // getBadgeImg() es una función pura de ese streak — el espectador
+          // reconstruye la misma imagen localmente. render() ya sabe dibujar
+          // state.badgeAnim solo (mismo overlay que usa el jugador real).
+          if (typeof payload.streak === 'number' && typeof getBadgeImg === 'function') {
+            const badgeColor = getBadgeImg(payload.streak);
+            if (badgeColor) {
+              state.badgeAnim = { t: 0, img: badgeColor, streak: payload.streak, inRowBonus: payload.inRowBonus || 0 };
+              setTimeout(() => { if (typeof sfxBonus !== 'undefined' && typeof sfxPlay === 'function') { sfxBonus.currentTime = 0; sfxPlay(sfxBonus); } }, 800);
+            }
+          }
+        }, 200);
+      },
+    };
+    const capturedPin2 = state.pin2Anim;
+    setTimeout(() => { if (state.pin2Anim === capturedPin2) capturedPin2.fading = true; }, 1000);
+  }, 300);
+  setTimeout(() => { if (state.pin1Anim === capturedPin1) capturedPin1.fading = true; }, 1000);
+};
+
+window.monumentsSpectatorUpdateTimer = function (timeLeft) {
+  if (!_monumentsSpecMode || !state) return;
+  state.timeLeft = timeLeft;
+  timerNumberEl.textContent = timeLeft;
+  timerNumberEl.classList.remove('timer-number-infinity');
+  if (timeLeft <= 10) {
+    timerNumberEl.style.color = '#ffffff';
+    countdownImg.src = 'images/countdownred4.png';
+    const _nowTick = Date.now();
+    if (timeLeft > 0 && timeLeft !== _monumentsSpecLastTick && (_nowTick - _monumentsSpecLastTickSoundAt) > 700
+        && typeof sfxTickdown !== 'undefined') {
+      sfxTickdown.currentTime = 0; sfxPlay(sfxTickdown);
+      _monumentsSpecLastTickSoundAt = _nowTick;
+    }
+  } else {
+    timerNumberEl.style.color = '';
+    countdownImg.src = 'images/countdown4.png';
+  }
+  _monumentsSpecLastTick = timeLeft;
+};
+
+window.monumentsSpectatorUpdateScore = function (score, dots) {
+  if (!_monumentsSpecMode || !state) return;
+  state.score = score;
+  state.displayedScore = score;
+  scoreValueEl.textContent = (score + (window.campaignBase ? window.campaignBase() : 0)).toLocaleString();
+  // dots: mismo motivo que citiesSpectatorUpdateScore.
+  if (typeof dots === 'number') {
+    state.dots = Math.max(0, Math.min(dots, DOTS_NEEDED - 1));
+    updateDotsUI();
+  }
+};
+
+let _monumentsSpecLastCard = null;
+// oppName/oppAvatar/oppScore: ver comentario largo en citiesSpectatorSetPlayerCard.
+window.monumentsSpectatorSetPlayerCard = function (name, avatar, score, oppName, oppAvatar, oppScore) {
+  if (!_monumentsSpecMode) return;
+  _monumentsSpecLastCard = { name, avatar, score, oppName, oppAvatar, oppScore };
+  const lb = document.getElementById('leaderboard');
+  if (!lb) return;
+  const rowH = getLbRowHeight();
+  const showOpp = !!oppName;
+  // TOP_MARGIN: ver comentario largo en citiesSpectatorSetPlayerCard (mismo
+  // clip-path recorta el emote-bubble de wrongEffect si la fila de arriba
+  // queda pegada a top:0 del contenedor).
+  const TOP_MARGIN = Math.round(rowH * 0.4);
+  lb.style.height = (showOpp ? rowH * 2 + LB_GAP + TOP_MARGIN : rowH + TOP_MARGIN) + 'px';
+  let el = document.getElementById('monuments-spec-lb-entry');
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'lb-entry lb-player';
+    el.id = 'monuments-spec-lb-entry';
+    el.style.top = TOP_MARGIN + 'px';
+    el.innerHTML = `<div class="lb-avatar"><img class="lb-avatar-img" id="monuments-spec-lb-avatar" src="images/profilepic/ppdefault.png"></div>`
+      + `<span class="lb-name" id="monuments-spec-lb-name"></span>`
+      + `<span class="lb-score" id="monuments-spec-lb-score">0</span>`;
+    lb.appendChild(el);
+  }
+  const nameEl = document.getElementById('monuments-spec-lb-name');
+  if (nameEl) nameEl.textContent = name || 'Jugador';
+  const avatarEl = document.getElementById('monuments-spec-lb-avatar');
+  if (avatarEl && avatar) avatarEl.src = avatar;
+  const scoreEl = document.getElementById('monuments-spec-lb-score');
+  if (scoreEl) scoreEl.textContent = (score || 0).toLocaleString();
+
+  let oppEl = document.getElementById('monuments-spec-lb-opp');
+  if (showOpp) {
+    if (!oppEl) {
+      oppEl = document.createElement('div');
+      oppEl.className = 'lb-entry lb-vsopp';
+      oppEl.id = 'monuments-spec-lb-opp';
+      oppEl.style.top = (TOP_MARGIN + rowH + LB_GAP) + 'px';
+      oppEl.innerHTML = `<div class="lb-avatar"><img class="lb-avatar-img" id="monuments-spec-lb-opp-avatar" src="images/profilepic/ppdefault.png"></div>`
+        + `<span class="lb-name" id="monuments-spec-lb-opp-name"></span>`
+        + `<span class="lb-score" id="monuments-spec-lb-opp-score">0</span>`;
+      lb.appendChild(oppEl);
+    }
+    const oppNameEl = document.getElementById('monuments-spec-lb-opp-name');
+    if (oppNameEl) oppNameEl.textContent = oppName || 'Rival';
+    const oppAvatarEl = document.getElementById('monuments-spec-lb-opp-avatar');
+    if (oppAvatarEl && oppAvatar) oppAvatarEl.src = oppAvatar;
+    const oppScoreEl = document.getElementById('monuments-spec-lb-opp-score');
+    if (oppScoreEl) oppScoreEl.textContent = (oppScore || 0).toLocaleString();
+    // Reordenar según puesto — ver comentario largo en citiesSpectatorSetPlayerCard.
+    const friendOnTop = (score || 0) >= (oppScore || 0);
+    el.style.top    = (TOP_MARGIN + (friendOnTop ? 0 : rowH + LB_GAP)) + 'px';
+    oppEl.style.top = (TOP_MARGIN + (friendOnTop ? rowH + LB_GAP : 0)) + 'px';
+  } else if (oppEl) {
+    oppEl.remove();
+  } else {
+    el.style.top = TOP_MARGIN + 'px';
+  }
+};
+
+window.monumentsSpectatorWrongEffect = function (target) {
+  if (!_monumentsSpecMode) return;
+  const el = document.getElementById(target === 'opponent' ? 'monuments-spec-lb-opp' : 'monuments-spec-lb-entry');
+  if (!el) return;
+  el.style.animation = 'none'; void el.offsetWidth;
+  el.style.animation = 'lb-wrong-flash 0.75s ease-out, lb-shake 0.45s ease-in-out';
+  setTimeout(() => { el.style.animation = ''; }, 820);
+  // z-index elevado mientras dura el emote — ver comentario largo en citiesSpectatorWrongEffect.
+  const prevZ = el.style.zIndex;
+  el.style.zIndex = '50';
+  setTimeout(() => { el.style.zIndex = prevZ; }, 1800);
+  if (typeof spawnEmoteBubble === 'function') spawnEmoteBubble(el);
+};
+
+// "Se acabó el tiempo" en la cartilla del espectador 1v1 (cities/monuments) —
+// mismo mecanismo que *SpectatorWrongEffect pero con el cronómetro.
+window.citiesSpectatorTimesUpEffect = function (target) {
+  if (!_citiesSpecMode) return;
+  const el = document.getElementById(target === 'opponent' ? 'cities-spec-lb-opp' : 'cities-spec-lb-entry');
+  if (!el) return;
+  const prevZ = el.style.zIndex; el.style.zIndex = '50';
+  setTimeout(() => { el.style.zIndex = prevZ; }, 2600);
+  if (typeof window._applyTimesUpEffect === 'function') window._applyTimesUpEffect(el);
+};
+window.monumentsSpectatorTimesUpEffect = function (target) {
+  if (!_monumentsSpecMode) return;
+  const el = document.getElementById(target === 'opponent' ? 'monuments-spec-lb-opp' : 'monuments-spec-lb-entry');
+  if (!el) return;
+  const prevZ = el.style.zIndex; el.style.zIndex = '50';
+  setTimeout(() => { el.style.zIndex = prevZ; }, 2600);
+  if (typeof window._applyTimesUpEffect === 'function') window._applyTimesUpEffect(el);
+};
+
+window.monumentsSpectatorReposition = function () {
+  if (!_monumentsSpecMode || !_monumentsSpecLastCard) return;
+  window.monumentsSpectatorSetPlayerCard(_monumentsSpecLastCard.name, _monumentsSpecLastCard.avatar, _monumentsSpecLastCard.score);
+};
+
+window.monumentsSpectatorShowTimesUp = function () {
+  if (!_monumentsSpecMode) return;
+  clearTimeout(_monumentsSpecTimesUpT1);
+  clearTimeout(_monumentsSpecTimesUpT2);
+  if (typeof playMusic === 'function') playMusic(null);
+  if (typeof sfxTimesUp !== 'undefined' && typeof sfxPlay === 'function') { sfxTimesUp.currentTime = 0; sfxPlay(sfxTimesUp); }
+  countdownImg.style.animationPlayState = 'paused';
+  timeupOverlay.style.display = 'flex';
+  timeupOverlay.classList.remove('timeup-out');
+  timeupOverlay.classList.add('timeup-in');
+  _monumentsSpecTimesUpT1 = setTimeout(() => {
+    if (!_monumentsSpecMode) return;
+    timeupOverlay.classList.remove('timeup-in');
+    timeupOverlay.classList.add('timeup-out');
+    _monumentsSpecTimesUpT2 = setTimeout(() => {
+      if (!_monumentsSpecMode) return;
+      timeupOverlay.style.display = 'none';
+      timeupOverlay.classList.remove('timeup-out');
+    }, 400);
+  }, 1800);
+};
+
+window.monumentsSpectatorShowPostgame = function (payload) {
+  if (!_monumentsSpecMode) return;
+  const cwEl = document.getElementById('countdown-widget');
+  if (cwEl) cwEl.style.display = 'none';
+  gameoverScreen.classList.remove('mode-flags', 'mode-shapes');
+  gameoverScreen.classList.add('mode-monuments');
+  gameoverScreen.style.pointerEvents = 'none';
+  document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men1.png');
+  document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men2.png');
+  document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl1.png');
+  document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl2.png');
+  document.querySelectorAll('.game-bg-women1').forEach(el => el.src = 'images/characters/women1.png');
+  document.querySelectorAll('.game-bg-women2').forEach(el => el.src = 'images/characters/women1.png');
+  // Selectores propios (game-bg-city-monuments/2), NO .game-bg-city genérico
+  // (ese es el de Cities) — así no se pisa el fondo de Cities por error.
+  document.querySelectorAll('.game-bg-city-monuments').forEach(el => el.src = 'images/bg/level4complete.png');
+  document.querySelectorAll('.game-bg-city-monuments2').forEach(el => el.src = 'images/bg/level4complete2.png');
+  document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check4.png');
+  document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong4.png');
+  if (typeof window.hideGameoverConfirm === 'function') window.hideGameoverConfirm();
+  const confirmWrap = document.querySelector('.gameover-confirm-wrap');
+  if (confirmWrap) confirmWrap.style.display = 'none';
+  gameoverScreen.style.display = 'flex';
+  const label = gameoverScreen.querySelector('.gameover-text1-label');
+  if (label) label.textContent = (typeof t === 'function') ? t('gameover.monuments') : 'Landmark Loco';
+  if (finalScoreEl) finalScoreEl.textContent = (payload.totalScore || 0).toLocaleString();
+  if (newHighscoreBanner) newHighscoreBanner.style.display = payload.isNewHighscore ? 'flex' : 'none';
+  const rpEl = document.getElementById('right-panel');
+  if (rpEl) rpEl.style.display = 'none';
+  {
+    const nCorrect = payload.correctCount || 0;
+    _specBuildCountRow(
+      document.getElementById('gameover-checks-row'),
+      gameoverScreen.querySelector('.game-bg-check3'),
+      gameoverScreen.querySelector('.grade-count-total'),
+      nCorrect, (typeof getModeCheckImg === 'function') ? getModeCheckImg() : 'images/check4.png', 0);
+    _specBuildCountRow(
+      document.getElementById('gameover-wrongs-row'),
+      gameoverScreen.querySelector('.game-bg-wrong3'),
+      gameoverScreen.querySelector('.wrong-count-total'),
+      payload.wrongCount || 0, (typeof getModeWrongImg === 'function') ? getModeWrongImg() : 'images/wrong4.png',
+      (nCorrect > 0 ? (nCorrect - 1) * 0.1 + 0.2 : 0) + 0.4);
+  }
+  const wrongTotalEl = document.getElementById('gameover-wrong-total');
+  if (wrongTotalEl) wrongTotalEl.textContent = payload.wrongCount || 0;
+  const splashWrongEl = document.getElementById('splash-wrong-total');
+  if (splashWrongEl) splashWrongEl.textContent = payload.wrongCount || 0;
+  // Contraparte de correctas — mismo elemento que actualiza updateGradeCountsUI()
+  // en el jugador real (gradeCounts.perfect+good+fair, estado LOCAL que acá no
+  // existe) — faltaba del todo, se quedaba con el número de la ÚLTIMA partida
+  // real jugada en esta pestaña en vez del conteo del jugador espectado.
+  const correctTotalEl = document.getElementById('gameover-count-total');
+  if (correctTotalEl) correctTotalEl.textContent = payload.correctCount || 0;
+  const splashCorrectEl = document.getElementById('splash-count-total');
+  if (splashCorrectEl) splashCorrectEl.textContent = payload.correctCount || 0;
+  scoreDisplayEl.style.display = 'none';
+  if (typeof playMusic === 'function' && typeof sfxPostgame !== 'undefined') playMusic(sfxPostgame);
+};
+
+window.monumentsSpectatorHidePostgame = function () {
+  if (gameoverScreen) { gameoverScreen.style.display = 'none'; gameoverScreen.style.pointerEvents = ''; gameoverScreen.classList.remove('mode-monuments'); }
+  const confirmWrap = document.querySelector('.gameover-confirm-wrap');
+  if (confirmWrap) confirmWrap.style.display = '';
+};
+// ═════════════════════════════════════════════════════════════════════════════
 
 // ── Monuments lobby hooks (idéntico al patrón de cities) ─────────────────────
 let _monumentsSeededRand = null;
@@ -3897,6 +5381,8 @@ window.monumentsHardReset = function() {
 window.monumentsSetLobbyScores = function(members) {
   if (!Array.isArray(members) || typeof window._lbUpdateEntry !== 'function') return;
   members.forEach(m => window._lbUpdateEntry('lob' + m.id, m.score || 0));
+  // Ver comentario en citiesSetVsOpponentScore — mismo motivo.
+  if (window._isSpectating) { window._refreshGroupSpectatorLeaderboard?.(); return; }
   if (typeof positionLeaderboard === 'function' && state) positionLeaderboard(state.score, true);
 };
 window.monumentsSetLobbyWrongFor = function(uid) {
@@ -3962,6 +5448,14 @@ function getLbRowHeight() {
 }
 
 function initLeaderboard() {
+  // #leaderboard es compartido con el espectador de siluetas/etc. — sin este
+  // guard, cualquier actualización de la lista de amigos (onFriendsUpdate,
+  // que dispara seguido mientras se espeta a un amigo cuyo score/estado
+  // cambia en vivo) pisaba la tarjeta armada por
+  // shapesSpectatorSetPlayerCard/flagsSpectatorSetPlayerCard con esta
+  // reconstrucción genérica — que SIEMPRE agrega una tarjeta "Tú" con el
+  // perfil del espectador. Ese era el "sale mi cartilla" reportado.
+  if (window._isSpectating) return;
   const lb = document.getElementById('leaderboard');
   lb.innerHTML = '';
   lb.classList.toggle('vs-active', !!(window._vsActive || window._lobbyActive));
@@ -3977,7 +5471,7 @@ function initLeaderboard() {
       const avatarHTML = p.avatar
         ? `<div class="lb-avatar lb-avatar-img-wrap"><img class="lb-avatar-img" src="${p.avatar}" onerror="this.parentNode.innerHTML='${p.initial || '?'}';this.parentNode.style.background='${p.color || '#888'}'"></div>`
         : `<div class="lb-avatar" style="background:${p.color}">${p.initial}</div>`;
-      el.innerHTML = avatarHTML + `<span class="lb-name">${p.name}</span>` + `<span class="lb-score">${p.score.toLocaleString()}</span>`;
+      el.innerHTML = `<span class="lb-rank rank-other"></span>` + avatarHTML + `<span class="lb-name">${p.name}</span>` + `<span class="lb-score">${p.score.toLocaleString()}</span>`;
       el.style.transition = 'none';
       el.style.top = '-9999px';
       lbElements[el.id] = el;
@@ -4014,7 +5508,8 @@ function initLeaderboard() {
   playerEl.className = 'lb-entry lb-player';
   playerEl.id = 'lb-player';
   const _myName = window._sbProfile?.name || localStorage.getItem('playerName') || 'Tú';
-  playerEl.innerHTML = `<div class="lb-avatar"><img class="lb-avatar-img" src="${localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png'}"></div>`
+  playerEl.innerHTML = `<span class="lb-rank rank-other"></span>`
+                     + `<div class="lb-avatar"><img class="lb-avatar-img" src="${localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png'}"></div>`
                      + `<span class="lb-name">${_myName}</span>`
                      + `<span class="lb-score" id="lb-player-score">0</span>`;
   playerEl.style.transition = 'none';
@@ -4075,6 +5570,20 @@ function positionLeaderboard(playerScore, animate) {
   all.forEach((p, rank) => {
     const el = lbElements[`lb-${p.id}`];
     if (el) el.style.top = ((rank - windowStart) * rowH + bottomOffset) + 'px';
+  });
+
+  // Número de posición en cada fila (1°/2°/…) — mismo mecanismo que
+  // flagsPositionLeaderboard. Faltaba acá, así que en versus/lobby de
+  // cities/monuments/shapes (todos usan #leaderboard) el número de puesto en
+  // vivo no aparecía; solo funcionaba en banderas (reportado). El CSS
+  // #leaderboard.vs-active .lb-rank lo hace visible en versus.
+  all.forEach((p, rank) => {
+    const el = lbElements[`lb-${p.id}`];
+    if (!el) return;
+    const rankEl = el.querySelector('.lb-rank');
+    if (!rankEl) return;
+    rankEl.textContent = rank + 1;
+    rankEl.className = 'lb-rank ' + (rank === 0 ? 'rank-1' : rank === 1 ? 'rank-2' : rank === 2 ? 'rank-3' : 'rank-other');
   });
 
   const scoreEl = lbElements['lb-player'].querySelector('.lb-score');
@@ -4195,6 +5704,13 @@ function resetState() {
     badgeAnim: null,
     lastTimestamp: null,
     streak: 0,
+    // El idle-skip de render() asume que el canvas ya tiene un frame dibujado
+    // para retener tal cual — en una ronda/partida recién arrancada (sin
+    // dots/animaciones todavía) esa condición de idle se cumple DESDE EL
+    // primer frame, así que sin esta bandera el mapa nunca llegaba a
+    // dibujarse hasta el primer click (que recién ahí generaba algo
+    // "activo" que rompía el idle-skip).
+    mapDrawn: false,
   };
 }
 
@@ -4453,6 +5969,14 @@ function nextCity() {
     state.cityShownAt = Date.now();
     state.phase = 'waiting';
     slideMonumentIn(state.currentCity);
+    if (typeof window._specReportRound === 'function') {
+      window._specReportRound({
+        mode: 'monuments', index: _monumentsSpecRoundIdx++,
+        monumentName: state.currentCity.name, img: state.currentCity.img,
+        lat: state.currentCity.lat, lon: state.currentCity.lon,
+        timeLeft: state.timeLeft,
+      });
+    }
   } else {
     const isPrac = window.practiceConfig && window.practiceConfig.active;
     if (isPrac) {
@@ -4468,6 +5992,14 @@ function nextCity() {
     state.cityShownAt = Date.now();
     state.phase = 'waiting';
     slideTagIn(state.currentCity.name, state.currentCity.country);
+    if (typeof window._specReportRound === 'function') {
+      window._specReportRound({
+        mode: 'game', index: _citiesSpecRoundIdx++,
+        cityName: state.currentCity.name, countryCode: state.currentCity.country,
+        lat: state.currentCity.lat, lon: state.currentCity.lon,
+        timeLeft: state.timeLeft,
+      });
+    }
   }
 }
 
@@ -4522,6 +6054,23 @@ function slideMonumentIn(monument) {
   monumentNameEl.style.opacity = '0';
   if (slideMonumentIn._nameTimer) clearTimeout(slideMonumentIn._nameTimer);
   slideMonumentIn._nameTimer = setTimeout(() => {
+    // GUARD: este timer tiene 3.5s de delay — bien largo. Si en ese lapso el
+    // ESPECTADOR ya pasó a Cities (_citiesSpecMode), NO escribir el nombre
+    // del monumento: quedaría encima del cartel de la ciudad, pegado (el
+    // "sigue mostrando el nombre de monumentos en ciudades" reportado, que
+    // los cancels no cubrían porque el timer se agendaba de nuevo o disparaba
+    // en un hueco). Mismo problema para el JUGADOR REAL, no solo el
+    // espectador: si el último monumento de una partida (versus grupal) se
+    // ve justo antes de que la ronda/partida termine, este timer puede
+    // sobrevivir al "jugar de nuevo" — si la revancha vuelve a arrancar
+    // Ciudades dentro de esos 3.5s, escribía el nombre del monumento VIEJO
+    // encima del cartel nuevo de Ciudades apenas entraba (el "tag3.png
+    // descolocado con una identificación de monumentos de la partida
+    // anterior" reportado). startGame() (real) SÍ cancela este timer, pero
+    // solo si ya corrió para cuando este dispara — chequear el modo ACTUAL
+    // acá mismo es la garantía real, sin depender de esa carrera de timing.
+    if (typeof _citiesSpecMode !== 'undefined' && _citiesSpecMode) return;
+    if (window.pendingGameMode !== 'monuments') return;
     monumentNameEl.textContent = (typeof tMonument === 'function') ? tMonument(monument.name) : monument.name;
     monumentNameEl.style.opacity = '1';
   }, 3500);
@@ -4561,17 +6110,27 @@ canvas.addEventListener('click', (e) => {
   let base, bonusAmt, totalGained, badgeColor, inRowBonus;
 
   if (window.pendingGameMode === 'game') {
-    // ── Cities: nuevo sistema ──
-    const M = getCitiesM(correctCount); // leer M ANTES de incrementar
-    if (grade !== 'wayoff') correctCount++;
+    // ── Cities: multiplicador M + badge de racha "IN A ROW" ──
+    const M = getCitiesM(correctCount); // M usa correctCount (total correcto) — leer ANTES de incrementar
     base     = CITIES_SCORE_MAP[grade];
     const elapsed = (Date.now() - shownAt) / 1000;
     const _citiesPracticeInf = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
     const gotBonus = !_citiesPracticeInf && base > 0 && elapsed < SPEED_BONUS_WIN;
     bonusAmt      = gotBonus ? Math.round(base * (CITIES_SPEED_MULT - 1)) : 0;
-    totalGained   = Math.round((base + bonusAmt) * M * hintMult);
-    badgeColor    = null;
-    inRowBonus    = 0;
+    // Racha CONSECUTIVA (state.streak) para el badge "IN A ROW" — se resetea
+    // en wayoff, igual que Monuments. Antes Cities no la rastreaba y el badge
+    // nunca salía (los hitos 3/5/10/… quedaban invisibles, reportado — en
+    // versus Y en práctica). correctCount (total correcto, para el
+    // multiplicador M) mantiene su propia cuenta aparte.
+    if (grade === 'wayoff') {
+      state.streak = 0;
+    } else {
+      state.streak++;
+      correctCount++;
+    }
+    badgeColor    = getBadgeImg(state.streak);
+    inRowBonus    = getInRowBonus(state.streak);
+    totalGained   = Math.round((base + bonusAmt) * M * hintMult) + inRowBonus;
   } else {
     // ── Monuments: sistema actual ──
     if (grade === 'wayoff') {
@@ -4596,7 +6155,13 @@ canvas.addEventListener('click', (e) => {
     if (window._lobbyActive && typeof window._lobbyReportAnswer === 'function') window._lobbyReportAnswer(grade !== 'wayoff', Math.round(state.score));
     if (grade === 'wayoff' && (window._vsActive || window._lobbyActive) && typeof window._lbWrongEffect === 'function') window._lbWrongEffect('player');
   }
-  if (window.pendingGameMode === 'game' && totalGained > 0) showScorePopup(totalGained);
+  // Popup de "+puntaje" en Cities: SOLO lo ganado por el acierto (base·bonus·M),
+  // SIN el inRowBonus — el bonus de racha va aparte, en el badge "IN A ROW"
+  // (mismo criterio que Monuments, que muestra el popup sin el inRowBonus).
+  if (window.pendingGameMode === 'game') {
+    const _acierto = totalGained - inRowBonus;
+    if (_acierto > 0) showScorePopup(_acierto);
+  }
   if (bonusAmt > 0) {
     clearTimeout(speedBonusHideId);
     speedBonusText.classList.remove('visible');
@@ -4605,12 +6170,28 @@ canvas.addEventListener('click', (e) => {
     speedBonusHideId = setTimeout(() => speedBonusText.classList.remove('visible'), 1600);
   }
 
+  // fontSize se calcula UNA vez acá (no en cada frame del render loop, donde
+  // antes corría measureText() en un while por cada dot visible en pantalla,
+  // 60 veces por segundo durante los 4s que dura la etiqueta — bastante costo
+  // de canvas repetido sin necesidad, ya que el resultado es siempre el mismo
+  // para el mismo nombre).
+  const _dotLabel = (window.pendingGameMode === 'monuments')
+    ? ((typeof tMonument === 'function') ? tMonument(state.currentCity.name) : state.currentCity.name)
+    : ((typeof tCity === 'function') ? tCity(state.currentCity.name) : state.currentCity.name);
+  let _dotFontSize = 11;
+  ctx.font = `bold ${_dotFontSize}px Georgia`;
+  while (_dotFontSize > 7 && ctx.measureText(_dotLabel).width > 90) {
+    _dotFontSize--;
+    ctx.font = `bold ${_dotFontSize}px Georgia`;
+  }
+
   state.placedDots.push({
     x: correct.x, y: correct.y,
     name: state.currentCity.name,
     labelOpacity: 1,
     labelBorn: Date.now(),
     permanent: grade === 'perfect' || isRecordingMonuments,
+    fontSize: _dotFontSize,
   });
 
   const isPractice = window.practiceConfig && window.practiceConfig.active;
@@ -4649,6 +6230,34 @@ canvas.addEventListener('click', (e) => {
   const clickLL  = canvasToLatLon(clickX, clickY);
   const correctLL = { lat: state.currentCity.lat, lon: state.currentCity.lon };
   const distKm = haversineKm(clickLL.lat, clickLL.lon, correctLL.lat, correctLL.lon);
+  if ((window.pendingGameMode === 'game' || window.pendingGameMode === 'monuments') && typeof window._specReportAnswer === 'function') {
+    // clickX/clickY/correct.x/correct.y son coordenadas de canvas (DISPLAY_W/H),
+    // portables 1:1 al canvas del espectador porque usa la misma calibración.
+    // totalGained/bonusAmt viajan para que el espectador pueda mostrar el
+    // popup de "+puntos" y el cartel de bonus de velocidad igual que el
+    // jugador real — sin esto no había forma de saber cuánto mostrar.
+    // + campaignBase(): el espectador no tiene forma propia de saber cuánto
+    // acumuló el jugador en modos anteriores de la campaña — sin sumarlo
+    // acá, veía el puntaje arrancar de 0 en Ciudades en vez de seguir
+    // sumando desde Banderas/Siluetas.
+    // streak/inRowBonus: ahora en Monuments Y Cities (ambos rastrean racha
+    // consecutiva para el badge "IN A ROW") — van como NÚMERO, no la imagen ya
+    // resuelta (badgeColor es un elemento <img> del jugador real, no
+    // serializable); el espectador reconstruye la imagen llamando getBadgeImg(streak) él
+    // mismo, es una función pura del streak.
+    // dots: el "trencito" de +5s (advanceDot) es la MISMA función reusada del
+    // lado espectador, pero sus dots LOCALES se cuentan desde que se unió —
+    // si entró a mitad de partida, su trencito llenaba/vaciaba en momentos
+    // distintos a los del jugador real. state.dots (post-increment, YA pasó
+    // por advanceDot() arriba) viaja acá para que el espectador pueda
+    // pisar su valor local con el real antes de llamar a su propio
+    // advanceDot() (ver citiesSpectatorResolvePick/monumentsSpectatorResolvePick).
+    window._specReportAnswer(grade !== 'wayoff', Math.round(state.score + (window.campaignBase ? window.campaignBase() : 0)), {
+      grade, clickX, clickY, correctX: correct.x, correctY: correct.y, distKm,
+      cityName: state.currentCity.name, totalGained, bonusAmt,
+      streak: state.streak, inRowBonus, dots: state.dots,
+    });
+  }
   state.pin1Anim = { x: clickX, y: clickY,
                     targetX: correct.x, targetY: correct.y,
                     distKm, grade,
@@ -4719,21 +6328,84 @@ function getBadgeImg(streak) {
 }
 
 // ── RENDER ───────────────────────────────────────────────────────────────────
-function render(timestamp) {
+// render() real, renombrada — la versión pública de más abajo la envuelve en
+// try/catch. Motivo: si el usuario cambia de pestaña y vuelve, el navegador
+// PAUSA requestAnimationFrame por completo mientras está oculta (los
+// setTimeout/setInterval del juego NO se pausan, solo se throttlean) — al
+// volver, el próximo frame de render() puede recibir un dt gigante (todo el
+// tiempo que estuvo la pestaña oculta de un salto). Si eso disparaba una
+// excepción en CUALQUIER punto de esta función (antes de llegar a su propio
+// requestAnimationFrame(render) del final), el loop entero moría en
+// silencio: el mapa quedaba visualmente congelado y con state.phase pegado
+// en lo que sea que valía en ese momento — si no era 'waiting', el canvas
+// dejaba de reaccionar a los clicks para siempre, exactamente el bug
+// reportado ("cambio de pestaña y vuelvo, y el mapa no reacciona a clicks").
+function _renderFrame(timestamp) {
   if (!state) return;
 
-  const dt = state.lastTimestamp ? (timestamp - state.lastTimestamp) / 1000 : 0;
+  // Clamp defensivo: aunque no haga falta para evitar el crash de más arriba
+  // (el catch de abajo ya lo cubre), un dt de varios minutos de un salto
+  // igual podía disparar animaciones/tweens a velocidades absurdas por UN
+  // frame. 0.25s alcanza y sobra para cualquier frame real a 4fps+.
+  let dt = state.lastTimestamp ? (timestamp - state.lastTimestamp) / 1000 : 0;
+  if (dt > 0.25) dt = 0.25;
   state.lastTimestamp = timestamp;
+
+  // Nada animándose → no hace falta limpiar ni redibujar el mapa de fondo
+  // completo (drawImage de la imagen entera) 60 veces por segundo sin parar;
+  // el canvas ya retiene el último frame dibujado tal cual quedó. Antes esto
+  // corría SIEMPRE, incluso con el jugador parado mirando el mapa sin hacer
+  // nada — el gasto continuo de CPU/GPU era la causa más probable del lag
+  // persistente, sobre todo en hardware más modesto.
+  // Un dot NO permanente sigue "activo" mientras siga en el array, sin
+  // importar la edad exacta — el filtro que lo saca (más abajo) vive DENTRO
+  // del bloque que este idle-check saltea, así que si cortáramos por edad
+  // exacta (age<4) un dot podía quedar con opacidad ~0 pero nunca EXACTAMENTE
+  // 0, sin que el filtro llegue a sacarlo nunca — un "zombie" acumulándose en
+  // el array para siempre. Los permanentes sí cortan por edad (age<4): una vez
+  // asentada su bandera/label ya no cambian más, quedan estáticos.
+  const anyActiveDot = state.placedDots.some(dot =>
+    !dot.permanent || (Date.now() - dot.labelBorn) / 1000 < 4
+  );
+  const isIdle = state.mapDrawn && !anyActiveDot && !state.sunburst && !state.pin1Anim && !state.pin2Anim &&
+                 state.starParticles.length === 0 && !state.badgeAnim &&
+                 state.displayedScore >= state.score;
+  if (isIdle) {
+    animFrameId = requestAnimationFrame(render);
+    return;
+  }
 
   ctx.clearRect(0, 0, DISPLAY_W, DISPLAY_H);
   const activeMap = window.pendingGameMode === 'monuments' ? imgMap2 : imgMap;
   ctx.drawImage(activeMap, 0, 0, DISPLAY_W, DISPLAY_H);
+  state.mapDrawn = true;
 
   if (state.displayedScore < state.score) {
     const diff = state.score - state.displayedScore;
     state.displayedScore = Math.min(state.score, state.displayedScore + Math.max(1, Math.round(diff * 8 * dt)));
     scoreValueEl.textContent = (state.displayedScore + (window.campaignBase ? window.campaignBase() : 0)).toLocaleString();
-    sortLeaderboard(state.score);
+    // sortLeaderboard() usa positionLeaderboard(), que reposiciona
+    // lbElements['lb-player'] con la lógica de leaderboard NORMAL
+    // multi-fila — ni existe durante el espectador de Cities (la tarjeta la
+    // arma citiesSpectatorSetPlayerCard() a mano). Mismo bug que el fix del
+    // resize: pisaba la altura de 1 fila y la tarjeta se veía saltar arriba
+    // cada vez que el puntaje del espectado subía. Ver
+    // citiesSpectatorReposition() más arriba.
+    if (window._isSpectating) {
+      // Grupal (N filas, ver GroupSpectate/_renderGroupLeaderboard en
+      // spectate.js) es un caso DISTINTO del 1v1 (citiesSpectatorReposition,
+      // 2 filas fijas) — llamando siempre a la de 1v1, la cartilla grupal
+      // nunca se volvía a posicionar cuando el puntaje del espectado subía,
+      // quedando con alturas viejas (el "se rompe la posición de la
+      // tablilla" reportado).
+      if (typeof window._isGroupSpectating === 'function' && window._isGroupSpectating()) {
+        window._refreshGroupSpectatorLeaderboard?.();
+      } else if (typeof window.citiesSpectatorReposition === 'function') {
+        window.citiesSpectatorReposition();
+      }
+    } else {
+      sortLeaderboard(state.score);
+    }
   }
 
   for (const dot of state.placedDots) {
@@ -4769,14 +6441,9 @@ function render(timestamp) {
     if (age < 4) {
       ctx.globalAlpha = dot.labelOpacity;
 
-      const maxFontSize = 11;
-      const minFontSize = 7;
-      let fontSize = maxFontSize;
-      ctx.font = `bold ${fontSize}px Georgia`;
-      while (fontSize > minFontSize && ctx.measureText(dot.name).width > 90) {
-        fontSize--;
-        ctx.font = `bold ${fontSize}px Georgia`;
-      }
+      // fontSize ya viene calculado desde que se creó el dot (ver placedDots.push) —
+      // antes esto corría measureText() en un while todos los frames.
+      ctx.font = `bold ${dot.fontSize || 11}px Georgia`;
 
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
@@ -5082,6 +6749,30 @@ if (state.sunburst) {
   animFrameId = requestAnimationFrame(render);
 }
 
+// Wrapper público — ver comentario largo arriba de _renderFrame(). Si algo
+// dentro tira una excepción (dt gigante al volver de una pestaña oculta,
+// asset todavía no listo, lo que sea), el catch reprograma el próximo frame
+// igual: el loop de animación NUNCA muere del todo, así state.phase siempre
+// tiene la chance de volver a 'waiting' y el canvas nunca se queda sordo a
+// los clicks de forma permanente.
+function render(timestamp) {
+  try {
+    _renderFrame(timestamp);
+  } catch (e) {
+    if (state) state.lastTimestamp = null;
+    animFrameId = requestAnimationFrame(render);
+  }
+}
+
+// Evita el salto de dt gigante desde el origen (no solo mitigarlo en el catch
+// de arriba) — al volver de una pestaña oculta, requestAnimationFrame estuvo
+// pausado todo ese tiempo; el próximo frame real que llegue va a tener un
+// timestamp muy adelantado respecto al último guardado. Sin esto, ESE primer
+// frame post-regreso computaba un dt de varios segundos/minutos de un salto.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && state) state.lastTimestamp = null;
+});
+
 // ── TIMER ─────────────────────────────────────────────────────────────────────
 function startTimer() {
   const _practiceInfinite = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
@@ -5096,6 +6787,7 @@ function startTimer() {
     state.timeLeft--;
     timerNumberEl.textContent = state.timeLeft;
     timerNumberEl.classList.remove('timer-number-infinity');
+    if ((window.pendingGameMode === 'game' || window.pendingGameMode === 'monuments') && typeof window._specReportTick === 'function') window._specReportTick(state.timeLeft);
 
     if (state.timeLeft <= 10) {
       timerNumberEl.style.color = '#ffffff';
@@ -5114,6 +6806,7 @@ let endGameTimeout1 = null, endGameTimeout2 = null;
 function endGame() {
   mapGameOver = true;
   gameAborted = false;
+  if ((window.pendingGameMode === 'game' || window.pendingGameMode === 'monuments') && typeof window._specReportTimesUp === 'function') window._specReportTimesUp();
   clearInterval(timerIntervalId);
   if (slideMonumentIn._nameTimer) { clearTimeout(slideMonumentIn._nameTimer); slideMonumentIn._nameTimer = null; }
   monumentNameEl.style.opacity = '0';
@@ -5160,19 +6853,7 @@ function endGame() {
       }
       // ── PRÁCTICA: redirigir al panel de práctica ──────────
       if (window.practiceConfig && window.practiceConfig.active) {
-        window.practiceConfig.active = false;
-        document.body.classList.remove('practice-mode');
-        const sc = state.score;
-        if (typeof window.resetEntranceElements === 'function') window.resetEntranceElements();
-        const ls = document.getElementById('loading-screen');
-        if (ls) { ls.style.display = 'flex'; ls.style.opacity = '1'; }
-        try { playMusic(sfxMenuMusic); } catch(e) {}
-        if (typeof window.showEntranceElementsStatic === 'function') window.showEntranceElementsStatic();
-        { const lpg = document.getElementById('loading-practice-group'); lpg.classList.remove('table-gone'); lpg.classList.add('panel-visible'); }
-        document.getElementById('practice-mode-section').style.display = 'none';
-        document.getElementById('practice-config-section').style.display = 'none';
-        if (window._practiceStats) { window._practiceStats.correct = correctCount || 0; window._practiceStats.wrong = wrongCount || 0; }
-        window.showPracticeScore(sc);
+        window.endPracticeSession(state.score, correctCount, wrongCount);
         return;
       }
       // ─────────────────────────────────────────────────────
@@ -5201,6 +6882,12 @@ function endGame() {
       newHighscoreBanner.style.display = isNewHighscore ? 'flex' : 'none';
       if (isNewHighscore) {
         newHighscoreScore.textContent = (window.pendingGameMode === 'monuments' ? monumentsHighscore : highscore).toLocaleString();
+      }
+      if ((window.pendingGameMode === 'game' || window.pendingGameMode === 'monuments') && typeof window._specReportPostgame === 'function') {
+        window._specReportPostgame({
+          totalScore: state.score + (window.campaignBase ? window.campaignBase() : 0),
+          finalScore: state.score, correctCount, wrongCount, isNewHighscore,
+        });
       }
       const gameoverTextLabel = document.querySelector('.gameover-text1-label');
       if (gameoverTextLabel) {
@@ -5272,6 +6959,25 @@ window.addEventListener('resize', redimensionarJuego);
 window.addEventListener('resize', () => {
   const rp = document.getElementById('right-panel');
   if (!rp || getComputedStyle(rp).display === 'none') return;
+  // positionLeaderboard() es la lógica del leaderboard NORMAL multi-fila
+  // (lee lbElements['lb-player'], que ni existe durante el espectador de
+  // Cities — esa tarjeta la arma citiesSpectatorSetPlayerCard() a mano, en el
+  // MISMO #right-panel/#leaderboard compartido). Sin este guard, cualquier
+  // resize/zoom mientras se espectaba pisaba la altura de 1 fila que puso
+  // citiesSpectatorSetPlayerCard con la altura "ventana de varias filas" del
+  // leaderboard normal, dejando la tarjeta pegada arriba en vez de abajo (el
+  // panel está anclado por `bottom`, así que una altura de más corre el
+  // origen hacia arriba) — el "sale arriba en vez de abajo" reportado.
+  if (window._isSpectating) {
+    // Mismo motivo que en el render loop de arriba — grupal (N filas) es
+    // distinto de 1v1 (2 filas fijas).
+    if (typeof window._isGroupSpectating === 'function' && window._isGroupSpectating()) {
+      window._refreshGroupSpectatorLeaderboard?.();
+    } else if (typeof window.citiesSpectatorReposition === 'function') {
+      window.citiesSpectatorReposition();
+    }
+    return;
+  }
   positionLeaderboard(lastLbScore >= 0 ? lastLbScore : 0, false);
   requestAnimationFrame(() => {
     Object.values(lbElements).forEach(el => { el.style.transition = 'top 0.7s cubic-bezier(0.22,1,0.36,1)'; });
@@ -5291,7 +6997,11 @@ const PREGAME_STEPS = [
 
 let pregameTimeout = null;
 let pregameAborted = false;
-function runPregameCountdown(onDone) {
+// elapsedMs (opcional): cuánto del 3-2-1 ya pasó del lado del jugador REAL —
+// lo usa el espectador de cities que se une a mitad de la cuenta (ver
+// citiesSpectatorShowPregame) para arrancar en el número que corresponde, en
+// vez de siempre desde "3". Mismo patrón que runFlagsPregame/runShapesPregame.
+function runPregameCountdown(onDone, elapsedMs) {
   pregameAborted = false;
   pregameCountdownEl.style.display = 'flex';
   // Desbloquear el compositor de Opera al arrancar la cuenta regresiva (ver
@@ -5301,9 +7011,20 @@ function runPregameCountdown(onDone) {
     window.nudgeRepaint();
     setTimeout(window.nudgeRepaint, 120);
   }
-  sfxCountdown.currentTime = 0;
-  sfxCountdown.play().catch(() => {});
   let step = 0;
+  let firstStepRemaining = null;
+  if (elapsedMs > 0) {
+    let acc = 0;
+    for (let i = 0; i < PREGAME_STEPS.length; i++) {
+      const stepEnd = acc + PREGAME_STEPS[i].hold;
+      if (elapsedMs < stepEnd) { step = i; firstStepRemaining = stepEnd - elapsedMs; break; }
+      acc = stepEnd;
+      step = i + 1;
+    }
+    if (step >= PREGAME_STEPS.length) { pregameCountdownEl.style.display = 'none'; onDone(); return; }
+  }
+  sfxCountdown.currentTime = elapsedMs > 0 ? elapsedMs / 1000 : 0;
+  sfxCountdown.play().catch(() => {});
 
   function showStep() {
     if (pregameAborted) return; // se abandonó durante el 3-2-1
@@ -5313,13 +7034,15 @@ function runPregameCountdown(onDone) {
       return;
     }
     const { src, hold, size } = PREGAME_STEPS[step++];
+    const thisHold = firstStepRemaining != null ? firstStepRemaining : hold;
+    firstStepRemaining = null;
     pregameCountdownImg.style.animation = 'none';
     pregameCountdownImg.style.width  = size + 'cqmin';
     pregameCountdownImg.style.height = size + 'cqmin';
     pregameCountdownImg.src = src;
     void pregameCountdownImg.offsetWidth;
     pregameCountdownImg.style.animation = '';
-    pregameTimeout = setTimeout(showStep, hold);
+    pregameTimeout = setTimeout(showStep, thisHold);
   }
 
   showStep();
@@ -5382,6 +7105,7 @@ function startGame() {
   tagImg.style.height = '';
   cityTagText.style.display = '';
   cityTagEl.querySelector('img').classList.remove('monument-appear');
+  monumentImgEl.classList.remove('monument-appear');
   monumentImgEl.style.display = 'none';
   monumentImgEl.src = '';
   monumentNameEl.textContent = '';
@@ -5414,6 +7138,26 @@ function startGame() {
     if (countdownWidget) countdownWidget.style.visibility = '';
   }
 
+  if ((window.pendingGameMode === 'game' || window.pendingGameMode === 'monuments') && typeof window._specReportPregame === 'function') {
+    const _specDur = (window.practiceConfig && window.practiceConfig.active) ? practiceGetDuration() : GAME_DURATION;
+    const _specInf = window.practiceConfig && window.practiceConfig.active && _specDur === 0;
+    // mode dinámico (no hardcodeado a 'game') es IMPRESCINDIBLE acá — a
+    // diferencia de shapes (donde 'round' llega antes que 'pregame' y ya
+    // actualiza _mode del lado espectador) y de flags (que siempre es el
+    // primer modo de la campaña, así que el default 'flags' de _mode ya le
+    // pega), Cities/Monuments nunca son el primer modo Y su 'pregame' llega
+    // ANTES que su 'round' — sin este campo, _mode en spectate.js quedaba
+    // pegado en el modo ANTERIOR de la campaña, montando la UI equivocada
+    // durante todo el 3-2-1. window.pendingGameMode ya vale 'game' o
+    // 'monuments' acá (lo fija el botón de entrada de cada uno) así que
+    // sirve directo, sin mapear.
+    // campaignBaseAtStart: el jugador real muestra este número desde el
+    // arranque del 3-2-1 — el espectador no tiene forma propia de saberlo.
+    window._specReportPregame({
+      mode: window.pendingGameMode, duration: _specInf ? '∞' : _specDur, infinite: _specInf, startedAt: Date.now(),
+      campaignBaseAtStart: window.campaignBase ? window.campaignBase() : 0,
+    });
+  }
   runPregameCountdown(() => {
     playMusic(sfxGameMusic);
     if (window._practiceStats) window._practiceStats.startTime = Date.now();
@@ -5457,6 +7201,12 @@ document.querySelector('.splash-confirm-wrap')?.addEventListener('click', () => 
     if (howtoVideo) howtoVideo.play();
     confirmStep = 1;
     window.waitForHowtoVideo();
+    // Avisar a un posible espectador que este primer confirm ya se apretó —
+    // sin esto, el mirror de instrucciones del espectador (ver
+    // _showSplashMirror en spectate.js) se quedaba siempre pegado en el
+    // texto/video del paso 1, aunque el jugador real ya hubiera avanzado al
+    // paso 2 (video de ayuda bajando + texto cambiado).
+    if (typeof window._specReportSplash === 'function') window._specReportSplash({ mode: window.pendingGameMode, step: 2 });
   } else {
     // Lanzamiento normal (no versus/lobby): asegurar que el leaderboard use amigos,
     // y que la selección de banderas vuelva a Math.random (no la semilla sincronizada).
@@ -5499,6 +7249,13 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
     window.campaign.base = (window.campaign.base || 0) + sc;
     window.campaign.idx++;
     if (window.campaign.idx < window.campaign.btns.length) {
+      // Avisar al espectador YA (antes de _fireNext, que puede demorar si el
+      // manifest todavía no terminó de precargar) que dejamos el postgame de
+      // este modo — sin esto _specReportAdvancing() nunca se llamaba desde
+      // NINGÚN lado del código (quedó definida en spectate.js pero muerta),
+      // así que el espectador se quedaba viendo el postgame VIEJO congelado
+      // hasta que -si acaso- llegaba el 'round'/'pregame' del modo siguiente.
+      if (typeof window._specReportAdvancing === 'function') window._specReportAdvancing();
       // Gameover se queda visible e intacto hasta que _fireNext está listo.
       // En ese momento se oculta el gameover y se dispara el siguiente modo
       // en el mismo bloque sincrónico (sin frame intermedio en blanco).
@@ -5532,6 +7289,13 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
       // Ocultar el gameover de monuments antes de mostrar results; si no, queda
       // encima y bloquea el click del confirm para ver el rank.
       gameoverScreen.style.display = 'none';
+      // Sin esto, un espectador mirando quedaba con el postgame de Monuments
+      // congelado para siempre — _setPlaying(false) es lo único que dispara
+      // SoloSpectate.stop(), que a su vez hace que la presencia del jugador
+      // "salga" del canal y el espectador reciba el aviso de partida
+      // terminada (vuelve solo a la pantalla de carga). El otro camino (no
+      // campaña, más abajo) sí lo llama — acá faltaba.
+      window._setPlaying(false);
       if (typeof showResultsScreen === 'function') showResultsScreen();
     }
     return;
@@ -5690,7 +7454,7 @@ function sfxPlay(sfx) {
 }
 
 function getAllSfx() {
-  return [sfxCheck, sfxPostgame, sfxGameMusic, sfxMenuMusic, sfxSelect, sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus, sfxTickdown, sfxTimesUp,
+  return [sfxCheck, sfxPostgame, sfxPregame, sfxGameMusic, sfxMenuMusic, sfxSelect, sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus, sfxTickdown, sfxTimesUp,
     typeof sfxLevel2  !== 'undefined' ? sfxLevel2        : null,
     window.sfxCheer  || null,
     window.sfxLoop   || null,
@@ -5978,6 +7742,25 @@ window.showPracticeScore = function(score) {
   if (wrongEl) wrongEl.textContent = 'x' + wrong;
 
   popup.style.display = 'flex';
+};
+
+// Cierra una sesión de práctica (timeout natural o quit manual) y vuelve al panel
+// de práctica con el score. Único punto de esta secuencia — antes estaba duplicada
+// casi idéntica en monuments.js (x2), flags.js y shapes.js, lo que la hacía propensa
+// a que las copias se desincronizaran entre sí (ver bug mezcla panel1/panel2).
+window.endPracticeSession = function (score, correct, wrong) {
+  window.practiceConfig.active = false;
+  document.body.classList.remove('practice-mode');
+  if (typeof window.resetEntranceElements === 'function') window.resetEntranceElements();
+  const ls = document.getElementById('loading-screen');
+  if (ls) { ls.style.display = 'flex'; ls.style.opacity = '1'; }
+  try { if (typeof playMusic !== 'undefined') playMusic(window.sfxMenuMusic || sfxMenuMusic); } catch (e) {}
+  if (typeof window.showEntranceElementsStatic === 'function') window.showEntranceElementsStatic();
+  if (window._practiceStats) {
+    window._practiceStats.correct = correct || 0;
+    window._practiceStats.wrong   = wrong   || 0;
+  }
+  window.showPracticeScore(score);
 };
 
 // ── Click en es-practice button
