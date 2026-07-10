@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base href="../../">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How to Recognize Countries by Their Silhouette — Shape Memory Tricks</title>
+  <meta name="description" content="Italy is a boot, Chile is a ribbon, Croatia is a croissant. Learn the visual hooks and elimination techniques that make country outlines instantly recognizable in map quizzes.">
+  <link rel="canonical" href="https://mygeochallenge.com/learn/recognize-country-shapes/">
+  <link rel="icon" type="image/png" href="images/planet3.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6238929099865050" crossorigin="anonymous"></script>
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"Article","headline":"How to Recognize Countries by Their Silhouette","description":"Learn the visual hooks and elimination techniques that make country outlines instantly recognizable in map quizzes.","url":"https://mygeochallenge.com/learn/recognize-country-shapes/","inLanguage":["en","es"],"publisher":{"@type":"Organization","name":"myGeoChallenge","url":"https://mygeochallenge.com/"}}
+  </script>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--gold:#f5c842;--gold-dark:#c8920a;--dark:#0f1e2d;--sky:#3a8acb}
+    html{scroll-behavior:smooth}
+    body{font-family:'Nunito',sans-serif;background:var(--dark);color:#cdd8e8;overflow-x:hidden}
+    @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(245,200,66,.5)}50%{box-shadow:0 0 0 18px rgba(245,200,66,0)}}
+    nav{display:flex;align-items:center;justify-content:space-between;padding:14px 48px;background:rgba(10,30,55,.6);border-bottom:1px solid rgba(255,255,255,.1);position:sticky;top:0;z-index:200;backdrop-filter:blur(10px)}
+    .nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+    .nav-logo img{height:54px;filter:drop-shadow(0 2px 8px rgba(0,0,0,.4));transition:transform .2s}
+    .nav-logo:hover img{transform:scale(1.1)}
+    .nav-right{display:flex;align-items:center;gap:14px}
+    .nav-link{color:rgba(255,255,255,.8);text-decoration:none;font-size:.88rem;font-weight:700;transition:color .2s}
+    .nav-link:hover,.nav-link.active{color:var(--gold)}
+    .lang-btn{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);color:#fff;font-family:inherit;font-size:.82rem;font-weight:800;padding:6px 13px;border-radius:50px;cursor:pointer;transition:background .2s;letter-spacing:.5px}
+    .lang-btn:hover{background:rgba(255,255,255,.22)}
+    .nav-kofi{background:#ff5e5b;color:#fff;font-weight:800;font-size:.85rem;padding:8px 16px;border-radius:50px;text-decoration:none;transition:background .15s,transform .15s;white-space:nowrap}
+    .nav-kofi:hover{background:#e04a47;transform:scale(1.05)}
+    .nav-play{background:var(--gold);color:var(--dark);font-weight:900;font-size:.92rem;padding:9px 22px;border-radius:50px;text-decoration:none;transition:transform .15s,background .2s}
+    .nav-play:hover{background:var(--gold-dark);color:#fff;transform:scale(1.05)}
+    .art-hero{position:relative;padding:80px 24px 56px;text-align:center;background:linear-gradient(135deg,#0d1d30 0%,#183358 100%);border-bottom:1px solid rgba(255,255,255,.06)}
+    .crumb{display:inline-block;color:rgba(255,255,255,.5);font-size:.85rem;font-weight:800;text-decoration:none;margin-bottom:20px;transition:color .2s}
+    .crumb:hover{color:var(--gold)}
+    .eyebrow{display:inline-block;font-size:.73rem;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:var(--gold);background:rgba(245,200,66,.1);border:1px solid rgba(245,200,66,.25);padding:5px 16px;border-radius:50px;margin-bottom:16px}
+    .art-title{font-size:clamp(1.8rem,4.4vw,3rem);font-weight:900;color:#fff;line-height:1.15;max-width:840px;margin:0 auto 16px}
+    .art-title span{color:var(--gold)}
+    .art-desc{font-size:1rem;font-weight:600;color:rgba(255,255,255,.62);max-width:660px;margin:0 auto;line-height:1.75}
+    .art-body{max-width:840px;margin:0 auto;padding:52px 24px 24px}
+    h2.sec{font-size:1.45rem;font-weight:900;color:#fff;margin:44px 0 14px;line-height:1.3}
+    h2.sec span{color:var(--gold)}
+    h3.sub{font-size:1.08rem;font-weight:900;color:var(--gold);margin:28px 0 10px}
+    p.body{font-size:.97rem;font-weight:600;color:rgba(255,255,255,.68);line-height:1.85;margin-bottom:14px}
+    p.body strong{color:#fff}
+    ul.blist{margin:10px 0 16px 22px}
+    ul.blist li{font-size:.97rem;font-weight:600;color:rgba(255,255,255,.68);margin-bottom:8px;line-height:1.7}
+    ul.blist li strong{color:#fff}
+    .shapegrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin:20px 0 8px}
+    .shape-spot{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:16px 12px;text-align:center;transition:background .2s,transform .2s}
+    .shape-spot:hover{background:rgba(245,200,66,.08);border-color:rgba(245,200,66,.3);transform:translateY(-4px)}
+    .shape-spot img{width:92px;height:92px;object-fit:contain;margin:0 auto 9px;display:block;filter:drop-shadow(0 3px 10px rgba(0,0,0,.5))}
+    .shape-spot .country{font-size:.9rem;font-weight:900;color:#fff;margin-bottom:3px}
+    .shape-spot .fact{font-size:.77rem;font-weight:600;color:rgba(255,255,255,.48);line-height:1.5}
+    .related{max-width:1000px;margin:0 auto;padding:26px 24px 60px}
+    .rel-head{font-size:.73rem;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:var(--gold);margin-bottom:16px}
+    .rel-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+    .rel-card{display:block;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:20px 18px;text-decoration:none;transition:background .2s,transform .2s,border-color .2s}
+    .rel-card:hover{background:rgba(245,200,66,.08);border-color:rgba(245,200,66,.3);transform:translateY(-4px)}
+    .rel-kicker{font-size:.66rem;font-weight:900;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:8px}
+    .rel-title{font-size:.96rem;font-weight:900;color:#fff;line-height:1.4}
+    .cta-section{padding:80px 24px;text-align:center;background:linear-gradient(180deg,#1e5a9a 0%,var(--sky) 60%,#5bb8ee 100%)}
+    .cta-section h2{font-size:clamp(1.5rem,3.6vw,2.4rem);font-weight:900;color:#fff;text-shadow:0 3px 16px rgba(0,0,0,.4);margin-bottom:14px}
+    .cta-section p{font-size:.98rem;font-weight:600;color:rgba(255,255,255,.82);margin-bottom:28px;max-width:520px;margin-left:auto;margin-right:auto;line-height:1.65}
+    .btn-gold{display:inline-block;background:var(--gold);color:var(--dark);font-size:1.02rem;font-weight:900;padding:14px 36px;border-radius:60px;text-decoration:none;animation:pulse 2.4s ease-in-out infinite;transition:transform .15s,background .2s}
+    .btn-gold:hover{transform:scale(1.07);background:var(--gold-dark);color:#fff;animation:none}
+    footer{background:var(--dark);color:rgba(255,255,255,.42);padding:28px 24px;text-align:center;font-size:.84rem;font-weight:600;border-top:1px solid rgba(255,255,255,.06)}
+    .footer-links{margin-bottom:10px;display:flex;justify-content:center;flex-wrap:wrap;gap:5px 18px}
+    footer a{color:var(--gold);text-decoration:none}
+    .reveal{opacity:0;transform:translateY(26px);transition:opacity .65s ease,transform .65s ease}
+    .reveal.visible{opacity:1;transform:translateY(0)}
+    @media(max-width:660px){nav{padding:12px 16px}.nav-link{display:none}.nav-kofi{display:none}.rel-grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-logo" href="/"><img src="images/horizontallogo.png" alt="myGeoChallenge"></a>
+  <div class="nav-right">
+    <a class="nav-link" href="how-to-play/" data-i18n="nav.howto">How to Play</a>
+    <a class="nav-link active" href="learn/" data-i18n="nav.learn">Learn</a>
+    <a class="nav-link" href="about/" data-i18n="nav.about">About</a>
+    <button class="lang-btn" id="lang-btn" type="button">🌐 <span id="lang-label">ES</span></button>
+    <a class="nav-kofi" href="https://ko-fi.com/mygeochallenge" target="_blank" rel="noopener">☕ Support</a>
+    <a class="nav-play" href="play/" data-i18n="nav.play">Play Free</a>
+  </div>
+</nav>
+
+<header class="art-hero">
+  <a class="crumb" href="learn/" data-i18n="crumb">← All study guides</a>
+  <div><div class="eyebrow" data-i18n="eyebrow">Map Skills · Study Guide</div></div>
+  <h1 class="art-title" data-i18n="title">How to Recognize Countries <span>by Their Silhouette</span></h1>
+  <p class="art-desc" data-i18n="desc">A country's outline is a fingerprint. Once you attach an image to it — a boot, a ribbon, a croissant — you can't unsee it. Here's how to build that mental library fast.</p>
+</header>
+
+<main class="art-body">
+  <p class="body reveal" data-i18n="p1">Shape-recognition quizzes feel impossible the first time: a white blob appears on screen and you're supposed to know it's Burkina Faso. But the skill is far more learnable than it looks, because it isn't really about memorizing outlines — it's about <strong>attaching a picture or a story to each shape</strong>. The brain is spectacular at remembering pictures and terrible at remembering abstract contours. This guide gives you the pictures.</p>
+
+  <h2 class="sec reveal" data-i18n="s1">Start with the <span>unmistakables</span></h2>
+  <p class="body reveal" data-i18n="p2">A handful of countries have silhouettes so distinctive they become free points within one session of practice. Lock these in first — they're also your anchors for locating everything else:</p>
+  <div class="shapegrid reveal">
+    <div class="shape-spot"><img src="images/countries/Italia1.png" alt="Italy country shape"><div class="country" data-i18n="sh1.c">Italy</div><div class="fact" data-i18n="sh1.f">The famous boot, kicking Sicily like a football.</div></div>
+    <div class="shape-spot"><img src="images/countries/Chile1.png" alt="Chile country shape"><div class="country" data-i18n="sh2.c">Chile</div><div class="fact" data-i18n="sh2.f">A 4,270 km ribbon. Nothing else in the world is this thin.</div></div>
+    <div class="shape-spot"><img src="images/countries/Japon1.png" alt="Japan country shape"><div class="country" data-i18n="sh3.c">Japan</div><div class="fact" data-i18n="sh3.f">A curved arc of four main islands, like a seahorse.</div></div>
+    <div class="shape-spot"><img src="images/countries/Croacia1.png" alt="Croatia country shape"><div class="country" data-i18n="sh4.c">Croatia</div><div class="fact" data-i18n="sh4.f">A croissant (or boomerang) wrapping around Bosnia.</div></div>
+    <div class="shape-spot"><img src="images/countries/Somalia1.png" alt="Somalia country shape"><div class="country" data-i18n="sh5.c">Somalia</div><div class="fact" data-i18n="sh5.f">The number 7, forming the Horn of Africa.</div></div>
+    <div class="shape-spot"><img src="images/countries/Vietnam1.png" alt="Vietnam country shape"><div class="country" data-i18n="sh6.c">Vietnam</div><div class="fact" data-i18n="sh6.f">A long letter S hugging the coast of Southeast Asia.</div></div>
+    <div class="shape-spot"><img src="images/countries/Tailandia1.png" alt="Thailand country shape"><div class="country" data-i18n="sh7.c">Thailand</div><div class="fact" data-i18n="sh7.f">An elephant's head — the trunk drops down the Malay Peninsula.</div></div>
+    <div class="shape-spot"><img src="images/countries/Madagascar1.png" alt="Madagascar country shape"><div class="country" data-i18n="sh8.c">Madagascar</div><div class="fact" data-i18n="sh8.f">A left footprint floating off Africa's east coast.</div></div>
+  </div>
+
+  <h2 class="sec reveal" data-i18n="s2">Technique 1: <span>one anchor per continent</span></h2>
+  <p class="body reveal" data-i18n="p3">You don't need to know every country cold. You need a few <strong>anchor shapes per continent</strong> that you recognize instantly, and then you can reason relative to them. In South America, Brazil's huge eastern bulge and Chile's ribbon anchor the whole continent — if a shape looks like a chunky wedge between them, you're choosing among Argentina, Bolivia and Peru. In Africa, Egypt's near-square, South Africa's rhino-head and Somalia's 7 divide the map into thirds. In Europe, the Iberian square, the Italian boot, and Scandinavia's hanging tiger fill in the west and north.</p>
+
+  <h2 class="sec reveal" data-i18n="s3">Technique 2: <span>read the edges</span></h2>
+  <p class="body reveal" data-i18n="p4">Before guessing a name, extract information from the outline itself:</p>
+  <ul class="blist reveal">
+    <li data-i18n="li1"><strong>Long smooth edges are man-made borders.</strong> Ruler-straight lines mean colonial-era borders — think North Africa (Algeria, Libya, Egypt) or the US-Canada line. A shape that's mostly straight lines is probably African or Middle Eastern desert.</li>
+    <li data-i18n="li2"><strong>Jagged, fractal edges are coastline.</strong> Deep zigzags and fjords scream Norway, Greece or Chile. If one side is smooth and the other chaotic, the chaotic side faces the sea — which tells you the country's orientation.</li>
+    <li data-i18n="li3"><strong>A compact blob with no coast often means landlocked.</strong> Round-ish shapes with all-natural borders point to places like Bolivia, Mongolia, or the countries of Central Africa.</li>
+    <li data-i18n="li4"><strong>Islands nearby are a signature.</strong> Sicily's triangle under the boot, Tasmania under Australia, and the North/South split of New Zealand are as identifying as the mainland itself.</li>
+  </ul>
+
+  <h2 class="sec reveal" data-i18n="s4">Technique 3: <span>archipelagos have personalities</span></h2>
+  <p class="body reveal" data-i18n="p5">Island nations look like scattered dots at first, but each scatter has its own texture. <strong>Indonesia</strong> sprawls horizontally across a huge span — a whole shelf of islands with Sumatra's diagonal slab on the left. <strong>The Philippines</strong> is a tighter, more vertical cluster. <strong>Greece</strong> is a mainland with crumbs shaken off its southern edge. <strong>Japan</strong> is a clean arc. When a shape question shows multiple pieces, ask: horizontal sprawl, vertical cluster, crumbs, or arc?</p>
+
+  <h2 class="sec reveal" data-i18n="s5">The traps: <span>rotation, scale and mirror twins</span></h2>
+  <p class="body reveal" data-i18n="p6">Quiz games — myGeoChallenge included — display every country at roughly the same size, which removes your biggest real-world clue. Russia and Luxembourg occupy the same box. So <strong>never reason from apparent size</strong>; reason from proportion and edge texture instead. Also watch out for the mirror twins: a rotated Uruguay can pass for a small African state, and Portugal's vertical rectangle resembles a slimmed-down Benin. When two candidates feel equally right, fall back on the edges rule — which side is coast? — and the answer usually resolves itself.</p>
+
+  <h2 class="sec reveal" data-i18n="s6">Building the library: <span>10 minutes a day</span></h2>
+  <p class="body reveal" data-i18n="p7">The efficient way to learn all ~195 shapes is not one heroic session, it's short reps with immediate feedback. Play a round, note which shapes you missed, and invent a picture for each miss on the spot — the sillier the better. "Hungary is a fat fish swimming west." "Kazakhstan is a whale with an open mouth." Nobody else needs to understand your images; they only need to fire when the outline appears. In myGeoChallenge's <strong>Map Mayhem</strong> mode, wrong answers show you the correct country immediately, which is exactly the feedback loop this method needs. Most players who do a daily 10-minute run recognize the majority of the world within a few weeks.</p>
+</main>
+
+<section class="related">
+  <div class="rel-head" data-i18n="rel.head">Keep studying</div>
+  <div class="rel-grid">
+    <a class="rel-card" href="learn/flags-that-look-alike/"><div class="rel-kicker" data-i18n="rel1.k">Flags</div><div class="rel-title" data-i18n="rel1.t">Flags that look almost identical — and how to tell them apart</div></a>
+    <a class="rel-card" href="learn/smallest-countries/"><div class="rel-kicker" data-i18n="rel2.k">World facts</div><div class="rel-title" data-i18n="rel2.t">The world's smallest countries, ranked</div></a>
+    <a class="rel-card" href="learn/get-better-at-geography/"><div class="rel-kicker" data-i18n="rel3.k">Method</div><div class="rel-title" data-i18n="rel3.t">How to actually get better at geography quizzes</div></a>
+  </div>
+</section>
+
+<section class="cta-section">
+  <h2 data-i18n="cta.title">Time to test that mental library.</h2>
+  <p data-i18n="cta.desc">Map Mayhem shows you real country silhouettes against the clock. Free, in your browser, no download.</p>
+  <a class="btn-gold" href="play/" data-i18n="cta.btn">Play Map Mayhem — Free</a>
+</section>
+
+<footer>
+  <div class="footer-links">
+    <a href="/" data-i18n="f.home">Home</a>
+    <a href="about/" data-i18n="f.about">About</a>
+    <a href="how-to-play/" data-i18n="f.howto">How to Play</a>
+    <a href="learn/" data-i18n="f.learn">Learn</a>
+    <a href="contact/" data-i18n="f.contact">Contact</a>
+    <a href="privacy/" data-i18n="f.priv">Privacy Policy</a>
+    <a href="play/" data-i18n="f.play">Play</a>
+  </div>
+  <p>&copy; 2026 myGeoChallenge · mygeochallenge.com · <span data-i18n="f.rights">All rights reserved</span></p>
+</footer>
+
+<script>
+const T={
+  en:{},
+  es:{
+    'nav.howto':'Cómo Jugar','nav.learn':'Aprender','nav.about':'El Juego','nav.play':'Jugar Gratis',
+    'crumb':'← Todas las guías de estudio',
+    'eyebrow':'Mapas · Guía de Estudio',
+    'title':'Cómo Reconocer Países <span>por su Silueta</span>',
+    'desc':'El contorno de un país es una huella digital. Una vez que le asocias una imagen — una bota, una cinta, un croissant — no puedes dejar de verla. Así se construye esa biblioteca mental rápido.',
+    'p1':'Los quizzes de siluetas parecen imposibles la primera vez: aparece una mancha blanca en pantalla y se supone que sepas que es Burkina Faso. Pero la habilidad es mucho más aprendible de lo que parece, porque en realidad no se trata de memorizar contornos — se trata de <strong>asociar una imagen o una historia a cada forma</strong>. El cerebro es espectacular recordando imágenes y pésimo recordando contornos abstractos. Esta guía te da las imágenes.',
+    's1':'Empieza con las <span>inconfundibles</span>',
+    'p2':'Un puñado de países tiene siluetas tan distintivas que se convierten en puntos gratis con una sola sesión de práctica. Fija estas primero — además son tus anclas para ubicar todo lo demás:',
+    'sh1.c':'Italia','sh1.f':'La famosa bota, pateando a Sicilia como una pelota.',
+    'sh2.c':'Chile','sh2.f':'Una cinta de 4.270 km. Nada más en el mundo es tan delgado.',
+    'sh3.c':'Japón','sh3.f':'Un arco curvo de cuatro islas principales, como un caballito de mar.',
+    'sh4.c':'Croacia','sh4.f':'Un croissant (o boomerang) abrazando a Bosnia.',
+    'sh5.c':'Somalia','sh5.f':'El número 7, formando el Cuerno de África.',
+    'sh6.c':'Vietnam','sh6.f':'Una letra S larga pegada a la costa del Sudeste Asiático.',
+    'sh7.c':'Tailandia','sh7.f':'La cabeza de un elefante — la trompa baja por la península malaya.',
+    'sh8.c':'Madagascar','sh8.f':'La huella de un pie izquierdo flotando frente a la costa este de África.',
+    's2':'Técnica 1: <span>un ancla por continente</span>',
+    'p3':'No necesitas saberte todos los países de memoria. Necesitas unas pocas <strong>formas ancla por continente</strong> que reconozcas al instante, y a partir de ellas razonas en relación. En Sudamérica, el enorme bulto oriental de Brasil y la cinta de Chile anclan todo el continente — si una forma parece una cuña robusta entre ambos, estás eligiendo entre Argentina, Bolivia y Perú. En África, el casi-cuadrado de Egipto, la cabeza de rinoceronte de Sudáfrica y el 7 de Somalia dividen el mapa en tercios. En Europa, el cuadrado ibérico, la bota italiana y el tigre colgante de Escandinavia completan el oeste y el norte.',
+    's3':'Técnica 2: <span>lee los bordes</span>',
+    'p4':'Antes de adivinar un nombre, extrae información del contorno mismo:',
+    'li1':'<strong>Los bordes largos y rectos son fronteras artificiales.</strong> Líneas de regla significan fronteras de la era colonial — piensa en el norte de África (Argelia, Libia, Egipto) o la línea EE.UU.-Canadá. Una forma hecha mayormente de líneas rectas probablemente es desierto africano o de Medio Oriente.',
+    'li2':'<strong>Los bordes dentados y fractales son costa.</strong> Zigzags profundos y fiordos gritan Noruega, Grecia o Chile. Si un lado es liso y el otro caótico, el lado caótico mira al mar — lo que te dice la orientación del país.',
+    'li3':'<strong>Una masa compacta sin costa suele significar país sin salida al mar.</strong> Formas redondeadas con fronteras naturales apuntan a lugares como Bolivia, Mongolia o los países de África Central.',
+    'li4':'<strong>Las islas cercanas son una firma.</strong> El triángulo de Sicilia bajo la bota, Tasmania bajo Australia y la división Norte/Sur de Nueva Zelanda identifican tanto como el continente mismo.',
+    's4':'Técnica 3: <span>los archipiélagos tienen personalidad</span>',
+    'p5':'Las naciones insulares parecen puntos dispersos al principio, pero cada dispersión tiene su propia textura. <strong>Indonesia</strong> se extiende horizontalmente a lo largo de un espacio enorme — todo un estante de islas con la losa diagonal de Sumatra a la izquierda. <strong>Filipinas</strong> es un grupo más apretado y vertical. <strong>Grecia</strong> es un continente con migas sacudidas de su borde sur. <strong>Japón</strong> es un arco limpio. Cuando una pregunta muestra varias piezas, pregúntate: ¿extensión horizontal, grupo vertical, migas o arco?',
+    's5':'Las trampas: <span>rotación, escala y gemelos espejo</span>',
+    'p6':'Los juegos de quiz — myGeoChallenge incluido — muestran cada país aproximadamente del mismo tamaño, lo que elimina tu mayor pista del mundo real. Rusia y Luxemburgo ocupan la misma caja. Así que <strong>nunca razones por el tamaño aparente</strong>; razona por proporción y textura de bordes. Cuidado también con los gemelos espejo: un Uruguay rotado puede pasar por un pequeño estado africano, y el rectángulo vertical de Portugal se parece a un Benín adelgazado. Cuando dos candidatos parecen igual de correctos, vuelve a la regla de los bordes — ¿qué lado es costa? — y la respuesta suele resolverse sola.',
+    's6':'Construyendo la biblioteca: <span>10 minutos al día</span>',
+    'p7':'La forma eficiente de aprender las ~195 siluetas no es una sesión heroica, son repeticiones cortas con feedback inmediato. Juega una ronda, anota qué formas fallaste, e inventa una imagen para cada fallo en el momento — cuanto más ridícula, mejor. "Hungría es un pez gordo nadando hacia el oeste." "Kazajistán es una ballena con la boca abierta." Nadie más necesita entender tus imágenes; solo necesitan dispararse cuando aparece el contorno. En el modo <strong>Map Mayhem</strong> de myGeoChallenge, las respuestas incorrectas te muestran el país correcto de inmediato, que es exactamente el ciclo de feedback que este método necesita. La mayoría de los jugadores que hacen una sesión diaria de 10 minutos reconocen la mayor parte del mundo en unas semanas.',
+    'rel.head':'Sigue estudiando',
+    'rel1.k':'Banderas','rel1.t':'Banderas casi idénticas — y cómo distinguirlas',
+    'rel2.k':'Datos del mundo','rel2.t':'Los países más pequeños del mundo, en ranking',
+    'rel3.k':'Método','rel3.t':'Cómo mejorar de verdad en los quizzes de geografía',
+    'cta.title':'Hora de poner a prueba esa biblioteca mental.',
+    'cta.desc':'Map Mayhem te muestra siluetas reales de países contra el reloj. Gratis, en tu navegador, sin descargas.',
+    'cta.btn':'Jugar Map Mayhem — Gratis',
+    'f.home':'Inicio','f.about':'El Juego','f.howto':'Cómo Jugar','f.learn':'Aprender','f.contact':'Contacto','f.priv':'Política de Privacidad','f.play':'Jugar','f.rights':'Todos los derechos reservados'
+  }
+};
+document.querySelectorAll('[data-i18n]').forEach(el=>{const k=el.dataset.i18n;if(T.en[k]===undefined)T.en[k]=el.innerHTML;});
+const lb=document.getElementById('lang-btn');
+const ll=document.getElementById('lang-label');
+let lang=localStorage.getItem('mgc-landing-lang')||'en';
+function applyLang(l){
+  lang=l;localStorage.setItem('mgc-landing-lang',l);document.documentElement.lang=l;
+  document.querySelectorAll('[data-i18n]').forEach(el=>{const k=el.dataset.i18n;if(T[l]&&T[l][k]!==undefined)el.innerHTML=T[l][k];});
+  ll.textContent=l==='en'?'ES':'EN';
+}
+lb.addEventListener('click',()=>applyLang(lang==='en'?'es':'en'));
+const obs=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');obs.unobserve(e.target);}});},{threshold:0.08});
+document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
+applyLang(lang);
+</script>
+</body>
+</html>

@@ -223,6 +223,15 @@
     .rk{width:86px;height:86px;object-fit:contain;border-radius:10px;background:rgba(255,255,255,.05);padding:5px;flex-shrink:0;transition:transform .2s;filter:drop-shadow(0 2px 8px rgba(0,0,0,.4))}
     .rk:hover{transform:scale(1.22);filter:drop-shadow(0 4px 16px rgba(245,200,66,.35))}
 
+    /* GUIDES HUB */
+    .guides-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:8px}
+    @media(max-width:980px){.guides-grid{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:520px){.guides-grid{grid-template-columns:1fr}}
+    .gcard{display:block;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:20px 18px;text-decoration:none;transition:background .2s,transform .2s,border-color .2s}
+    .gcard:hover{background:rgba(245,200,66,.08);border-color:rgba(245,200,66,.3);transform:translateY(-4px)}
+    .gcard .gk{font-size:.66rem;font-weight:900;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:8px}
+    .gcard .gt{font-size:.96rem;font-weight:900;color:#fff;line-height:1.4;margin-bottom:7px}
+    .gcard .gd{font-size:.8rem;font-weight:600;color:rgba(255,255,255,.5);line-height:1.55}
     .cta-section{position:relative;padding:100px 24px;text-align:center;background:linear-gradient(180deg,#1e5a9a 0%,var(--sky) 55%,#5bb8ee 100%);overflow:hidden}
     .cta-cloud-1{position:absolute;top:10%;left:-280px;width:28%;animation:cloudFly 55s linear infinite;opacity:.26;pointer-events:none}
     .cta-cloud-2{position:absolute;top:55%;left:-200px;width:20%;animation:cloudFly 74s linear infinite -22s;opacity:.18;pointer-events:none}
@@ -505,6 +514,27 @@
 </section>
 
 
+<!-- STUDY GUIDES HUB -->
+<section class="content-section" id="guides" style="background:linear-gradient(180deg,rgba(0,0,0,.14) 0%,rgba(0,0,0,.22) 100%)">
+  <div class="section-inner">
+    <div class="section-head reveal">
+      <div class="eyebrow" data-i18n="guides.eyebrow">Study Guides</div>
+      <h2 class="section-title" data-i18n="guides.title">Go <span>Deeper</span></h2>
+      <p class="section-sub" data-i18n="guides.sub">In-depth guides on the exact topics the game tests. Each one takes about five minutes to read and pays for itself in your next run.</p>
+    </div>
+    <div class="guides-grid reveal">
+      <a class="gcard" href="learn/flags-that-look-alike/"><div class="gk" data-i18n="g1.k">Flags</div><div class="gt" data-i18n="g1.t">Flags that look almost identical</div><div class="gd" data-i18n="g1.d">Chad vs Romania, Ireland vs Côte d'Ivoire — the one detail that separates each pair.</div></a>
+      <a class="gcard" href="learn/flag-colors-meaning/"><div class="gk" data-i18n="g2.k">Flags</div><div class="gt" data-i18n="g2.t">What flag colors actually mean</div><div class="gd" data-i18n="g2.d">Pan-African, pan-Arab, Nordic cross: six families that classify 200 flags.</div></a>
+      <a class="gcard" href="learn/recognize-country-shapes/"><div class="gk" data-i18n="g3.k">Map skills</div><div class="gt" data-i18n="g3.t">Recognize countries by silhouette</div><div class="gd" data-i18n="g3.d">Boots, ribbons and croissants — build a mental library of outlines fast.</div></a>
+      <a class="gcard" href="learn/surprise-capitals/"><div class="gk" data-i18n="g4.k">Capitals</div><div class="gt" data-i18n="g4.t">Capitals that aren't the biggest city</div><div class="gd" data-i18n="g4.d">Canberra, Ottawa, Abuja: the full quiz-proof list, with the stories behind them.</div></a>
+      <a class="gcard" href="learn/landmarks-by-region/"><div class="gk" data-i18n="g5.k">Landmarks</div><div class="gt" data-i18n="g5.t">A field guide to world landmarks</div><div class="gd" data-i18n="g5.d">Read architecture like a detective: material, roofline and setting give away the region.</div></a>
+      <a class="gcard" href="learn/smallest-countries/"><div class="gk" data-i18n="g6.k">World facts</div><div class="gt" data-i18n="g6.t">The world's smallest countries</div><div class="gd" data-i18n="g6.d">From the Vatican to Malta — the microstates every quiz loves to ask about.</div></a>
+      <a class="gcard" href="learn/island-nations/"><div class="gk" data-i18n="g7.k">Islands</div><div class="gt" data-i18n="g7.t">Island nations you keep mixing up</div><div class="gd" data-i18n="g7.d">Dominica vs Dominican Republic, and the logic of three oceans full of islands.</div></a>
+      <a class="gcard" href="learn/get-better-at-geography/"><div class="gk" data-i18n="g8.k">Method</div><div class="gt" data-i18n="g8.t">How to actually get better</div><div class="gd" data-i18n="g8.d">Patterns, elimination and short daily sessions — the training method that sticks.</div></a>
+    </div>
+  </div>
+</section>
+
 <!-- CTA -->
 <section class="cta-section">
   <img class="cta-cloud-1" src="images/bg/cloud1.png" alt=""><img class="cta-cloud-2" src="images/bg/cloud2.png" alt="">
@@ -521,6 +551,7 @@
     <a href="/" data-i18n="f.home">Home</a>
     <a href="about/" data-i18n="f.about">About</a>
     <a href="how-to-play/" data-i18n="f.howto">How to Play</a>
+    <a href="contact/" data-i18n="f.contact">Contact</a>
     <a href="privacy/" data-i18n="f.priv">Privacy Policy</a>
     <a href="play/" data-i18n="f.play">Play</a>
     <a href="https://ko-fi.com/mygeochallenge" target="_blank" rel="noopener" data-i18n="f.ko">☕ Support us</a>
@@ -580,8 +611,17 @@ const T={
     'cap.9':'<strong>Tanzania:</strong> Dodoma (not Dar es Salaam)',
     'cap.10':'<strong>Kazakhstan:</strong> Astana (formerly Nur-Sultan — not Almaty)',
     'ranks.eyebrow':'Progression','ranks.title':'35 Ranks to <span>Earn</span>','ranks.sub':'Every answer you already know here is a speed bonus in the making. The ranks are earned, not given.',
+    'guides.eyebrow':'Study Guides','guides.title':'Go <span>Deeper</span>','guides.sub':'In-depth guides on the exact topics the game tests. Each one takes about five minutes to read and pays for itself in your next run.',
+    'g1.k':'Flags','g1.t':'Flags that look almost identical','g1.d':'Chad vs Romania, Ireland vs Côte d\'Ivoire — the one detail that separates each pair.',
+    'g2.k':'Flags','g2.t':'What flag colors actually mean','g2.d':'Pan-African, pan-Arab, Nordic cross: six families that classify 200 flags.',
+    'g3.k':'Map skills','g3.t':'Recognize countries by silhouette','g3.d':'Boots, ribbons and croissants — build a mental library of outlines fast.',
+    'g4.k':'Capitals','g4.t':'Capitals that aren\'t the biggest city','g4.d':'Canberra, Ottawa, Abuja: the full quiz-proof list, with the stories behind them.',
+    'g5.k':'Landmarks','g5.t':'A field guide to world landmarks','g5.d':'Read architecture like a detective: material, roofline and setting give away the region.',
+    'g6.k':'World facts','g6.t':'The world\'s smallest countries','g6.d':'From the Vatican to Malta — the microstates every quiz loves to ask about.',
+    'g7.k':'Islands','g7.t':'Island nations you keep mixing up','g7.d':'Dominica vs Dominican Republic, and the logic of three oceans full of islands.',
+    'g8.k':'Method','g8.t':'How to actually get better','g8.d':'Patterns, elimination and short daily sessions — the training method that sticks.',
     'cta.title':'Okay, now go actually play.','cta.desc':'The best way to learn geography is to get something wrong and never forget it. The game does that faster than any list. Start with Practice Tour for zero pressure, or jump into World Tour if you\'re feeling confident.','cta.btn':"Start Playing — It's Free",
-    'f.home':'Home','f.about':'About','f.howto':'How to Play','f.priv':'Privacy Policy','f.play':'Play','f.ko':'☕ Support us','f.rights':'All rights reserved',
+    'f.home':'Home','f.about':'About','f.howto':'How to Play','f.contact':'Contact','f.priv':'Privacy Policy','f.play':'Play','f.ko':'☕ Support us','f.rights':'All rights reserved',
     'lb.play':'Find it in the game →','lb.close':'Close'
   },
   es:{
@@ -633,8 +673,17 @@ const T={
     'cap.9':'<strong>Tanzania:</strong> Dodoma (no Dar es Salaam)',
     'cap.10':'<strong>Kazajistán:</strong> Astana (antes Nur-Sultán — no Almaty)',
     'ranks.eyebrow':'Progresión','ranks.title':'35 Rangos para <span>Ganar</span>','ranks.sub':'Cada respuesta que ya sabés de acá es un bono de velocidad listo para usarse. Los rangos se ganan, no se regalan.',
+    'guides.eyebrow':'Guías de Estudio','guides.title':'Profundiza <span>Más</span>','guides.sub':'Guías a fondo sobre los temas exactos que evalúa el juego. Cada una toma unos cinco minutos de lectura y se paga sola en tu próxima partida.',
+    'g1.k':'Banderas','g1.t':'Banderas casi idénticas','g1.d':'Chad vs Rumanía, Irlanda vs Costa de Marfil — el detalle que separa a cada par.',
+    'g2.k':'Banderas','g2.t':'Qué significan los colores de las banderas','g2.d':'Panafricana, panárabe, cruz nórdica: seis familias que clasifican 200 banderas.',
+    'g3.k':'Mapas','g3.t':'Reconoce países por su silueta','g3.d':'Botas, cintas y croissants — construye una biblioteca mental de contornos rápido.',
+    'g4.k':'Capitales','g4.t':'Capitales que no son la ciudad más grande','g4.d':'Canberra, Ottawa, Abuya: la lista completa a prueba de quizzes, con sus historias.',
+    'g5.k':'Monumentos','g5.t':'Guía de campo de monumentos','g5.d':'Lee la arquitectura como un detective: material, techo y entorno delatan la región.',
+    'g6.k':'Datos del mundo','g6.t':'Los países más pequeños del mundo','g6.d':'Del Vaticano a Malta — los microestados que todo quiz adora preguntar.',
+    'g7.k':'Islas','g7.t':'Naciones insulares que siempre confundes','g7.d':'Dominica vs República Dominicana, y la lógica de tres océanos llenos de islas.',
+    'g8.k':'Método','g8.t':'Cómo mejorar de verdad','g8.d':'Patrones, eliminación y sesiones cortas diarias — el método de entrenamiento que se graba.',
     'cta.title':'Bien, ahora ve a jugar de verdad.','cta.desc':'La mejor forma de aprender geografía es equivocarte y no olvidarlo nunca. El juego hace eso más rápido que cualquier lista. Empieza con el Modo Práctica si quieres sin presión, o entra directo al Tour Mundial si te sientes con confianza.','cta.btn':'Empezar a Jugar — Es Gratis',
-    'f.home':'Inicio','f.about':'El Juego','f.howto':'Cómo Jugar','f.priv':'Política de Privacidad','f.play':'Jugar','f.ko':'☕ Apóyanos','f.rights':'Todos los derechos reservados',
+    'f.home':'Inicio','f.about':'El Juego','f.howto':'Cómo Jugar','f.contact':'Contacto','f.priv':'Política de Privacidad','f.play':'Jugar','f.ko':'☕ Apóyanos','f.rights':'Todos los derechos reservados',
     'lb.play':'Encuéntralo en el juego →','lb.close':'Cerrar'
   }
 };
