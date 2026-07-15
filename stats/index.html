@@ -9,61 +9,232 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
   :root{
-    --bg:#0a1628; --panel:#111d35; --panel2:#0e1830; --border:#1e3a5f;
-    --text:#cce0ff; --muted:#5a7da6; --accent:#ffe066; --green:#6fdf6f; --blue:#4aa3ff;
+    --bg:#0a1628; --panel:#111d35; --panel2:#0e1830; --panel3:#16274a; --border:#1e3a5f;
+    --text:#cce0ff; --muted:#5a7da6; --dim:#3d5a80;
+    --accent:#ffe066; --green:#6fdf6f; --blue:#4aa3ff; --red:#ff7a7a; --pink:#ff7ad9;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
     font-family:'Segoe UI',system-ui,Arial,sans-serif;-webkit-font-smoothing:antialiased;}
   a{color:var(--accent);}
+  ::-webkit-scrollbar{height:8px;width:8px;}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
 
   /* ── Login ── */
-  #login{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;}
+  #login{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;
+    background:radial-gradient(circle at 30% 20%, #132a4d 0%, #0a1628 60%);}
   #login form{background:var(--panel);border:1px solid var(--border);border-radius:16px;
-    padding:34px 30px;width:100%;max-width:360px;text-align:center;}
+    padding:34px 30px;width:100%;max-width:360px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.4);}
   #login img{width:120px;margin-bottom:10px;}
   #login h1{color:var(--accent);font-size:20px;margin:0 0 4px;}
   #login p{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin:0 0 24px;}
   #login input{width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:8px;
-    color:var(--text);font-size:15px;padding:12px 14px;margin-bottom:12px;outline:none;}
+    color:var(--text);font-size:15px;padding:12px 14px;margin-bottom:12px;outline:none;transition:border-color .15s;}
   #login input:focus{border-color:var(--accent);}
   #login button{width:100%;background:var(--accent);color:var(--bg);font-weight:700;font-size:15px;
-    border:none;border-radius:8px;padding:13px;cursor:pointer;letter-spacing:.03em;margin-top:6px;}
+    border:none;border-radius:8px;padding:13px;cursor:pointer;letter-spacing:.03em;margin-top:6px;transition:filter .15s;}
+  #login button:hover{filter:brightness(1.08);}
   #login button:disabled{opacity:.6;cursor:default;}
-  #login .err{color:#ff7a7a;font-size:13px;min-height:18px;margin-top:6px;}
+  #login .err{color:var(--red);font-size:13px;min-height:18px;margin-top:6px;}
 
-  /* ── Dashboard ── */
-  #dash{display:none;max-width:1200px;margin:0 auto;padding:22px 18px 60px;}
-  .topbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:22px;}
-  .topbar img{width:42px;}
-  .topbar h1{font-size:19px;margin:0;color:#fff;}
+  /* ── Shell ── */
+  #dash{display:none;}
+  .topbar{position:sticky;top:0;z-index:20;background:rgba(10,22,40,.92);backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--border);}
+  .topbar-inner{max-width:1300px;margin:0 auto;padding:12px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .topbar img{width:34px;border-radius:8px;}
+  .topbar h1{font-size:16px;margin:0;color:#fff;font-weight:700;}
   .topbar .spacer{flex:1;}
-  .topbar .upd{font-size:12px;color:var(--muted);}
-  .topbar .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);
+  .topbar .upd{font-size:11.5px;color:var(--muted);white-space:nowrap;}
+  .topbar .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);
     margin-right:6px;animation:pulse 1.4s ease-in-out infinite;}
   @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.25;}}
   .btn{background:transparent;border:1px solid var(--border);color:var(--text);border-radius:8px;
-    padding:8px 14px;font-size:13px;cursor:pointer;}
+    padding:7px 13px;font-size:12.5px;cursor:pointer;transition:.15s;}
   .btn:hover{border-color:var(--accent);color:var(--accent);}
 
-  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px;}
-  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 16px 14px;}
-  .card .v{font-size:30px;font-weight:800;color:var(--accent);line-height:1.1;}
-  .card .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:6px;}
+  .controlbar{position:sticky;top:59px;z-index:19;background:var(--bg);border-bottom:1px solid var(--border);}
+  .controlbar-inner{max-width:1300px;margin:0 auto;padding:10px 18px;display:flex;align-items:center;
+    gap:18px;flex-wrap:wrap;justify-content:space-between;}
+
+  .tabs-nav{display:flex;gap:4px;overflow-x:auto;-ms-overflow-style:none;scrollbar-width:none;}
+  .tabs-nav::-webkit-scrollbar{display:none;}
+  .tab-btn{background:transparent;border:none;color:var(--muted);padding:8px 14px;font-size:13px;
+    font-weight:600;cursor:pointer;border-radius:8px;white-space:nowrap;transition:.15s;}
+  .tab-btn:hover{color:var(--text);background:var(--panel2);}
+  .tab-btn.active{color:var(--bg);background:var(--accent);}
+
+  .rangebar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .range-btn{background:var(--panel2);border:1px solid var(--border);color:var(--muted);border-radius:20px;
+    padding:5px 13px;font-size:12px;cursor:pointer;font-weight:600;transition:.15s;}
+  .range-btn:hover{color:var(--text);border-color:var(--blue);}
+  .range-btn.active{background:var(--blue);color:#fff;border-color:var(--blue);}
+
+  main{max-width:1300px;margin:0 auto;padding:20px 18px 60px;}
+  .tab-page{display:none;animation:fadein .2s ease;}
+  .tab-page.active{display:block;}
+  @keyframes fadein{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px;}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;
+    display:flex;flex-direction:column;gap:2px;transition:border-color .15s;}
+  .card:hover{border-color:var(--dim);}
+  .card .icon{font-size:15px;opacity:.8;margin-bottom:2px;}
+  .card .v{font-size:26px;font-weight:800;color:var(--accent);line-height:1.1;font-variant-numeric:tabular-nums;}
+  .card .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:4px;}
   .card.live .v{color:var(--green);}
 
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;}
-  .box{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 16px 10px;}
-  .box h2{font-size:13px;color:var(--text);margin:0 0 14px;font-weight:600;letter-spacing:.03em;}
-  .box.wide{grid-column:1 / -1;}
-  canvas{max-height:300px;}
+  .section-title{font-size:13px;color:var(--muted);margin:26px 0 12px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:8px;}
+  .section-title .sub{font-size:11.5px;color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0;}
 
-  table{width:100%;border-collapse:collapse;font-size:13px;}
-  table th{color:var(--muted);text-align:left;font-weight:600;padding:6px 8px;border-bottom:1px solid var(--border);text-transform:uppercase;font-size:10.5px;letter-spacing:.05em;}
-  table td{padding:7px 8px;border-bottom:1px solid #16263f;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;}
+  .box{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 16px 12px;
+    min-width:0;}
+  .box h2{font-size:12.5px;color:var(--text);margin:0 0 14px;font-weight:700;letter-spacing:.02em;
+    display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .box.wide{grid-column:1 / -1;}
+  .chart-wrap{position:relative;height:280px;}
+  .chart-wrap.short{height:220px;}
+  canvas{max-height:100%;}
+
+  .table-scroll{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:340px;}
+  table th{color:var(--muted);text-align:left;font-weight:600;padding:6px 8px;border-bottom:1px solid var(--border);
+    text-transform:uppercase;font-size:10.5px;letter-spacing:.05em;white-space:nowrap;}
+  table td{padding:8px 8px;border-bottom:1px solid #16263f;}
   table tr:last-child td{border-bottom:none;}
   table td.n{text-align:right;color:var(--accent);font-weight:700;font-variant-numeric:tabular-nums;}
   .flag{font-size:16px;margin-right:7px;}
+  .rank-badge{display:inline-block;width:20px;height:20px;line-height:20px;text-align:center;border-radius:50%;
+    font-size:11px;font-weight:800;background:var(--panel2);color:var(--muted);}
+  .rank-badge.gold{background:#4a3d0e;color:var(--accent);}
+  .rank-badge.silver{background:#2a3a4a;color:#d8e4f0;}
+  .rank-badge.bronze{background:#3a2412;color:#e0a06a;}
+
+  /* ── Tabs internos (leaderboard por modo) ── */
+  .subtabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;}
+  .subtab{background:var(--panel2);border:1px solid var(--border);color:var(--muted);border-radius:8px;
+    padding:6px 12px;font-size:12.5px;cursor:pointer;font-weight:600;transition:.15s;}
+  .subtab:hover{color:var(--text);}
+  .subtab.active{background:var(--blue);color:#fff;border-color:var(--blue);}
+
+  /* ── Funnel ── */
+  .funnel{display:flex;align-items:stretch;gap:0;}
+  .funnel-step{flex:1;text-align:center;padding:16px 8px;}
+  .funnel-step .v{font-size:26px;font-weight:800;color:var(--accent);font-variant-numeric:tabular-nums;}
+  .funnel-step .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:4px;}
+  .funnel-step .p{font-size:12px;color:var(--green);margin-top:3px;font-weight:700;}
+  .funnel-arrow{display:flex;align-items:center;color:var(--dim);font-size:20px;padding:0 4px;}
+
+  .retention-note{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.6;
+    background:var(--panel2);border-radius:8px;padding:10px 12px;}
+
+  /* ── Resumen ejecutivo (insights auto-generados) ── */
+  .insights{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:22px;}
+  .insight-card{background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--dim);
+    border-radius:10px;padding:12px 14px;font-size:12.5px;line-height:1.5;color:var(--text);}
+  .insight-card b{color:#fff;}
+  .insight-card.ok{border-left-color:var(--green);}
+  .insight-card.warn{border-left-color:var(--accent);}
+  .insight-card.crit{border-left-color:var(--red);}
+
+  /* ── Ayuda contextual (ⓘ) ── */
+  .help{display:inline-block;width:14px;height:14px;line-height:14px;text-align:center;border-radius:50%;
+    background:var(--panel2);color:var(--muted);font-size:10px;font-style:normal;cursor:help;margin-left:4px;}
+  .card .help{margin-left:0;margin-top:1px;}
+
+  /* ── Heatmap de retención por cohorte ── */
+  #cohort-wrap{overflow-x:auto;}
+  #tbl-cohort td.cell{text-align:center;font-variant-numeric:tabular-nums;font-weight:700;font-size:12px;
+    border-radius:6px;padding:8px 4px;}
+  #tbl-cohort td.cell.dim{color:var(--dim);font-weight:400;}
+  #tbl-cohort td.cohort-name{white-space:nowrap;font-weight:600;}
+  #tbl-cohort td.cohort-size{color:var(--muted);text-align:right;}
+
+  /* ── Status pill (cuentas) ── */
+  .status-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;
+    font-size:11px;font-weight:700;white-space:nowrap;}
+  .status-pill .dotstat{width:6px;height:6px;border-radius:50%;}
+  .status-pill.active{background:rgba(111,223,111,.12);color:var(--green);}
+  .status-pill.active .dotstat{background:var(--green);}
+  .status-pill.stale{background:rgba(255,224,102,.12);color:var(--accent);}
+  .status-pill.stale .dotstat{background:var(--accent);}
+  .status-pill.churned{background:rgba(255,122,122,.12);color:var(--red);}
+  .status-pill.churned .dotstat{background:var(--red);}
+  .status-pill.never{background:rgba(90,125,166,.15);color:var(--muted);}
+  .status-pill.never .dotstat{background:var(--muted);}
+
+  /* ── Filtros de cuentas ── */
+  .filter-chips{display:flex;gap:6px;flex-wrap:wrap;}
+  .chip{background:var(--panel2);border:1px solid var(--border);color:var(--muted);border-radius:20px;
+    padding:6px 13px;font-size:12px;cursor:pointer;font-weight:600;transition:.15s;white-space:nowrap;}
+  .chip:hover{color:var(--text);}
+  .chip.active{background:var(--accent);color:var(--bg);border-color:var(--accent);}
+  th.sortable{cursor:pointer;user-select:none;}
+  th.sortable:hover{color:var(--text);}
+  th.sortable .arrow{opacity:.5;margin-left:3px;}
+  th.sortable.sorted .arrow{opacity:1;color:var(--accent);}
+
+  /* ── Tabla de cuentas ── */
+  .accounts-toolbar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center;}
+  #accounts-search{flex:1;min-width:200px;max-width:320px;background:var(--panel2);border:1px solid var(--border);
+    border-radius:8px;color:var(--text);font-size:13px;padding:9px 12px;outline:none;transition:border-color .15s;}
+  #accounts-search:focus{border-color:var(--accent);}
+  .accounts-count{font-size:12px;color:var(--muted);white-space:nowrap;}
+  .acc-row{cursor:pointer;transition:background .1s;}
+  .acc-row:hover td{background:var(--panel3);}
+  .acc-row .caret{display:inline-block;width:14px;color:var(--muted);transition:transform .15s;}
+  .acc-row.open .caret{transform:rotate(90deg);color:var(--accent);}
+  .acc-games{display:none;background:var(--panel2);}
+  .acc-games.open{display:table-row;}
+  .acc-games td{padding:0;border-bottom:1px solid #16263f;}
+  .acc-games-inner{padding:10px 14px 14px 32px;}
+  .acc-games-inner table{font-size:12px;min-width:260px;}
+  .acc-games-inner th{font-size:10px;}
+  .supporter-star{color:var(--accent);}
+  .mode-pill{display:inline-block;padding:2px 9px;border-radius:10px;font-size:10.5px;font-weight:700;margin-right:4px;}
+  .mode-pill.flags{background:#3a3010;color:var(--accent);}
+  .mode-pill.shapes{background:#0e2e4a;color:var(--blue);}
+  .mode-pill.cities{background:#123a1e;color:var(--green);}
+  .mode-pill.monuments{background:#3a1030;color:var(--pink);}
+  .mode-pill.versus{background:#2a2a2a;color:#ccc;}
+  .mode-pill.session-campaign{background:#123a1e;color:var(--green);}
+  .mode-pill.session-practice{background:#0e2e4a;color:var(--blue);}
+  .mode-pill.session-standalone{background:#2a2a2a;color:#ccc;}
+  .mode-pill.session-unknown{background:#1c1c1c;color:var(--dim);}
+  .empty{color:var(--muted);font-size:12.5px;padding:16px 4px;text-align:center;}
+
+  /* ── Loading skeleton ── */
+  #skeleton{display:none;padding:60px 18px;text-align:center;color:var(--muted);font-size:14px;}
+  #skeleton .spin{width:26px;height:26px;border:3px solid var(--border);border-top-color:var(--accent);
+    border-radius:50%;margin:0 auto 14px;animation:spin .7s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* ── Modal: partidas de un día/hora/mes ── */
+  .modal-overlay{display:none;position:fixed;inset:0;z-index:50;background:rgba(4,10,20,.6);
+    align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(2px);}
+  .modal-box{background:var(--panel);border:1px solid var(--border);border-radius:14px;
+    width:100%;max-width:640px;max-height:80vh;display:flex;flex-direction:column;
+    box-shadow:0 30px 80px rgba(0,0,0,.5);}
+  .modal-head{display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--border);}
+  .modal-head h3{margin:0;font-size:14.5px;color:#fff;font-weight:700;flex:1;}
+  .modal-head .count{font-size:11.5px;color:var(--muted);}
+  .modal-close{background:transparent;border:none;color:var(--muted);font-size:20px;cursor:pointer;
+    line-height:1;padding:4px 6px;border-radius:6px;}
+  .modal-close:hover{color:var(--text);background:var(--panel2);}
+  .modal-body{overflow-y:auto;padding:6px 18px 18px;}
+  .modal-subtitle{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;
+    font-weight:700;margin:16px 0 8px;display:flex;align-items:center;gap:6px;}
+  .modal-subtitle:first-child{margin-top:4px;}
+  .activity-hint{font-size:11px;color:var(--dim);margin-top:8px;}
+
+  @media (max-width:640px){
+    .topbar h1{display:none;}
+    .controlbar-inner{flex-direction:column;align-items:stretch;gap:10px;}
+    .cards{grid-template-columns:repeat(2,1fr);}
+    .card .v{font-size:22px;}
+  }
 </style>
 </head>
 <body>
@@ -82,32 +253,172 @@
 
 <div id="dash">
   <div class="topbar">
-    <img src="../images/logo.png" alt="">
-    <h1>myGeoChallenge · Stats</h1>
-    <span class="spacer"></span>
-    <span class="upd"><span class="dot"></span><span id="upd-time">—</span></span>
-    <button class="btn" id="refresh-btn">↺ Refrescar</button>
-    <button class="btn" id="logout-btn">Salir</button>
+    <div class="topbar-inner">
+      <img src="../images/logo.png" alt="">
+      <h1>myGeoChallenge · Stats</h1>
+      <span class="spacer"></span>
+      <span class="upd"><span class="dot"></span><span id="upd-time">—</span></span>
+      <button class="btn" id="refresh-btn">↺ Refrescar</button>
+      <button class="btn" id="logout-btn">Salir</button>
+    </div>
   </div>
 
-  <div class="cards" id="cards"></div>
+  <div class="controlbar">
+    <div class="controlbar-inner">
+      <div class="tabs-nav" id="tabs-nav"></div>
+      <div class="rangebar" id="rangebar"></div>
+    </div>
+  </div>
 
-  <div class="grid">
-    <div class="box wide">
-      <h2>Actividad diaria (últimos 30 días)</h2>
-      <canvas id="chart-activity"></canvas>
+  <div id="skeleton"><div class="spin"></div>Cargando datos…</div>
+
+  <main id="main">
+    <!-- ── RESUMEN ── -->
+    <section class="tab-page active" data-page="resumen">
+      <div class="insights" id="insights"></div>
+      <div class="cards" id="cards-total"></div>
+      <div class="cards" id="cards-period"></div>
+
+      <div class="section-title">Actividad <span class="sub" id="period-sub"></span></div>
+      <div class="grid">
+        <div class="box wide">
+          <h2 id="activity-title">Actividad</h2>
+          <div class="chart-wrap"><canvas id="chart-activity"></canvas></div>
+          <div class="activity-hint">💡 Hacé clic en un punto del gráfico para ver el detalle de las partidas de ese momento.</div>
+        </div>
+        <div class="box">
+          <h2>Partidas por modo</h2>
+          <div class="chart-wrap short"><canvas id="chart-modes"></canvas></div>
+        </div>
+        <div class="box">
+          <h2>Actividad por hora del día (UTC)</h2>
+          <div class="chart-wrap short"><canvas id="chart-hourly"></canvas></div>
+        </div>
+        <div class="box">
+          <h2>Países conectados</h2>
+          <div class="table-scroll"><table id="tbl-countries"><tbody></tbody></table></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── RETENCIÓN ── -->
+    <section class="tab-page" data-page="retencion">
+      <div class="grid">
+        <div class="box">
+          <h2>Usuarios activos</h2>
+          <div class="cards" id="retention-cards" style="margin-bottom:0"></div>
+          <div class="retention-note" id="retention-note"></div>
+        </div>
+        <div class="box">
+          <h2>Visita → Registro → Partida <span class="sub" id="funnel-sub"></span></h2>
+          <div class="funnel" id="funnel"></div>
+        </div>
+        <div class="box">
+          <h2>Usuarios activos en el tiempo <span class="sub" id="active-users-sub"></span></h2>
+          <div class="chart-wrap short"><canvas id="chart-active-users"></canvas></div>
+        </div>
+        <div class="box">
+          <h2>¿Vuelven después de la 1ra partida? <span class="sub">all-time</span></h2>
+          <div class="chart-wrap short"><canvas id="chart-play-buckets"></canvas></div>
+        </div>
+        <div class="box wide">
+          <h2>Retención por cohorte de registro
+            <span class="sub">% de cada camada de usuarios que sigue jugando semana a semana, all-time
+              <span class="help" title="Cada fila es un grupo de usuarios que se registró la misma semana. W0 = semana de registro, W1 = una semana después, etc. El % indica cuántos de ese grupo jugaron al menos una vez en esa semana relativa a su registro.">ⓘ</span></span>
+          </h2>
+          <div id="cohort-wrap"><table id="tbl-cohort"><tbody></tbody></table></div>
+        </div>
+        <div class="box wide">
+          <h2>Cuentas en riesgo de abandono
+            <span class="sub">jugaron alguna vez pero no volvieron en 7+ días
+              <span class="help" title="Cuentas con al menos 1 partida jugada históricamente cuya última actividad fue hace 7 días o más, ordenadas de más a menos tiempo inactivas.">ⓘ</span></span>
+          </h2>
+          <div class="table-scroll"><table id="tbl-atrisk"><tbody></tbody></table></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── LEADERBOARDS ── -->
+    <section class="tab-page" data-page="leaderboards">
+      <div class="box">
+        <div class="subtabs" id="lb-tabs"></div>
+        <div class="table-scroll"><table id="tbl-leaderboard"><tbody></tbody></table></div>
+      </div>
+    </section>
+
+    <!-- ── VERSUS ── -->
+    <section class="tab-page" data-page="versus">
+      <div class="cards" id="cards-versus"></div>
+      <div class="grid">
+        <div class="box">
+          <h2>Partidas versus por modo</h2>
+          <div class="chart-wrap short"><canvas id="chart-versus-modes"></canvas></div>
+        </div>
+        <div class="box">
+          <h2>Top jugadores (record versus)</h2>
+          <div class="table-scroll"><table id="tbl-versus"><tbody></tbody></table></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── CUENTAS ── -->
+    <section class="tab-page" data-page="cuentas">
+      <div class="box wide">
+        <div class="accounts-toolbar">
+          <input id="accounts-search" type="text" placeholder="Buscar usuario…">
+          <div class="filter-chips" id="accounts-filters"></div>
+          <span class="spacer" style="flex:1"></span>
+          <span class="accounts-count" id="accounts-count"></span>
+        </div>
+        <div class="table-scroll">
+          <table id="tbl-accounts">
+            <thead><tr>
+              <th></th>
+              <th class="sortable" data-sort="username">Usuario <span class="arrow">↕</span></th>
+              <th>País</th>
+              <th>Estado</th>
+              <th class="sortable" data-sort="created_at">Registro <span class="arrow">↕</span></th>
+              <th class="sortable" data-sort="last_active">Última act. <span class="arrow">↕</span></th>
+              <th class="sortable" data-sort="play_count" style="text-align:right">Partidas <span class="arrow">↕</span></th>
+              <th class="sortable" data-sort="hs_total" style="text-align:right">Score total <span class="arrow">↕</span></th>
+              <th style="text-align:right">Versus</th>
+            </tr></thead>
+            <tbody id="accounts-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="modal-overlay" id="day-modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="day-modal-title">Partidas</h3>
+      <button class="modal-close" id="day-modal-close">✕</button>
     </div>
-    <div class="box">
-      <h2>Partidas por modo</h2>
-      <canvas id="chart-modes"></canvas>
-    </div>
-    <div class="box">
-      <h2>Países conectados</h2>
-      <table id="tbl-countries"><tbody></tbody></table>
-    </div>
-    <div class="box">
-      <h2>Top jugadores (puntaje total)</h2>
-      <table id="tbl-players"><tbody></tbody></table>
+    <div class="modal-body">
+      <div class="modal-subtitle">🎮 Partidas <span id="day-modal-games-count"></span></div>
+      <div class="table-scroll">
+        <table id="tbl-day-modal">
+          <thead><tr><th>Hora</th><th>Jugador</th><th>País</th><th>Modo</th><th>Contexto</th><th style="text-align:right">Score</th></tr></thead>
+          <tbody id="day-modal-body"></tbody>
+        </table>
+      </div>
+      <div class="modal-subtitle">👁 Visitantes <span id="day-modal-visits-count"></span></div>
+      <div class="table-scroll">
+        <table id="tbl-day-modal-visits">
+          <thead><tr><th>Hora</th><th>Cuenta</th><th>País</th></tr></thead>
+          <tbody id="day-modal-visits-body"></tbody>
+        </table>
+      </div>
+      <div class="modal-subtitle">🆕 Cuentas creadas <span id="day-modal-regs-count"></span></div>
+      <div class="table-scroll">
+        <table id="tbl-day-modal-regs">
+          <thead><tr><th>Hora</th><th>Usuario</th></tr></thead>
+          <tbody id="day-modal-regs-body"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>
@@ -119,16 +430,67 @@ const ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 const COUNTRY_NAMES = {AF:'Afganistán',AL:'Albania',DZ:'Argelia',AD:'Andorra',AO:'Angola',AR:'Argentina',AM:'Armenia',AU:'Australia',AT:'Austria',AZ:'Azerbaiyán',BS:'Bahamas',BH:'Baréin',BD:'Bangladés',BB:'Barbados',BY:'Bielorrusia',BE:'Bélgica',BZ:'Belice',BJ:'Benín',BT:'Bután',BO:'Bolivia',BA:'Bosnia',BW:'Botsuana',BR:'Brasil',BN:'Brunéi',BG:'Bulgaria',BF:'Burkina Faso',BI:'Burundi',CV:'Cabo Verde',KH:'Camboya',CM:'Camerún',CA:'Canadá',CF:'Rep. Centroafricana',TD:'Chad',CL:'Chile',CN:'China',CO:'Colombia',KM:'Comoras',CG:'Congo',CR:'Costa Rica',HR:'Croacia',CU:'Cuba',CY:'Chipre',CZ:'Chequia',DK:'Dinamarca',DJ:'Yibuti',DM:'Dominica',DO:'Rep. Dominicana',EC:'Ecuador',EG:'Egipto',SV:'El Salvador',GQ:'Guinea Ecuatorial',ER:'Eritrea',EE:'Estonia',SZ:'Esuatini',ET:'Etiopía',FJ:'Fiyi',FI:'Finlandia',FR:'Francia',GA:'Gabón',GM:'Gambia',GE:'Georgia',DE:'Alemania',GH:'Ghana',GR:'Grecia',GD:'Granada',GT:'Guatemala',GN:'Guinea',GW:'Guinea-Bisáu',GY:'Guyana',HT:'Haití',HN:'Honduras',HU:'Hungría',IS:'Islandia',IN:'India',ID:'Indonesia',IR:'Irán',IQ:'Irak',IE:'Irlanda',IL:'Israel',IT:'Italia',JM:'Jamaica',JP:'Japón',JO:'Jordania',KZ:'Kazajistán',KE:'Kenia',KI:'Kiribati',KW:'Kuwait',KG:'Kirguistán',LA:'Laos',LV:'Letonia',LB:'Líbano',LS:'Lesoto',LR:'Liberia',LY:'Libia',LI:'Liechtenstein',LT:'Lituania',LU:'Luxemburgo',MG:'Madagascar',MW:'Malaui',MY:'Malasia',MV:'Maldivas',ML:'Malí',MT:'Malta',MH:'Islas Marshall',MR:'Mauritania',MU:'Mauricio',MX:'México',FM:'Micronesia',MD:'Moldavia',MC:'Mónaco',MN:'Mongolia',ME:'Montenegro',MA:'Marruecos',MZ:'Mozambique',MM:'Birmania',NA:'Namibia',NR:'Nauru',NP:'Nepal',NL:'Países Bajos',NZ:'Nueva Zelanda',NI:'Nicaragua',NE:'Níger',NG:'Nigeria',MK:'Macedonia del Norte',NO:'Noruega',OM:'Omán',PK:'Pakistán',PW:'Palaos',PA:'Panamá',PG:'Papúa N. Guinea',PY:'Paraguay',PE:'Perú',PH:'Filipinas',PL:'Polonia',PT:'Portugal',QA:'Catar',RO:'Rumanía',RU:'Rusia',RW:'Ruanda',KN:'San Cristóbal y N.',LC:'Santa Lucía',VC:'San Vicente',WS:'Samoa',SM:'San Marino',ST:'Santo Tomé',SA:'Arabia Saudita',SN:'Senegal',RS:'Serbia',SC:'Seychelles',SL:'Sierra Leona',SG:'Singapur',SK:'Eslovaquia',SI:'Eslovenia',SB:'Islas Salomón',SO:'Somalia',ZA:'Sudáfrica',SS:'Sudán del Sur',ES:'España',LK:'Sri Lanka',SD:'Sudán',SR:'Surinam',SE:'Suecia',CH:'Suiza',SY:'Siria',TW:'Taiwán',TJ:'Tayikistán',TZ:'Tanzania',TH:'Tailandia',TL:'Timor Oriental',TG:'Togo',TO:'Tonga',TT:'Trinidad y Tobago',TN:'Túnez',TR:'Turquía',TM:'Turkmenistán',TV:'Tuvalu',UG:'Uganda',UA:'Ucrania',AE:'Emiratos Árabes',GB:'Reino Unido',US:'Estados Unidos',UY:'Uruguay',UZ:'Uzbekistán',VU:'Vanuatu',VE:'Venezuela',VN:'Vietnam',YE:'Yemen',ZM:'Zambia',ZW:'Zimbabue'};
 function flag(cc){ if(!cc||cc.length!==2) return '🏳️'; const u=cc.toUpperCase(); if(!/^[A-Z]{2}$/.test(u)) return '🏳️'; return String.fromCodePoint(...[...u].map(c=>0x1F1E6+c.charCodeAt(0)-65)); }
 function countryName(cc){ return COUNTRY_NAMES[(cc||'').toUpperCase()] || (cc==='XX'||!cc?'Desconocido':cc); }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function rankClass(i){ return i===0?'gold':i===1?'silver':i===2?'bronze':''; }
 
 const $ = (id)=>document.getElementById(id);
-let creds = null, timer = null, charts = {};
+let creds = null, timer = null, charts = {}, lastData = null;
+let currentRange = localStorage.getItem('_admin_range') || '30d';
+let currentModeTab = 'total';
+let currentPage = localStorage.getItem('_admin_page') || 'resumen';
+
+const RANGES = [
+  ['1d','1D'], ['7d','7D'], ['30d','30D'], ['90d','90D'], ['365d','365D'], ['all','TODO'],
+];
+const RANGE_LABEL = Object.fromEntries(RANGES);
+const PAGES = [
+  ['resumen','📊 Resumen'], ['retencion','🔁 Retención'], ['leaderboards','🏆 Leaderboards'],
+  ['versus','⚔️ Versus'], ['cuentas','👤 Cuentas'],
+];
+const MODE_TABS = [
+  ['total','Total'], ['flags','Banderas'], ['shapes','Figuras'], ['cities','Ciudades'], ['monuments','Monumentos'],
+];
+const MODE_LABELS = { flags:'Banderas', shapes:'Figuras', cities:'Ciudades', monuments:'Monumentos', versus:'Versus', otro:'Otro' };
+const MODE_COLORS = { flags:'#ffe066', shapes:'#4aa3ff', cities:'#6fdf6f', monuments:'#ff7ad9' };
+const ACCOUNT_FILTERS = [
+  ['all','Todos'], ['active','Activos (<7d)'], ['stale','Inactivos (7-30d)'], ['churned','Perdidos (30d+)'], ['never','Nunca jugaron'],
+];
+let accountsFilter = 'all';
+let accountsSort = { key:'last_active', dir:'desc' };
+
+function daysSince(iso){ return iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 86400000) : null; }
+function accountStatus(a){
+  if(!a.play_count) return { cls:'never', label:'Nunca jugó' };
+  const d = daysSince(a.last_active);
+  if(d === null) return { cls:'never', label:'Nunca jugó' };
+  if(d < 7) return { cls:'active', label:'Activo' };
+  if(d < 30) return { cls:'stale', label:`Inactivo (${d}d)` };
+  return { cls:'churned', label:`Perdido (${d}d)` };
+}
+
+// ── Navegación por pestañas ────────────────────────────────────────────────────
+function buildTabsNav(){
+  const nav = $('tabs-nav');
+  nav.innerHTML = PAGES.map(([k,l])=>`<button class="tab-btn${k===currentPage?' active':''}" data-page="${k}">${l}</button>`).join('');
+  nav.querySelectorAll('.tab-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      currentPage = btn.dataset.page;
+      localStorage.setItem('_admin_page', currentPage);
+      nav.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('.tab-page').forEach(p=>p.classList.toggle('active', p.dataset.page===currentPage));
+      // Chart.js no dimensiona bien canvases que estaban en display:none.
+      Object.values(charts).forEach(c=>c && c.resize && c.resize());
+    });
+  });
+}
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
-async function callStats(user, pass){
+async function callStats(user, pass, range){
   const res = await fetch(FN_URL, {
     method:'POST',
     headers:{ 'Content-Type':'application/json', 'apikey':ANON, 'Authorization':'Bearer '+ANON },
-    body: JSON.stringify({ user, pass }),
+    body: JSON.stringify({ user, pass, range: range || currentRange }),
   });
   if(res.status === 401) throw new Error('Usuario o contraseña incorrectos');
   const json = await res.json().catch(()=>({}));
@@ -145,10 +507,7 @@ $('login-form').addEventListener('submit', async (e)=>{
     const data = await callStats(user, pass);
     creds = { user, pass };
     localStorage.setItem('_admin_creds', JSON.stringify(creds));
-    $('login').style.display = 'none';
-    $('dash').style.display = 'block';
-    render(data);
-    startPolling();
+    enterDashboard(data);
   } catch(err){
     $('login-err').textContent = err.message || 'Error';
   } finally {
@@ -166,6 +525,36 @@ $('logout-btn').addEventListener('click', ()=>{
 
 $('refresh-btn').addEventListener('click', refresh);
 
+function enterDashboard(data){
+  $('login').style.display = 'none';
+  $('dash').style.display = 'block';
+  buildTabsNav();
+  buildRangeBar();
+  document.querySelectorAll('.tab-page').forEach(p=>p.classList.toggle('active', p.dataset.page===currentPage));
+  render(data);
+  startPolling();
+}
+
+// ── Selector de rango ─────────────────────────────────────────────────────────
+function buildRangeBar(){
+  const bar = $('rangebar');
+  bar.innerHTML = '';
+  RANGES.forEach(([key,label])=>{
+    const b = document.createElement('button');
+    b.className = 'range-btn' + (key===currentRange ? ' active' : '');
+    b.textContent = label;
+    b.addEventListener('click', ()=>{
+      if(key === currentRange) return;
+      currentRange = key;
+      localStorage.setItem('_admin_range', key);
+      bar.querySelectorAll('.range-btn').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      refresh();
+    });
+    bar.appendChild(b);
+  });
+}
+
 // ── Polling en vivo ───────────────────────────────────────────────────────────
 function startPolling(){ stopPolling(); timer = setInterval(refresh, 15000); }
 function stopPolling(){ if(timer){ clearInterval(timer); timer = null; } }
@@ -173,105 +562,549 @@ document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && creds
 
 async function refresh(){
   if(!creds) return;
-  try { render(await callStats(creds.user, creds.pass)); }
-  catch(e){ /* si falla la auth (clave cambiada), volver al login */
+  try { render(await callStats(creds.user, creds.pass, currentRange)); }
+  catch(e){
     if(/incorrect|unauthor/i.test(e.message)){ $('logout-btn').click(); }
   }
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
-const CARD_DEFS = [
-  ['onlineNow','En línea ahora',true],
-  ['playingNow','Jugando ahora',true],
-  ['totalUsers','Usuarios totales',false],
-  ['newToday','Nuevos hoy',false],
-  ['totalGames','Partidas totales',false],
-  ['gamesToday','Partidas hoy',false],
-  ['totalVisits','Visitas totales',false],
-  ['visitsToday','Visitas hoy',false],
-  ['versusTotal','Versus totales',false],
-  ['versusToday','Versus hoy',false],
+const CARD_DEFS_TOTAL = [
+  ['onlineNow','🟢','En línea ahora',true],
+  ['playingNow','🎮','Jugando ahora',true],
+  ['totalUsers','👥','Usuarios totales',false],
+  ['totalGames','🎯','Partidas totales',false],
+  ['totalVisits','👁','Visitas totales',false],
+  ['versusTotal','⚔️','Versus totales',false],
 ];
 
 function render(data){
+  lastData = data;
+  $('skeleton').style.display = 'none';
+  $('main').style.display = 'block';
+
   const T = data.totals || {};
-  $('cards').innerHTML = CARD_DEFS.map(([k,l,live])=>
-    `<div class="card${live?' live':''}"><div class="v">${(T[k]??0).toLocaleString('es')}</div><div class="l">${l}</div></div>`
+  $('cards-total').innerHTML = CARD_DEFS_TOTAL.map(([k,icon,l,live])=>
+    `<div class="card${live?' live':''}"><div class="icon">${icon}</div><div class="v">${(T[k]??0).toLocaleString('es')}</div><div class="l">${l}</div></div>`
   ).join('');
+
+  const rl = RANGE_LABEL[data.range] || data.range;
+  $('period-sub').textContent = `— período: ${rl}`;
+  $('activity-title').textContent = `Actividad (${rl})`;
+  $('funnel-sub').textContent = `(${rl})`;
+  $('active-users-sub').textContent = `(${rl})`;
 
   $('upd-time').textContent = 'Actualizado ' + new Date(data.generated_at||Date.now()).toLocaleTimeString('es');
 
+  renderInsights(data.insights||{}, data.funnel||{}, rl);
+  renderPeriodCards(data.period||{}, rl);
   renderActivity(data.series||{});
   renderModes(data.gamesByMode||{});
+  renderHourly(data.hourly||[]);
   renderCountries(data.topCountries||[]);
-  renderPlayers(data.topPlayers||[]);
+  renderRetention(data.retention||{});
+  renderFunnel(data.funnel||{});
+  renderActiveUsers(data.series||{});
+  renderPlayBuckets(data.playBuckets||{});
+  renderCohortTable(data.cohortRetention||[]);
+  renderAtRisk(data.atRisk||[]);
+  renderLeaderboardTabs();
+  renderLeaderboard(data.leaderboards||{});
+  renderVersusCards(data.totals||{}, data.period||{}, rl);
+  renderVersusModes(data.versusByMode||{});
+  renderVersusTop((data.leaderboards||{}).versus||[]);
+  renderAccounts(data.accounts||[]);
+}
+
+function sevClass(pct, warnAt, critAt){ return pct>=critAt?'crit':pct>=warnAt?'warn':'ok'; }
+function renderInsights(ins, funnel, rl){
+  const cards = [];
+  if(ins.totalUsersAllTime){
+    cards.push({
+      cls: sevClass(ins.neverPlayedPct, 30, 55),
+      html: `📭 <b>${ins.neverPlayedPct}%</b> de las cuentas registradas (${ins.neverPlayedCount} de ${ins.totalUsersAllTime}) nunca jugó ni una partida.`,
+    });
+  }
+  if(ins.everPlayed){
+    cards.push({
+      cls: sevClass(ins.oneAndDonePct, 40, 65),
+      html: `🔁 De los que sí jugaron, <b>${ins.oneAndDonePct}%</b> jugó una sola vez y no volvió (${ins.oneAndDone} cuentas).`,
+    });
+  }
+  cards.push({
+    cls: ins.atRiskCount > 5 ? 'warn' : 'ok',
+    html: `⚠️ <b>${ins.atRiskCount||0}</b> cuentas jugaron antes pero no volvieron en más de una semana.`,
+  });
+  const visitors = funnel.visitors||0, regs = funnel.registrations||0, active = funnel.activePlayers||0;
+  if(visitors > 0){
+    const pReg = Math.round(regs/visitors*100);
+    cards.push({
+      cls: sevClass(100-pReg, 40, 70),
+      html: `👁 De los visitantes del período (${rl}), <b>${pReg}%</b> se registró${regs>0 ? ` y de esos, <b>${Math.round(active/regs*100)}%</b> jugó al menos una vez` : ''}.`,
+    });
+  }
+  $('insights').innerHTML = cards.map(c=>`<div class="insight-card ${c.cls}">${c.html}</div>`).join('');
+}
+
+function renderPeriodCards(p, rl){
+  const defs = [
+    ['newUsers','🆕', `Nuevos (${rl})`],
+    ['games','🎯', `Partidas (${rl})`],
+    ['visits','👁', `Visitantes únicos (${rl})`],
+    ['versus','⚔️', `Versus (${rl})`],
+  ];
+  $('cards-period').innerHTML = defs.map(([k,icon,l])=>
+    `<div class="card"><div class="icon">${icon}</div><div class="v">${(p[k]??0).toLocaleString('es')}</div><div class="l">${l}</div></div>`
+  ).join('');
+}
+
+function renderVersusCards(T, p, rl){
+  const defs = [
+    ['versusTotal', T.versusTotal||0, '⚔️', 'Versus totales'],
+    ['versusPeriod', p.versus||0, '📅', `Versus (${rl})`],
+  ];
+  $('cards-versus').innerHTML = defs.map(([k,v,icon,l])=>
+    `<div class="card"><div class="icon">${icon}</div><div class="v">${v.toLocaleString('es')}</div><div class="l">${l}</div></div>`
+  ).join('');
 }
 
 function lineDS(label,arr,color){
   return { label, data:arr, borderColor:color, backgroundColor:color+'22',
-    tension:.3, borderWidth:2, pointRadius:0, pointHoverRadius:4, fill:true };
+    tension:.3, borderWidth:2, pointRadius:0, pointHoverRadius:4, pointHoverBackgroundColor:color, fill:true };
 }
+function fmtLabel(l, granularity){
+  if(granularity==='hour') return l.slice(11,13)+'h';
+  if(granularity==='month') return l;
+  return l.slice(5);
+}
+const chartDefaults = {
+  plugins:{
+    legend:{ labels:{ color:'#cce0ff', boxWidth:12, font:{size:11} } },
+    tooltip:{ backgroundColor:'#0e1830', borderColor:'#1e3a5f', borderWidth:1, titleColor:'#fff',
+      bodyColor:'#cce0ff', padding:10, cornerRadius:8, displayColors:true },
+  },
+};
+let activityRawLabels = [], activityGranularity = 'day';
 function renderActivity(s){
   const ctx = $('chart-activity');
+  const g = s.granularity || 'day';
+  activityRawLabels = s.labels || [];
+  activityGranularity = g;
   const cfg = {
     type:'line',
-    data:{ labels:(s.labels||[]).map(d=>d.slice(5)), datasets:[
+    data:{ labels:(s.labels||[]).map(l=>fmtLabel(l,g)), datasets:[
       lineDS('Visitantes', s.visitors||[], '#4aa3ff'),
       lineDS('Partidas', s.games||[], '#ffe066'),
       lineDS('Registros', s.registrations||[], '#6fdf6f'),
       lineDS('Versus', s.versus||[], '#ff7ad9'),
     ]},
-    options:{ responsive:true, interaction:{mode:'index',intersect:false},
-      plugins:{ legend:{ labels:{ color:'#cce0ff', boxWidth:12, font:{size:11} } } },
+    options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+      onHover:(evt,els,chart)=>{ chart.canvas.style.cursor = els.length ? 'pointer' : 'default'; },
+      onClick:(evt,els,chart)=>{
+        const points = chart.getElementsAtEventForMode(evt, 'index', {intersect:false}, true);
+        if(points.length) openDayPanel(activityRawLabels[points[0].index], activityGranularity);
+      },
+      plugins: chartDefaults.plugins,
       scales:{
         x:{ ticks:{ color:'#5a7da6', maxRotation:0, autoSkip:true, maxTicksLimit:12, font:{size:10} }, grid:{ color:'#16263f' } },
         y:{ beginAtZero:true, ticks:{ color:'#5a7da6', precision:0, font:{size:10} }, grid:{ color:'#16263f' } },
       } }
   };
-  if(charts.activity){ charts.activity.data = cfg.data; charts.activity.update('none'); }
+  if(charts.activity){ charts.activity.data = cfg.data; charts.activity.options = cfg.options; charts.activity.update('none'); }
   else charts.activity = new Chart(ctx, cfg);
 }
+
+// ── Panel de detalle: partidas de un bucket del gráfico de actividad ──────────
+function keyForClient(granularity, iso){
+  if(granularity==='hour') return iso.slice(0,13);
+  if(granularity==='month') return iso.slice(0,7);
+  return iso.slice(0,10);
+}
+function bucketLabelPretty(rawKey, granularity){
+  if(granularity==='hour') return new Date(rawKey+':00:00Z').toLocaleString('es', { dateStyle:'medium', timeStyle:'short' });
+  if(granularity==='month') return new Date(rawKey+'-01T00:00:00Z').toLocaleDateString('es', { year:'numeric', month:'long', timeZone:'UTC' });
+  return new Date(rawKey+'T00:00:00Z').toLocaleDateString('es', { weekday:'long', year:'numeric', month:'long', day:'numeric', timeZone:'UTC' });
+}
+const SESSION_LABELS = { campaign:'🌍 Gira Mundial', practice:'🎯 Práctica', standalone:'🎮 Individual' };
+function contextBadge(e){
+  if(e.type === 'versus') return '<span class="mode-pill versus">⚔️ Compe</span>';
+  const label = SESSION_LABELS[e.session_type] || '❔ Sin datos';
+  return `<span class="mode-pill session-${e.session_type||'unknown'}">${label}</span>`;
+}
+function playerCell(username){
+  return username ? escapeHtml(username) : '<span style="color:var(--dim);font-style:italic">Cuenta no registrada</span>';
+}
+function countryCell(cc){
+  return cc ? `<span class="flag">${flag(cc)}</span>${countryName(cc)}` : '<span style="color:var(--dim)">—</span>';
+}
+function openDayPanel(rawKey, granularity){
+  if(rawKey == null) return;
+  const allEvents = (lastData && lastData.events) || [];
+  const allVisits = (lastData && lastData.visits) || [];
+  const allRegs = (lastData && lastData.registrationsList) || [];
+  const events = allEvents
+    .filter(e => keyForClient(granularity, e.created_at) === rawKey)
+    .sort((a,b)=> new Date(a.created_at) - new Date(b.created_at));
+  const visits = allVisits
+    .filter(v => keyForClient(granularity, v.created_at) === rawKey)
+    .sort((a,b)=> new Date(a.created_at) - new Date(b.created_at));
+  const regs = allRegs
+    .filter(r => keyForClient(granularity, r.created_at) === rawKey)
+    .sort((a,b)=> new Date(a.created_at) - new Date(b.created_at));
+
+  $('day-modal-title').textContent = bucketLabelPretty(rawKey, granularity);
+  $('day-modal-games-count').textContent = `(${events.length})`;
+  $('day-modal-visits-count').textContent = `(${visits.length})`;
+  $('day-modal-regs-count').textContent = `(${regs.length})`;
+
+  const tb = $('day-modal-body');
+  if(!events.length){
+    tb.innerHTML = '<tr><td class="empty" colspan="6">Sin partidas registradas en este momento</td></tr>';
+  } else {
+    tb.innerHTML = events.map(e=>{
+      const hora = new Date(e.created_at).toLocaleTimeString('es', { hour:'2-digit', minute:'2-digit' });
+      const modeLabel = MODE_LABELS[e.mode] || e.mode || '—';
+      const score = e.score!=null ? e.score.toLocaleString('es') : '—';
+      return `<tr><td>${hora}</td><td>${playerCell(e.username)}</td><td>${countryCell(e.country_code)}</td>` +
+        `<td><span class="mode-pill ${e.mode||''}">${modeLabel}</span></td><td>${contextBadge(e)}</td><td class="n">${score}</td></tr>`;
+    }).join('');
+  }
+
+  const vb = $('day-modal-visits-body');
+  if(!visits.length){
+    vb.innerHTML = '<tr><td class="empty" colspan="3">Sin visitas registradas en este momento</td></tr>';
+  } else {
+    vb.innerHTML = visits.map(v=>{
+      const hora = new Date(v.created_at).toLocaleTimeString('es', { hour:'2-digit', minute:'2-digit' });
+      return `<tr><td>${hora}</td><td>${playerCell(v.username)}</td><td>${countryCell(v.country_code)}</td></tr>`;
+    }).join('');
+  }
+
+  const rb = $('day-modal-regs-body');
+  if(!regs.length){
+    rb.innerHTML = '<tr><td class="empty" colspan="2">Sin cuentas nuevas en este momento</td></tr>';
+  } else {
+    rb.innerHTML = regs.map(r=>{
+      const hora = new Date(r.created_at).toLocaleTimeString('es', { hour:'2-digit', minute:'2-digit' });
+      return `<tr><td>${hora}</td><td>${escapeHtml(r.username||'—')} 🆕</td></tr>`;
+    }).join('');
+  }
+
+  $('day-modal').style.display = 'flex';
+}
+function closeDayPanel(){ $('day-modal').style.display = 'none'; }
+$('day-modal-close').addEventListener('click', closeDayPanel);
+$('day-modal').addEventListener('click', (e)=>{ if(e.target.id === 'day-modal') closeDayPanel(); });
+document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeDayPanel(); });
 
 function renderModes(m){
   const labels = ['Banderas','Figuras','Ciudades','Monumentos'];
   const vals = [m.flags||0, m.shapes||0, m.cities||0, m.monuments||0];
+  const total = vals.reduce((a,b)=>a+b,0);
   const cfg = {
     type:'doughnut',
     data:{ labels, datasets:[{ data:vals,
-      backgroundColor:['#ffe066','#4aa3ff','#6fdf6f','#ff7ad9'], borderColor:'#111d35', borderWidth:2 }] },
-    options:{ responsive:true, cutout:'58%',
-      plugins:{ legend:{ position:'bottom', labels:{ color:'#cce0ff', boxWidth:12, font:{size:11} } } } }
+      backgroundColor:[MODE_COLORS.flags,MODE_COLORS.shapes,MODE_COLORS.cities,MODE_COLORS.monuments],
+      borderColor:'#111d35', borderWidth:2, hoverOffset:6 }] },
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'62%',
+      plugins:{ ...chartDefaults.plugins, legend:{ position:'bottom', labels:{ color:'#cce0ff', boxWidth:12, font:{size:11} } },
+        tooltip:{ ...chartDefaults.plugins.tooltip, callbacks:{ label:(ctx)=>{
+          const pct = total>0 ? Math.round(ctx.parsed/total*100) : 0;
+          return `${ctx.label}: ${ctx.parsed.toLocaleString('es')} (${pct}%)`;
+        } } } } }
   };
-  if(charts.modes){ charts.modes.data = cfg.data; charts.modes.update('none'); }
+  if(charts.modes){ charts.modes.data = cfg.data; charts.modes.options = cfg.options; charts.modes.update('none'); }
   else charts.modes = new Chart($('chart-modes'), cfg);
+}
+
+function renderHourly(hourly){
+  const labels = Array.from({length:24}, (_,i)=> String(i).padStart(2,'0')+'h');
+  const maxV = Math.max(1, ...hourly);
+  const cfg = {
+    type:'bar',
+    data:{ labels, datasets:[{ label:'Partidas', data:hourly, backgroundColor:hourly.map(v=>v===maxV && v>0 ? '#ffe066' : '#4aa3ff'),
+      borderRadius:3, maxBarThickness:16 }] },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false }, tooltip: chartDefaults.plugins.tooltip },
+      scales:{
+        x:{ ticks:{ color:'#5a7da6', maxRotation:0, autoSkip:true, maxTicksLimit:12, font:{size:9} }, grid:{ display:false } },
+        y:{ beginAtZero:true, ticks:{ color:'#5a7da6', precision:0, font:{size:10} }, grid:{ color:'#16263f' } },
+      } }
+  };
+  if(charts.hourly){ charts.hourly.data = cfg.data; charts.hourly.update('none'); }
+  else charts.hourly = new Chart($('chart-hourly'), cfg);
+}
+
+function renderVersusModes(m){
+  const labels = ['Banderas','Figuras','Ciudades','Monumentos'];
+  const vals = [m.flags||0, m.shapes||0, m.cities||0, m.monuments||0];
+  const cfg = {
+    type:'bar',
+    data:{ labels, datasets:[{ label:'Versus', data:vals,
+      backgroundColor:[MODE_COLORS.flags,MODE_COLORS.shapes,MODE_COLORS.cities,MODE_COLORS.monuments], borderRadius:4 }] },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false }, tooltip: chartDefaults.plugins.tooltip },
+      scales:{
+        x:{ ticks:{ color:'#5a7da6', font:{size:10} }, grid:{ display:false } },
+        y:{ beginAtZero:true, ticks:{ color:'#5a7da6', precision:0, font:{size:10} }, grid:{ color:'#16263f' } },
+      } }
+  };
+  if(charts.versusModes){ charts.versusModes.data = cfg.data; charts.versusModes.update('none'); }
+  else charts.versusModes = new Chart($('chart-versus-modes'), cfg);
 }
 
 function renderCountries(rows){
   const tb = $('tbl-countries').querySelector('tbody');
-  if(!rows.length){ tb.innerHTML = '<tr><td style="color:#5a7da6">Sin datos aún</td></tr>'; return; }
+  if(!rows.length){ tb.innerHTML = '<tr><td class="empty">Sin datos en este período</td></tr>'; return; }
   tb.innerHTML = '<tr><th>País</th><th style="text-align:right">Visitantes</th></tr>' +
     rows.map(r=>`<tr><td><span class="flag">${flag(r.code)}</span>${countryName(r.code)}</td><td class="n">${r.count.toLocaleString('es')}</td></tr>`).join('');
 }
 
-function renderPlayers(rows){
-  const tb = $('tbl-players').querySelector('tbody');
-  if(!rows.length){ tb.innerHTML = '<tr><td style="color:#5a7da6">Sin datos aún</td></tr>'; return; }
-  tb.innerHTML = '<tr><th>#</th><th>Jugador</th><th style="text-align:right">Puntaje</th></tr>' +
-    rows.map((r,i)=>`<tr><td style="color:#5a7da6">${i+1}</td><td>${escapeHtml(r.username||'—')}</td><td class="n">${(r.hs_total||0).toLocaleString('es')}</td></tr>`).join('');
+function renderRetention(r){
+  const cards = [
+    ['dau','🟢','Activos hoy (DAU)','Cuentas con actividad en las últimas 24 horas.'],
+    ['wau','📈','Activos 7 días (WAU)','Cuentas con actividad en los últimos 7 días.'],
+    ['mau','📊','Activos 30 días (MAU)','Cuentas con actividad en los últimos 30 días.'],
+  ];
+  $('retention-cards').innerHTML = cards.map(([k,icon,l,help])=>
+    `<div class="card"><div class="icon">${icon}</div><div class="v">${(r[k]??0).toLocaleString('es')}</div><div class="l">${l} <span class="help" title="${help}">ⓘ</span></div></div>`
+  ).join('');
+  const rl = RANGE_LABEL[lastData.range] || lastData.range;
+  $('retention-note').textContent = r.cohortSize
+    ? `De las ${r.cohortSize} cuentas creadas en el período (${rl}), ${r.returnedCohort} volvieron a estar activas en un día distinto al de su registro (${r.returnRate}% retención).`
+    : `Sin cuentas nuevas en este período.`;
 }
-function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function renderFunnel(f){
+  const visitors = f.visitors||0, regs = f.registrations||0, active = f.activePlayers||0;
+  const pReg = visitors>0 ? Math.round(regs/visitors*100) : 0;
+  const pActive = regs>0 ? Math.round(active/regs*100) : 0;
+  $('funnel').innerHTML = `
+    <div class="funnel-step"><div class="v">${visitors.toLocaleString('es')}</div><div class="l">Visitantes únicos</div></div>
+    <div class="funnel-arrow">→</div>
+    <div class="funnel-step"><div class="v">${regs.toLocaleString('es')}</div><div class="l">Se registraron</div><div class="p">${pReg}%</div></div>
+    <div class="funnel-arrow">→</div>
+    <div class="funnel-step"><div class="v">${active.toLocaleString('es')}</div><div class="l">Jugaron ≥1 partida</div><div class="p">${pActive}%</div></div>
+  `;
+}
+
+function renderActiveUsers(s){
+  const g = s.granularity || 'day';
+  const cfg = {
+    type:'line',
+    data:{ labels:(s.labels||[]).map(l=>fmtLabel(l,g)), datasets:[
+      lineDS('Usuarios activos', s.activeUsers||[], '#6fdf6f'),
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+      plugins:{ legend:{ display:false }, tooltip: chartDefaults.plugins.tooltip },
+      scales:{
+        x:{ ticks:{ color:'#5a7da6', maxRotation:0, autoSkip:true, maxTicksLimit:10, font:{size:10} }, grid:{ color:'#16263f' } },
+        y:{ beginAtZero:true, ticks:{ color:'#5a7da6', precision:0, font:{size:10} }, grid:{ color:'#16263f' } },
+      } }
+  };
+  if(charts.activeUsers){ charts.activeUsers.data = cfg.data; charts.activeUsers.update('none'); }
+  else charts.activeUsers = new Chart($('chart-active-users'), cfg);
+}
+
+function renderPlayBuckets(b){
+  const labels = ['1 vez (no volvió)','2-5 veces','6-15 veces','16+ veces'];
+  const vals = [b.one||0, b.few||0, b.mid||0, b.many||0];
+  const cfg = {
+    type:'bar',
+    data:{ labels, datasets:[{ label:'Cuentas', data:vals,
+      backgroundColor:['#ff7a7a','#ffe066','#4aa3ff','#6fdf6f'], borderRadius:4 }] },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false }, tooltip: chartDefaults.plugins.tooltip },
+      scales:{
+        x:{ ticks:{ color:'#5a7da6', font:{size:10} }, grid:{ display:false } },
+        y:{ beginAtZero:true, ticks:{ color:'#5a7da6', precision:0, font:{size:10} }, grid:{ color:'#16263f' } },
+      } }
+  };
+  if(charts.playBuckets){ charts.playBuckets.data = cfg.data; charts.playBuckets.update('none'); }
+  else charts.playBuckets = new Chart($('chart-play-buckets'), cfg);
+}
+
+function cohortCellColor(pct){
+  if(pct == null) return '';
+  const alpha = Math.min(0.9, 0.08 + (pct/100)*0.7);
+  return `background:rgba(74,163,255,${alpha.toFixed(2)});color:${pct>=45?'#fff':'#cce0ff'};`;
+}
+function renderCohortTable(rows){
+  const tb = $('tbl-cohort');
+  if(!rows.length){ tb.innerHTML = '<tr><td class="empty">Sin cohortes aún</td></tr>'; return; }
+  const weekCount = Math.max(...rows.map(r=>r.weeks.length));
+  const head = '<tr><th>Semana de registro</th><th style="text-align:right">Usuarios</th>' +
+    Array.from({length:weekCount}, (_,i)=>`<th style="text-align:center">S${i}</th>`).join('') + '</tr>';
+  const body = rows.map(r=>{
+    const cells = r.weeks.map(pct=>{
+      if(pct == null) return '<td class="cell dim">—</td>';
+      return `<td class="cell" style="${cohortCellColor(pct)}">${pct}%</td>`;
+    }).join('');
+    const d = new Date(r.cohort).toLocaleDateString('es', { day:'2-digit', month:'short' });
+    return `<tr><td class="cohort-name">${d}</td><td class="cohort-size">${r.size}</td>${cells}</tr>`;
+  }).join('');
+  tb.innerHTML = head + body;
+}
+
+function renderAtRisk(rows){
+  const tb = $('tbl-atrisk');
+  if(!rows.length){ tb.innerHTML = '<tr><td class="empty">Nadie en riesgo por ahora 🎉</td></tr>'; return; }
+  tb.innerHTML = '<tr><th>Jugador</th><th style="text-align:right">Partidas jugadas</th><th style="text-align:right">Score total</th>' +
+    '<th style="text-align:right">Última actividad</th><th style="text-align:right">Días inactivo</th></tr>' +
+    rows.map(r=>{
+      const sev = r.days_inactive >= 30 ? 'var(--red)' : 'var(--accent)';
+      return `<tr><td>${escapeHtml(r.username||'—')}</td><td class="n">${r.play_count}</td><td class="n">${(r.hs_total||0).toLocaleString('es')}</td>` +
+        `<td class="n">${new Date(r.last_active).toLocaleDateString('es')}</td><td class="n" style="color:${sev}">${r.days_inactive}d</td></tr>`;
+    }).join('');
+}
+
+function renderLeaderboardTabs(){
+  const el = $('lb-tabs');
+  if(el.children.length) return; // solo se arma una vez
+  el.innerHTML = MODE_TABS.map(([k,l])=>`<button class="subtab${k===currentModeTab?' active':''}" data-mode="${k}">${l}</button>`).join('');
+  el.querySelectorAll('.subtab').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      currentModeTab = btn.dataset.mode;
+      el.querySelectorAll('.subtab').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      if(lastData) renderLeaderboard(lastData.leaderboards||{});
+    });
+  });
+}
+function renderLeaderboard(lbs){
+  const tb = $('tbl-leaderboard').querySelector('tbody');
+  const rows = lbs[currentModeTab] || [];
+  if(!rows.length){ tb.innerHTML = '<tr><td class="empty">Sin datos aún</td></tr>'; return; }
+  tb.innerHTML = '<tr><th>#</th><th>Jugador</th><th style="text-align:right">Puntaje</th></tr>' +
+    rows.map((r,i)=>`<tr><td><span class="rank-badge ${rankClass(i)}">${i+1}</span></td><td>${escapeHtml(r.username||'—')}</td><td class="n">${(r.score||0).toLocaleString('es')}</td></tr>`).join('');
+}
+
+function renderVersusTop(rows){
+  const tb = $('tbl-versus').querySelector('tbody');
+  if(!rows.length){ tb.innerHTML = '<tr><td class="empty">Sin datos aún</td></tr>'; return; }
+  tb.innerHTML = '<tr><th>#</th><th>Jugador</th><th style="text-align:right">W</th><th style="text-align:right">L</th><th style="text-align:right">Win%</th></tr>' +
+    rows.map((r,i)=>{
+      const total = (r.wins||0)+(r.losses||0);
+      const pct = total>0 ? Math.round((r.wins||0)/total*100) : 0;
+      return `<tr><td><span class="rank-badge ${rankClass(i)}">${i+1}</span></td><td>${escapeHtml(r.username||'—')}</td><td class="n">${r.wins||0}</td><td class="n" style="color:var(--red)">${r.losses||0}</td><td class="n">${pct}%</td></tr>`;
+    }).join('');
+}
+
+let accountsData = [];
+function renderAccounts(rows){
+  accountsData = rows;
+  buildAccountFilters();
+  applyAccountsView();
+}
+function buildAccountFilters(){
+  const el = $('accounts-filters');
+  if(el.children.length) return; // solo se arma una vez
+  el.innerHTML = ACCOUNT_FILTERS.map(([k,l])=>`<button class="chip${k===accountsFilter?' active':''}" data-filter="${k}">${l}</button>`).join('');
+  el.querySelectorAll('.chip').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      accountsFilter = btn.dataset.filter;
+      el.querySelectorAll('.chip').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      applyAccountsView();
+    });
+  });
+  document.querySelectorAll('#tbl-accounts th.sortable').forEach(th=>{
+    th.addEventListener('click', ()=>{
+      const key = th.dataset.sort;
+      if(accountsSort.key === key) accountsSort.dir = accountsSort.dir === 'asc' ? 'desc' : 'asc';
+      else accountsSort = { key, dir:'desc' };
+      document.querySelectorAll('#tbl-accounts th.sortable').forEach(h=>{
+        h.classList.toggle('sorted', h===th);
+        h.querySelector('.arrow').textContent = h===th ? (accountsSort.dir==='asc'?'↑':'↓') : '↕';
+      });
+      applyAccountsView();
+    });
+  });
+}
+function applyAccountsView(){
+  const q = $('accounts-search').value.trim().toLowerCase();
+  let rows = accountsData.filter(a=>{
+    if(q && !(a.username||'').toLowerCase().includes(q)) return false;
+    if(accountsFilter === 'all') return true;
+    return accountStatus(a).cls === accountsFilter;
+  });
+  const { key, dir } = accountsSort;
+  const mul = dir === 'asc' ? 1 : -1;
+  rows = rows.slice().sort((a,b)=>{
+    let av = a[key], bv = b[key];
+    if(key==='created_at' || key==='last_active'){ av = av ? new Date(av).getTime() : 0; bv = bv ? new Date(bv).getTime() : 0; }
+    else if(key==='username'){ av = (av||'').toLowerCase(); bv = (bv||'').toLowerCase(); }
+    else { av = av||0; bv = bv||0; }
+    if(av < bv) return -1*mul;
+    if(av > bv) return 1*mul;
+    return 0;
+  });
+  drawAccounts(rows);
+}
+function drawAccounts(rows){
+  const tb = $('accounts-body');
+  const total = accountsData.length;
+  $('accounts-count').textContent = rows.length===total ? `${total} cuenta${total===1?'':'s'}` : `${rows.length} de ${total} cuentas`;
+  if(!rows.length){ tb.innerHTML = '<tr><td class="empty" colspan="9">Sin cuentas que coincidan</td></tr>'; return; }
+  tb.innerHTML = rows.map((a,i)=>{
+    const created = a.created_at ? new Date(a.created_at).toLocaleDateString('es') : '—';
+    const active = a.last_active ? new Date(a.last_active).toLocaleString('es') : '—';
+    const versusRec = `${a.vs_wins||0}W / ${a.vs_losses||0}L`;
+    const st = accountStatus(a);
+    const country = a.country_code
+      ? `<span class="flag">${flag(a.country_code)}</span>${countryName(a.country_code)}`
+      : `<span style="color:var(--dim)">—</span>`;
+    return `
+      <tr class="acc-row" data-idx="${i}">
+        <td><span class="caret">▶</span></td>
+        <td>${escapeHtml(a.username||'—')}${a.is_supporter?' <span class="supporter-star">★</span>':''}</td>
+        <td style="white-space:nowrap">${country}</td>
+        <td><span class="status-pill ${st.cls}"><span class="dotstat"></span>${st.label}</span></td>
+        <td>${created}</td>
+        <td>${active}</td>
+        <td class="n">${a.games_in_range||0}</td>
+        <td class="n">${(a.hs_total||0).toLocaleString('es')}</td>
+        <td class="n">${versusRec}</td>
+      </tr>
+      <tr class="acc-games" data-idx="${i}"><td colspan="9"><div class="acc-games-inner">${renderAccountGames(a.games||[])}</div></td></tr>
+    `;
+  }).join('');
+  tb.querySelectorAll('.acc-row').forEach(row=>{
+    row.addEventListener('click', ()=>{
+      const idx = row.dataset.idx;
+      const gamesRow = tb.querySelector(`.acc-games[data-idx="${idx}"]`);
+      const isOpen = row.classList.toggle('open');
+      gamesRow.classList.toggle('open', isOpen);
+    });
+  });
+}
+function renderAccountGames(games){
+  if(!games.length) return '<div class="empty">Sin partidas en este período</div>';
+  const rows = games.slice(0, 200).map(g=>{
+    const d = new Date(g.created_at).toLocaleString('es');
+    const modeLabel = MODE_LABELS[g.mode] || g.mode || '—';
+    const typeLabel = g.type === 'versus' ? ' <span class="mode-pill versus">VS</span>' : '';
+    const score = (g.score!=null) ? g.score.toLocaleString('es') : '—';
+    return `<tr><td>${d}</td><td><span class="mode-pill ${g.mode||''}">${modeLabel}</span>${typeLabel}</td><td class="n">${score}</td></tr>`;
+  }).join('');
+  return `<div class="table-scroll"><table><tr><th>Fecha</th><th>Modo</th><th style="text-align:right">Score</th></tr>${rows}</table></div>`;
+}
+$('accounts-search').addEventListener('input', applyAccountsView);
 
 // ── Sesión recordada ──────────────────────────────────────────────────────────
 (async function(){
   const saved = localStorage.getItem('_admin_creds');
   if(!saved) return;
+  $('skeleton').style.display = 'block';
+  $('main').style.display = 'none';
   try {
     creds = JSON.parse(saved);
-    const data = await callStats(creds.user, creds.pass);
-    $('login').style.display = 'none';
-    $('dash').style.display = 'block';
-    render(data); startPolling();
-  } catch(e){ localStorage.removeItem('_admin_creds'); creds = null; }
+    const data = await callStats(creds.user, creds.pass, currentRange);
+    enterDashboard(data);
+  } catch(e){
+    $('skeleton').style.display = 'none';
+    localStorage.removeItem('_admin_creds'); creds = null;
+  }
 })();
 </script>
 </body>

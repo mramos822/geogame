@@ -53,6 +53,17 @@
     });
   }
 
+  // 'practice' (modo práctica libre) | 'campaign' (Gira Mundial, encadena los 4
+  // modos) | 'standalone' (un modo suelto jugado fuera de campaña). Se lee acá
+  // en vez de recibirlo como parámetro para no tener que tocar flags/shapes/
+  // monuments.js: ambos flags ya son globales y están seteados cuando termina
+  // la partida.
+  function currentSessionType() {
+    if (window.practiceConfig && window.practiceConfig.active) return 'practice';
+    if (window.campaign && window.campaign.active) return 'campaign';
+    return 'standalone';
+  }
+
   async function logGame(mode, score) {
     const cc = (localStorage.getItem('_an_country') || null) || null;
     insertEvent({
@@ -62,6 +73,7 @@
       visitor_id: visitorId,
       country_code: cc,
       user_id: window._sbUserId || null,
+      session_type: currentSessionType(),
     });
   }
 
