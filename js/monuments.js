@@ -5994,6 +5994,10 @@ function resetState() {
   state = {
     phase: 'idle',
     timeLeft: practiceGetDuration(),
+    // timerDuration/timerStartedAt: fuente de verdad real del cronómetro (ver
+    // startTimer) — timeLeft es solo el valor derivado que se muestra.
+    timerDuration: practiceGetDuration(),
+    timerStartedAt: 0,
     score: 0,
     displayedScore: 0,
     dots: 0,
@@ -6184,7 +6188,13 @@ function advanceDot() {
 
     const _isInfinite = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
     if (!_isInfinite) {
-      state.timeLeft = Math.min(state.timeLeft + BONUS_TIME, 99);
+      // Ajustar timerDuration (la fuente de verdad real, ver startTimer), no
+      // timeLeft directo — si no, el próximo tick lo pisaría con el valor
+      // calculado contra timerStartedAt, perdiendo el bonus.
+      const elapsed = Math.floor((Date.now() - state.timerStartedAt) / 1000);
+      const newTimeLeft = Math.min(state.timeLeft + BONUS_TIME, 99);
+      state.timerDuration = elapsed + newTimeLeft;
+      state.timeLeft = newTimeLeft;
       timerNumberEl.textContent = state.timeLeft;
     }
     showTimeBonus();
@@ -7124,10 +7134,46 @@ function render(timestamp) {
 // timestamp muy adelantado respecto al último guardado. Sin esto, ESE primer
 // frame post-regreso computaba un dt de varios segundos/minutos de un salto.
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && state) state.lastTimestamp = null;
+  if (document.visibilityState !== 'visible' || !state) return;
+  state.lastTimestamp = null;
+  // Recalcular el cronómetro YA (no esperar al próximo tick del interval,
+  // que puede tardar hasta 1s más) — así el número se autocorrige al
+  // instante de volver, en vez de mostrar el valor viejo un momento.
+  if (timerIntervalId) _timerTick();
 });
 
 // ── TIMER ─────────────────────────────────────────────────────────────────────
+// timeLeft se calcula contra timerStartedAt (Date.now()), no restando 1 por
+// tick — si el navegador throttlea el setInterval de una pestaña en 2do
+// plano (le puede bajar la frecuencia a 1 tick cada varios segundos, o
+// menos), un contador que resta 1 por tick pierde ticks reales y queda
+// atrasado respecto al tiempo real; acá, en cuanto el interval vuelve a
+// tickear (o la pestaña vuelve a primer plano), se autocorrige de una sola
+// vez al valor real en vez de arrastrar el atraso (reportado: en salas
+// grupales, un jugador con la pestaña minimizada le llegaba tarde su propio
+// TIMES UP comparado con el resto).
+function _timerTick() {
+  if (!state) return;
+  const _practiceInfinite = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
+  if (_practiceInfinite) return;
+  const elapsed = Math.floor((Date.now() - state.timerStartedAt) / 1000);
+  state.timeLeft = Math.max(0, state.timerDuration - elapsed);
+  timerNumberEl.textContent = state.timeLeft;
+  timerNumberEl.classList.remove('timer-number-infinity');
+  if ((window.pendingGameMode === 'game' || window.pendingGameMode === 'monuments') && typeof window._specReportTick === 'function') window._specReportTick(state.timeLeft);
+
+  if (state.timeLeft <= 10) {
+    timerNumberEl.style.color = '#ffffff';
+    countdownImg.src = window.pendingGameMode === 'monuments' ? 'images/countdownred4.png' : 'images/countdownred.png';
+    if (state.timeLeft > 0) { sfxTickdown.currentTime = 0; sfxPlay(sfxTickdown); }
+  } else {
+    timerNumberEl.style.color = '';
+    countdownImg.src = window.pendingGameMode === 'monuments' ? 'images/countdown4.png' : 'images/countdown.png';
+  }
+
+  if (state.timeLeft <= 0) endGame();
+}
+
 function startTimer() {
   const _practiceInfinite = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
   if (_practiceInfinite) { timerNumberEl.textContent = '∞'; timerNumberEl.classList.add('timer-number-infinity'); }
@@ -7136,24 +7182,8 @@ function startTimer() {
   countdownImg.src = window.pendingGameMode === 'monuments' ? 'images/countdown4.png' : 'images/countdown.png';
   countdownImg.style.animationPlayState = 'running';
 
-  timerIntervalId = setInterval(() => {
-    if (_practiceInfinite) return;
-    state.timeLeft--;
-    timerNumberEl.textContent = state.timeLeft;
-    timerNumberEl.classList.remove('timer-number-infinity');
-    if ((window.pendingGameMode === 'game' || window.pendingGameMode === 'monuments') && typeof window._specReportTick === 'function') window._specReportTick(state.timeLeft);
-
-    if (state.timeLeft <= 10) {
-      timerNumberEl.style.color = '#ffffff';
-      countdownImg.src = window.pendingGameMode === 'monuments' ? 'images/countdownred4.png' : 'images/countdownred.png';
-      if (state.timeLeft > 0) { sfxTickdown.currentTime = 0; sfxPlay(sfxTickdown); }
-    } else {
-      timerNumberEl.style.color = '';
-      countdownImg.src = window.pendingGameMode === 'monuments' ? 'images/countdown4.png' : 'images/countdown.png';
-    }
-
-    if (state.timeLeft <= 0)  endGame();
-  }, 1000);
+  state.timerStartedAt = Date.now();
+  timerIntervalId = setInterval(_timerTick, 1000);
 }
 
 let endGameTimeout1 = null, endGameTimeout2 = null;

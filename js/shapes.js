@@ -67,6 +67,10 @@ if (typeof isMuted !== 'undefined' && isMuted) sfxLevel2.volume = 0;
 let shapesStreak = 0;
 let shapesRoundStartTime = null;
 let shapesTimeLeft = window.GAME_DURATION;
+// Fuente de verdad real del cronómetro (ver el setInterval de shapesTimeLeft
+// más abajo) — shapesTimeLeft es solo el valor derivado que se muestra.
+let shapesTimerDuration  = window.GAME_DURATION;
+let shapesTimerStartedAt = 0;
 let shapesTimerIntervalId = null;
 let shapesRunning = false;
 let shapesGameOver = false;
@@ -1482,7 +1486,16 @@ function showCountryShape(country, ext1, ext2, startDelay) {
           if (shapesDots >= 10 && !dotsContainer.classList.contains('train-animation')) {
             dotsContainer.classList.add('train-animation');
             const _shapesInfNow = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
-            if (!_shapesInfNow) shapesTimeLeft = Math.min(shapesTimeLeft + 5, 99);
+            if (!_shapesInfNow) {
+              // Ajustar shapesTimerDuration (fuente de verdad, ver
+              // _shapesTimerTick), no shapesTimeLeft directo — si no, el
+              // próximo tick lo pisaría con el valor calculado contra
+              // shapesTimerStartedAt, perdiendo el bonus.
+              const elapsed = Math.floor((Date.now() - shapesTimerStartedAt) / 1000);
+              const newTimeLeft = Math.min(shapesTimeLeft + 5, 99);
+              shapesTimerDuration = elapsed + newTimeLeft;
+              shapesTimeLeft = newTimeLeft;
+            }
             if (typeof playTimeBonus === 'function') playTimeBonus(document.getElementById('shapes-time-bonus'), 5);
             const tEl = document.getElementById('shapes-timer-number');
             const tImg = document.getElementById('shapes-timer-img');
@@ -2049,6 +2062,74 @@ function shapesPracticePickNext(exc) {
   return pick[Math.floor(Math.random() * pick.length)] || null;
 }
 
+// ── TIMER ─────────────────────────────────────────────────────────────────────
+// shapesTimeLeft se calcula contra shapesTimerStartedAt (Date.now()), no
+// restando 1 por tick — un setInterval throttleado en 2do plano pierde ticks
+// reales y un contador que resta 1 por tick queda atrasado respecto al
+// tiempo real; acá se autocorrige de una sola vez en cuanto vuelve a
+// tickear (o la pestaña vuelve a primer plano), en vez de arrastrar el atraso.
+function _shapesTimerTick() {
+  const _shapesInfinite = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
+  if (_shapesInfinite) return;
+  const tEl  = document.getElementById('shapes-timer-number');
+  const tImg = document.getElementById('shapes-timer-img');
+  const elapsed = Math.floor((Date.now() - shapesTimerStartedAt) / 1000);
+  shapesTimeLeft = Math.max(0, shapesTimerDuration - elapsed);
+  if (tEl) { tEl.textContent = shapesTimeLeft; tEl.classList.remove('timer-number-infinity'); }
+  if (shapesTimeLeft <= 10) {
+    if (tEl)  tEl.style.color = '#ffffff';
+    if (tImg) tImg.src = 'images/countdownred3.png';
+    if (shapesTimeLeft > 0 && typeof sfxTickdown !== 'undefined') { sfxTickdown.currentTime = 0; sfxPlay(sfxTickdown); }
+  } else {
+    if (tEl) tEl.style.color = '';
+  }
+  if (typeof window._specReportTick === 'function') window._specReportTick(shapesTimeLeft);
+  if (shapesTimeLeft <= 0) {
+    clearInterval(shapesTimerIntervalId);
+    shapesRunning = false;
+    shapesGameOver = true;
+    shapesBlockInput();
+    clearTimeout(shapesTagsTimeout); shapesTagsTimeout = null;
+    document.querySelectorAll('.shapes-tag').forEach(el => { el.style.cursor = 'default'; el.style.pointerEvents = 'none'; });
+    document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
+    clearTimeout(shapesCurrentAnimTimeout);
+    clearTimeout(shapesCurrentClipFadeTimeout);
+    // Cortar la transición sin pinear el transform como matriz px (eso
+    // convertía el translate(-50%,-50%) en px fijos y rompía el vmin al
+    // zoomear). Dejamos el style.transform actual, que ya está en %.
+    if (shapesCurrentImg)  { shapesCurrentImg.style.transition  = 'none'; }
+    if (shapesCurrentImg2) { shapesCurrentImg2.style.transition = 'none'; }
+    if (shapesCurrentClip) { const f = getComputedStyle(shapesCurrentClip).opacity;   shapesCurrentClip.style.transition = 'none'; shapesCurrentClip.style.opacity   = f; }
+    if (tImg) tImg.style.animationPlayState = 'paused';
+    if (typeof sfxTimesUp !== 'undefined') { sfxTimesUp.currentTime = 0; sfxPlay(sfxTimesUp); }
+    if (typeof window._specReportTimesUp === 'function') window._specReportTimesUp();
+    if (typeof playMusic  !== 'undefined') playMusic(null);
+    const timeupEl = document.getElementById('timeup-overlay');
+    if (timeupEl) {
+      timeupEl.style.zIndex = '300';
+      timeupEl.style.display = 'flex';
+      timeupEl.classList.remove('timeup-out');
+      timeupEl.classList.add('timeup-in');
+      shapesEndTimeout1 = setTimeout(() => {
+        if (shapesAborted) return;
+        timeupEl.classList.remove('timeup-in');
+        timeupEl.classList.add('timeup-out');
+        shapesEndTimeout2 = setTimeout(() => {
+          if (shapesAborted) return;
+          timeupEl.style.display = 'none';
+          timeupEl.classList.remove('timeup-out');
+          hideShapesMode();
+        }, 400);
+      }, 1800);
+    } else {
+      hideShapesMode();
+    }
+  }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && shapesRunning && shapesTimerIntervalId) _shapesTimerTick();
+});
+
 // ── SHOW / HIDE SHAPES MODE ───────────────────────────────────────────────────
 function showShapesMode() {
   shapesAborted = false; // nueva sesión: habilitar de nuevo
@@ -2165,63 +2246,10 @@ function showShapesMode() {
     const _cwPost = document.getElementById('shapes-countdown-widget');
     if (_cwPost) _cwPost.style.visibility = '';
 
+    shapesTimerDuration  = shapesTimeLeft;
+    shapesTimerStartedAt = Date.now();
     clearInterval(shapesTimerIntervalId);
-    shapesTimerIntervalId = setInterval(() => {
-      if (_shapesInfinite) return;
-      const tEl  = document.getElementById('shapes-timer-number');
-      const tImg = document.getElementById('shapes-timer-img');
-      shapesTimeLeft--;
-      if (tEl) { tEl.textContent = shapesTimeLeft; tEl.classList.remove('timer-number-infinity'); }
-      if (shapesTimeLeft <= 10) {
-        if (tEl)  tEl.style.color = '#ffffff';
-        if (tImg) tImg.src = 'images/countdownred3.png';
-        if (shapesTimeLeft > 0 && typeof sfxTickdown !== 'undefined') { sfxTickdown.currentTime = 0; sfxPlay(sfxTickdown); }
-      } else {
-        if (tEl) tEl.style.color = '';
-      }
-      if (typeof window._specReportTick === 'function') window._specReportTick(shapesTimeLeft);
-      if (shapesTimeLeft <= 0) {
-        clearInterval(shapesTimerIntervalId);
-        shapesRunning = false;
-        shapesGameOver = true;
-        shapesBlockInput();
-        clearTimeout(shapesTagsTimeout); shapesTagsTimeout = null;
-        document.querySelectorAll('.shapes-tag').forEach(el => { el.style.cursor = 'default'; el.style.pointerEvents = 'none'; });
-        document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
-        clearTimeout(shapesCurrentAnimTimeout);
-        clearTimeout(shapesCurrentClipFadeTimeout);
-        // Cortar la transición sin pinear el transform como matriz px (eso
-        // convertía el translate(-50%,-50%) en px fijos y rompía el vmin al
-        // zoomear). Dejamos el style.transform actual, que ya está en %.
-        if (shapesCurrentImg)  { shapesCurrentImg.style.transition  = 'none'; }
-        if (shapesCurrentImg2) { shapesCurrentImg2.style.transition = 'none'; }
-        if (shapesCurrentClip) { const f = getComputedStyle(shapesCurrentClip).opacity;   shapesCurrentClip.style.transition = 'none'; shapesCurrentClip.style.opacity   = f; }
-        if (tImg) tImg.style.animationPlayState = 'paused';
-        if (typeof sfxTimesUp !== 'undefined') { sfxTimesUp.currentTime = 0; sfxPlay(sfxTimesUp); }
-        if (typeof window._specReportTimesUp === 'function') window._specReportTimesUp();
-        if (typeof playMusic  !== 'undefined') playMusic(null);
-        const timeupEl = document.getElementById('timeup-overlay');
-        if (timeupEl) {
-          timeupEl.style.zIndex = '300';
-          timeupEl.style.display = 'flex';
-          timeupEl.classList.remove('timeup-out');
-          timeupEl.classList.add('timeup-in');
-          shapesEndTimeout1 = setTimeout(() => {
-            if (shapesAborted) return;
-            timeupEl.classList.remove('timeup-in');
-            timeupEl.classList.add('timeup-out');
-            shapesEndTimeout2 = setTimeout(() => {
-              if (shapesAborted) return;
-              timeupEl.style.display = 'none';
-              timeupEl.classList.remove('timeup-out');
-              hideShapesMode();
-            }, 400);
-          }, 1800);
-        } else {
-          hideShapesMode();
-        }
-      }
-    }, 1000);
+    shapesTimerIntervalId = setInterval(_shapesTimerTick, 1000);
   }); // end runShapesPregame
 }
 

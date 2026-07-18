@@ -300,21 +300,23 @@ window.LB = (() => {
         if (_expectedLeaves.delete(key)) return; // desconexión intencional (ver markExpectedLeave) — no es un abandono real
         clearTimeout(_graceTimers[key]);
         if (window._lobbyActive || window._lobbyInTransition) {
-          // Margen corto antes de tratar esto como abandono real. El
-          // broadcast 'expectleave' (ver markExpectedLeave) y este 'leave'
-          // real de presence viajan por canales separados (broadcast vs.
-          // presence) sin orden garantizado entre sí — si el 'leave' llega
-          // ANTES de que este cliente haya procesado su 'expectleave' (pura
-          // carrera de red), una desconexión INTENCIONAL (alguien pasando a
-          // espectar de prestado tras terminar su modo) se trataba como
-          // abandono real: pendingKick + _onPlayerGone marcaba al jugador
-          // como desconectado en el leaderboard de TODOS hasta que su
-          // siguiente 'join' (al reconectar tras espectar) lo revertía — el
-          // "desaparece y reaparece en el leaderboard" reportado. Re-chequear
-          // _expectedLeaves un toque después le da tiempo a ese broadcast
-          // tardío de llegar antes de comprometerse a la baja.
-          setTimeout(() => {
+          // ACTIVE_GAME_GRACE_MS (no 300ms) antes de tratar esto como abandono
+          // real. Antes este margen era de solo 300ms — pensado nada más para
+          // la carrera de red del broadcast 'expectleave' (ver markExpectedLeave,
+          // desconexión intencional al pasar a espectar de prestado) — pero
+          // eso también dejaba SIN NINGÚN margen real un simple blip de
+          // presencia por wifi o por la pestaña pasando a 2do plano (el
+          // throttling del navegador atrasa el heartbeat de Realtime): un
+          // jugador que minimiza y vuelve unos segundos después llegaba a
+          // reconectar recién DESPUÉS de que este timeout ya lo hubiera
+          // comprometido a _pendingKicks — quedaba "kickeado de la nada" y
+          // espectando para siempre, sin forma de volver a la partida
+          // (reportado). Guardar el timer en _graceTimers (igual que la sala
+          // de espera) hace que el handler de 'join' de más abajo lo cancele
+          // solo si el 'join' llega a tiempo.
+          _graceTimers[key] = setTimeout(() => {
             if (_expectedLeaves.delete(key)) return; // llegó tarde pero llegó — no es abandono real
+            delete _graceTimers[key];
             _pendingKicks.add(key);
             if (_onPlayerGone) _onPlayerGone(key);
             // Si el HOST se fue, promover al heredero (mismo algoritmo que _handleMemberGone)
@@ -341,14 +343,18 @@ window.LB = (() => {
               _aloneCalledThisGame = true;
               if (_onAlone) _onAlone();
             }
-          }, 300);
-          return; // sin grace timer durante partida activa
+          }, ACTIVE_GAME_GRACE_MS);
+          return;
         }
         _graceTimers[key] = setTimeout(() => _handleMemberGone(key), GRACE_MS);
       })
       .on('presence', { event: 'join' }, ({ key }) => {
         if (!key || key === uid || key.indexOf('spectator-') === 0) return;
         if (_graceTimers[key]) { clearTimeout(_graceTimers[key]); delete _graceTimers[key]; }
+        // Red de seguridad: si el 'join' llega tarde (ya se había comprometido
+        // el kick en _pendingKicks antes de que reconecte), sacarlo igual —
+        // volvió, así que no estaba realmente afuera.
+        _pendingKicks.delete(key);
         if (window._lobbyActive && _onPlayerBack) _onPlayerBack(key);
       })
       // Contador de espectadores GLOBAL de la sala — en grupo los espectados
@@ -399,6 +405,11 @@ window.LB = (() => {
 
   // Limpieza por desconexión (refresh/cierre de pestaña) durante la espera.
   const GRACE_MS = 5000;
+  // Margen más largo específico para un 'leave' DURANTE la partida (ver el
+  // handler de presence 'leave' más arriba) — tiene que sobrevivir el
+  // throttling típico de una pestaña minimizada reconectando su WebSocket de
+  // Realtime, no solo la carrera de red del broadcast 'expectleave'.
+  const ACTIVE_GAME_GRACE_MS = 8000;
   const _graceTimers = {};
   async function _handleMemberGone(goneId) {
     delete _graceTimers[goneId];

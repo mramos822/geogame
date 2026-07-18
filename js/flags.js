@@ -51,6 +51,10 @@ const flagsResultLabel   = document.getElementById('flags-result-label');
 
 let flagsTimerIntervalId = null;
 let flagsTimeLeft        = FLAGS_GAME_DURATION;
+// Fuente de verdad real del cronómetro (ver startFlagsTimer) — flagsTimeLeft
+// es solo el valor derivado que se muestra.
+let flagsTimerDuration   = FLAGS_GAME_DURATION;
+let flagsTimerStartedAt  = 0;
 let flagsScore           = 0;
 let flagsDisplayedScore  = 0;
 let flagsScoreRafId      = null;
@@ -1762,7 +1766,13 @@ function flagsAdvanceDot() {
 
     const _flagsInfNow = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
     if (!_flagsInfNow) {
-      flagsTimeLeft = Math.min(flagsTimeLeft + FLAGS_BONUS_TIME, 99);
+      // Ajustar flagsTimerDuration (fuente de verdad, ver startFlagsTimer), no
+      // flagsTimeLeft directo — si no, el próximo tick lo pisaría con el
+      // valor calculado contra flagsTimerStartedAt, perdiendo el bonus.
+      const elapsed = Math.floor((Date.now() - flagsTimerStartedAt) / 1000);
+      const newTimeLeft = Math.min(flagsTimeLeft + FLAGS_BONUS_TIME, 99);
+      flagsTimerDuration = elapsed + newTimeLeft;
+      flagsTimeLeft = newTimeLeft;
       flagsTimerEl.textContent = flagsTimeLeft;
     }
     if (typeof playTimeBonus === 'function') playTimeBonus(document.getElementById('flags-time-bonus'), FLAGS_BONUS_TIME);
@@ -2724,12 +2734,49 @@ window.gameStoppers.push(flagsHardReset);
 window.flagsHardReset = flagsHardReset;
 
 // ── TIMER ─────────────────────────────────────────────────────────────────────
+// flagsTimeLeft se calcula contra flagsTimerStartedAt (Date.now()), no
+// restando 1 por tick — un setInterval throttleado en 2do plano pierde ticks
+// reales y un contador que resta 1 por tick queda atrasado respecto al
+// tiempo real; acá se autocorrige de una sola vez en cuanto vuelve a
+// tickear (o la pestaña vuelve a primer plano), en vez de arrastrar el
+// atraso.
+function _flagsTimerTick() {
+  const _flagsInfinite = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
+  if (_flagsInfinite) return;
+  const elapsed = Math.floor((Date.now() - flagsTimerStartedAt) / 1000);
+  flagsTimeLeft = Math.max(0, flagsTimerDuration - elapsed);
+  flagsTimerEl.textContent = flagsTimeLeft;
+  flagsTimerEl.classList.remove('timer-number-infinity');
+
+  if (flagsTimeLeft <= 10) {
+    flagsTimerEl.style.color = '#ffffff';
+    flagsTimerImg.src = 'images/countdownred2.png';
+    if (flagsTimeLeft > 0 && typeof sfxTickdown !== 'undefined') { sfxTickdown.currentTime = 0; sfxPlay(sfxTickdown); }
+  }
+  if (typeof window._specReportTick === 'function') window._specReportTick(flagsTimeLeft);
+  if (flagsTimeLeft <= 0) {
+    clearInterval(flagsTimerIntervalId);
+    flagsRunning = false;
+    clearFlagsElimination();
+    disableAllLuggageGroups();
+    flagsLuggageWrap.classList.add('flags-game-ended');
+    if (typeof sfxTimesUp !== 'undefined') { sfxTimesUp.currentTime = 0; sfxPlay(sfxTimesUp); }
+    if (typeof window._specReportTimesUp === 'function') window._specReportTimesUp();
+    endFlagsGame();
+  }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && flagsRunning && flagsTimerIntervalId) _flagsTimerTick();
+});
+
 function startFlagsTimer() {
   clearInterval(flagsTimerIntervalId); // defensivo: evita timer doble si se llama dos veces
   const _flagsInfinite = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
   flagsTimeLeft = _flagsInfinite ? 0 : (window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer > 0)
     ? window.practiceConfig.timer
     : FLAGS_GAME_DURATION;
+  flagsTimerDuration  = flagsTimeLeft;
+  flagsTimerStartedAt = Date.now();
   flagsScore          = 0;
   flagsDisplayedScore = 0;
   flagsWrongCount     = 0;
@@ -2738,29 +2785,7 @@ function startFlagsTimer() {
   flagsRunning  = true;
   if (_flagsInfinite) { flagsTimerEl.textContent = '∞'; flagsTimerEl.classList.add('timer-number-infinity'); }
 
-  flagsTimerIntervalId = setInterval(() => {
-    if (_flagsInfinite) return;
-    flagsTimeLeft--;
-    flagsTimerEl.textContent = flagsTimeLeft;
-    flagsTimerEl.classList.remove('timer-number-infinity');
-
-    if (flagsTimeLeft <= 10) {
-      flagsTimerEl.style.color = '#ffffff';
-      flagsTimerImg.src = 'images/countdownred2.png';
-      if (flagsTimeLeft > 0 && typeof sfxTickdown !== 'undefined') { sfxTickdown.currentTime = 0; sfxPlay(sfxTickdown); }
-    }
-    if (typeof window._specReportTick === 'function' && !_flagsInfinite) window._specReportTick(flagsTimeLeft);
-    if (flagsTimeLeft <= 0) {
-      clearInterval(flagsTimerIntervalId);
-      flagsRunning = false;
-      clearFlagsElimination();
-      disableAllLuggageGroups();
-      flagsLuggageWrap.classList.add('flags-game-ended');
-      if (typeof sfxTimesUp !== 'undefined') { sfxTimesUp.currentTime = 0; sfxPlay(sfxTimesUp); }
-      if (typeof window._specReportTimesUp === 'function') window._specReportTimesUp();
-      endFlagsGame();
-    }
-  }, 1000);
+  flagsTimerIntervalId = setInterval(_flagsTimerTick, 1000);
 }
 
 // ── GAME OVER ─────────────────────────────────────────────────────────────────
