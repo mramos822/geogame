@@ -118,6 +118,13 @@
       </div>
       <input type="file" id="loading-profile-pic-input" accept="image/*" style="display:none">
     </div>
+    <div class="profile-flag-badge" id="profile-flag-badge" style="display:none">
+      <img id="profile-flag-badge-img" src="" alt="" draggable="false" oncontextmenu="return false">
+    </div>
+    <div class="profile-rank-badge" id="profile-rank-badge" style="display:none">
+      <img class="profile-rank-cup" id="profile-rank-cup" src="images/cups/cup1.png" alt="" draggable="false" oncontextmenu="return false">
+      <span class="profile-rank-num" id="profile-rank-num"></span>
+    </div>
     <div class="loading-name-wrap" id="loading-name-wrap">
       <span class="loading-player-name" id="loading-player-name"></span>
       <span class="supporter-badge" id="loading-supporter-badge" style="display:none" title="Supporter">⭐</span>
@@ -923,9 +930,16 @@
     <div id="loading-friend-group" class="table-gone">
     <img class="loading-howtotable" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
     <img class="loading-profile-pic" id="loading-friend-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
+    <div class="profile-flag-badge loading-friend-flag-badge" id="loading-friend-flag-badge" style="display:none">
+      <img id="loading-friend-flag-badge-img" src="" alt="" draggable="false" oncontextmenu="return false">
+    </div>
     <span class="loading-friend-status" id="loading-friend-status"></span>
+    <div class="profile-rank-badge" id="loading-friend-rank-badge" style="display:none">
+      <img class="profile-rank-cup" id="loading-friend-rank-cup" src="images/cups/cup1.png" alt="" draggable="false" oncontextmenu="return false">
+      <span class="profile-rank-num" id="loading-friend-rank-num"></span>
+    </div>
     <div class="loading-name-wrap">
-      <span class="loading-player-name" id="loading-friend-name"></span>
+      <span class="loading-player-name loading-friend-name-text" id="loading-friend-name"></span>
       <span class="supporter-badge" id="loading-friend-supporter-badge" style="display:none" title="Supporter">⭐</span>
     </div>
     <div class="loading-play-confirm-wrap" id="loading-friend-back-wrap">
@@ -1085,7 +1099,7 @@
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
     </div>
-    <div id="loading-version">Ver. 3.2.5</div>
+    <div id="loading-version">Ver. 3.3.0</div>
   </div>
 
   <!-- Pantalla de resultado versus (W/L) — fuera del loading-screen para verse tras la partida -->

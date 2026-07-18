@@ -272,6 +272,61 @@ function syncHsFromProfile(profile) {
 
 window.syncHsFromProfile = syncHsFromProfile;
 
+// Ruta de la bandera del país (código ISO2) para el circulito de perfil.
+function flagUrlForCountryCode(cc) {
+  const file = cc && window.COUNTRY_CODE_TO_FLAG ? window.COUNTRY_CODE_TO_FLAG[cc.toUpperCase()] : null;
+  return file ? `images/flags/${file}.png` : null;
+}
+window.flagUrlForCountryCode = flagUrlForCountryCode;
+
+// El badge de copa+puesto vive fuera del name-wrap (para no correr el centrado
+// del nombre) así que su posición hay que calcularla en JS a partir del ancho
+// real del nombre, que varía según el username. Se recalcula cada vez que el
+// nombre cambia y en resize mientras el badge esté visible.
+function _positionRankBadgeLeftOfName(nameWrapEl, badgeEl) {
+  if (!nameWrapEl || !badgeEl) return;
+  const parent = badgeEl.offsetParent;
+  if (!parent) return;
+  const wrapRect   = nameWrapEl.getBoundingClientRect();
+  const parentRect = parent.getBoundingClientRect();
+  const gap = 40; // px, espacio entre la copa y el nombre
+  badgeEl.style.left = (wrapRect.left - parentRect.left - gap) + 'px';
+  badgeEl.style.top  = (wrapRect.top  - parentRect.top + wrapRect.height / 2) + 'px';
+}
+window._positionRankBadgeLeftOfName = _positionRankBadgeLeftOfName;
+
+function _repositionVisibleRankBadges() {
+  const ownBadge = document.getElementById('profile-rank-badge');
+  const ownWrap  = document.getElementById('loading-name-wrap');
+  if (ownBadge && ownWrap && ownBadge.style.display !== 'none') _positionRankBadgeLeftOfName(ownWrap, ownBadge);
+  const friendBadge = document.getElementById('loading-friend-rank-badge');
+  const friendWrap  = document.querySelector('#loading-friend-group .loading-name-wrap');
+  if (friendBadge && friendWrap && friendBadge.style.display !== 'none') _positionRankBadgeLeftOfName(friendWrap, friendBadge);
+}
+window.addEventListener('resize', () => requestAnimationFrame(_repositionVisibleRankBadges));
+
+// Si la cuenta todavía no tiene guardado el país donde fue creada (cuentas
+// viejas, previas a este feature), lo detecta por IP en este login y lo
+// guarda como si fuera el de creación (backfill silencioso, ver memoria).
+async function _ensureCountryCode(profile) {
+  if (!profile || !profile.id || profile.country_code) return;
+  try {
+    let cc = localStorage.getItem('_an_country');
+    if (!cc) {
+      const r = await fetch('https://ipinfo.io/json');
+      const d = await r.json();
+      cc = (d && d.country) || '';
+      localStorage.setItem('_an_country', cc);
+    }
+    if (!cc) return;
+    await window.sbUpdateProfile(profile.id, { country_code: cc });
+    profile.country_code = cc;
+    if (window._sbProfile && window._sbProfile.id === profile.id) window._sbProfile.country_code = cc;
+    if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
+  } catch (e) {}
+}
+window._ensureCountryCode = _ensureCountryCode;
+
 // Limpia los scores locales al cerrar sesión (quedan en cero para el perfil guest).
 function clearLocalScores(full = false) {
   const keys = ['playCount','avgSum_flags','avgSum_shapes','avgSum_game','avgSum_monuments',
@@ -356,6 +411,37 @@ window.refreshProfileStats = function () {
         size -= 0.1;
         rankLabel.style.fontSize = size + 'cqmin';
       }
+    }
+  }
+
+  // Copa + puesto global (solo cuentas registradas: los invitados no están en rankings).
+  const rankBadge = document.getElementById('profile-rank-badge');
+  if (rankBadge) {
+    if (p && window._accountLoggedIn && p.id && typeof window.getGlobalRankForId === 'function') {
+      window.getGlobalRankForId(p.id).then(pos => {
+        if (!pos) { rankBadge.style.display = 'none'; return; }
+        rankBadge.style.display = '';
+        const cupEl = document.getElementById('profile-rank-cup');
+        const numEl = document.getElementById('profile-rank-num');
+        if (cupEl) cupEl.src = `images/cups/${window._cupForRank(pos)}.png`;
+        if (numEl) numEl.textContent = '#' + pos;
+        _positionRankBadgeLeftOfName(document.getElementById('loading-name-wrap'), rankBadge);
+      }).catch(() => { rankBadge.style.display = 'none'; });
+    } else {
+      rankBadge.style.display = 'none';
+    }
+  }
+
+  // Bandera del país de creación de la cuenta.
+  const flagBadge = document.getElementById('profile-flag-badge');
+  if (flagBadge) {
+    const flagUrl = (p && window._accountLoggedIn) ? window.flagUrlForCountryCode?.(p.country_code) : null;
+    if (flagUrl) {
+      flagBadge.style.display = '';
+      const img = document.getElementById('profile-flag-badge-img');
+      if (img) img.src = flagUrl;
+    } else {
+      flagBadge.style.display = 'none';
     }
   }
 };
@@ -1018,6 +1104,7 @@ window.startCampaign = function () {
             syncHsFromProfile(profile);   // hs locales ← max(local, supabase)
             clearLocalScores();           // solo avgs/playcount → 0
             if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
+            _ensureCountryCode(profile);
             if (typeof _updateProfileBtnLabel === 'function') _updateProfileBtnLabel();
             if (typeof loadFriends === 'function') loadFriends();
             if (typeof window.sbUpdateLastActive === 'function') window.sbUpdateLastActive(data.user.id).catch(() => {});
@@ -1346,6 +1433,10 @@ function confirmNameChange() {
     if (el) el.textContent = limpio;
     maybeAutoAssignPic(limpio);
     _updateProfileBtnLabel();
+    const rankBadge = document.getElementById('profile-rank-badge');
+    if (rankBadge && rankBadge.style.display !== 'none') {
+      requestAnimationFrame(() => _positionRankBadgeLeftOfName(wrap, rankBadge));
+    }
   }
   wrap.classList.remove('editing');
 }
@@ -1417,6 +1508,7 @@ async function _onSessionReady(userId) {
     syncHsFromProfile(profile);  // hs locales ← max(local, supabase) para display en partida
     clearLocalScores();          // solo avgs/playcount
     if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
+    _ensureCountryCode(profile);
     if (typeof loadFriends === 'function') loadFriends();  // poblar barra ingame con amigos reales
     _updateProfileBtnLabel();
   } catch(e) {}
@@ -1869,7 +1961,7 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
   let _rankingsRTChannel = null; // realtime channel
   let _allGlobalRows = null;     // full sorted list for rank computation
 
-  const SEL = 'id, username, avatar_url, hs_flags, hs_shapes, hs_cities, hs_monuments, hs_total, play_count, vs_wins, vs_losses, is_supporter, avg_sum_flags, avg_sum_shapes, avg_sum_cities, avg_sum_monuments, play_count_flags, play_count_shapes, play_count_cities, play_count_monuments';
+  const SEL = 'id, username, avatar_url, hs_flags, hs_shapes, hs_cities, hs_monuments, hs_total, play_count, vs_wins, vs_losses, is_supporter, avg_sum_flags, avg_sum_shapes, avg_sum_cities, avg_sum_monuments, play_count_flags, play_count_shapes, play_count_cities, play_count_monuments, country_code';
 
   function _totalScore(p) {
     const fromCols = (p.hs_flags||0)+(p.hs_shapes||0)+(p.hs_cities||0)+(p.hs_monuments||0);
@@ -1887,7 +1979,7 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
       play_count_flags: p.play_count_flags||0, play_count_shapes: p.play_count_shapes||0,
       play_count_cities: p.play_count_cities||0, play_count_monuments: p.play_count_monuments||0,
       play_count: p.play_count||0, vs_wins: p.vs_wins||0, vs_losses: p.vs_losses||0,
-      is_supporter: p.is_supporter||false,
+      is_supporter: p.is_supporter||false, country_code: p.country_code || null,
     };
   }
   function _sortAndRank(profiles) {
@@ -1947,6 +2039,32 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
     _rankingsRawMap.friends = Object.fromEntries((data||[]).map(p => [p.id, p]));
     return rows;
   }
+
+  // Puesto global de un id cualquiera (para el badge de copa en los paneles
+  // de perfil). Reusa el listado completo ya ordenado por fetchTopGlobal.
+  async function getGlobalRankForId(id) {
+    if (!id) return null;
+    if (!_allGlobalRows) await fetchTopGlobal();
+    if (!_allGlobalRows) return null;
+    const row = _allGlobalRows.find(r => r.id === id);
+    return row ? row.rank : null;
+  }
+  window.getGlobalRankForId = getGlobalRankForId;
+
+  // ── copa según puesto ─────────────────────────────────────────────────────────
+  function _cupForRank(rank) {
+    if (rank === 1) return 'cup1';
+    if (rank === 2) return 'cup2';
+    if (rank === 3) return 'cup3';
+    if (rank <= 9) return 'cup4';
+    if (rank <= 49) return 'cup5';
+    if (rank <= 99) return 'cup6';
+    if (rank <= 499) return 'cup7';
+    if (rank <= 999) return 'cup8';
+    if (rank <= 1999) return 'cup9';
+    return 'cup10';
+  }
+  window._cupForRank = _cupForRank;
 
   // ── renderer ──────────────────────────────────────────────────────────────────
   function renderRankings(rows, tab) {
@@ -2594,6 +2712,34 @@ function openFriendProfile(friend) {
     }
   }
 
+  const friendRankBadge = document.getElementById('loading-friend-rank-badge');
+  if (friendRankBadge) {
+    if (friend.id && typeof window.getGlobalRankForId === 'function') {
+      window.getGlobalRankForId(friend.id).then(pos => {
+        if (currentFriendProfile !== friend || !pos) { friendRankBadge.style.display = 'none'; return; }
+        friendRankBadge.style.display = '';
+        const cupEl = document.getElementById('loading-friend-rank-cup');
+        const numEl = document.getElementById('loading-friend-rank-num');
+        if (cupEl) cupEl.src = `images/cups/${window._cupForRank(pos)}.png`;
+        if (numEl) numEl.textContent = '#' + pos;
+        _positionRankBadgeLeftOfName(document.querySelector('#loading-friend-group .loading-name-wrap'), friendRankBadge);
+      }).catch(() => { friendRankBadge.style.display = 'none'; });
+    } else {
+      friendRankBadge.style.display = 'none';
+    }
+  }
+  const friendFlagBadge = document.getElementById('loading-friend-flag-badge');
+  if (friendFlagBadge) {
+    const flagUrl = window.flagUrlForCountryCode?.(friend.country_code);
+    if (flagUrl) {
+      friendFlagBadge.style.display = '';
+      const img = document.getElementById('loading-friend-flag-badge-img');
+      if (img) img.src = flagUrl;
+    } else {
+      friendFlagBadge.style.display = 'none';
+    }
+  }
+
   updateFriendButtons();
   const friendGroup = document.getElementById('loading-friend-group');
   if (friendGroup) {
@@ -2620,6 +2766,10 @@ function _clearFriendPanel() {
   if (rankLabel) rankLabel.textContent = '';
   const vsEl = document.getElementById('loading-friend-vs-record');
   if (vsEl) vsEl.style.display = 'none';
+  const friendRankBadge = document.getElementById('loading-friend-rank-badge');
+  if (friendRankBadge) friendRankBadge.style.display = 'none';
+  const friendFlagBadge = document.getElementById('loading-friend-flag-badge');
+  if (friendFlagBadge) friendFlagBadge.style.display = 'none';
   const statusEl = document.getElementById('loading-friend-status');
   if (statusEl) { statusEl.textContent = ''; statusEl.className = 'loading-friend-status'; }
   const actions = document.getElementById('loading-friend-actions');
@@ -3157,9 +3307,11 @@ window.gameStoppers.push(() => {
   // paraba timers, no ocultaba los assets; al encadenar a OTRO modo (ej.
   // cities→siluetas) esos assets quedaban pegados de fondo (reportado). No se
   // toca si _vsShowingResult (assets a propósito visibles bajo la tabla de
-  // resultados, igual que respetan los *HardReset).
+  // resultados, igual que respetan los *HardReset) ni si _powerQuitOverlay
+  // (el mapa tiene que seguir de fondo durante el game over de práctica al
+  // salir con power; recién se oculta en quitToMenu() al volver al menú).
   try {
-    if (!window._vsShowingResult) {
+    if (!window._vsShowingResult && !window._powerQuitOverlay) {
       const gw = document.getElementById('game-wrapper');
       if (gw) gw.style.display = 'none';
     }
@@ -3619,14 +3771,12 @@ const GAME_DURATION   = window.GAME_DURATION;
 const BONUS_TIME      = 5;
 const DOTS_NEEDED     = 10;
 const SPEED_BONUS_WIN = 3;
-const SPEED_MULT      = 1.25;
 
 // Pixel thresholds on the DISPLAYED canvas
 const PERFECT_PX = 7;
 const GOOD_PX    = 20;
 const FAIR_PX    = 45;
 
-const SCORE_MAP = { perfect: 300, good: 150, fair: 50, wayoff: 0 };
 const LABEL_MAP = { perfect: 'Perfecto', good: 'Bien', fair: 'Regular', wayoff: 'Muy lejos' };
 
 // ── CITIES SCORING (nuevo sistema fiel al juego viejo) ────────────────────────
@@ -3639,6 +3789,22 @@ const CITIES_M_TABLE = [
 function getCitiesM(n) {
   let M = 1;
   for (const [min, m] of CITIES_M_TABLE) { if (n >= min) M = m; }
+  return M;
+}
+
+// ── MONUMENTS SCORING (mismo mecanismo que Cities, reverse-engineered de video:
+// perfect y good dan siempre el mismo puntaje; fair queda en la proporción
+// good/perfect del sistema viejo de referencia, 2/3). Los saltos de M pasan en
+// los MISMOS umbrales que CITIES_M_TABLE (contados ronda a ronda contra el
+// video, no cada 10 correctas), pero la muestra nunca subió de M=11 pese a
+// superar las 40 correctas — así que la tabla corta ahí y no sigue a
+// 13/15/19 como Cities.
+const MONUMENTS_SCORE_MAP  = { perfect: 30, good: 30, fair: 20, wayoff: 0 };
+const MONUMENTS_SPEED_MULT = 1.5;
+const MONUMENTS_M_TABLE = CITIES_M_TABLE.slice(0, 9); // hasta [22, 11] inclusive
+function getMonumentsM(n) {
+  let M = 1;
+  for (const [min, m] of MONUMENTS_M_TABLE) { if (n >= min) M = m; }
   return M;
 }
 
@@ -3708,6 +3874,145 @@ const monumentNameEl = document.getElementById('monument-name');
   monumentImgEl.style.top    = tpx(51);
   monumentImgEl.style.left   = tpx(87);
 })();
+
+// ── ZOOM + ARRASTRE DEL MAPA (scroll / drag) ─────────────────────────────────
+// Cities/Monuments comparten este canvas — permite acercar SOLO el fondo del
+// mapa hasta el doble con la rueda, para clickear con más precisión, sin
+// agrandar los puntos/nombres/pines (deben leerse igual de grandes a
+// cualquier zoom). Por eso el "zoom" NO es un transform CSS del canvas: es
+// una cámara lógica (mapCamera) que recorta una porción del mapa al
+// dibujarlo (más chica cuanto más zoom), mientras que dots/pines/etc. se
+// dibujan en su posición de PANTALLA (worldToScreen) pero con su tamaño de
+// siempre, sin escalar. Con zoom > 1 también se puede arrastrar el mapa
+// (click y mover) para pasear por la parte que no entra en pantalla.
+const MAP_ZOOM_MIN  = 1;
+const MAP_ZOOM_MAX  = 2;
+const MAP_ZOOM_STEP = 0.08;
+let mapCamera = { zoom: 1, x: 0, y: 0 };
+
+// Coordenada de mundo (la misma que usan latLonToCanvas/state.placedDots) → píxel de pantalla actual.
+function worldToScreen(wx, wy) {
+  return { x: (wx - mapCamera.x) * mapCamera.zoom, y: (wy - mapCamera.y) * mapCamera.zoom };
+}
+// Inversa: píxel de pantalla (lo que ya devuelve el click, vía canvas.getBoundingClientRect) → mundo.
+function screenToWorld(sx, sy) {
+  return { x: sx / mapCamera.zoom + mapCamera.x, y: sy / mapCamera.zoom + mapCamera.y };
+}
+
+// Clampea camera.x/y para que la vista nunca muestre nada fuera del mapa.
+function clampMapCamera() {
+  const vw = DISPLAY_W / mapCamera.zoom;
+  const vh = DISPLAY_H / mapCamera.zoom;
+  mapCamera.x = Math.min(Math.max(mapCamera.x, 0), Math.max(0, DISPLAY_W - vw));
+  mapCamera.y = Math.min(Math.max(mapCamera.y, 0), Math.max(0, DISPLAY_H - vh));
+}
+
+function resetMapZoom() {
+  if (_mapZoomAnimId) { cancelAnimationFrame(_mapZoomAnimId); _mapZoomAnimId = null; }
+  mapCamera.zoom = 1;
+  mapCamera.x = 0;
+  mapCamera.y = 0;
+  _mapDrag = null;
+  _mapJustDragged = false;
+  canvas.style.cursor = 'crosshair';
+  if (state) state.mapDrawn = false; // fuerza un redraw aunque el loop esté "idle"
+}
+
+// Posición del cursor/touch en píxeles de PANTALLA (espacio del canvas).
+function _canvasScreenPos(e) {
+  const rect   = canvas.getBoundingClientRect();
+  const scaleX = canvas.width  / rect.width;
+  const scaleY = canvas.height / rect.height;
+  return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+}
+
+// Anima el zoom (y el paneo que lo acompaña para seguir el cursor) en vez de
+// saltar directo al valor nuevo — varios eventos 'wheel' seguidos (trackpad)
+// se encadenan sin trabarse porque cada tick arranca desde el zoom ACTUAL
+// (que puede estar a mitad de una animación anterior), no desde el objetivo.
+const MAP_ZOOM_ANIM_MS = 140;
+let _mapZoomAnimId = null;
+
+function _stepMapZoom(zoomDelta, screenX, screenY) {
+  const nextZoom = Math.min(MAP_ZOOM_MAX, Math.max(MAP_ZOOM_MIN, mapCamera.zoom + zoomDelta));
+  if (nextZoom === mapCamera.zoom) return;
+
+  const worldPt  = screenToWorld(screenX, screenY); // punto de mundo bajo el cursor, con el zoom actual
+  const fromZoom = mapCamera.zoom, fromX = mapCamera.x, fromY = mapCamera.y;
+
+  // Cámara de destino: worldPt debajo del cursor otra vez, ya con el zoom nuevo y clampeada.
+  const vw = DISPLAY_W / nextZoom, vh = DISPLAY_H / nextZoom;
+  const toX = Math.min(Math.max(worldPt.x - screenX / nextZoom, 0), Math.max(0, DISPLAY_W - vw));
+  const toY = Math.min(Math.max(worldPt.y - screenY / nextZoom, 0), Math.max(0, DISPLAY_H - vh));
+
+  if (_mapZoomAnimId) cancelAnimationFrame(_mapZoomAnimId);
+  const start = performance.now();
+  const tick = (now) => {
+    const p = Math.min(1, (now - start) / MAP_ZOOM_ANIM_MS);
+    const ease = 1 - (1 - p) ** 3; // ease-out cúbico: rápido al empezar, suave al llegar
+    mapCamera.zoom = fromZoom + (nextZoom - fromZoom) * ease;
+    mapCamera.x    = fromX    + (toX    - fromX)    * ease;
+    mapCamera.y    = fromY    + (toY    - fromY)    * ease;
+    if (state) state.mapDrawn = false;
+    _mapZoomAnimId = p < 1 ? requestAnimationFrame(tick) : null;
+  };
+  _mapZoomAnimId = requestAnimationFrame(tick);
+}
+
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const { x: screenX, y: screenY } = _canvasScreenPos(e);
+  // Normalizado: un "click" de rueda de mouse ronda deltaY=±100; un trackpad
+  // manda deltas chicos y continuos. Clampeado para que ningún evento pegue
+  // un salto de zoom brusco, sea cual sea el dispositivo.
+  const norm = Math.max(-2, Math.min(2, e.deltaY / 100));
+  _stepMapZoom(-norm * MAP_ZOOM_STEP, screenX, screenY);
+}, { passive: false });
+
+// ── Arrastre (drag) del mapa con zoom > 1 ────────────────────────────────────
+// DRAG_THRESHOLD: si el puntero se movió más que esto entre el pointerdown y
+// el pointerup, se considera un arrastre y el 'click' de después NO cuenta
+// como intento de adivinar (si no, cualquier drag además clavaría un pin).
+const MAP_DRAG_THRESHOLD = 6;
+let _mapDrag = null; // { startScreenX, startScreenY, startCamX, startCamY, dragged }
+
+canvas.addEventListener('pointerdown', (e) => {
+  if (mapCamera.zoom <= 1 || e.button !== 0) return;
+  const pos = _canvasScreenPos(e);
+  _mapDrag = { startScreenX: pos.x, startScreenY: pos.y, startCamX: mapCamera.x, startCamY: mapCamera.y, dragged: false };
+  canvas.setPointerCapture(e.pointerId);
+});
+
+canvas.addEventListener('pointermove', (e) => {
+  if (!_mapDrag) return;
+  const pos = _canvasScreenPos(e);
+  const dx = pos.x - _mapDrag.startScreenX;
+  const dy = pos.y - _mapDrag.startScreenY;
+  if (!_mapDrag.dragged && Math.hypot(dx, dy) > MAP_DRAG_THRESHOLD) {
+    _mapDrag.dragged = true;
+    canvas.style.cursor = 'grabbing';
+  }
+  if (!_mapDrag.dragged) return;
+  mapCamera.x = _mapDrag.startCamX - dx / mapCamera.zoom;
+  mapCamera.y = _mapDrag.startCamY - dy / mapCamera.zoom;
+  clampMapCamera();
+  if (state) state.mapDrawn = false;
+});
+
+// Seteado por _endMapDrag cuando el gesto fue un arrastre real — el handler
+// de 'click' (que dispara igual tras soltar, lo haya movido o no) lo revisa
+// para no clavar un pin de adivinanza al final de un simple paneo del mapa.
+let _mapJustDragged = false;
+
+function _endMapDrag(e) {
+  if (!_mapDrag) return;
+  if (_mapDrag.dragged) _mapJustDragged = true;
+  if (e && e.pointerId !== undefined) { try { canvas.releasePointerCapture(e.pointerId); } catch (err) {} }
+  canvas.style.cursor = 'crosshair';
+  _mapDrag = null;
+}
+canvas.addEventListener('pointerup', _endMapDrag);
+canvas.addEventListener('pointercancel', _endMapDrag);
 
 const timerNumberEl  = document.getElementById('timer-number');
 const countdownImg   = document.querySelector('#countdown-widget img');
@@ -5719,6 +6024,7 @@ function resetState() {
     // "activo" que rompía el idle-skip).
     mapDrawn: false,
   };
+  resetMapZoom();
 }
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
@@ -5815,7 +6121,7 @@ function slideTagIn(cityName, countryCode) {
       slideTagIn._hintShown = true;
       const countryName = (typeof getCityCountryName === 'function') ? getCityCountryName(countryCode) : countryCode;
       setTagText(`${dispCity}, ${countryName}`);
-    }, 3000);
+    }, 5000);
   }
 
   cityTagEl.style.visibility = 'hidden';
@@ -5905,15 +6211,6 @@ function advanceDot() {
 
     }, 2000);
   }
-}
-
-// ── SCORE ─────────────────────────────────────────────────────────────────────
-function computeScore(grade, cityShownAt) {
-  const base    = SCORE_MAP[grade];
-  const elapsed = (Date.now() - cityShownAt) / 1000;
-  const ratio   = base > 0 ? Math.max(0, 1 - elapsed / SPEED_BONUS_WIN) : 0;
-  const bonusAmt = Math.round(base * (SPEED_MULT - 1) * ratio);
-  return { base, bonusAmt, total: base + bonusAmt };
 }
 
 // ── RESULT LABEL ─────────────────────────────────────────────────────────────
@@ -6091,6 +6388,9 @@ function slideMonumentIn(monument) {
 
 // ── CLICK ─────────────────────────────────────────────────────────────────────
 canvas.addEventListener('click', (e) => {
+  // El 'click' dispara igual al soltar tras arrastrar el mapa (con zoom) —
+  // si el gesto fue un drag real, no cuenta como intento de adivinar.
+  if (_mapJustDragged) { _mapJustDragged = false; return; }
   if (mapGameOver || !state || state.phase !== 'waiting') return;
   state.phase = 'animating';
   const isRecordingMonuments = document.body.classList.contains('recording-mode') && window.pendingGameMode === 'monuments';
@@ -6103,8 +6403,18 @@ canvas.addEventListener('click', (e) => {
 
   const scaleX  = canvas.width / rect.width;
   const scaleY  = canvas.height / rect.height;
-  const clickX  = (e.clientX - rect.left) * scaleX;
-  const clickY  = (e.clientY - rect.top) * scaleY;
+  const screenClickX = (e.clientX - rect.left) * scaleX;
+  const screenClickY = (e.clientY - rect.top) * scaleY;
+  // El click llega en píxeles de PANTALLA (afectados por el zoom del mapa);
+  // se convierte a coordenadas de MUNDO acá mismo así todo lo que sigue
+  // (distancia/grade, dot guardado, spectator sync, cálculo de km) sigue
+  // funcionando en el mismo sistema de siempre, sin tocar nada más abajo.
+  // Esto también es lo que hace que el zoom dé más precisión: la misma
+  // tolerancia de PERFECT_PX/GOOD_PX/FAIR_PX en mundo cubre menos pantalla
+  // (y por lo tanto menos margen de error de mouse) cuanto más zoom.
+  const clickWorld = screenToWorld(screenClickX, screenClickY);
+  const clickX = clickWorld.x;
+  const clickY = clickWorld.y;
 
   const correct = latLonToCanvas(state.currentCity.lat, state.currentCity.lon);
   const d       = dist(clickX, clickY, correct.x, correct.y);
@@ -6139,21 +6449,27 @@ canvas.addEventListener('click', (e) => {
     inRowBonus    = getInRowBonus(state.streak);
     totalGained   = Math.round((base + bonusAmt) * M * hintMult) + inRowBonus;
   } else {
-    // ── Monuments: sistema actual ──
+    // ── Monuments: mismo mecanismo que Cities (M + bonus binario de velocidad),
+    // reverse-engineered de video: perfect/good dan siempre el mismo puntaje,
+    // fair queda en la proporción good/perfect del sistema viejo (2/3). Ver
+    // MONUMENTS_M_TABLE.
+    const M = getMonumentsM(correctCount); // leer ANTES de incrementar, igual que Cities
+    base     = MONUMENTS_SCORE_MAP[grade];
+    const elapsed = (Date.now() - shownAt) / 1000;
+    const _monPracticeInf = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
+    const gotBonus = !_monPracticeInf && base > 0 && elapsed < SPEED_BONUS_WIN;
+    bonusAmt = gotBonus ? Math.round(base * (MONUMENTS_SPEED_MULT - 1)) : 0;
     if (grade === 'wayoff') {
       state.streak = 0;
     } else {
       state.streak++;
       correctCount++;
     }
-    const streakMult = 1 + Math.floor(state.streak / 4) * 0.3;
     badgeColor  = getBadgeImg(state.streak);
     inRowBonus  = getInRowBonus(state.streak);
-    ({ base, bonusAmt } = computeScore(grade, shownAt));
-    if (window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0) bonusAmt = 0;
-    const streakBonus = Math.round((base + bonusAmt) * (streakMult - 1));
-    totalGained = Math.round((base + bonusAmt + streakBonus) * hintMult) + inRowBonus;
-    if (base + bonusAmt + streakBonus > 0) showScorePopup(Math.round((base + bonusAmt + streakBonus) * hintMult));
+    // Math.floor (no round): con M=1.5/2.5/7.5 el producto cae justo en .5 y el
+    // video de referencia mostraba el valor de abajo (67, no 68), no el de arriba.
+    totalGained = Math.floor((base + bonusAmt) * M * hintMult) + inRowBonus;
   }
 
   state.score += totalGained;
@@ -6162,10 +6478,9 @@ canvas.addEventListener('click', (e) => {
     if (window._lobbyActive && typeof window._lobbyReportAnswer === 'function') window._lobbyReportAnswer(grade !== 'wayoff', Math.round(state.score));
     if (grade === 'wayoff' && (window._vsActive || window._lobbyActive) && typeof window._lbWrongEffect === 'function') window._lbWrongEffect('player');
   }
-  // Popup de "+puntaje" en Cities: SOLO lo ganado por el acierto (base·bonus·M),
-  // SIN el inRowBonus — el bonus de racha va aparte, en el badge "IN A ROW"
-  // (mismo criterio que Monuments, que muestra el popup sin el inRowBonus).
-  if (window.pendingGameMode === 'game') {
+  // Popup de "+puntaje": SOLO lo ganado por el acierto (base·bonus·M), SIN el
+  // inRowBonus — el bonus de racha va aparte, en el badge "IN A ROW".
+  if (window.pendingGameMode === 'game' || window.pendingGameMode === 'monuments') {
     const _acierto = totalGained - inRowBonus;
     if (_acierto > 0) showScorePopup(_acierto);
   }
@@ -6288,7 +6603,10 @@ canvas.addEventListener('click', (e) => {
                         spawnStars(correct.x, correct.y);
                         if (!isRecordingMonuments) {
                           setTimeout(() => {
-                            showResultLabel(correct.x, correct.y, grade, base, bonusAmt);
+                            // showResultLabel posiciona un <div> DOM superpuesto al canvas
+                            // (no dibuja en el ctx), así que necesita coordenadas de PANTALLA.
+                            const rlPos = worldToScreen(correct.x, correct.y);
+                            showResultLabel(rlPos.x, rlPos.y, grade, base, bonusAmt);
                             if (badgeColor) {
                               state.badgeAnim = { t: 0, img: badgeColor, streak: state.streak, inRowBonus };
                               setTimeout(() => { sfxBonus.currentTime = 0; sfxPlay(sfxBonus); }, 800);
@@ -6384,7 +6702,21 @@ function _renderFrame(timestamp) {
 
   ctx.clearRect(0, 0, DISPLAY_W, DISPLAY_H);
   const activeMap = window.pendingGameMode === 'monuments' ? imgMap2 : imgMap;
-  ctx.drawImage(activeMap, 0, 0, DISPLAY_W, DISPLAY_H);
+  // Zoom del mapa: recorta una porción más chica de la imagen fuente cuanto
+  // más zoom (mapCamera.zoom), estirada al canvas completo — así solo el
+  // fondo se agranda, sin tocar el tamaño de nada que se dibuje encima.
+  {
+    const vw   = DISPLAY_W / mapCamera.zoom;
+    const vh   = DISPLAY_H / mapCamera.zoom;
+    const natW = activeMap.naturalWidth  || DISPLAY_W;
+    const natH = activeMap.naturalHeight || DISPLAY_H;
+    ctx.drawImage(
+      activeMap,
+      (mapCamera.x / DISPLAY_W) * natW, (mapCamera.y / DISPLAY_H) * natH,
+      (vw / DISPLAY_W) * natW,          (vh / DISPLAY_H) * natH,
+      0, 0, DISPLAY_W, DISPLAY_H
+    );
+  }
   state.mapDrawn = true;
 
   if (state.displayedScore < state.score) {
@@ -6419,10 +6751,15 @@ function _renderFrame(timestamp) {
     const age = (Date.now() - dot.labelBorn) / 1000;
     dot.labelOpacity = age < 3 ? 1 : Math.max(0, 1 - (age - 3));
 
+    // dot.x/y son coordenadas de MUNDO (mismas que latLonToCanvas); se
+    // dibujan en su posición de PANTALLA (sigue el zoom del mapa) pero con
+    // tamaño fijo — el punto/nombre/banderín no se agrandan con el mapa.
+    const { x: sx, y: sy } = worldToScreen(dot.x, dot.y);
+
     const dotAlpha = dot.permanent ? 1 : dot.labelOpacity;
     ctx.globalAlpha = dotAlpha;
     ctx.beginPath();
-    ctx.arc(dot.x, dot.y, 3, 0, Math.PI * 2);
+    ctx.arc(sx, sy, 3, 0, Math.PI * 2);
     const perfectColor = window.pendingGameMode === 'monuments' ? '#000000' : '#ff2222';
     ctx.fillStyle = dot.permanent ? perfectColor : '#666666';
     ctx.strokeStyle = '#000';
@@ -6438,7 +6775,7 @@ function _renderFrame(timestamp) {
       const angle = (60 * (1 - flagAlpha)) * Math.PI / 180;
       ctx.globalAlpha = flagAlpha;
       ctx.save();
-      ctx.translate(dot.x + 6, dot.y + 4);
+      ctx.translate(sx + 6, sy + 4);
       ctx.rotate(angle);
       ctx.drawImage(imgFlag, -fw / 2, -fh, fw, fh);
       ctx.restore();
@@ -6459,9 +6796,9 @@ function _renderFrame(timestamp) {
       const dotLabel = (window.pendingGameMode === 'monuments')
         ? ((typeof tMonument === 'function') ? tMonument(dot.name) : dot.name)
         : ((typeof tCity === 'function') ? tCity(dot.name) : dot.name);
-      ctx.strokeText(dotLabel, dot.x, dot.y + 8);
+      ctx.strokeText(dotLabel, sx, sy + 8);
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(dotLabel, dot.x, dot.y + 8);
+      ctx.fillText(dotLabel, sx, sy + 8);
 
       ctx.globalAlpha = 1;
     }
@@ -6483,11 +6820,12 @@ if (state.sunburst) {
     const TAU = Math.PI * 2;
     const alpha = Math.pow(1 - prog, 1.5) * 0.78;
 
+    const sbScreen = worldToScreen(sb.x, sb.y);
     const drawLayer = (rays, innerR, outerR, tipW, rotSpeed) => {
       const angle = sb.t * rotSpeed;
       ctx.save();
       ctx.globalAlpha = alpha;
-      ctx.translate(sb.x, sb.y);
+      ctx.translate(sbScreen.x, sbScreen.y);
       ctx.rotate(angle);
       ctx.fillStyle = '#0a0a0a';
       ctx.beginPath();
@@ -6517,8 +6855,12 @@ if (state.sunburst) {
     const sc   = 10 - 9 * p.progress;
     const curW = PIN_W * sc;
     const curH = PIN_H * sc;
-    const tipX = p.x + xDir * d;
-    const tipY = p.y - d;
+    // p.x/p.y son coordenadas de MUNDO — se posicionan en pantalla (sigue el
+    // zoom), pero "d" (altura del arco de tiro) y el tamaño del pin (curW/curH)
+    // son offsets de animación en píxeles de pantalla fijos, sin escalar.
+    const pScreen = worldToScreen(p.x, p.y);
+    const tipX = pScreen.x + xDir * d;
+    const tipY = pScreen.y - d;
 
     let angle = 0;
     if (p.progress >= 1) {
@@ -6561,10 +6903,14 @@ if (state.sunburst) {
     const p2 = state.pin2Anim;
     if (!p1.fading) p1.lineProgress = Math.min(1, p1.lineProgress + dt / 0.45);
     const lp = p1.lineProgress;
-    const destX = p2 ? p2.x : p1.targetX;
-    const destY = p2 ? p2.y : p1.targetY;
-    const toX = p1.x + lp * (destX - p1.x);
-    const toY = p1.y + lp * (destY - p1.y);
+    // p1.x/y, p2.x/y y p1.targetX/Y son coordenadas de MUNDO — la línea y su
+    // label se dibujan en pantalla (siguen el zoom) con grosor/font fijos.
+    const p1Screen = worldToScreen(p1.x, p1.y);
+    const destWorldX = p2 ? p2.x : p1.targetX;
+    const destWorldY = p2 ? p2.y : p1.targetY;
+    const destScreen = worldToScreen(destWorldX, destWorldY);
+    const toX = p1Screen.x + lp * (destScreen.x - p1Screen.x);
+    const toY = p1Screen.y + lp * (destScreen.y - p1Screen.y);
     const lineAlpha = p2 ? Math.min(p1.opacity, p2.opacity) : p1.opacity;
     if (lp > 0.001 && lineAlpha > 0.01) {
       const DASH = 14, GAP = 9, PERIOD = DASH + GAP;
@@ -6574,7 +6920,7 @@ if (state.sunburst) {
       ctx.lineCap = 'round';
       // borde blanco
       ctx.beginPath();
-      ctx.moveTo(p1.x, p1.y);
+      ctx.moveTo(p1Screen.x, p1Screen.y);
       ctx.lineTo(toX, toY);
       ctx.strokeStyle = 'rgba(255,255,255,0.7)';
       ctx.lineWidth = 4;
@@ -6583,7 +6929,7 @@ if (state.sunburst) {
       ctx.stroke();
       // línea negra encima
       ctx.beginPath();
-      ctx.moveTo(p1.x, p1.y);
+      ctx.moveTo(p1Screen.x, p1Screen.y);
       ctx.lineTo(toX, toY);
       ctx.strokeStyle = '#000000';
       ctx.lineWidth = 2;
@@ -6599,9 +6945,9 @@ if (state.sunburst) {
         const label = km < 1
           ? '< 1 km'
           : Math.round(km).toLocaleString() + ' km';
-        const midX = (p1.x + destX) / 2;
-        const midY = (p1.y + destY) / 2;
-        let angle = Math.atan2(destY - p1.y, destX - p1.x);
+        const midX = (p1Screen.x + destScreen.x) / 2;
+        const midY = (p1Screen.y + destScreen.y) / 2;
+        let angle = Math.atan2(destScreen.y - p1Screen.y, destScreen.x - p1Screen.x);
         // Mantener el texto siempre legible (nunca boca abajo)
         if (angle > Math.PI / 2 || angle < -Math.PI / 2) angle += Math.PI;
         const fs = Math.round(DISPLAY_W * 0.014);
@@ -6663,8 +7009,9 @@ if (state.sunburst) {
     s.vy   += 0.06;
     s.opacity = Math.max(0, 1 - s.life / 0.8);
     if (s.opacity <= 0) { state.starParticles.splice(i, 1); continue; }
+    const sScreen = worldToScreen(s.x, s.y);
     ctx.globalAlpha = s.opacity;
-    ctx.drawImage(imgStar, s.x - s.size / 2, s.y - s.size / 2, s.size, s.size);
+    ctx.drawImage(imgStar, sScreen.x - s.size / 2, sScreen.y - s.size / 2, s.size, s.size);
     ctx.globalAlpha = 1;
   }
 

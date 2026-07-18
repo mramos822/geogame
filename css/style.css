@@ -1912,14 +1912,16 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   transition: transform 0.4s ease-in;
   transform: translateY(-120%);
 }
-/* Bloque superior del perfil de amigo desplazado a la izquierda para centrarlo */
+/* Foto y estado de conexión del amigo alineados con la misma posición que
+   usa la foto del perfil propio (50% + 33cqmin), ya que el nombre/jugadas
+   ahora se centran igual que en el perfil propio. */
 #loading-friend-group .loading-profile-pic {
   position: absolute;
   top: calc(50% - 30cqmin);
-  left: calc(50% + 19cqmin);
+  left: calc(50% + 30cqmin);
   transform: translate(-50%, -50%);
-  width: 12cqmin;
-  height: 12cqmin;
+  width: 10cqmin;
+  height: 10cqmin;
   border-radius: 50%;
   object-fit: cover;
   overflow: hidden;
@@ -1928,29 +1930,27 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   pointer-events: none;
   z-index: 221;
 }
-#loading-friend-group .loading-name-wrap   { left: calc(50% - 12cqmin); }
-#loading-friend-group .loading-play-count  { left: calc(50% - 12cqmin); }
 
 .loading-friend-status {
   position: absolute;
   top: calc(50% - 30cqmin);
-  left: calc(50% + 28cqmin);
+  left: calc(50% + 36cqmin);
   transform: translateY(-50%);
-  width: 22cqmin;
+  width: 19cqmin;
   z-index: 213;
   display: flex;
   align-items: center;
-  gap: 1cqmin;
+  gap: 0.9cqmin;
   font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
-  font-size: 2.6cqmin;
+  font-size: 2.3cqmin;
   color: #8a7a3a;
   pointer-events: none;
 }
 .loading-friend-status::before {
   content: '';
   flex: none;
-  width: 1.6cqmin;
-  height: 1.6cqmin;
+  width: 1.4cqmin;
+  height: 1.4cqmin;
   border-radius: 50%;
   background: currentColor;
 }
@@ -2156,9 +2156,65 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   gap: 1.4cqmin;
 }
 
+/* Copa + puesto global, a la izquierda del nombre. Posicionado aparte del
+   name-wrap (no como hijo del flex) para que el nombre se mantenga centrado
+   exactamente como antes de agregar este badge. El ancho del nombre varía
+   según el username, así que left/top los calcula JS (_positionRankBadgeLeftOfName)
+   a partir del rect real del name-wrap; acá solo el fallback antes de medir. */
+.profile-rank-badge {
+  position: absolute;
+  top: 18%;
+  left: 50%;
+  transform: translate(-100%, -50%);
+  z-index: 212;
+  display: flex;
+  align-items: center;
+  gap: 0.4cqmin;
+}
+.profile-rank-cup {
+  width: 5.5cqmin;
+  height: 5.5cqmin;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.profile-rank-num {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-style: normal;
+  font-size: 3cqmin;
+  color: #8b6a00;
+}
+
+/* Bandera del país de creación de la cuenta: circulito superpuesto en la
+   esquina inferior-derecha de la foto de perfil. */
+.profile-flag-badge {
+  position: absolute;
+  top: calc(50% - 30cqmin + 4.5cqmin);
+  left: calc(50% + 33cqmin + 4.5cqmin);
+  transform: translate(-50%, -50%);
+  width: 5cqmin;
+  height: 5cqmin;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 0.4cqmin solid #fff;
+  z-index: 222; /* por encima de #loading-friend-group .loading-profile-pic (221) */
+  pointer-events: none;
+}
+.profile-flag-badge img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+#loading-friend-group .profile-flag-badge {
+  top: calc(50% - 30cqmin + 3.7cqmin);
+  left: calc(50% + 30cqmin + 3.7cqmin);
+}
+
 .loading-player-name {
   font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
-  font-size: 6.3cqmin;
+  font-size: 6.0cqmin;
   color: #4cdd6a;
   -webkit-text-stroke: 0.8cqmin #1a6b30;
   paint-order: stroke fill;
@@ -2483,9 +2539,9 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 .loading-play-confirm-wrap {
   position: absolute;
   top: 22%;
-  left: calc(50% - 46cqmin);
+  left: calc(50% - 48cqmin);
   transform: translate(-50%, -50%);
-  width: 14cqmin;
+  width: 12.5cqmin;
   z-index: 212;
   cursor: pointer;
 }
@@ -2527,7 +2583,7 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   transform: translate(-50%, -50%);
   z-index: 212;
   font-family: 'Dimbo', sans-serif;
-  font-size: 4.7cqmin;
+  font-size: 4.4cqmin;
   color: #000;
   transform: translate(-50%, -50%) scaleY(0.9);
   letter-spacing: 0;
@@ -3381,6 +3437,13 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 body.account-logged .loading-player-name {
   color: #fde20e;
   -webkit-text-stroke: 0.8cqmin #8b6a00;
+}
+
+/* El nombre del amigo en su panel de perfil no depende de si YO tengo
+   sesión iniciada: siempre es amarillo (los amigos son siempre cuentas). */
+#loading-friend-name {
+  color: #fde20e !important;
+  -webkit-text-stroke: 0.8cqmin #8b6a00 !important;
 }
 body.account-logged .loading-name-edit {
   display: none;
