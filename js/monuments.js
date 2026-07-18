@@ -1902,7 +1902,8 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
     if (_rankingsCache.top100) return _rankingsCache.top100;
     if (!window.sb) return [];
     const { data } = await window.sb.from('profiles')
-      .select(SEL);
+      .select(SEL)
+      .eq('hidden_from_rankings', false);
     const rows = _sortAndRank(data || []).slice(0, 100);
     _rankingsCache.top100 = rows;
     _rankingsRawMap.top100 = Object.fromEntries((data||[]).map(p => [p.id, p]));
@@ -1914,7 +1915,8 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
     if (!window.sb) return [];
     const myId = window._sbProfile?.id;
     const { data: all } = await window.sb.from('profiles')
-      .select(SEL);
+      .select(SEL)
+      .eq('hidden_from_rankings', false);
     _allGlobalRows = _sortAndRank(all || []);
     const allRows = _allGlobalRows;
     let start = 0, end = 30;

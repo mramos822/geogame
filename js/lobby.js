@@ -121,10 +121,18 @@ window.LB = (() => {
     return c;
   }
 
+  // is_playing solo es confiable si last_active es reciente — si el flag quedó
+  // pegado en true (browser cerrado/crash a mitad de partida sin el UPDATE final),
+  // last_active deja de actualizarse y esto lo trata como "no jugando" igual.
+  function _isActuallyPlaying(p) {
+    if (!p || !p.is_playing || !p.last_active) return false;
+    return (Date.now() - new Date(p.last_active)) / 1000 < 120;
+  }
+
   async function _fetchMembers() {
     if (!_lobbyId) return;
     const { data, error } = await window.sb.from('lobby_members')
-      .select('user_id, score, joined_at, p:user_id(username, avatar_url, is_playing)')
+      .select('user_id, score, joined_at, p:user_id(username, avatar_url, is_playing, last_active)')
       .eq('lobby_id', _lobbyId).order('joined_at');
     if (error) { console.warn('[LB] fetchMembers:', error.message); return; }
     _members = (data || []).map(m => ({
@@ -133,7 +141,7 @@ window.LB = (() => {
       avatar:    (m.p && m.p.avatar_url) || 'images/profilepic/ppdefault.png',
       score:     m.score || 0,
       isHost:    m.user_id === _hostId,
-      is_playing: !!(m.p && m.p.is_playing),
+      is_playing: _isActuallyPlaying(m.p),
       joined_at: m.joined_at,
     }));
     // Si la sala quedó totalmente vacía (todos se fueron sin avisar), cerrarla.
@@ -168,7 +176,7 @@ window.LB = (() => {
         const updated = payload.new;
         const m = _members.find(x => x.id === updated.id);
         if (!m) return;
-        m.is_playing = !!updated.is_playing;
+        m.is_playing = _isActuallyPlaying(updated);
         if (_onMembers) _onMembers(_members);
       })
       .subscribe();
