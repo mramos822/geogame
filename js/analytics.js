@@ -5,9 +5,16 @@
 // bloquea el juego.
 //
 // API pública:
-//   window.Analytics.logVisit()           -> 1 visita por sesión de navegador
-//   window.Analytics.logGame(mode, score)  -> 1 evento por partida single-player
-//   window.Analytics.logVersus(mode)       -> 1 evento por partida versus terminada
+//   window.Analytics.logVisit()             -> 1 visita por sesión de navegador
+//   window.Analytics.logGame(mode, score)   -> 1 evento por modo jugado (para el
+//                                              desglose "Partidas por modo"; NO es
+//                                              "1 partida" a efectos de las métricas
+//                                              totales del dashboard)
+//   window.Analytics.logVersus(mode)        -> 1 evento por partida versus terminada
+//   window.Analytics.logCampaign(score)     -> 1 evento por Gira Mundial COMPLETA
+//                                              (los 4 modos terminados); esto es lo
+//                                              que cuenta como "1 partida" en los
+//                                              totales del dashboard junto a versus
 (function () {
   // ID anónimo estable por dispositivo (reusa el del viejo overlay si existe).
   let visitorId = localStorage.getItem('_devstats_vid');
@@ -92,7 +99,22 @@
     });
   }
 
-  window.Analytics = { logVisit, logGame, logVersus };
+  // 1 evento por Gira Mundial completa (los 4 modos terminados sin salir antes).
+  // Llamado por monuments.js justo cuando la campaña llega al último modo y
+  // window.campaign.active pasa a false. `score` es el puntaje acumulado total.
+  async function logCampaign(score) {
+    const cc = (localStorage.getItem('_an_country') || null) || null;
+    insertEvent({
+      type: 'campaign',
+      score: (typeof score === 'number' && isFinite(score)) ? Math.round(score) : null,
+      visitor_id: visitorId,
+      country_code: cc,
+      user_id: window._sbUserId || null,
+      session_type: 'campaign',
+    });
+  }
+
+  window.Analytics = { logVisit, logGame, logVersus, logCampaign };
 
   // Registrar la visita en cuanto el cliente sb esté listo.
   function tryVisit(attempt) {

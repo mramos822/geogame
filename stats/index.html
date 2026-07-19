@@ -673,9 +673,22 @@ function lineDS(label,arr,color){
     tension:.3, borderWidth:2, pointRadius:0, pointHoverRadius:4, pointHoverBackgroundColor:color, fill:true };
 }
 function fmtLabel(l, granularity){
-  if(granularity==='hour') return l.slice(11,13)+'h';
+  if(granularity==='hour') return String(new Date(l+':00:00Z').getHours()).padStart(2,'0')+'h';
   if(granularity==='month') return l;
   return l.slice(5);
+}
+// Para granularidad 'hour' (rango 1D), las 24 barras son horas reales consecutivas
+// pero al mostrarlas en hora LOCAL el número de hora puede "dar la vuelta" a mitad
+// del gráfico (ej: 17h,18h...23h,0h,1h...16h), lo cual marea. Se reordena para que
+// siempre se lea 23h -> 0h de izquierda a derecha, simulando el ciclo del día.
+function reorderHourly(labels, granularity, seriesArrays){
+  if(granularity !== 'hour') return { labels, seriesArrays };
+  const idx = labels.map((_,i)=>i)
+    .sort((a,b)=> new Date(labels[b]+':00:00Z').getHours() - new Date(labels[a]+':00:00Z').getHours());
+  return {
+    labels: idx.map(i=>labels[i]),
+    seriesArrays: seriesArrays.map(arr => idx.map(i=>(arr||[])[i])),
+  };
 }
 const chartDefaults = {
   plugins:{
@@ -688,15 +701,18 @@ let activityRawLabels = [], activityGranularity = 'day';
 function renderActivity(s){
   const ctx = $('chart-activity');
   const g = s.granularity || 'day';
-  activityRawLabels = s.labels || [];
+  const { labels, seriesArrays } = reorderHourly(s.labels||[], g,
+    [s.visitors||[], s.games||[], s.registrations||[], s.versus||[]]);
+  const [visitors, games, registrations, versus] = seriesArrays;
+  activityRawLabels = labels;
   activityGranularity = g;
   const cfg = {
     type:'line',
-    data:{ labels:(s.labels||[]).map(l=>fmtLabel(l,g)), datasets:[
-      lineDS('Visitantes', s.visitors||[], '#4aa3ff'),
-      lineDS('Partidas', s.games||[], '#ffe066'),
-      lineDS('Registros', s.registrations||[], '#6fdf6f'),
-      lineDS('Versus', s.versus||[], '#ff7ad9'),
+    data:{ labels:labels.map(l=>fmtLabel(l,g)), datasets:[
+      lineDS('Visitantes', visitors, '#4aa3ff'),
+      lineDS('Partidas', games, '#ffe066'),
+      lineDS('Registros', registrations, '#6fdf6f'),
+      lineDS('Versus', versus, '#ff7ad9'),
     ]},
     options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
       onHover:(evt,els,chart)=>{ chart.canvas.style.cursor = els.length ? 'pointer' : 'default'; },
@@ -890,10 +906,11 @@ function renderFunnel(f){
 
 function renderActiveUsers(s){
   const g = s.granularity || 'day';
+  const { labels, seriesArrays } = reorderHourly(s.labels||[], g, [s.activeUsers||[]]);
   const cfg = {
     type:'line',
-    data:{ labels:(s.labels||[]).map(l=>fmtLabel(l,g)), datasets:[
-      lineDS('Usuarios activos', s.activeUsers||[], '#6fdf6f'),
+    data:{ labels:labels.map(l=>fmtLabel(l,g)), datasets:[
+      lineDS('Usuarios activos', seriesArrays[0], '#6fdf6f'),
     ]},
     options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
       plugins:{ legend:{ display:false }, tooltip: chartDefaults.plugins.tooltip },

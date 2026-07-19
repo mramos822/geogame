@@ -129,28 +129,34 @@ Deno.serve(async (req) => {
     const granularity = chooseGranularity(nowMs - windowStartMs);
     const labels = buildLabels(granularity, windowStartMs, nowMs);
 
-    // ── Totales globales (all-time, no dependen del rango) ────────────────────
+    // ── Todas las consultas independientes de esta ventana se lanzan juntas en un
+    // solo Promise.all: antes iban en tandas secuenciales (totales → dau/wau/mau →
+    // filas crudas → leaderboards → cuentas → países → cohortes), y cada tanda
+    // sumaba su propio round-trip de red, haciendo el dashboard sensiblemente
+    // lento en cualquier rango. Ninguna de estas depende del resultado de otra,
+    // así que corren todas en paralelo.
     const [
       totalUsers, onlineNow, playingNow,
-      totalGames, totalVisits, versusTotal,
+      totalCampaigns, totalVisits, versusTotal,
+      dau, wau, mau,
+      profilesRes, gamesRes, visitsRes, campaignsRes,
+      lbFlags, lbShapes, lbCities, lbMonuments, lbTotal, lbVersus,
+      allProfilesRes, countryEventsRes, allEventsRes,
     ] = await Promise.all([
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true })),
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true }).gte('last_active', onlineISO)),
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true }).eq('is_playing', true).gte('last_active', onlineISO)),
-      cnt(sb.from('analytics_events').select('*', { count: 'exact', head: true }).in('type', ['game', 'versus'])),
+      // "Partidas" = Gira Mundial COMPLETA (los 4 modos, evento 'campaign' logueado
+      // recién al terminar el último) + partidas versus terminadas. NO se cuenta por
+      // modo: jugar los 4 modos de una campaña son eventos 'game' individuales (para
+      // el desglose "Partidas por modo"), pero solo 1 'campaign' si se termina, y 0
+      // si el jugador abandona antes de los 4 modos.
+      cnt(sb.from('analytics_events').select('*', { count: 'exact', head: true }).eq('type', 'campaign')),
       cnt(sb.from('analytics_events').select('*', { count: 'exact', head: true }).eq('type', 'visit')),
       cnt(sb.from('analytics_events').select('*', { count: 'exact', head: true }).eq('type', 'versus')),
-    ]);
-
-    // ── Retención (DAU/WAU/MAU, all-time, no depende del rango) ───────────────
-    const [dau, wau, mau] = await Promise.all([
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true }).gte('last_active', dauISO)),
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true }).gte('last_active', wauISO)),
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true }).gte('last_active', mauISO)),
-    ]);
-
-    // ── Filas crudas de la ventana seleccionada ────────────────────────────────
-    const [profilesRes, gamesRes, visitsRes] = await Promise.all([
       sb.from('profiles')
         .select('id, username, created_at, last_active, play_count, hs_total, vs_wins, vs_losses, is_supporter')
         .gte('created_at', windowISO).limit(50000),
@@ -158,17 +164,43 @@ Deno.serve(async (req) => {
         .in('type', ['game', 'versus']).gte('created_at', windowISO).limit(50000),
       sb.from('analytics_events').select('created_at, visitor_id, country_code, user_id')
         .eq('type', 'visit').gte('created_at', windowISO).limit(50000),
+      sb.from('analytics_events').select('created_at, score, user_id, country_code')
+        .eq('type', 'campaign').gte('created_at', windowISO).limit(50000),
+      sb.from('profiles').select('username, hs_flags').order('hs_flags', { ascending: false }).limit(10),
+      sb.from('profiles').select('username, hs_shapes').order('hs_shapes', { ascending: false }).limit(10),
+      sb.from('profiles').select('username, hs_cities').order('hs_cities', { ascending: false }).limit(10),
+      sb.from('profiles').select('username, hs_monuments').order('hs_monuments', { ascending: false }).limit(10),
+      sb.from('profiles').select('username, hs_total').order('hs_total', { ascending: false }).limit(10),
+      sb.from('profiles').select('username, vs_wins, vs_losses').order('vs_wins', { ascending: false }).limit(10),
+      sb.from('profiles')
+        .select('id, username, created_at, last_active, play_count, hs_total, vs_wins, vs_losses, is_supporter, country_code')
+        .order('last_active', { ascending: false, nullsFirst: false })
+        .limit(2000),
+      sb.from('analytics_events')
+        .select('user_id, country_code, created_at')
+        .not('user_id', 'is', null)
+        .not('country_code', 'is', null)
+        .order('created_at', { ascending: true })
+        .limit(50000),
+      sb.from('analytics_events')
+        .select('created_at, user_id')
+        .in('type', ['game', 'versus'])
+        .not('user_id', 'is', null)
+        .limit(50000),
     ]);
 
     const regRows      = profilesRes.data || [];
     const gameRows      = gamesRes.data     || [];
     const visitRows     = visitsRes.data    || [];
+    const campaignRows  = campaignsRes.data || [];
     const singleRows    = gameRows.filter((r: any) => r.type === 'game');
     const versusRows    = gameRows.filter((r: any) => r.type === 'versus');
+    // "Partidas" reales del período: Giras Mundiales completas + versus terminados.
+    const finishedRows  = [...campaignRows, ...versusRows];
 
     // Series por bucket (hora/día/mes según granularidad)
     const seriesRegs     = bucketByKey(regRows, labels, granularity);
-    const seriesGames    = bucketByKey(gameRows, labels, granularity);
+    const seriesGames    = bucketByKey(finishedRows, labels, granularity);
     const seriesVersus   = bucketByKey(versusRows, labels, granularity);
     const visMap: Record<string, Set<string>> = {};
     for (const r of visitRows) {
@@ -191,9 +223,9 @@ Deno.serve(async (req) => {
       versusByMode[m] = (versusByMode[m] || 0) + 1;
     }
 
-    // Heatmap de actividad por hora del día (UTC), partidas single-player + versus
+    // Heatmap de actividad por hora del día (UTC): Giras Mundiales completas + versus
     const hourly = new Array(24).fill(0);
-    for (const r of gameRows) {
+    for (const r of finishedRows) {
       const h = new Date(r.created_at as string).getUTCHours();
       hourly[h]++;
     }
@@ -226,23 +258,9 @@ Deno.serve(async (req) => {
     }
     const returnRate = registrations > 0 ? Math.round((returnedCohort / registrations) * 100) : 0;
 
-    // ── Leaderboards por modo + versus (all-time, no dependen del rango: son highscores) ──
-    const [lbFlags, lbShapes, lbCities, lbMonuments, lbTotal, lbVersus] = await Promise.all([
-      sb.from('profiles').select('username, hs_flags').order('hs_flags', { ascending: false }).limit(10),
-      sb.from('profiles').select('username, hs_shapes').order('hs_shapes', { ascending: false }).limit(10),
-      sb.from('profiles').select('username, hs_cities').order('hs_cities', { ascending: false }).limit(10),
-      sb.from('profiles').select('username, hs_monuments').order('hs_monuments', { ascending: false }).limit(10),
-      sb.from('profiles').select('username, hs_total').order('hs_total', { ascending: false }).limit(10),
-      sb.from('profiles').select('username, vs_wins, vs_losses').order('vs_wins', { ascending: false }).limit(10),
-    ]);
-
     // ── Cuentas + historial de partidas (dentro de la ventana) ────────────────
     // Trae todas las cuentas (no solo las creadas en la ventana) para poder ver
     // el historial de partidas de cualquier usuario en el período elegido.
-    const allProfilesRes = await sb.from('profiles')
-      .select('id, username, created_at, last_active, play_count, hs_total, vs_wins, vs_losses, is_supporter')
-      .order('last_active', { ascending: false, nullsFirst: false })
-      .limit(2000);
     const allProfiles = allProfilesRes.data || [];
     const gamesByUser: Record<string, any[]> = {};
     for (const r of gameRows as any[]) {
@@ -256,12 +274,6 @@ Deno.serve(async (req) => {
     // `profiles` no guarda país propio: se toma el país del evento MÁS ANTIGUO
     // con ese user_id (cualquier tipo: visit/game/versus), que en la práctica es
     // la primera visita logueada, es decir muy cerca del momento de registro.
-    const countryEventsRes = await sb.from('analytics_events')
-      .select('user_id, country_code, created_at')
-      .not('user_id', 'is', null)
-      .not('country_code', 'is', null)
-      .order('created_at', { ascending: true })
-      .limit(50000);
     const countryByUser: Record<string, string> = {};
     for (const r of (countryEventsRes.data || []) as any[]) {
       if (!countryByUser[r.user_id]) countryByUser[r.user_id] = r.country_code; // primera aparición = la más vieja (orden asc)
@@ -302,7 +314,11 @@ Deno.serve(async (req) => {
         id: p.id, username: p.username, created_at: p.created_at, last_active: p.last_active,
         play_count: p.play_count || 0, hs_total: p.hs_total || 0,
         vs_wins: p.vs_wins || 0, vs_losses: p.vs_losses || 0, is_supporter: !!p.is_supporter,
-        country_code: countryByUser[p.id] || null,
+        // `profiles.country_code` es la fuente confiable (se backfillea una sola vez
+        // al loguear, ver _ensureCountryCode en monuments.js); countryByUser (evento
+        // más viejo con país en analytics_events) es solo fallback para cuentas que
+        // por lo que sea todavía no lo tienen seteado ahí.
+        country_code: p.country_code || countryByUser[p.id] || null,
         games_in_range: games.length, games,
       };
     });
@@ -326,11 +342,6 @@ Deno.serve(async (req) => {
     // específicamente, así que se reconstruye desde los eventos crudos.
     const WEEK_MS = 7 * 86400000;
     const MAX_COHORT_WEEKS = 6; // columnas W0..W6
-    const allEventsRes = await sb.from('analytics_events')
-      .select('created_at, user_id')
-      .in('type', ['game', 'versus'])
-      .not('user_id', 'is', null)
-      .limit(50000);
     const allEvents = allEventsRes.data || [];
     const signupById: Record<string, number> = {};
     for (const p of allProfiles) signupById[p.id] = new Date(p.created_at).getTime();
@@ -401,9 +412,9 @@ Deno.serve(async (req) => {
       ok: true,
       generated_at: now.toISOString(),
       range,
-      totals: { totalUsers, onlineNow, playingNow, totalGames, totalVisits, versusTotal },
+      totals: { totalUsers, onlineNow, playingNow, totalGames: totalCampaigns + versusTotal, totalVisits, versusTotal },
       period: {
-        newUsers: registrations, games: singleRows.length + versusRows.length,
+        newUsers: registrations, games: finishedRows.length,
         visits: uniqueVisitors, versus: versusRows.length,
       },
       retention: { dau, wau, mau, returnedCohort, cohortSize: registrations, returnRate },

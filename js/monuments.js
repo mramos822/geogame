@@ -7669,6 +7669,9 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
       }
     } else {
       window.campaign.active = false;
+      if (window.Analytics && typeof window.Analytics.logCampaign === 'function') {
+        window.Analytics.logCampaign(window.campaign.base || 0);
+      }
       playMusic(null);
       // Ocultar el gameover de monuments antes de mostrar results; si no, queda
       // encima y bloquea el click del confirm para ver el rank.
