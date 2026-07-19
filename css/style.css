@@ -1758,6 +1758,25 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 .spectator-badge-eye-pupil.looking-right {
   transform: translateX(12%);
 }
+/* Bandera del país de la cuenta, pegada a la izquierda de points.png en la
+   fila de rankings — mismo truco que .social-spectate-eye: vive DENTRO de
+   .loading-social-score (que ya es position:absolute) para no correrle el
+   centrado a nada del resto de la fila. */
+.loading-social-flag {
+  position: absolute;
+  left: -6cqmin;
+  top: 50%;
+  transform: translate(0, -50%);
+  width: 4cqmin;
+  height: 4cqmin;
+  border-radius: 50%;
+  overflow: hidden;
+  object-fit: cover;
+  border: 0.3cqmin solid #fff;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
 .loading-social-points {
   position: absolute;
   top: 50%;
@@ -1929,6 +1948,16 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   display: block;
   pointer-events: none;
   z-index: 221;
+}
+
+/* El nombre/"Has jugado X veces" del amigo se centraban en el 50% del panel
+   (igual que el perfil propio), pero el back (50% - 48cqmin) y la foto del
+   amigo (50% + 30cqmin) no son simétricos respecto a ese 50% — el punto medio
+   real entre ambos es 50% - 9cqmin. Sin este ajuste el texto queda corrido a
+   la derecha, con mucho más espacio del lado del back que del lado de la foto. */
+#loading-friend-group .loading-name-wrap,
+#loading-friend-group .loading-play-count {
+  left: calc(50% - 9cqmin);
 }
 
 .loading-friend-status {
@@ -2148,7 +2177,10 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 .loading-name-wrap {
   position: absolute;
   top: 18%;
-  left: 50%;
+  /* Centrado entre el back (50% - 48cqmin) y la foto de perfil propia
+     (50% + 33cqmin), no en el 50% puro del panel — si no, queda corrido a la
+     derecha con mucho más espacio del lado del back que del lado de la foto. */
+  left: calc(50% - 7.5cqmin);
   transform: translate(-50%, -50%);
   z-index: 212;
   display: flex;
@@ -2186,19 +2218,22 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   color: #8b6a00;
 }
 
-/* Bandera del país de creación de la cuenta: circulito superpuesto en la
-   esquina inferior-derecha de la foto de perfil. */
+/* Bandera del país de creación de la cuenta: circulito a la derecha del
+   nombre (como la copa de rango, pero del otro lado). El ancho del nombre
+   varía según el username, así que left/top los calcula JS
+   (_positionFlagBadgeRightOfName) a partir del rect real del name-wrap; acá
+   solo el fallback antes de medir. */
 .profile-flag-badge {
   position: absolute;
-  top: calc(50% - 30cqmin + 4.5cqmin);
-  left: calc(50% + 33cqmin + 4.5cqmin);
-  transform: translate(-50%, -50%);
+  top: 18%;
+  left: 50%;
+  transform: translate(0, -50%);
   width: 5cqmin;
   height: 5cqmin;
   border-radius: 50%;
   overflow: hidden;
   border: 0.4cqmin solid #fff;
-  z-index: 222; /* por encima de #loading-friend-group .loading-profile-pic (221) */
+  z-index: 212;
   pointer-events: none;
 }
 .profile-flag-badge img {
@@ -2206,10 +2241,6 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   height: 100%;
   object-fit: cover;
   display: block;
-}
-#loading-friend-group .profile-flag-badge {
-  top: calc(50% - 30cqmin + 3.7cqmin);
-  left: calc(50% + 30cqmin + 3.7cqmin);
 }
 
 .loading-player-name {
@@ -2579,7 +2610,9 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 .loading-play-count {
   position: absolute;
   top: 24%;
-  left: 50%;
+  /* Mismo criterio que .loading-name-wrap: centrado entre el back y la foto,
+     no en el 50% puro del panel. */
+  left: calc(50% - 7.5cqmin);
   transform: translate(-50%, -50%);
   z-index: 212;
   font-family: 'Dimbo', sans-serif;

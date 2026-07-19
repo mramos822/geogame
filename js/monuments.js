@@ -279,29 +279,69 @@ function flagUrlForCountryCode(cc) {
 }
 window.flagUrlForCountryCode = flagUrlForCountryCode;
 
-// El badge de copa+puesto vive fuera del name-wrap (para no correr el centrado
-// del nombre) así que su posición hay que calcularla en JS a partir del ancho
-// real del nombre, que varía según el username. Se recalcula cada vez que el
-// nombre cambia y en resize mientras el badge esté visible.
-function _positionRankBadgeLeftOfName(nameWrapEl, badgeEl) {
-  if (!nameWrapEl || !badgeEl) return;
+// La copa (izquierda del "Has jugado X veces") y la bandera (derecha del
+// nombre) viven fuera de esos textos, como elementos absolutos aparte, para
+// no tener que tocar el flex interno del name-wrap. Pero eso significa que
+// si solo se pega el badge al costado del texto YA centrado (left:50%), el
+// conjunto [badge+texto] queda descentrado — el texto sigue en el medio y el
+// badge cuelga para un lado. Acá se centra el PAR como si fuera un solo
+// bloque: se corre el texto la mitad del ancho del badge (+gap) hacia el
+// lado contrario, y el badge se pega justo al lado de esa nueva posición.
+const BADGE_TEXT_GAP = 40; // px, separación entre el badge y el texto
+function _centerBadgeWithText(textEl, badgeEl, side) {
+  if (!textEl || !badgeEl) return;
   const parent = badgeEl.offsetParent;
   if (!parent) return;
-  const wrapRect   = nameWrapEl.getBoundingClientRect();
-  const parentRect = parent.getBoundingClientRect();
-  const gap = 40; // px, espacio entre la copa y el nombre
-  badgeEl.style.left = (wrapRect.left - parentRect.left - gap) + 'px';
-  badgeEl.style.top  = (wrapRect.top  - parentRect.top + wrapRect.height / 2) + 'px';
+
+  // Centro NATURAL del texto: el que le da su propio CSS sin ningún corrimiento
+  // nuestro (no siempre es el 50% del panel — el name-wrap del amigo, por
+  // ejemplo, se centra un poco más a la izquierda que el propio para quedar
+  // entre el back y la foto). Se limpia el left inline y se mide en vivo, así
+  // esto funciona sea cual sea ese centro sin tener que hardcodearlo acá.
+  textEl.style.left = '';
+  if (badgeEl.style.display === 'none') return;
+
+  const parentRect      = parent.getBoundingClientRect();
+  const naturalRect     = textEl.getBoundingClientRect();
+  const naturalCenterX  = (naturalRect.left - parentRect.left) + naturalRect.width / 2;
+  const badgeW  = badgeEl.offsetWidth;
+  const textW   = naturalRect.width;
+  const shift   = (badgeW + BADGE_TEXT_GAP) / 2;
+
+  let textCenterX, badgeLeftPx;
+  if (side === 'before') { // badge a la izquierda del texto (la copa)
+    textCenterX = naturalCenterX + shift;
+    const textLeftEdge = textCenterX - textW / 2;
+    badgeLeftPx = textLeftEdge - BADGE_TEXT_GAP; // badge usa translate(-100%,-50%): left = su borde derecho
+  } else { // side === 'after' — badge a la derecha del texto (la bandera)
+    textCenterX = naturalCenterX - shift;
+    const textRightEdge = textCenterX + textW / 2;
+    badgeLeftPx = textRightEdge + BADGE_TEXT_GAP; // badge usa translate(0,-50%): left = su borde izquierdo
+  }
+  // El transform:translate(-50%,...) que ya trae el CSS del texto termina de
+  // centrarlo sobre este punto (mismo mecanismo que su 'left:50%' original).
+  textEl.style.left = textCenterX + 'px';
+  badgeEl.style.left = badgeLeftPx + 'px';
+  const textRect = textEl.getBoundingClientRect(); // ya en su posición final
+  badgeEl.style.top = (textRect.top - parentRect.top + textRect.height / 2) + 'px';
 }
-window._positionRankBadgeLeftOfName = _positionRankBadgeLeftOfName;
+window._centerBadgeWithText = _centerBadgeWithText;
 
 function _repositionVisibleRankBadges() {
+  // La copa vive en el renglón de "Has jugado X veces" (no en el del nombre).
   const ownBadge = document.getElementById('profile-rank-badge');
-  const ownWrap  = document.getElementById('loading-name-wrap');
-  if (ownBadge && ownWrap && ownBadge.style.display !== 'none') _positionRankBadgeLeftOfName(ownWrap, ownBadge);
+  const ownPlayCount = document.getElementById('loading-play-count');
+  if (ownBadge && ownPlayCount) _centerBadgeWithText(ownPlayCount, ownBadge, 'before');
   const friendBadge = document.getElementById('loading-friend-rank-badge');
-  const friendWrap  = document.querySelector('#loading-friend-group .loading-name-wrap');
-  if (friendBadge && friendWrap && friendBadge.style.display !== 'none') _positionRankBadgeLeftOfName(friendWrap, friendBadge);
+  const friendPlayCount = document.getElementById('loading-friend-play-count');
+  if (friendBadge && friendPlayCount) _centerBadgeWithText(friendPlayCount, friendBadge, 'before');
+
+  const ownWrap = document.getElementById('loading-name-wrap');
+  const ownFlag = document.getElementById('profile-flag-badge');
+  if (ownFlag && ownWrap) _centerBadgeWithText(ownWrap, ownFlag, 'after');
+  const friendWrap = document.querySelector('#loading-friend-group .loading-name-wrap');
+  const friendFlag = document.getElementById('loading-friend-flag-badge');
+  if (friendFlag && friendWrap) _centerBadgeWithText(friendWrap, friendFlag, 'after');
 }
 window.addEventListener('resize', () => requestAnimationFrame(_repositionVisibleRankBadges));
 
@@ -419,16 +459,17 @@ window.refreshProfileStats = function () {
   if (rankBadge) {
     if (p && window._accountLoggedIn && p.id && typeof window.getGlobalRankForId === 'function') {
       window.getGlobalRankForId(p.id).then(pos => {
-        if (!pos) { rankBadge.style.display = 'none'; return; }
+        if (!pos) { rankBadge.style.display = 'none'; _centerBadgeWithText(document.getElementById('loading-play-count'), rankBadge, 'before'); return; }
         rankBadge.style.display = '';
         const cupEl = document.getElementById('profile-rank-cup');
         const numEl = document.getElementById('profile-rank-num');
         if (cupEl) cupEl.src = `images/cups/${window._cupForRank(pos)}.png`;
         if (numEl) numEl.textContent = '#' + pos;
-        _positionRankBadgeLeftOfName(document.getElementById('loading-name-wrap'), rankBadge);
-      }).catch(() => { rankBadge.style.display = 'none'; });
+        _centerBadgeWithText(document.getElementById('loading-play-count'), rankBadge, 'before');
+      }).catch(() => { rankBadge.style.display = 'none'; _centerBadgeWithText(document.getElementById('loading-play-count'), rankBadge, 'before'); });
     } else {
       rankBadge.style.display = 'none';
+      _centerBadgeWithText(document.getElementById('loading-play-count'), rankBadge, 'before');
     }
   }
 
@@ -436,12 +477,15 @@ window.refreshProfileStats = function () {
   const flagBadge = document.getElementById('profile-flag-badge');
   if (flagBadge) {
     const flagUrl = (p && window._accountLoggedIn) ? window.flagUrlForCountryCode?.(p.country_code) : null;
+    const nameWrap = document.getElementById('loading-name-wrap');
     if (flagUrl) {
       flagBadge.style.display = '';
       const img = document.getElementById('profile-flag-badge-img');
       if (img) img.src = flagUrl;
+      _centerBadgeWithText(nameWrap, flagBadge, 'after');
     } else {
       flagBadge.style.display = 'none';
+      _centerBadgeWithText(nameWrap, flagBadge, 'after');
     }
   }
 };
@@ -1433,9 +1477,12 @@ function confirmNameChange() {
     if (el) el.textContent = limpio;
     maybeAutoAssignPic(limpio);
     _updateProfileBtnLabel();
-    const rankBadge = document.getElementById('profile-rank-badge');
-    if (rankBadge && rankBadge.style.display !== 'none') {
-      requestAnimationFrame(() => _positionRankBadgeLeftOfName(wrap, rankBadge));
+    // La copa ya no depende del ancho del nombre (vive en el renglón de "Has
+    // jugado X veces", ese texto no cambia al renombrarse) — no hace falta
+    // reposicionarla acá.
+    const flagBadge = document.getElementById('profile-flag-badge');
+    if (flagBadge && flagBadge.style.display !== 'none') {
+      requestAnimationFrame(() => _centerBadgeWithText(wrap, flagBadge, 'after'));
     }
   }
   wrap.classList.remove('editing');
@@ -2083,11 +2130,13 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
       const medalCls = r.rank === 1 ? ' rk-gold' : r.rank === 2 ? ' rk-silver' : r.rank === 3 ? ' rk-bronze' : '';
       const el = document.createElement('div');
       el.className = 'loading-social-row' + (isMe ? ' is-me-row' : '');
+      const flagUrl = window.flagUrlForCountryCode?.(r.country_code);
       el.innerHTML =
         `<span class="rankings-pos${medalCls}">#${r.rank}</span>` +
         `<img class="loading-social-avatar" src="${r.avatar}" onerror="this.src='images/profilepic/ppdefault.png'" alt="" draggable="false" oncontextmenu="return false">` +
         `<div class="loading-social-info"><span class="loading-social-name">${r.name}</span></div>` +
         `<div class="loading-social-score">` +
+          (flagUrl ? `<img class="loading-social-flag" src="${flagUrl}" alt="" draggable="false" oncontextmenu="return false">` : '') +
           `<img class="loading-social-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">` +
           `<span class="loading-social-score-val">${r.score.toLocaleString()}</span>` +
         `</div>` +
@@ -2713,30 +2762,35 @@ function openFriendProfile(friend) {
   }
 
   const friendRankBadge = document.getElementById('loading-friend-rank-badge');
+  const friendPlayCountEl = document.getElementById('loading-friend-play-count');
   if (friendRankBadge) {
     if (friend.id && typeof window.getGlobalRankForId === 'function') {
       window.getGlobalRankForId(friend.id).then(pos => {
-        if (currentFriendProfile !== friend || !pos) { friendRankBadge.style.display = 'none'; return; }
+        if (currentFriendProfile !== friend || !pos) { friendRankBadge.style.display = 'none'; _centerBadgeWithText(friendPlayCountEl, friendRankBadge, 'before'); return; }
         friendRankBadge.style.display = '';
         const cupEl = document.getElementById('loading-friend-rank-cup');
         const numEl = document.getElementById('loading-friend-rank-num');
         if (cupEl) cupEl.src = `images/cups/${window._cupForRank(pos)}.png`;
         if (numEl) numEl.textContent = '#' + pos;
-        _positionRankBadgeLeftOfName(document.querySelector('#loading-friend-group .loading-name-wrap'), friendRankBadge);
-      }).catch(() => { friendRankBadge.style.display = 'none'; });
+        _centerBadgeWithText(friendPlayCountEl, friendRankBadge, 'before');
+      }).catch(() => { friendRankBadge.style.display = 'none'; _centerBadgeWithText(friendPlayCountEl, friendRankBadge, 'before'); });
     } else {
       friendRankBadge.style.display = 'none';
+      _centerBadgeWithText(friendPlayCountEl, friendRankBadge, 'before');
     }
   }
   const friendFlagBadge = document.getElementById('loading-friend-flag-badge');
   if (friendFlagBadge) {
     const flagUrl = window.flagUrlForCountryCode?.(friend.country_code);
+    const friendNameWrap = document.querySelector('#loading-friend-group .loading-name-wrap');
     if (flagUrl) {
       friendFlagBadge.style.display = '';
       const img = document.getElementById('loading-friend-flag-badge-img');
       if (img) img.src = flagUrl;
+      _centerBadgeWithText(friendNameWrap, friendFlagBadge, 'after');
     } else {
       friendFlagBadge.style.display = 'none';
+      _centerBadgeWithText(friendNameWrap, friendFlagBadge, 'after');
     }
   }
 
@@ -3290,7 +3344,7 @@ window.gameStoppers = window.gameStoppers || [];
 window.gameStoppers.push(() => {
   try { pregameAborted = true; clearTimeout(pregameTimeout); pregameTimeout = null; } catch (e) {}
   try { gameAborted = true; clearTimeout(endGameTimeout1); clearTimeout(endGameTimeout2); } catch (e) {}
-  try { clearInterval(timerIntervalId); } catch (e) {}
+  try { clearInterval(timerIntervalId); timerIntervalId = null; } catch (e) {}
   try { if (animFrameId) cancelAnimationFrame(animFrameId); animFrameId = null; } catch (e) {}
   if (window._powerQuitOverlay) {
     // Bloquear canvas durante el overlay de game over de práctica
@@ -4383,7 +4437,7 @@ window.citiesHardReset = function() {
   try { gameAborted = true; } catch(e) {}
   try { pregameAborted = true; clearTimeout(pregameTimeout); pregameTimeout = null; } catch(e) {}
   try { clearTimeout(endGameTimeout1); clearTimeout(endGameTimeout2); } catch(e) {}
-  try { clearInterval(timerIntervalId); } catch(e) {}
+  try { clearInterval(timerIntervalId); timerIntervalId = null; } catch(e) {}
   try { if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; } } catch(e) {}
   const _sbt = document.getElementById('speed-bonus-text');
   if (_sbt) _sbt.classList.remove('visible');
@@ -4520,7 +4574,7 @@ window.citiesSpectatorEnter = function () {
 
   mapGameOver = false;
   gameAborted = false;
-  clearInterval(timerIntervalId);
+  clearInterval(timerIntervalId); timerIntervalId = null;
   clearTimeout(pregameTimeout);
   clearTimeout(_citiesSpecTimesUpT1); clearTimeout(_citiesSpecTimesUpT2);
   canvas.style.pointerEvents = 'none'; // solo-lectura: no hay click que resolver
@@ -5204,7 +5258,7 @@ window.monumentsSpectatorEnter = function () {
 
   mapGameOver = false;
   gameAborted = false;
-  clearInterval(timerIntervalId);
+  clearInterval(timerIntervalId); timerIntervalId = null;
   clearTimeout(pregameTimeout);
   clearTimeout(_monumentsSpecTimesUpT1); clearTimeout(_monumentsSpecTimesUpT2);
   canvas.style.pointerEvents = 'none'; // solo-lectura: no hay click que resolver
@@ -5680,7 +5734,7 @@ window.monumentsHardReset = function() {
   try { gameAborted = true; } catch(e) {}
   try { pregameAborted = true; clearTimeout(pregameTimeout); pregameTimeout = null; } catch(e) {}
   try { clearTimeout(endGameTimeout1); clearTimeout(endGameTimeout2); } catch(e) {}
-  try { clearInterval(timerIntervalId); } catch(e) {}
+  try { clearInterval(timerIntervalId); timerIntervalId = null; } catch(e) {}
   try { if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; } } catch(e) {}
   const _sbt = document.getElementById('speed-bonus-text');
   if (_sbt) _sbt.classList.remove('visible');
@@ -7189,7 +7243,7 @@ function endGame() {
   mapGameOver = true;
   gameAborted = false;
   if ((window.pendingGameMode === 'game' || window.pendingGameMode === 'monuments') && typeof window._specReportTimesUp === 'function') window._specReportTimesUp();
-  clearInterval(timerIntervalId);
+  clearInterval(timerIntervalId); timerIntervalId = null;
   if (slideMonumentIn._nameTimer) { clearTimeout(slideMonumentIn._nameTimer); slideMonumentIn._nameTimer = null; }
   monumentNameEl.style.opacity = '0';
   state.phase = 'idle';
@@ -7443,7 +7497,7 @@ function startGame() {
     sfxCountdown.currentTime = 0;
   }
   mapGameOver = false;
-  clearInterval(timerIntervalId);
+  clearInterval(timerIntervalId); timerIntervalId = null;
   if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
   canvas.style.pointerEvents = '';
   // Restaurar tamaño del canvas si fue liberado en iOS al final de la ronda anterior.
