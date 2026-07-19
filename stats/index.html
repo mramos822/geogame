@@ -130,6 +130,9 @@
   .retention-note{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.6;
     background:var(--panel2);border-radius:8px;padding:10px 12px;}
 
+  .modes-total{text-align:center;margin-top:10px;font-size:13px;color:var(--muted);}
+  .modes-total b{color:var(--text);font-size:15px;}
+
   /* ── Resumen ejecutivo (insights auto-generados) ── */
   .insights{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:22px;}
   .insight-card{background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--dim);
@@ -289,6 +292,7 @@
         <div class="box">
           <h2>Partidas por modo</h2>
           <div class="chart-wrap short"><canvas id="chart-modes"></canvas></div>
+          <div class="modes-total" id="modes-total"></div>
         </div>
         <div class="box">
           <h2>Actividad por hora del día (UTC)</h2>
@@ -831,6 +835,7 @@ function renderModes(m){
   };
   if(charts.modes){ charts.modes.data = cfg.data; charts.modes.options = cfg.options; charts.modes.update('none'); }
   else charts.modes = new Chart($('chart-modes'), cfg);
+  $('modes-total').innerHTML = `Total: <b>${total.toLocaleString('es')}</b>`;
 }
 
 function renderHourly(hourly){

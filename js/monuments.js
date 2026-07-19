@@ -3773,7 +3773,7 @@ const DOTS_NEEDED     = 10;
 const SPEED_BONUS_WIN = 3;
 
 // Pixel thresholds on the DISPLAYED canvas
-const PERFECT_PX = 7;
+const PERFECT_PX = 4;
 const GOOD_PX    = 20;
 const FAIR_PX    = 45;
 
@@ -3908,7 +3908,6 @@ function clampMapCamera() {
 }
 
 function resetMapZoom() {
-  if (_mapZoomAnimId) { cancelAnimationFrame(_mapZoomAnimId); _mapZoomAnimId = null; }
   mapCamera.zoom = 1;
   mapCamera.x = 0;
   mapCamera.y = 0;
@@ -3926,37 +3925,22 @@ function _canvasScreenPos(e) {
   return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
 }
 
-// Anima el zoom (y el paneo que lo acompaña para seguir el cursor) en vez de
-// saltar directo al valor nuevo — varios eventos 'wheel' seguidos (trackpad)
-// se encadenan sin trabarse porque cada tick arranca desde el zoom ACTUAL
-// (que puede estar a mitad de una animación anterior), no desde el objetivo.
-const MAP_ZOOM_ANIM_MS = 140;
-let _mapZoomAnimId = null;
-
+// Zoom directo, sin animación: cada evento 'wheel' mueve mapCamera.zoom/x/y
+// al toque, ya clampeado, ajustando la cámara para que el punto de mundo bajo
+// el cursor quede fijo (zoom "hacia donde apunta el mouse"). Al ser síncrono
+// (sin requestAnimationFrame de por medio) cada evento parte siempre del
+// último valor real, así que ráfagas de wheel (mouse/trackpad) se acumulan
+// bien sin necesidad de trackear un "target" aparte.
 function _stepMapZoom(zoomDelta, screenX, screenY) {
   const nextZoom = Math.min(MAP_ZOOM_MAX, Math.max(MAP_ZOOM_MIN, mapCamera.zoom + zoomDelta));
   if (nextZoom === mapCamera.zoom) return;
 
-  const worldPt  = screenToWorld(screenX, screenY); // punto de mundo bajo el cursor, con el zoom actual
-  const fromZoom = mapCamera.zoom, fromX = mapCamera.x, fromY = mapCamera.y;
-
-  // Cámara de destino: worldPt debajo del cursor otra vez, ya con el zoom nuevo y clampeada.
+  const worldPt = screenToWorld(screenX, screenY); // punto de mundo bajo el cursor, con el zoom actual
   const vw = DISPLAY_W / nextZoom, vh = DISPLAY_H / nextZoom;
-  const toX = Math.min(Math.max(worldPt.x - screenX / nextZoom, 0), Math.max(0, DISPLAY_W - vw));
-  const toY = Math.min(Math.max(worldPt.y - screenY / nextZoom, 0), Math.max(0, DISPLAY_H - vh));
-
-  if (_mapZoomAnimId) cancelAnimationFrame(_mapZoomAnimId);
-  const start = performance.now();
-  const tick = (now) => {
-    const p = Math.min(1, (now - start) / MAP_ZOOM_ANIM_MS);
-    const ease = 1 - (1 - p) ** 3; // ease-out cúbico: rápido al empezar, suave al llegar
-    mapCamera.zoom = fromZoom + (nextZoom - fromZoom) * ease;
-    mapCamera.x    = fromX    + (toX    - fromX)    * ease;
-    mapCamera.y    = fromY    + (toY    - fromY)    * ease;
-    if (state) state.mapDrawn = false;
-    _mapZoomAnimId = p < 1 ? requestAnimationFrame(tick) : null;
-  };
-  _mapZoomAnimId = requestAnimationFrame(tick);
+  mapCamera.zoom = nextZoom;
+  mapCamera.x = Math.min(Math.max(worldPt.x - screenX / nextZoom, 0), Math.max(0, DISPLAY_W - vw));
+  mapCamera.y = Math.min(Math.max(worldPt.y - screenY / nextZoom, 0), Math.max(0, DISPLAY_H - vh));
+  if (state) state.mapDrawn = false;
 }
 
 canvas.addEventListener('wheel', (e) => {
@@ -3979,7 +3963,11 @@ let _mapDrag = null; // { startScreenX, startScreenY, startCamX, startCamY, drag
 canvas.addEventListener('pointerdown', (e) => {
   if (mapCamera.zoom <= 1 || e.button !== 0) return;
   const pos = _canvasScreenPos(e);
-  _mapDrag = { startScreenX: pos.x, startScreenY: pos.y, startCamX: mapCamera.x, startCamY: mapCamera.y, dragged: false };
+  _mapDrag = {
+    startScreenX: pos.x, startScreenY: pos.y,
+    startClientX: e.clientX, startClientY: e.clientY,
+    startCamX: mapCamera.x, startCamY: mapCamera.y, dragged: false,
+  };
   canvas.setPointerCapture(e.pointerId);
 });
 
@@ -3988,9 +3976,19 @@ canvas.addEventListener('pointermove', (e) => {
   const pos = _canvasScreenPos(e);
   const dx = pos.x - _mapDrag.startScreenX;
   const dy = pos.y - _mapDrag.startScreenY;
-  if (!_mapDrag.dragged && Math.hypot(dx, dy) > MAP_DRAG_THRESHOLD) {
-    _mapDrag.dragged = true;
-    canvas.style.cursor = 'grabbing';
+  if (!_mapDrag.dragged) {
+    // El umbral se mide en píxeles de PANTALLA reales (clientX/Y), no en el
+    // espacio interno del canvas (pos, en unidades DISPLAY_W/H): en pantallas
+    // más chicas que el stage de referencia (1920×911, ver letterbox.js) ese
+    // espacio interno queda escalado hacia arriba, así que un par de px reales
+    // de temblor del mouse al clickear ya superaban el umbral en unidades de
+    // canvas y activaban "arrastre" en vez de registrar el click de adivinar.
+    const clientDx = e.clientX - _mapDrag.startClientX;
+    const clientDy = e.clientY - _mapDrag.startClientY;
+    if (Math.hypot(clientDx, clientDy) > MAP_DRAG_THRESHOLD) {
+      _mapDrag.dragged = true;
+      canvas.style.cursor = 'grabbing';
+    }
   }
   if (!_mapDrag.dragged) return;
   mapCamera.x = _mapDrag.startCamX - dx / mapCamera.zoom;
