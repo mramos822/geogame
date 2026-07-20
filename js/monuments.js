@@ -1136,6 +1136,7 @@ window.startCampaign = function () {
           window._accountLoggedIn = true;
           window._sbUserId = data.user.id;
           document.body.classList.add('account-logged');
+          if (typeof window.sbClaimAnonymousEvents === 'function') window.sbClaimAnonymousEvents();
           try {
             await syncLocalDataToAccount(data.user.id);
             const profile = await window.sbGetProfile(data.user.id);

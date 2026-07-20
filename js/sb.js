@@ -66,6 +66,17 @@ window.sbGetSession = async function() {
   return data.session;
 };
 
+// Vincula al usuario recién logueado las partidas/visitas que jugó como invitado
+// desde este mismo dispositivo antes de crear la cuenta (ver claim_anonymous_events
+// en la DB). Fire-and-forget: nunca debe interrumpir el flujo de login.
+window.sbClaimAnonymousEvents = async function() {
+  try {
+    const visitorId = localStorage.getItem('_devstats_vid');
+    if (!visitorId) return;
+    await sb.rpc('claim_anonymous_events', { p_visitor_id: visitorId });
+  } catch (e) {}
+};
+
 // ── SESSION GUARD (un solo dispositivo activo por cuenta) ─────────────────────
 
 window.sbSetSessionToken = async function(uid, token) {
@@ -404,6 +415,7 @@ sb.auth.onAuthStateChange((event, session) => {
   window._accountLoggedIn = true;
   window._sbUserId = session.user.id;
   document.body.classList.add('account-logged');
+  window.sbClaimAnonymousEvents();
   try {
     const profile = await window.sbGetProfile(session.user.id);
     window._sbProfile = profile;
