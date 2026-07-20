@@ -7,10 +7,25 @@ window.sb = sb;
 
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 
+// País por IP para guardarlo en la cuenta desde su creación (ver handle_new_user
+// en la DB, que lo lee de raw_user_meta_data). Usa el valor ya cacheado por
+// analytics.js si está disponible; si no, lo pide en el momento.
+async function _getCountryCodeForSignup() {
+  const cached = localStorage.getItem('_an_country');
+  if (cached) return cached || null;
+  try {
+    const r = await fetch('https://ipinfo.io/json');
+    const d = await r.json();
+    if (d && d.country) { localStorage.setItem('_an_country', d.country); return d.country; }
+  } catch (e) {}
+  return null;
+}
+
 window.sbRegister = async function(username, email, password) {
+  const country_code = await _getCountryCodeForSignup();
   const { data, error } = await sb.auth.signUp({
     email, password,
-    options: { data: { username } }
+    options: { data: { username, country_code } }
   });
   if (error) throw error;
   return data;
