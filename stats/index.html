@@ -702,22 +702,21 @@ function lineDS(label,arr,color){
     tension:.3, borderWidth:2, pointRadius:0, pointHoverRadius:4, pointHoverBackgroundColor:color, fill:true };
 }
 function fmtLabel(l, granularity){
-  if(granularity==='hour') return String(new Date(l+':00:00Z').getHours()).padStart(2,'0')+'h';
+  if(granularity==='hour'){
+    // Tiempo transcurrido real desde ahora (no la hora de reloj local del bucket),
+    // así el eje siempre lee "hace cuánto" en vez de la hora del día.
+    const hoursAgo = Math.round((Date.now() - new Date(l+':00:00Z').getTime()) / 3600000);
+    return hoursAgo <= 0 ? 'ahora' : `-${hoursAgo}h`;
+  }
   if(granularity==='month') return l;
   return l.slice(5);
 }
-// Para granularidad 'hour' (rango 1D), las 24 barras son horas reales consecutivas
-// pero al mostrarlas en hora LOCAL el número de hora puede "dar la vuelta" a mitad
-// del gráfico (ej: 17h,18h...23h,0h,1h...16h), lo cual marea. Se reordena para que
-// siempre se lea 23h -> 0h de izquierda a derecha, simulando el ciclo del día.
+// El backend ya entrega las 24 horas en orden cronológico real (hace 23h -> ahora),
+// así que no hace falta (ni conviene) reordenarlas: antes se reordenaba por hora de
+// reloj local descendente, lo cual rompía el orden cronológico real cada vez que el
+// rango cruzaba la medianoche.
 function reorderHourly(labels, granularity, seriesArrays){
-  if(granularity !== 'hour') return { labels, seriesArrays };
-  const idx = labels.map((_,i)=>i)
-    .sort((a,b)=> new Date(labels[b]+':00:00Z').getHours() - new Date(labels[a]+':00:00Z').getHours());
-  return {
-    labels: idx.map(i=>labels[i]),
-    seriesArrays: seriesArrays.map(arr => idx.map(i=>(arr||[])[i])),
-  };
+  return { labels, seriesArrays };
 }
 const chartDefaults = {
   plugins:{
