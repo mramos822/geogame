@@ -98,6 +98,14 @@
   .chart-wrap.short{height:220px;}
   canvas{max-height:100%;}
 
+  .activity-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;}
+  .activity-cell{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px 14px 8px;}
+  .activity-cell-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px;}
+  .activity-cell-head .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;}
+  .activity-cell-head .name{font-size:12px;font-weight:700;color:var(--text);}
+  .activity-cell-head .total{font-size:15px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;}
+  .activity-cell .chart-wrap{height:120px;}
+
   .table-scroll{overflow-x:auto;}
   table{width:100%;border-collapse:collapse;font-size:13px;min-width:340px;}
   table th{color:var(--muted);text-align:left;font-weight:600;padding:6px 8px;border-bottom:1px solid var(--border);
@@ -286,8 +294,25 @@
       <div class="grid">
         <div class="box wide">
           <h2 id="activity-title">Actividad</h2>
-          <div class="chart-wrap"><canvas id="chart-activity"></canvas></div>
-          <div class="activity-hint">💡 Hacé clic en un punto del gráfico para ver el detalle de las partidas de ese momento.</div>
+          <div class="activity-grid" id="activity-grid">
+            <div class="activity-cell" data-metric="visitors">
+              <div class="activity-cell-head"><span><span class="dot" style="background:var(--blue)"></span><span class="name">Visitantes</span></span><span class="total" id="activity-total-visitors">—</span></div>
+              <div class="chart-wrap"><canvas id="chart-act-visitors"></canvas></div>
+            </div>
+            <div class="activity-cell" data-metric="games">
+              <div class="activity-cell-head"><span><span class="dot" style="background:var(--accent)"></span><span class="name">Partidas</span></span><span class="total" id="activity-total-games">—</span></div>
+              <div class="chart-wrap"><canvas id="chart-act-games"></canvas></div>
+            </div>
+            <div class="activity-cell" data-metric="registrations">
+              <div class="activity-cell-head"><span><span class="dot" style="background:var(--green)"></span><span class="name">Registros</span></span><span class="total" id="activity-total-registrations">—</span></div>
+              <div class="chart-wrap"><canvas id="chart-act-registrations"></canvas></div>
+            </div>
+            <div class="activity-cell" data-metric="versus">
+              <div class="activity-cell-head"><span><span class="dot" style="background:var(--pink)"></span><span class="name">Versus</span></span><span class="total" id="activity-total-versus">—</span></div>
+              <div class="chart-wrap"><canvas id="chart-act-versus"></canvas></div>
+            </div>
+          </div>
+          <div class="activity-hint">💡 Hacé clic en un punto de cualquier gráfico para ver el detalle de las partidas de ese momento.</div>
         </div>
         <div class="box">
           <h2>Partidas por modo</h2>
@@ -702,36 +727,44 @@ const chartDefaults = {
   },
 };
 let activityRawLabels = [], activityGranularity = 'day';
+const activityMetrics = [
+  { key:'visitors', canvas:'chart-act-visitors', total:'activity-total-visitors', color:'#4aa3ff' },
+  { key:'games', canvas:'chart-act-games', total:'activity-total-games', color:'#ffe066' },
+  { key:'registrations', canvas:'chart-act-registrations', total:'activity-total-registrations', color:'#6fdf6f' },
+  { key:'versus', canvas:'chart-act-versus', total:'activity-total-versus', color:'#ff7ad9' },
+];
 function renderActivity(s){
-  const ctx = $('chart-activity');
   const g = s.granularity || 'day';
   const { labels, seriesArrays } = reorderHourly(s.labels||[], g,
-    [s.visitors||[], s.games||[], s.registrations||[], s.versus||[]]);
-  const [visitors, games, registrations, versus] = seriesArrays;
+    activityMetrics.map(m=>s[m.key]||[]));
   activityRawLabels = labels;
   activityGranularity = g;
-  const cfg = {
-    type:'line',
-    data:{ labels:labels.map(l=>fmtLabel(l,g)), datasets:[
-      lineDS('Visitantes', visitors, '#4aa3ff'),
-      lineDS('Partidas', games, '#ffe066'),
-      lineDS('Registros', registrations, '#6fdf6f'),
-      lineDS('Versus', versus, '#ff7ad9'),
-    ]},
-    options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
-      onHover:(evt,els,chart)=>{ chart.canvas.style.cursor = els.length ? 'pointer' : 'default'; },
-      onClick:(evt,els,chart)=>{
-        const points = chart.getElementsAtEventForMode(evt, 'index', {intersect:false}, true);
-        if(points.length) openDayPanel(activityRawLabels[points[0].index], activityGranularity);
-      },
-      plugins: chartDefaults.plugins,
-      scales:{
-        x:{ ticks:{ color:'#5a7da6', maxRotation:0, autoSkip:true, maxTicksLimit:12, font:{size:10} }, grid:{ color:'#16263f' } },
-        y:{ beginAtZero:true, ticks:{ color:'#5a7da6', precision:0, font:{size:10} }, grid:{ color:'#16263f' } },
-      } }
-  };
-  if(charts.activity){ charts.activity.data = cfg.data; charts.activity.options = cfg.options; charts.activity.update('none'); }
-  else charts.activity = new Chart(ctx, cfg);
+  const xLabels = labels.map(l=>fmtLabel(l,g));
+
+  activityMetrics.forEach((m,i)=>{
+    const data = seriesArrays[i];
+    const total = data.reduce((a,b)=>a+(b||0),0);
+    $(m.total).textContent = total.toLocaleString('es');
+    const cfg = {
+      type:'line',
+      data:{ labels:xLabels, datasets:[ lineDS(null, data, m.color) ] },
+      options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+        onHover:(evt,els,chart)=>{ chart.canvas.style.cursor = els.length ? 'pointer' : 'default'; },
+        onClick:(evt,els,chart)=>{
+          const points = chart.getElementsAtEventForMode(evt, 'index', {intersect:false}, true);
+          if(points.length) openDayPanel(activityRawLabels[points[0].index], activityGranularity);
+        },
+        plugins:{ legend:{ display:false }, tooltip:{ ...chartDefaults.plugins.tooltip,
+          callbacks:{ label:(ctx)=> (ctx.parsed.y??0).toLocaleString('es') } } },
+        scales:{
+          x:{ ticks:{ color:'#5a7da6', maxRotation:0, autoSkip:true, maxTicksLimit:8, font:{size:9} }, grid:{ display:false } },
+          y:{ beginAtZero:true, ticks:{ color:'#5a7da6', precision:0, font:{size:9}, maxTicksLimit:4 }, grid:{ color:'#16263f' } },
+        } }
+    };
+    const key = 'act_'+m.key;
+    if(charts[key]){ charts[key].data = cfg.data; charts[key].options = cfg.options; charts[key].update('none'); }
+    else charts[key] = new Chart($(m.canvas), cfg);
+  });
 }
 
 // ── Panel de detalle: partidas de un bucket del gráfico de actividad ──────────
