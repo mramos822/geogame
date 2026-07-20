@@ -20,6 +20,7 @@ function fitRankLabel(id, maxWidthVmin) {
 let finalBackTimeout = null;
 let _finalRanking = null;
 let _finalPos = 0;
+let _finalTotal = 0;
 
 function _onFinalResize() {
   if (!finalScreen || finalScreen.style.display === 'none') return;
@@ -94,6 +95,7 @@ function showFinalScreen() {
 
   _finalRanking = ranking;
   _finalPos     = pos;
+  _finalTotal   = total;
   window.removeEventListener('resize', _onFinalResize);
   window.addEventListener('resize', _onFinalResize);
   if (window.visualViewport) {
@@ -260,9 +262,71 @@ document.getElementById('final-confirm-back-wrap')?.addEventListener('click', ()
   // video). Así la app no acumula memoria entre sesiones y la siguiente partida o
   // entrar a social arranca con baseline bajo, sin necesidad de recargar la página.
   if (typeof window.releaseGameMemory === 'function') window.releaseGameMemory();
+  if (!window._accountLoggedIn && localStorage.getItem('hideGuestRankPopup') !== '1') {
+    showGuestRankPopup(_finalTotal || 0);
+  }
 });
 document.getElementById('final-confirm-back-wrap')?.addEventListener('mouseenter', () => { if (typeof playSelect === 'function') playSelect(); });
 document.getElementById('final-confirm-back-wrap')?.addEventListener('mouseleave', () => { if (typeof playSelect === 'function') playSelect(); });
+
+// ── Popup: puesto en el ranking para invitados ────────────────────────────────
+// Los invitados no entran al ranking real (visitor_id no es una identidad
+// confiable, ver conversación de diseño), así que en vez de eso se les muestra
+// dónde caerían + un CTA a crear cuenta. Se dispara cada vez que vuelven al menú
+// tras terminar una Gira Mundial, salvo que hayan marcado "no mostrar de nuevo".
+async function _guestRankPosition(total) {
+  if (!window.sb) return null;
+  try {
+    const { data } = await window.sb.from('profiles')
+      .select('hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total')
+      .eq('hidden_from_rankings', false);
+    if (!data) return null;
+    const scores = data.map(p => Math.max(p.hs_total || 0, (p.hs_flags||0)+(p.hs_shapes||0)+(p.hs_cities||0)+(p.hs_monuments||0)));
+    return { pos: scores.filter(s => s > total).length + 1, total: scores.length + 1 };
+  } catch (e) { return null; }
+}
+
+function showGuestRankPopup(total) {
+  const popup = document.getElementById('guest-rank-popup');
+  if (!popup) return;
+  const rank = typeof getRank === 'function' ? getRank(total) : null;
+  const imgEl = document.getElementById('guest-rank-popup-rankimg');
+  if (imgEl && rank) imgEl.src = rank.img;
+  const scoreEl = document.getElementById('guest-rank-popup-score');
+  if (scoreEl) scoreEl.textContent = total.toLocaleString();
+  const msgEl = document.getElementById('guest-rank-popup-msg');
+  if (msgEl) msgEl.textContent = '';
+  const dontshow = document.getElementById('guest-rank-popup-dontshow');
+  if (dontshow) dontshow.checked = false;
+  popup.classList.add('open');
+  _guestRankPosition(total).then(r => {
+    if (!popup.classList.contains('open') || !msgEl) return;
+    if (r) msgEl.textContent = t('guestPopup.msg', { pos: r.pos, total: r.total });
+  });
+}
+
+function hideGuestRankPopup() {
+  const popup = document.getElementById('guest-rank-popup');
+  if (document.getElementById('guest-rank-popup-dontshow')?.checked) {
+    localStorage.setItem('hideGuestRankPopup', '1');
+  }
+  popup?.classList.remove('open');
+}
+
+document.getElementById('guest-rank-popup-close')?.addEventListener('click', () => {
+  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; sfxCheck.play(); }
+  hideGuestRankPopup();
+});
+document.getElementById('guest-rank-popup-register')?.addEventListener('click', () => {
+  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; sfxCheck.play(); }
+  document.getElementById('guest-rank-popup')?.classList.remove('open');
+  if (typeof window.openAccountModal === 'function') window.openAccountModal('register');
+});
+document.getElementById('guest-rank-popup-login')?.addEventListener('click', () => {
+  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; sfxCheck.play(); }
+  document.getElementById('guest-rank-popup')?.classList.remove('open');
+  if (typeof window.openAccountModal === 'function') window.openAccountModal('login');
+});
 
 document.getElementById('final-confirm-wrap')?.addEventListener('click', () => {
   if (typeof confirmCooldown !== 'undefined' && confirmCooldown) return;

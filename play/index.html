@@ -868,6 +868,28 @@
       </div>
     </div>
 
+    <!-- Popup: puesto en el ranking para invitados (post Gira Mundial) -->
+    <div class="account-modal" id="guest-rank-popup">
+      <div class="account-modal-box">
+        <button class="account-modal-close" id="guest-rank-popup-close" type="button">✕</button>
+        <span class="account-modal-title" data-i18n="guestPopup.title">¡Buena partida!</span>
+        <div class="guest-rank-badge">
+          <img class="guest-rank-badge-img" id="guest-rank-popup-rankimg" src="images/ranks/1.png" alt="" draggable="false" oncontextmenu="return false">
+          <div class="guest-rank-badge-score">
+            <img src="images/points.png" alt="" draggable="false" oncontextmenu="return false">
+            <span id="guest-rank-popup-score">0</span>
+          </div>
+        </div>
+        <p class="account-modal-desc" id="guest-rank-popup-msg"></p>
+        <button class="account-modal-opt account-modal-register" id="guest-rank-popup-register" type="button" data-i18n="guestPopup.register">Registrarme</button>
+        <button class="account-modal-link" id="guest-rank-popup-login" type="button" data-i18n="guestPopup.haveAccount">Ya tengo una cuenta</button>
+        <label class="guest-rank-popup-checkbox">
+          <input type="checkbox" id="guest-rank-popup-dontshow">
+          <span data-i18n="guestPopup.dontShowAgain">No mostrar este mensaje de nuevo</span>
+        </label>
+      </div>
+    </div>
+
     <div id="loading-rankings-group" class="table-gone">
       <img class="loading-howtotable" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false">
       <img class="loading-social-logo" src="images/logo.png" alt="" draggable="false" oncontextmenu="return false">
@@ -1099,7 +1121,7 @@
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
     </div>
-    <div id="loading-version">Ver. 3.3.9</div>
+    <div id="loading-version">Ver. 3.4.0</div>
   </div>
 
   <!-- Pantalla de resultado versus (W/L) — fuera del loading-screen para verse tras la partida -->

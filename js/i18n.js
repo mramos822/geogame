@@ -156,8 +156,12 @@ const I18N = {
     'results.newRecordMsg': '¡Excelente trabajo {name}! ¡Acabas de batir un nuevo récord personal!',
     'results.notBestMsg': 'No está mal, {name}. ¡Pero no es tu mejor puntaje! {record} es el puntaje a superar, que te deja en el puesto {pos} entre tus amigos{friendMsg}.',
     'results.friendAbove': ', justo detrás de {name}', 'results.friendBelow': ', justo delante de {name}',
-    'results.guestRankTeaser': 'Como invitado no compite en el ranking, ¡pero con esta puntuación quedarías en el puesto #{pos} de {total} jugadores!',
-    'results.guestRankCta': 'Creá tu cuenta para guardar tu lugar',
+    // Popup de invitado (post Gira Mundial)
+    'guestPopup.title': '¡Buena partida!',
+    'guestPopup.msg': 'Como invitado no aparecés en el ranking, ¡pero con esta puntuación quedarías en el puesto #{pos} de {total} jugadores!',
+    'guestPopup.register': 'Registrarme',
+    'guestPopup.haveAccount': 'Ya tengo una cuenta',
+    'guestPopup.dontShowAgain': 'No mostrar este mensaje de nuevo',
     // Cuenta
     'nav.account': 'Cuenta',
     'account.title': 'Mi Cuenta', 'account.desc': 'Conecta tu cuenta para guardar tu progreso y competir con amigos online.',
@@ -345,8 +349,12 @@ const I18N = {
     'results.newRecordMsg': 'Fantastic work {name}, you just hit a new high score!',
     'results.notBestMsg': "Not bad, {name}. But it's not your best score! {record} is the score to beat, which puts you in position {pos} among your friends{friendMsg}.",
     'results.friendAbove': ', just behind {name}', 'results.friendBelow': ', just ahead of {name}',
-    'results.guestRankTeaser': "As a guest you don't compete on the leaderboard, but with this score you'd rank #{pos} out of {total} players!",
-    'results.guestRankCta': 'Create your account to claim your spot',
+    // Guest popup (post World Tour)
+    'guestPopup.title': 'Nice game!',
+    'guestPopup.msg': "As a guest you don't show up on the leaderboard, but with this score you'd rank #{pos} out of {total} players!",
+    'guestPopup.register': 'Sign up',
+    'guestPopup.haveAccount': 'I already have an account',
+    'guestPopup.dontShowAgain': "Don't show this again",
     // Account
     'nav.account': 'Account',
     'account.title': 'My Account', 'account.desc': 'Connect your account to save your progress and compete with friends online.',

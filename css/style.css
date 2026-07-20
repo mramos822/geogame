@@ -3416,6 +3416,42 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 .account-modal-close:hover  { transform: scale(1.1); }
 .account-modal-close:active { transform: scale(0.95); }
 
+.guest-rank-badge {
+  display: flex;
+  align-items: center;
+  gap: 1.4cqmin;
+}
+.guest-rank-badge-img {
+  width: 9cqmin;
+  height: auto;
+  filter: drop-shadow(0 0.3cqmin 0.6cqmin rgba(0,0,0,.35));
+}
+.guest-rank-badge-score {
+  display: flex;
+  align-items: center;
+  gap: 0.6cqmin;
+  background: #fff3c4;
+  border: 0.4cqmin solid #d8b400;
+  border-radius: 2cqmin;
+  padding: 0.6cqmin 1.4cqmin;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  color: #5a4400;
+  font-size: 2.4cqmin;
+}
+.guest-rank-badge-score img { width: 2.6cqmin; height: 2.6cqmin; }
+
+.guest-rank-popup-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.8cqmin;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 1.5cqmin;
+  color: #a08650;
+  cursor: pointer;
+  margin-top: 0.2cqmin;
+}
+.guest-rank-popup-checkbox input { cursor: pointer; }
+
 .account-view { display: flex; flex-direction: column; align-items: center; gap: 2.2cqmin; width: 100%; }
 
 .account-form {
@@ -5869,14 +5905,6 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   padding: 6% 16% 20%;
   pointer-events: none;
 }
-
-.results-guest-cta {
-  display: inline;
-  pointer-events: auto;
-  cursor: pointer;
-  color: #1a6fd1;
-}
-.results-guest-cta:hover { color: #0d4f9e; }
 
 .results-flightatt {
   position: absolute;
