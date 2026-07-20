@@ -5870,6 +5870,14 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   pointer-events: none;
 }
 
+.results-guest-cta {
+  display: inline;
+  pointer-events: auto;
+  cursor: pointer;
+  color: #1a6fd1;
+}
+.results-guest-cta:hover { color: #0d4f9e; }
+
 .results-flightatt {
   position: absolute;
   bottom: 3%;

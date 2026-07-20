@@ -41,6 +41,27 @@ function buildResultsMessage(total) {
   return t('results.notBestMsg', { name: playerName, record, pos, friendMsg });
 }
 
+// Vista previa de ranking para invitados: no compiten de verdad (visitor_id no es una
+// identidad confiable, se podría spamear en incógnito), pero mostrarles dónde
+// quedarían + CTA a crear cuenta empuja al registro sin inflar el ranking real.
+// Usa el mismo cálculo de puntaje que el panel de Rankings (rank.js): max(hs_total,
+// suma de columnas), solo cuentas con hidden_from_rankings=false.
+async function guestRankPreviewHtml(total) {
+  if (!window.sb) return '';
+  try {
+    const { data } = await window.sb.from('profiles')
+      .select('hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total')
+      .eq('hidden_from_rankings', false);
+    if (!data) return '';
+    const scores = data.map(p => Math.max(p.hs_total || 0, (p.hs_flags||0)+(p.hs_shapes||0)+(p.hs_cities||0)+(p.hs_monuments||0)));
+    const pos = scores.filter(s => s > total).length + 1;
+    const totalPlayers = scores.length + 1;
+    const msg = t('results.guestRankTeaser', { pos, total: totalPlayers });
+    const cta = t('results.guestRankCta');
+    return ` <span class="results-guest-cta" id="results-guest-cta">${msg} <u>${cta}</u></span>`;
+  } catch (e) { return ''; }
+}
+
 const sfxCheer = new Audio('sfx/endgamecheeryay.mp3');
 const sfxLoop  = new Audio('sfx/endgameloop.mp3');
 sfxLoop.loop = true;
@@ -253,9 +274,20 @@ resultsBackWrap?.addEventListener('click', () => {
   if (resultsBackStep === 0) {
     resultsBackStep = 1;
     const descEl = document.getElementById('results-rank-desc');
-    if (descEl) descEl.textContent = buildResultsMessage(resultsScreen._total || 0);
+    const total = resultsScreen._total || 0;
+    if (descEl) descEl.textContent = buildResultsMessage(total);
     if (!document.querySelector('.results-text3-wrap').classList.contains('active')) {
       document.querySelector('.results-text3-wrap')?.classList.add('active');
+    }
+    if (descEl && !window._accountLoggedIn) {
+      guestRankPreviewHtml(total).then(html => {
+        if (!html || resultsBackStep !== 1) return; // no pisar si ya avanzó/cerró
+        descEl.innerHTML = descEl.textContent + html;
+        document.getElementById('results-guest-cta')?.addEventListener('click', () => {
+          sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+          if (typeof window.openAccountModal === 'function') window.openAccountModal('register');
+        });
+      });
     }
   } else {
     hideResultsScreen(true);
