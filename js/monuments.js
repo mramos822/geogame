@@ -6156,7 +6156,6 @@ function slideTagIn(cityName, countryCode) {
   }
 
   if (slideTagIn._countryTimer) clearTimeout(slideTagIn._countryTimer);
-  slideTagIn._hintShown = false;
 
   function setTagText(text) {
     cityTagText.textContent = text;
@@ -6173,9 +6172,11 @@ function slideTagIn(cityName, countryCode) {
 
   const dispCity = (typeof tCity === 'function') ? tCity(cityName) : cityName;
   setTagText(dispCity);
+  // Pista visual: a los 5s sin responder, se revela el país. Ya NO penaliza
+  // el puntaje (ver hintMult removido del cálculo más abajo) — es solo
+  // una ayuda, no un castigo.
   if (countryCode) {
     slideTagIn._countryTimer = setTimeout(() => {
-      slideTagIn._hintShown = true;
       const countryName = (typeof getCityCountryName === 'function') ? getCityCountryName(countryCode) : countryCode;
       setTagText(`${dispCity}, ${countryName}`);
     }, 5000);
@@ -6486,7 +6487,6 @@ canvas.addEventListener('click', (e) => {
 
   saveGradeCount(grade);
 
-  const hintMult = slideTagIn._hintShown ? 0.5 : 1;
   let base, bonusAmt, totalGained, badgeColor, inRowBonus;
 
   if (window.pendingGameMode === 'game') {
@@ -6510,7 +6510,7 @@ canvas.addEventListener('click', (e) => {
     }
     badgeColor    = getBadgeImg(state.streak);
     inRowBonus    = getInRowBonus(state.streak);
-    totalGained   = Math.round((base + bonusAmt) * M * hintMult) + inRowBonus;
+    totalGained   = Math.round((base + bonusAmt) * M) + inRowBonus;
   } else {
     // ── Monuments: mismo mecanismo que Cities (M + bonus binario de velocidad),
     // reverse-engineered de video: perfect/good dan siempre el mismo puntaje,
@@ -6532,7 +6532,7 @@ canvas.addEventListener('click', (e) => {
     inRowBonus  = getInRowBonus(state.streak);
     // Math.floor (no round): con M=1.5/2.5/7.5 el producto cae justo en .5 y el
     // video de referencia mostraba el valor de abajo (67, no 68), no el de arriba.
-    totalGained = Math.floor((base + bonusAmt) * M * hintMult) + inRowBonus;
+    totalGained = Math.floor((base + bonusAmt) * M) + inRowBonus;
   }
 
   state.score += totalGained;
