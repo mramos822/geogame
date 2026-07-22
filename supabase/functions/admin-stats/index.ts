@@ -142,6 +142,7 @@ Deno.serve(async (req) => {
       profilesRes, gamesRes, visitsRes, campaignsRes,
       lbFlags, lbShapes, lbCities, lbMonuments, lbTotal, lbVersus,
       allProfilesRes, countryEventsRes, allEventsRes,
+      founderEligibleRes, founderClaimedRes,
     ] = await Promise.all([
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true })),
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true }).gte('last_active', onlineISO)),
@@ -187,6 +188,19 @@ Deno.serve(async (req) => {
         .in('type', ['game', 'versus'])
         .not('user_id', 'is', null)
         .limit(50000),
+      // ── Fundador (primeros 100 RECLAMOS, no primeras 100 cuentas) ──────────
+      // elegibles = is_founder=true todavía sin reclamar (pueden confirmar el
+      // popup y equiparse); claimed = ya confirmaron (founder_popup_seen=true,
+      // ver claim_founder_pack). Al llegar a 100 claimed, is_founder se revoca
+      // sola del lado del server para quien no llegó a reclamar.
+      sb.from('profiles')
+        .select('username, created_at')
+        .eq('is_founder', true).eq('founder_popup_seen', false)
+        .order('created_at', { ascending: true }),
+      sb.from('profiles')
+        .select('username, founder_claimed_at')
+        .eq('founder_popup_seen', true)
+        .order('founder_claimed_at', { ascending: true }),
     ]);
 
     const regRows      = profilesRes.data || [];
@@ -444,6 +458,12 @@ Deno.serve(async (req) => {
         versus:    (lbVersus.data    || []).map((p: any) => ({ username: p.username, wins: p.vs_wins || 0, losses: p.vs_losses || 0 })),
       },
       accounts,
+      founder: {
+        eligible: (founderEligibleRes.data || []).map((p: any) => ({ username: p.username, created_at: p.created_at })),
+        claimed: (founderClaimedRes.data || []).map((p: any) => ({ username: p.username, claimed_at: p.founder_claimed_at })),
+        claimedCount: (founderClaimedRes.data || []).length,
+        cap: 100,
+      },
     }), { headers: CORS });
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: CORS });

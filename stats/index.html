@@ -417,6 +417,26 @@
         </div>
       </div>
     </section>
+
+    <!-- ── FUNDADOR ── -->
+    <section class="tab-page" data-page="fundador">
+      <div class="cards" id="cards-founder"></div>
+      <div class="grid">
+        <div class="box">
+          <h2>Elegibles sin reclamar
+            <span class="sub">is_founder=true, todavía no confirmaron el popup
+              <span class="help" title="Pueden entrar, jugar una Vuelta Mundial y ver el popup del paquete de Fundador. Si el cupo de 100 reclamos se completa antes de que confirmen, dejan de ser elegibles automáticamente (ver claim_founder_pack).">ⓘ</span></span>
+          </h2>
+          <div class="table-scroll"><table id="tbl-founder-eligible"><tbody></tbody></table></div>
+        </div>
+        <div class="box">
+          <h2>Ya reclamaron el paquete
+            <span class="sub">founder_popup_seen=true, orden real de reclamo</span>
+          </h2>
+          <div class="table-scroll"><table id="tbl-founder-claimed"><tbody></tbody></table></div>
+        </div>
+      </div>
+    </section>
   </main>
 </div>
 
@@ -474,7 +494,7 @@ const RANGES = [
 const RANGE_LABEL = Object.fromEntries(RANGES);
 const PAGES = [
   ['resumen','📊 Resumen'], ['retencion','🔁 Retención'], ['leaderboards','🏆 Leaderboards'],
-  ['versus','⚔️ Versus'], ['cuentas','👤 Cuentas'],
+  ['versus','⚔️ Versus'], ['cuentas','👤 Cuentas'], ['fundador','👑 Fundador'],
 ];
 const MODE_TABS = [
   ['total','Total'], ['flags','Banderas'], ['shapes','Figuras'], ['cities','Ciudades'], ['monuments','Monumentos'],
@@ -643,6 +663,7 @@ function render(data){
   renderVersusModes(data.versusByMode||{});
   renderVersusTop((data.leaderboards||{}).versus||[]);
   renderAccounts(data.accounts||[]);
+  renderFounder(data.founder||{});
 }
 
 function sevClass(pct, warnAt, critAt){ return pct>=critAt?'crit':pct>=warnAt?'warn':'ok'; }
@@ -1010,6 +1031,32 @@ function renderAtRisk(rows){
       return `<tr><td>${escapeHtml(r.username||'—')}</td><td class="n">${r.play_count}</td><td class="n">${(r.hs_total||0).toLocaleString('es')}</td>` +
         `<td class="n">${new Date(r.last_active).toLocaleDateString('es')}</td><td class="n" style="color:${sev}">${r.days_inactive}d</td></tr>`;
     }).join('');
+}
+
+function renderFounder(f){
+  const eligible = f.eligible || [];
+  const claimed  = f.claimed  || [];
+  const cap = f.cap || 100;
+  const remaining = Math.max(0, cap - claimed.length);
+  $('cards-founder').innerHTML = [
+    ['👑', claimed.length + ' / ' + cap, 'Paquete reclamado'],
+    ['🎟️', eligible.length, 'Elegibles sin reclamar'],
+    ['⏳', remaining, 'Cupos restantes'],
+  ].map(([icon,v,l])=>`<div class="card"><div class="icon">${icon}</div><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
+
+  const tbE = $('tbl-founder-eligible');
+  if(!eligible.length){ tbE.innerHTML = '<tr><td class="empty">Nadie elegible sin reclamar por ahora.</td></tr>'; }
+  else {
+    tbE.innerHTML = '<tr><th>Usuario</th><th style="text-align:right">Cuenta creada</th></tr>' +
+      eligible.map(r=>`<tr><td>${escapeHtml(r.username||'—')}</td><td class="n">${new Date(r.created_at).toLocaleDateString('es')}</td></tr>`).join('');
+  }
+
+  const tbC = $('tbl-founder-claimed');
+  if(!claimed.length){ tbC.innerHTML = '<tr><td class="empty">Todavía nadie reclamó el paquete.</td></tr>'; }
+  else {
+    tbC.innerHTML = '<tr><th>#</th><th>Usuario</th><th style="text-align:right">Reclamado</th></tr>' +
+      claimed.map((r,i)=>`<tr><td class="n">${i+1}</td><td>${escapeHtml(r.username||'—')}</td><td class="n">${r.claimed_at ? new Date(r.claimed_at).toLocaleString('es') : '—'}</td></tr>`).join('');
+  }
 }
 
 function renderLeaderboardTabs(){

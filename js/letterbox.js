@@ -34,7 +34,7 @@
 
     // Mover los hijos directos de <body> al stage, salvo scripts/estilos,
     // el aviso de pantalla y el lector temporal de resolución.
-    var keepOut = { 'screen-warning': 1, 'temp-res-readout': 1, 'app-stage': 1, 'app-stage-outer': 1, 'init-cover': 1 };
+    var keepOut = { 'screen-warning': 1, 'temp-res-readout': 1, 'app-stage': 1, 'app-stage-outer': 1, 'init-cover': 1, 'test-founder-popup-btn': 1 };
     var kids = Array.prototype.slice.call(document.body.childNodes);
     kids.forEach(function (n) {
       if (n.nodeType === 1) {

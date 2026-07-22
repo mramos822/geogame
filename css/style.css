@@ -1312,7 +1312,13 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 
   transition: transform 0.4s ease-out; /* bajada (vuelve la mesa) */
   will-change: transform;
-  pointer-events: none; /* la capa no captura clicks; solo sus hijos interactivos */
+  /* Antes era pointer-events:none con solo unos hijos en pointer-events:auto
+     ("la capa no captura clicks; solo sus hijos interactivos"), pero eso
+     dejaba pasar los clicks en cualquier hueco (el fondo del tablero, zonas
+     sin elementos) hacia la lista de Rankings de abajo, permitiendo
+     seleccionar otra fila con el perfil propio abierto encima. Al estar
+     "por encima" debe bloquear todo como una capa normal. */
+  pointer-events: auto;
 }
 #loading-table-group.table-gone {
   transition: transform 0.4s ease-in; /* subida (sale la mesa) */
@@ -1380,8 +1386,65 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 .rankings-pos.rk-gold   { color: #c8920a; }
 .rankings-pos.rk-silver { color: #888; }
 .rankings-pos.rk-bronze { color: #a05a2c; }
-/* highlight own row */
-.loading-social-row.is-me-row { border-color: #f0b800; background: #fffbe8; box-shadow: 0 0 0 0.2cqmin #f0b80044; }
+/* Celda con fondo oscuro/ocupado (images/customize/cells/<code>.png, ver
+   CUSTOMIZE_CELL_LIGHT_TEXT en js/sb.js) equipada por la fila: el texto pasa
+   a blanco con contorno del color que tendría normalmente (el
+   dorado/plateado/bronce de medalla, o el marrón default), para que se siga
+   leyendo bien en vez de perderse contra el fondo. La clase la agrega JS por
+   fila (CUSTOMIZE_CELL_LIGHT_TEXT.has(cellCode), ver renderRankings y demás
+   renderers de filas en monuments.js) — no en CSS puro porque el código de
+   celda vive en profiles, no es derivable del DOM. Cualquier cell code nuevo
+   con fondo oscuro solo necesita sumarse a esa lista, no tocar este CSS. */
+.loading-social-row.cell-light-text .rankings-pos {
+  color: #fff;
+  -webkit-text-stroke: 0.4cqmin #8b6a00;
+  paint-order: stroke fill;
+}
+.loading-social-row.cell-light-text .rankings-pos.rk-gold   { -webkit-text-stroke-color: #c8920a; }
+.loading-social-row.cell-light-text .rankings-pos.rk-silver { -webkit-text-stroke-color: #888; }
+.loading-social-row.cell-light-text .rankings-pos.rk-bronze { -webkit-text-stroke-color: #a05a2c; }
+.loading-social-row.cell-light-text .loading-social-name {
+  color: #fff;
+  -webkit-text-stroke: 0.4cqmin #4a3b00;
+  paint-order: stroke fill;
+  /* El stroke pinta por fuera del glyph sin ensanchar la caja del span —
+     .loading-social-name tiene overflow:hidden + max-width para el
+     ellipsis de nombres largos (ver arriba), así que sin este respiro el
+     contorno se cortaba a los lados, mismo bug que .card-light-text
+     .lb-name (ver esa regla en .lb-entry más abajo). */
+  padding: 0 0.4cqmin;
+  max-width: calc(26cqmin - 0.8cqmin);
+}
+/* highlight own row: un tinte dorado por background-blend-mode ENCIMA de
+   cualquier --cust-cell que tenga equipado (0001.png u otro código futuro) —
+   así funciona para cualquier celda sin tener que generar un PNG "-mine"
+   duplicado por cada asset de personalización que se agregue más adelante.
+   El glow usa filter:drop-shadow en vez de box-shadow: drop-shadow calca el
+   CANAL ALPHA real del contenido (el borde redondeado del PNG, con sus
+   esquinas ya recortadas por su propia transparencia), así el resplandor
+   queda pegado al contorno exacto del dibujo. box-shadow, en cambio, dibuja
+   su propio rectángulo con el border-radius del elemento (1cqmin) — un radio
+   distinto al de la esquina real del PNG, por eso se veía como un halo
+   suelto/de otra forma en vez de abrazar el borde dorado. */
+/* El tinte ya no puede ir en background-blend-mode (eso mezcla capas de
+   background-image; la celda ahora se pinta con border-image, una capa
+   aparte) — se pasó a un ::before por encima, con mix-blend-mode:multiply
+   contra lo que sea que haya debajo (el border-image real). Al ser el primer
+   hijo generado, pinta después del border/fondo del row pero antes que los
+   hijos reales (avatar/nombre/etc), así que tiñe la celda sin taparlos. */
+.loading-social-row.is-me-row {
+  filter: drop-shadow(0 0 0.5cqmin #f0b800cc);
+}
+.loading-social-row.is-me-row::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: #f0b800;
+  opacity: 0.12;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
 
 .rankings-desc {
   position: absolute;
@@ -1524,6 +1587,191 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 .loading-social-back-wrap:hover .loading-play-confirm2 { opacity: 1; }
 .loading-social-back-wrap.confirm-pressed .loading-play-confirm2 { opacity: 0; }
 
+/* ── Panel de Personalización ─────────────────────────────────────────────────── */
+#loading-customize-group {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 211; /* por encima del panel de perfil (210), que sigue debajo */
+  transition: transform 0.4s ease-out;
+  will-change: transform;
+  /* pointer-events:none dejaba pasar los clicks de los huecos hacia el panel
+     de perfil de abajo (mismo bug que #loading-table-group.above-rankings). */
+  pointer-events: auto;
+}
+#loading-customize-group .loading-social-back-wrap { pointer-events: auto; }
+#loading-customize-group.table-gone {
+  transition: transform 0.4s ease-in;
+  transform: translateY(-120%);
+}
+
+/* ── Izquierda: vista previa fija (avatar + nombre + tarjeta de leaderboard) ── */
+.customize-left {
+  position: absolute;
+  top: calc(50% + 6cqmin);
+  left: calc(50% - 42cqmin);
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2.4cqmin;
+  z-index: 212;
+  /* auto (no none): aunque no tenga nada clickeable, tiene que absorber el
+     click igual — si no, se cuela hacia el panel de perfil de abajo. */
+  pointer-events: auto;
+}
+.customize-preview-avatar-wrap {
+  position: relative;
+  width: 13cqmin;
+  height: 13cqmin;
+  border-radius: 50%;
+  /* SIN overflow:hidden ni borde blanco — mismo criterio que
+     .loading-profile-pic-wrap: el marco (.cust-frame-wrap::after) tiene que
+     poder sobresalir, y la foto se recorta sola con su propio
+     border-radius:50% (ver la regla del <img> de acá abajo). */
+  box-shadow: 0 0.6cqmin 1.4cqmin rgba(0,0,0,.35);
+}
+.customize-preview-avatar-wrap img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
+.customize-preview-name {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 3.4cqmin;
+  color: #fde20e;
+  -webkit-text-stroke: 0.3cqmin #8b6a00;
+  paint-order: stroke fill;
+}
+/* Preview de la ficha REAL del leaderboard in-game (.lb-entry.lb-player, ver
+   más abajo en el CSS) — .lb-entry es position:absolute normalmente porque
+   el juego la anima con JS; acá se resetea a flujo normal para mostrarla
+   quieta como muestra, con las mismas clases así nunca se desincroniza del
+   diseño real. */
+.customize-lb-preview { width: 13cqmin; }
+.customize-lb-preview .lb-entry {
+  position: relative;
+  top: auto; left: auto;
+  width: 100%;
+  transition: none;
+  /* El zoom del PNG (background-size/position) ya vive en la regla base
+     .lb-entry — no hace falta repetirlo acá. */
+}
+
+/* Miniatura de la ficha para la grilla de opciones: se escala entera (no se
+   achica solo el ancho) para que el texto guarde la misma proporción que
+   tiene de verdad en el juego, en vez de quedar gigante/cortado. */
+.customize-swatch-lb-scale {
+  transform: scale(0.6);
+  transform-origin: center;
+}
+
+/* ── Derecha: tabs (Marcos/Viñetas/Paneles) + grilla de opciones ── */
+.customize-right {
+  position: absolute;
+  top: calc(50% + 6cqmin);
+  left: calc(50% + 13cqmin);
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  z-index: 212;
+  pointer-events: auto;
+}
+.customize-tabs { display: flex; }
+.customize-tab {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 1.8cqmin;
+  /* --panel-* : tematizado en JS (_applyPanelTheme) según el color
+     dominante del panel equipado; estos valores son el fallback si no
+     hay panel cargado todavía. */
+  color: var(--panel-tab-text, #6b5a17);
+  background: var(--panel-tab-bg, #cfc9c0);
+  border: 0.3cqmin solid var(--panel-border, #8b6a00);
+  border-bottom: none;
+  border-radius: 1.4cqmin 1.4cqmin 0 0;
+  /* Ancho fijo (no por padding+contenido) para que las 4 tabs midan igual
+     sin importar el largo de la palabra ("Marcos" vs "Celdas" vs etc). */
+  width: 16cqmin;
+  box-sizing: border-box;
+  padding: 0.9cqmin 0.4cqmin;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.customize-tab + .customize-tab { margin-left: 0.4cqmin; }
+.customize-tab:not(.active):hover { background: var(--panel-tab-hover-bg, #ddd6cc); }
+.customize-tab.active { background: var(--panel-tab-active-bg, #eee9e3); color: var(--panel-tab-text, #5a4400); }
+.customize-grid {
+  width: 78cqmin;
+  min-height: 48cqmin;
+  max-height: 48cqmin;
+  overflow-y: auto;
+  background: var(--panel-grid-bg, #eee9e3);
+  border: 0.3cqmin solid var(--panel-border, #8b6a00);
+  border-radius: 0 1.2cqmin 1.2cqmin 1.2cqmin;
+  padding: 2.4cqmin;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 2cqmin;
+}
+.customize-grid::-webkit-scrollbar { width: 1.2cqmin; }
+.customize-grid::-webkit-scrollbar-thumb { background: #c4ad5e; border-radius: 1cqmin; }
+.customize-swatch {
+  position: relative;
+  width: 15.5cqmin;
+  height: 15.5cqmin;
+  border-radius: 1cqmin;
+  background: #fffef5;
+  border: 0.3cqmin solid #d8c47e;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* El label ocupa la franja de abajo (.customize-swatch-label, position:
+     absolute) sin achicar la caja del flex — así el centrado vertical
+     (align-items:center) usaba TODO el alto, dejando la preview más pegada
+     al label que al borde de arriba. Con este padding, el centrado pasa a
+     calcularse solo sobre el espacio libre de arriba. */
+  padding-bottom: 2cqmin;
+  transition: transform 0.1s;
+  overflow: hidden;
+}
+.customize-swatch:hover { transform: scale(1.04); }
+.customize-swatch.selected { border-color: #f4a800; box-shadow: 0 0 0.6cqmin 0.2cqmin #ffd700; }
+.customize-swatch.locked { cursor: not-allowed; opacity: 0.55; }
+.customize-swatch-label {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: rgba(90,68,0,.82);
+  color: #fff;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 1.15cqmin;
+  text-align: center;
+  padding: 0.4cqmin 0.2cqmin;
+  line-height: 1.15;
+}
+.customize-swatch-check {
+  position: absolute;
+  top: 0.4cqmin; right: 0.4cqmin;
+  width: 2.6cqmin;
+  height: 2.6cqmin;
+  border-radius: 50%;
+  background: #2bd14b;
+  color: #fff;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6cqmin;
+  z-index: 2;
+}
+.customize-swatch.selected .customize-swatch-check { display: flex; }
+.customize-swatch-lock {
+  position: absolute;
+  top: 0.4cqmin; right: 0.4cqmin;
+  font-size: 2cqmin;
+  z-index: 2;
+}
+
 /* ── Panel de amigos (lista en medio de la mesa) ─────────────────────────────── */
 .loading-social-panel {
   position: absolute;
@@ -1591,9 +1839,39 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   display: flex;
   align-items: center;
   gap: 1.4cqmin;
-  padding: 1.6cqmin 13cqmin 1.6cqmin 1.2cqmin;
-  background: #fffef5;
-  border: 0.3cqmin solid #d8c47e;
+  /* Vertical más chico que antes (era 1.6cqmin): ahora hay border-image
+     ocupando 0.9cqmin arriba/abajo (ver border-width más abajo), así que se
+     reduce el padding para dejarle a la fila el mismo espacio interior de
+     antes en vez de apretar el avatar de 6cqmin. */
+  padding: 0.7cqmin 13cqmin 0.7cqmin 1.2cqmin;
+  /* width+box-sizing explícitos: todas las filas deben medir igual (ancho del
+     contenedor) pase lo que pase con el largo del nombre — antes de esto,
+     como .loading-social-row no fijaba su propio tamaño, dependía del
+     stretch por defecto del flex-column padre y podía variar según el
+     contenido. Con la celda personalizable estirándose a 100% 100% del
+     fondo, cualquier diferencia de tamaño entre filas se notaba mucho más. */
+  width: 100%;
+  box-sizing: border-box;
+  height: 9.6cqmin;
+  /* Celda personalizable (images/customize/cells/<code>.png) — reemplaza
+     toda la tarjeta de la fila, no solo el avatar. Todas las filas setean
+     --cust-cell por JS (con fallback a 0001.png si no hay código propio, ver
+     CustomizeAssets.cellUrl).
+     border-image (NO background-image) a propósito: con background-size:100%
+     100% el PNG se estiraba en X e Y por separado para llenar la fila, y como
+     la proporción real de la fila (muy ancha, poco alta) no coincide con la
+     proporción del archivo (600×90), el borde/las esquinas quedaban
+     deformados (más finos/ovalados de lo que son en el arte). border-image
+     recorta esquinas+bordes del PNG (border-image-slice) y los reescala de
+     forma UNIFORME (mismo factor en X e Y, ver border-image-width) sin
+     estirarlos por separado — solo el relleno del medio (fill) se estira,
+     y al ser un color plano no se nota. */
+  border-style: solid;
+  border-width: 0.9cqmin;
+  border-image-source: var(--cust-cell);
+  border-image-slice: 14 fill;
+  border-image-width: 0.9cqmin;
+  border-image-repeat: stretch;
   border-radius: 1cqmin;
   position: relative;
   cursor: pointer;
@@ -1602,22 +1880,43 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 .loading-social-row:hover { transform: scale(1.015); }
 /* Filas de personas bloqueadas: en gris, al fondo de la lista */
 .loading-social-row.is-blocked-row { filter: grayscale(1); opacity: 0.6; }
-/* Marca de mejor amigo */
-.loading-social-row.is-fav { border-color: #f0b800; box-shadow: 0 0 0 0.2cqmin #f0b80055; }
-.loading-social-avatar {
+/* Marca de mejor amigo — solo el glow: un border-color acá no se vería, la
+   fila ya pinta su borde real con border-image (el color quedaría tapado). */
+.loading-social-row.is-fav { box-shadow: 0 0 0 0.2cqmin #f0b80055; }
+/* Wrap del avatar de fila (Rankings/Amigos) — mismo tamaño que el círculo de
+   la foto, así el marco de personalización (.cust-frame-wrap::after) queda
+   centrado sobre ella. SIN overflow:hidden, por la misma razón que
+   .loading-profile-pic-wrap: el marco tiene que poder sobresalir del círculo. */
+.loading-social-avatar-wrap {
   flex: none;
+  width: 6cqmin;
+  height: 6cqmin;
+  /* position+z-index EXPLÍCITOS (no depender de que un z-index negativo en
+     el ::before/::after de tinte quede "por debajo" de hermanos sin
+     position propio — esa regla de apilado es la que se comportaba
+     distinto según el navegador, ver .status-playing::before/::after,
+     visible sin repintar recién al pasar el mouse). Con esto el contenido
+     real de la fila siempre apila por encima sin ambigüedad. */
+  position: relative;
+  z-index: 1;
+}
+.loading-social-avatar {
   width: 6cqmin;
   height: 6cqmin;
   border-radius: 50%;
   object-fit: cover;
   background: #d6ecff;
-  border: 0.4cqmin solid #8b6a00;
+  /* SIN border acá — antes era un aro dorado fijo; ahora el aro lo pone el
+     marco de personalización (.cust-frame-wrap::after, con 0001.png como
+     default para quien no tiene uno equipado, ver _socialAvatarHtml). */
 }
 .loading-social-info {
   display: flex;
   flex-direction: column;
   min-width: 0;
   flex: 1;
+  position: relative;
+  z-index: 1;
 }
 .loading-social-name-row {
   display: flex;
@@ -1655,18 +1954,84 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 .loading-social-status .dot.playing { background: #2bd14b; }
 .loading-social-status .dot.offline { background: #b0b0b0; }
 
-/* Amigo jugando: fila titilando en verde, texto verde y punto con luz brillante */
-@keyframes social-playing-row {
-  0%, 100% { background-color: #e3f8e6; }
-  50%      { background-color: #aaedb6; }
+/* Amigo jugando: fila titilando en verde, texto verde y punto con luz
+   brillante. background-color animado + border-color ya no alcanzan: la
+   celda (images/customize/cells/<code>.png) se pinta como border-image
+   (ver más arriba) y tapa tanto el border-color como el background sólido
+   de siempre. Mismo truco que .is-me-row (tinte vía ::before +
+   mix-blend-mode:multiply, encima de CUALQUIER --cust-cell equipada) pero
+   animando su opacity en vez de un valor fijo, para que el titileo se siga
+   viendo sobre cualquier celda. */
+@keyframes social-playing-tint {
+  0%, 100% { opacity: 0.10; }
+  50%      { opacity: 0.42; }
 }
-.loading-social-row.status-playing {
-  border-color: #2bd14b;
-  background: #e3f8e6;
-  animation: social-playing-row 1.4s ease-in-out infinite;
+/* :not(.cell-green-asset) — si la celda equipada tiene su propia variante
+   "-green" dedicada (ver CUSTOMIZE_CELL_GREEN_VARIANTS/applyCellForStatus en
+   js/sb.js), --cust-cell ya apunta directo a ese PNG y este tinte genérico
+   se salta: aplicarlo igual encima se vería doblemente verde/desteñido. */
+.loading-social-row.status-playing:not(.cell-green-asset)::before {
+  content: '';
+  position: absolute;
+  /* inset:0 posiciona relativo al padding-box (adentro del borde) — con
+     border-width:0.9cqmin (ver .loading-social-row) eso dejaba afuera
+     justo la franja donde se pinta el border-image de la celda, tiñendo
+     solo el rectángulo interior. Extendido por el mismo ancho del borde
+     para cubrir la fila completa, arte de la celda incluido. */
+  inset: -0.9cqmin;
+  border-radius: inherit;
+  background: #2bd14b;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  /* z-index:0 (ni negativo ni por encima): TODO el contenido real de la
+     fila (avatar-wrap, info, score, rankname, emote) tiene ahora
+     position+z-index:1 EXPLÍCITO, así que este overlay queda debajo sin
+     ambigüedad pase lo que pase con el orden en el DOM. Los z-index
+     negativos parecían quedar sin capa de composición propia en algunos
+     navegadores (la animación solo se repintaba con algo externo, como
+     :hover -> transform en la fila) — con 0 (ni negativo) más will-change
+     debería componerse solo. */
+  z-index: 0;
+  will-change: opacity;
+  animation: social-playing-tint 1.4s ease-in-out infinite;
 }
 .loading-social-row.status-playing .loading-social-status {
   color: #1ea53a;
+}
+/* Celdas con variante -green dedicada: en vez del tinte genérico, se funde
+   (fade in/out real) entre el arte normal (que sigue de fondo, sin tocar,
+   en el border-image de la fila misma) y el arte -green — border-image-source
+   no es interpolable, así que animar esa propiedad directo solo permite
+   saltos duros (0% u 100%, nunca intermedio). Un ::after separado, del
+   mismo tamaño/recorte que el border-image de la fila pero pintando SOLO
+   la variante -green, con su OPACITY animada sí se funde de verdad (opacity
+   es la propiedad que se interpola), como un crossfade encima del normal. */
+@keyframes cell-green-fade {
+  0%, 100% { opacity: 0; }
+  50%      { opacity: 1; }
+}
+.loading-social-row.status-playing.cell-green-asset::after {
+  content: '';
+  position: absolute;
+  inset: -0.9cqmin;
+  border-style: solid;
+  border-width: 0.9cqmin;
+  border-image-source: var(--cust-cell-green);
+  /* CON "fill" (como la fila base) — el centro sí se pinta ahora, parejo
+     con el borde. Antes se había sacado el fill para evitar que tapara
+     avatar/nombre con z-index por encima, pero dejaba un hueco transparente
+     rarísimo en el medio. Ya no hace falta ese parche: todo el contenido
+     real (avatar-wrap/info/score/rankname/emote) tiene z-index:1 explícito,
+     así que este overlay puede ir en z-index:0 (ver abajo) y listo — pinta
+     el centro entero sin tapar nada. */
+  border-image-slice: 14 fill;
+  border-image-width: 0.9cqmin;
+  border-image-repeat: stretch;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  will-change: opacity;
+  animation: cell-green-fade 1.4s ease-in-out infinite;
 }
 @keyframes social-playing-dot {
   0%, 100% { opacity: 0.7; transform: scale(1); }
@@ -1676,19 +2041,19 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   animation: social-playing-dot 1.1s ease-in-out infinite;
 }
 
-/* Amigo desconectado: fila en gris/plomo */
+/* Amigo desconectado: fila en gris/plomo. filter:grayscale en la fila
+   ENTERA (mismo criterio que .is-blocked-row) — no alcanza con desaturar
+   avatar/emote/puntos por separado como antes: la celda (images/customize/
+   cells/<code>.png, pintada como border-image, ver más arriba) también
+   tiene que salir en gris, si no la fila queda con el borde dorado/de color
+   de siempre mientras todo lo de adentro se ve apagado. */
 .loading-social-row.status-offline {
   background: #d4d2cd;
   border-color: #a8a59d;
+  filter: grayscale(1) opacity(0.75);
 }
 .loading-social-row.status-offline .loading-social-status {
   color: #6f6c64;
-}
-.loading-social-row.status-offline .loading-social-avatar,
-.loading-social-row.status-offline .loading-social-emote,
-.loading-social-row.status-offline .loading-social-points,
-.loading-social-row.status-offline .loading-social-score-val {
-  filter: grayscale(1) opacity(0.6);
 }
 .loading-social-row.status-offline .loading-social-rankname {
   color: #b8b6b0;
@@ -1701,6 +2066,7 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   transform: translate(-50%, -50%);
   width: 20cqmin;
   height: 6cqmin;
+  z-index: 1;
 }
 .social-spectate-eye {
   /* Vive DENTRO de .loading-social-score (que ya es position:absolute, así
@@ -1819,6 +2185,7 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   paint-order: stroke fill;
   line-height: 1.05;
   pointer-events: none;
+  z-index: 1;
 }
 .loading-social-emote {
   position: absolute;
@@ -1829,6 +2196,7 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   height: 11cqmin;
   object-fit: contain;
   pointer-events: none;
+  z-index: 1;
 }
 
 /* Solicitudes: botones aceptar/rechazar a la derecha de la fila */
@@ -1933,21 +2301,32 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 }
 /* Foto y estado de conexión del amigo alineados con la misma posición que
    usa la foto del perfil propio (50% + 33cqmin), ya que el nombre/jugadas
-   ahora se centran igual que en el perfil propio. */
-#loading-friend-group .loading-profile-pic {
+   ahora se centran igual que en el perfil propio.
+   El posicionamiento vive en el WRAP (no en el <img> directo, como era
+   antes) por la misma razón que .loading-profile-pic-wrap: el marco de
+   personalización (.cust-frame-wrap::after, ver openFriendProfile en
+   monuments.js) necesita un contenedor propio para poder sobresalir —
+   ::after no se renderiza sobre <img> (elemento reemplazado). SIN
+   overflow:hidden ni border acá tampoco, mismo criterio: la foto se recorta
+   sola con su propio border-radius:50%. */
+.loading-friend-pic-wrap {
   position: absolute;
   top: calc(50% - 30cqmin);
-  left: calc(50% + 30cqmin);
+  left: calc(50% + 24cqmin);
   transform: translate(-50%, -50%);
   width: 10cqmin;
   height: 10cqmin;
   border-radius: 50%;
-  object-fit: cover;
-  overflow: hidden;
-  border: 0.6cqmin solid #fff;
-  display: block;
   pointer-events: none;
   z-index: 221;
+}
+#loading-friend-group .loading-profile-pic {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
 }
 
 /* El nombre/"Has jugado X veces" del amigo se centraban en el 50% del panel
@@ -1963,9 +2342,14 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 .loading-friend-status {
   position: absolute;
   top: calc(50% - 30cqmin);
-  left: calc(50% + 36cqmin);
+  left: calc(50% + 32cqmin);
   transform: translateY(-50%);
-  width: 19cqmin;
+  /* width:auto (no un valor fijo en cqmin) + white-space:nowrap: con ancho
+     fijo, un texto como "Hace 42 minutos" no entraba en una sola línea y el
+     nodo de texto (hijo anónimo del flex) se envolvía en dos renglones. */
+  width: max-content;
+  max-width: 24cqmin;
+  white-space: nowrap;
   z-index: 213;
   display: flex;
   align-items: center;
@@ -2133,16 +2517,31 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   -webkit-user-drag: none;
 }
 
-.loading-profile-pic-wrap {
+/* #id además de .clase: gana por especificidad a `.cust-frame-wrap { position:
+   relative }` (más abajo en este archivo) — sin esto, agregar la clase
+   cust-frame-wrap le pisaba el position:absolute por empate de especificidad
+   + orden de cascada, dejando el wrap en position:relative "por las dudas"
+   funcionando bien en algunos viewports y mal (corrido) en otros. */
+#loading-profile-pic-wrap.loading-profile-pic-wrap {
   position: absolute;
-  top: calc(50% - 30cqmin);
+}
+.loading-profile-pic-wrap {
+  /* Antes -30cqmin: con el marco de personalización sobresaliendo hacia
+     arriba (.cust-frame-wrap::after, inset negativo), las puntas de los
+     rayos del marco Founder chocaban contra la barra de madera del atril
+     que cuelga arriba del pergamino, quedando tapadas/cortadas ahí. Un poco
+     más de aire arriba para que el marco entre completo. */
+  top: calc(50% - 27cqmin);
   left: calc(50% + 33cqmin);
   transform: translate(-50%, -50%);
   width: 12cqmin;
   height: 12cqmin;
   border-radius: 50%;
-  overflow: hidden;
-  border: 0.6cqmin solid #fff;
+  /* SIN overflow:hidden acá — el marco de personalización (.cust-frame-wrap::after)
+     necesita poder sobresalir de este círculo. La foto y el overlay se
+     recortan solos con su propio border-radius:50% (ver abajo), así que no
+     hace falta que el wrap los recorte. */
+  border-width: 0;
   z-index: 211;
   cursor: pointer;
 }
@@ -2156,9 +2555,82 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   user-select: none;
   -webkit-user-drag: none;
 }
+
+/* A la derecha de la foto de perfil, a su misma altura (mismo "top" que
+   .loading-profile-pic-wrap: calc(50% - 27cqmin), foto de radio 6cqmin desde
+   +33cqmin => borde derecho en +39cqmin). Antes iba abajo de la foto con un
+   botón grande + label; acá al lado hace falta más chico y sin label. */
+.loading-customize-btn {
+  position: absolute;
+  top: calc(50% - 27cqmin);
+  left: calc(50% + 47cqmin);
+  transform: translate(-50%, -50%);
+  width: 8cqmin;
+  height: auto;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  z-index: 213;
+}
+/* Mismo comportamiento que .loading-play-confirm1/2: 2 imágenes apiladas,
+   la de hover (customize2.png) tapa a la normal con un fade. */
+.loading-customize-btn1 {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.loading-customize-btn2 {
+  position: absolute;
+  top: 53%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(1);
+  transform-origin: center center;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  opacity: 0;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.loading-customize-btn:hover .loading-customize-btn2 { opacity: 1; transform: translate(-50%, -50%) scale(1.16); }
+.loading-customize-btn.confirm-pressed .loading-customize-btn2 { opacity: 0; }
+
+/* Marco de foto personalizable (images/customize/frames/<code>.png). El PNG
+   se pone por CSS var (--cust-frame, seteada por JS por elemento — cada
+   avatar puede tener un código distinto según de quién sea el perfil) sobre
+   un ::after sin recortar, así el marco puede sobresalir del círculo de la
+   foto en vez de quedar recortado por el overflow:hidden del wrap. */
+.cust-frame-wrap { position: relative; }
+.cust-frame-wrap::after {
+  content: '';
+  position: absolute;
+  /* El arte de cada marco (images/customize/frames/<code>.png) es un MARCO:
+     el aro no debe pisar la foto, tiene que arrancar justo en el borde y
+     crecer hacia afuera, como un marco de cuadro de verdad. Cada PNG tiene su
+     propia proporción de aro dentro del canvas, así que el inset NO puede ser
+     un solo valor fijo compartido — viene por variable CSS, seteada en JS por
+     código (ver CUSTOMIZE_FRAME_INSET y applyFrame() en js/sb.js, con la
+     medición de cada asset documentada ahí). El fallback -14.5% es el de
+     0001.png por si --cust-frame-inset no se seteó. Para que no se recorten
+     las puntas/aro hace falta que el wrap NO tenga overflow:hidden (ver
+     .loading-profile-pic-wrap).*/
+  inset: var(--cust-frame-inset, -14.5%);
+  background-image: var(--cust-frame, none);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  pointer-events: none;
+  z-index: 4;
+}
+
 .loading-profile-pic-overlay {
   position: absolute;
   inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2169,6 +2641,8 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   transition: opacity 0.2s, background 0.2s;
   pointer-events: none;
 }
+/* Lápiz de "cambiar foto" más chico que el font-size heredado del overlay. */
+#loading-profile-pic-pencil { font-size: 2.4cqmin; }
 .loading-profile-pic-wrap:hover .loading-profile-pic-overlay {
   opacity: 1;
   background: rgba(0, 0, 0, 0.45);
@@ -3022,6 +3496,133 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 }
 .name-prompt-account-btn:hover { background: rgba(255,255,255,0.12); transform: scale(1.04); }
 
+/* ── POPUP DE BIENVENIDA FUNDADOR (una sola vez, founder_popup_seen) ── */
+#founder-popup {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 262;
+}
+#founder-popup.visible { display: flex; }
+.founder-popup-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.4cqmin;
+  background: #fffbe6;
+  border: 0.6cqmin solid #8b6a00;
+  border-radius: 2.4cqmin;
+  padding: 3.6cqmin 5.5cqmin 4.2cqmin;
+  box-shadow: 0 0.8cqmin 2cqmin rgba(0,0,0,0.4);
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  animation: welcomePopIn 0.35s cubic-bezier(0.34,1.56,0.64,1) both;
+  max-width: 62cqmin;
+}
+.founder-popup-logo {
+  width: 20cqmin;
+  height: auto;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.founder-popup-title {
+  font-size: 3.6cqmin;
+  color: #5a4400;
+  text-align: center;
+}
+.founder-popup-desc {
+  font-size: 1.7cqmin;
+  color: #7a6020;
+  text-align: center;
+  max-width: 50cqmin;
+  margin: 0;
+  line-height: 1.35;
+}
+.founder-popup-items {
+  display: flex;
+  gap: 1.8cqmin;
+  margin-top: 0.8cqmin;
+}
+.founder-popup-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7cqmin;
+}
+.founder-popup-item-sq-frame {
+  /* Mismo cuadrado que los otros 3 ítems, pero centra adentro el avatar
+     circular + marco (que sobresale del círculo a propósito, ver
+     applyFrame/CUSTOMIZE_FRAME_INSET) — el círculo se achica un poco para
+     que el aro no se salga del cuadrado contenedor. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.founder-popup-item-frame {
+  position: relative;
+  width: 6.6cqmin;
+  height: 6.6cqmin;
+  border-radius: 50%;
+  overflow: visible;
+}
+.founder-popup-item-frame img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+.founder-popup-item-sq {
+  width: 9cqmin;
+  height: 9cqmin;
+  border-radius: 1.2cqmin;
+  /* contain (no 100% 100%): la viñeta (140x200) y la celda (600x90) NO son
+     cuadradas — estirarlas a la caja las deforma. Con contain se ven en su
+     proporción real, centradas, con el fondo crema asomando alrededor. */
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: #eee9e3;
+  border: 0.25cqmin solid #8b6a00;
+  box-shadow: 0 0.3cqmin 0.8cqmin rgba(0,0,0,0.2);
+}
+.founder-popup-item-label {
+  font-size: 1.3cqmin;
+  color: #5a4400;
+}
+.founder-popup-confirm {
+  position: relative;
+  width: 14cqmin;
+  cursor: pointer;
+  margin-top: 1.2cqmin;
+}
+.founder-popup-confirm1 {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.founder-popup-confirm2 {
+  position: absolute;
+  top: 49%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 118%;
+  height: auto;
+  pointer-events: none;
+  opacity: 0;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.founder-popup-confirm:hover .founder-popup-confirm2 { opacity: 1; }
+.founder-popup-confirm.confirm-pressed .founder-popup-confirm2 { opacity: 0; }
+
 /* ── POPUP DE BIENVENIDA ─────────────────────────────── */
 #welcome-popup {
   position: absolute;
@@ -3418,27 +4019,91 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 
 .guest-rank-badge {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 1.4cqmin;
+  gap: 0.8cqmin;
 }
 .guest-rank-badge-img {
-  width: 9cqmin;
+  width: 18cqmin;
   height: auto;
   filter: drop-shadow(0 0.3cqmin 0.6cqmin rgba(0,0,0,.35));
 }
+/* Mismo formato que .results-rank-label / .final-rank-label */
+.guest-rank-badge-name {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-weight: bold;
+  font-size: 2.6cqmin;
+  color: #FFFF00;
+  -webkit-text-stroke: 0.4cqmin #000080;
+  paint-order: stroke fill;
+  letter-spacing: -0.5px;
+  text-align: center;
+}
+/* Mismo formato que .results-points-wrap (points.png + score en fuente Dimbo) */
 .guest-rank-badge-score {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 0.6cqmin;
-  background: #fff3c4;
-  border: 0.4cqmin solid #d8b400;
-  border-radius: 2cqmin;
-  padding: 0.6cqmin 1.4cqmin;
-  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
-  color: #5a4400;
-  font-size: 2.4cqmin;
+  justify-content: center;
 }
-.guest-rank-badge-score img { width: 2.6cqmin; height: 2.6cqmin; }
+.guest-rank-badge-score img { width: 23cqmin; height: auto; display: block; position: relative; top: 0.8cqmin; z-index: 1; transform: scaleY(1.2); }
+.guest-rank-badge-score span {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  font-family: 'Dimbo', sans-serif;
+  font-size: 5.4cqmin;
+  color: #fff;
+  -webkit-text-stroke: 0.5cqmin #000;
+  paint-order: stroke fill;
+}
+
+#guest-rank-popup-msg { margin-top: 1.4cqmin; }
+
+/* Ícono dibujado en CSS (no emoji) para que tome el mismo color que el texto
+   del popup, en vez de depender del render a color fijo de los emojis. */
+.guest-rank-connfail {
+  position: relative;
+  width: 14cqmin;
+  height: 14cqmin;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #7a6020;
+}
+.conn-signal {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.8cqmin;
+}
+.conn-signal span {
+  display: block;
+  width: 1.6cqmin;
+  background: currentColor;
+  border-radius: 0.4cqmin;
+  opacity: 0.6;
+}
+.conn-signal span:nth-child(1) { height: 2.8cqmin; }
+.conn-signal span:nth-child(2) { height: 4.6cqmin; }
+.conn-signal span:nth-child(3) { height: 6.4cqmin; }
+.conn-noentry {
+  position: absolute;
+  inset: 0;
+  border: 0.8cqmin solid currentColor;
+  border-radius: 50%;
+}
+.conn-noentry::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 141%;
+  height: 0.8cqmin;
+  background: currentColor;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
 
 .guest-rank-popup-checkbox {
   display: flex;
@@ -4395,7 +5060,26 @@ body.is-mobile #screen-warning-icon {
   left: 0;
   width: 100%;
   aspect-ratio: 4 / 6;
-  background: #1a4080;
+  /* Tarjeta personalizable (images/customize/cards/<code>.png), seteada por
+     JS por fila vía --cust-card. Sin background-color de respaldo: el arte
+     de las cartas tiene un margen transparente a propósito (la tarjeta
+     "flota" dentro del PNG), y un color de fondo sólido se veía como un
+     borde feo alrededor de esa transparencia — sobre todo notorio en la
+     Founder dorada (0002), menos en la azul (0001) porque combinaba.
+     --cust-card-default (seteada una vez en :root por
+     CustomizeAssets._initDefaultCardVar, ver js/sb.js) es la carta 0001 —
+     cubre las filas que nunca llaman a applyCard (bots del leaderboard, que
+     no son cuentas reales), que si no quedan directamente en blanco. */
+  background-image: var(--cust-card, var(--cust-card-default, none));
+  /* 140% + centrado (no 100%): el PNG tiene su propio margen transparente
+     (la tarjeta "flota" dentro del canvas, ver arriba), así que a 100% se
+     ve chica/con aire de sobra alrededor — mismo zoom que ya se usaba en la
+     vista previa de Personalizar (.customize-lb-preview .lb-entry) y en los
+     swatches de la grilla, ahora también acá para la ficha REAL del
+     leaderboard in-game. */
+  background-size: 140% 140%;
+  background-position: center;
+  background-repeat: no-repeat;
   border-radius: 1.1cqmin;
   box-shadow: 0 0.2cqmin 0.7cqmin rgba(0,0,0,0.35);
   display: flex;
@@ -4499,6 +5183,37 @@ body.is-mobile #screen-warning-icon {
 
 .lb-entry.lb-player .lb-score {
   color: #f0e060;
+}
+
+/* "Modo oscuro" de card (images/customize/cards/<code>.png, ver
+   CUSTOMIZE_CARD_LIGHT_TEXT en js/sb.js) — mismo criterio que
+   .cell-light-text: fondo de carta oscuro, texto pasa a blanco con contorno
+   del color que tendría normalmente. La clase la agrega solo
+   CustomizeAssets.applyCard(); el swatch de la grilla (_swatchPreview en
+   monuments.js) no pasa por applyCard y chequea el set directo.
+   Sin exigir .lb-player/.lb-vsopp (antes sí, y por eso la carta del rival
+   en VS y las de lobby grupal — .lb-entry a secas, sin ninguna de esas dos
+   clases — nunca mostraban el modo oscuro aunque correspondiera): la clase
+   card-light-text ya es señal suficiente, applyCard() solo la agrega
+   cuando hay una card real de por medio. */
+.lb-entry.card-light-text .lb-name {
+  color: #fff;
+  -webkit-text-stroke: 0.4cqmin #8b6a00;
+  paint-order: stroke fill;
+  /* El stroke pinta por fuera del glyph sin ensanchar la caja del span —
+     .lb-name tiene overflow:hidden + max-width para el ellipsis de nombres
+     largos, así que sin este respiro el contorno se cortaba a los lados
+     (los bordes del box lo recortaban antes de llegar al borde real del
+     trazo). Padding + max-width compensado le dan lugar al trazo dentro de
+     la misma caja recortada, sin desactivar el overflow:hidden que hace
+     falta para el ellipsis. */
+  padding: 0 0.4cqmin;
+  max-width: calc(92% - 0.8cqmin);
+}
+.lb-entry.card-light-text .lb-score {
+  color: #fff;
+  -webkit-text-stroke: 0.4cqmin #8b6a00;
+  paint-order: stroke fill;
 }
 
 .lb-rank {
@@ -7118,32 +7833,104 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   align-items: center;
   gap: 1.4cqmin;
   padding: 1.1cqmin 1.4cqmin;
-  background: #fffef5;
-  border: 0.3cqmin solid #d8c47e;
   border-radius: 1cqmin;
+  position: relative;
+  /* Celda personalizable (images/customize/cells/<code>.png), seteada por
+     CustomizeAssets.applyCellForStatus (ver _renderMembers en js/lobby.js).
+     background-image (NO border-image): esta celda es una CÁPSULA ya
+     terminada de punta a punta (bbox medido: 600×88 de 600×90), no un
+     patrón de borde+relleno para 9-slice — cortarla en franjas con
+     border-image solo pintaba bien el "fill" del medio, el resto (bordes/
+     puntas redondeadas) salía mal (el "solo se pinta el centro"
+     reportado). Mismo criterio que .versus-friend-row. SIN background-color
+     hardcodeado de respaldo: --cust-cell-default (ver _initDefaultCellVar
+     en js/sb.js) cubre el caso sin celda propia. */
+  background-image: var(--cust-cell, var(--cust-cell-default, none));
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
 }
 .lobby-member-row.is-host { border-color: #f0b800; box-shadow: 0 0 0 0.2cqmin #f0b80055; }
 .lobby-member-row.clickable { cursor: pointer; }
-.lobby-member-row.clickable:hover { background: rgba(255,255,255,0.12); }
-.lobby-member-row.is-playing {
-  border-color: #e8a020;
-  background: #fff3d4;
-  animation: lobby-member-playing 1.4s ease-in-out infinite;
+/* background-color (NO el shorthand "background"): ese shorthand resetea
+   TODAS las sub-propiedades de fondo a su valor inicial antes de aplicar el
+   color — incluida background-image, que es donde vive la celda real
+   (--cust-cell). Con el shorthand, pasar el mouse por encima borraba la
+   celda entera (el "desaparece al pasar el cursor" reportado). */
+.lobby-member-row.clickable:hover { background-color: rgba(255,255,255,0.12); }
+/* Fila titilando en VERDE cuando el miembro está jugando — mismo mecanismo
+   que .versus-friend-row.playing (panel de Retar/Invitar): el
+   background-color animado de antes (lobby-member-playing) nunca se veía
+   porque la celda se pinta con background-image encima. Tinte genérico
+   (::before) para celdas sin variante -green propia; crossfade real
+   (::after) para las que sí la tienen (ver
+   CUSTOMIZE_CELL_GREEN_VARIANTS/applyCellForStatus en js/sb.js). El
+   contenido real necesita z-index:1 explícito para no quedar tapado por
+   estos overlays (z-index:0) — mismo bug ya resuelto en los otros paneles. */
+.lobby-member-avatar-wrap,
+.lobby-member-name,
+.lobby-member-badge,
+.lobby-member-playing-badge,
+.lobby-host-btn,
+.lobby-kick-btn {
+  position: relative;
+  z-index: 1;
 }
-@keyframes lobby-member-playing {
-  0%, 100% { background-color: #fff3d4; }
-  50%      { background-color: #ffe0a0; }
+.lobby-member-row.is-playing:not(.cell-green-asset)::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: #2bd14b;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  z-index: 0;
+  animation: social-playing-tint 1.4s ease-in-out infinite;
+}
+.lobby-member-row.is-playing.cell-green-asset::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--cust-cell-green);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  will-change: opacity;
+  animation: cell-green-fade 1.4s ease-in-out infinite;
 }
 .lobby-member-row.is-playing .lobby-member-name { color: #8a5200; }
-.lobby-member-avatar {
+/* Wrap: mismo criterio que .loading-social-avatar-wrap — el marco de
+   personalización (.cust-frame-wrap::after, seteado por applyFrame en
+   _renderMembers) necesita un contenedor propio (position+tamaño) para
+   poder sobresalir del círculo; el <img> ya no lleva border/tamaño propio. */
+.lobby-member-avatar-wrap {
   flex: none;
-  width: 6cqmin; height: 6cqmin;
+  width: 6cqmin;
+  height: 6cqmin;
+  position: relative;
+}
+.lobby-member-avatar {
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
   object-fit: cover;
   background: #d6ecff;
-  border: 0.4cqmin solid #8b6a00;
+  display: block;
 }
 .lobby-member-name { flex: 1; font-size: 2.6cqmin; color: #4a3b00; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* "Modo oscuro" (ver CUSTOMIZE_CELL_LIGHT_TEXT en js/sb.js) — la clase ya la
+   agrega _renderMembers (js/lobby.js) pero le faltaba esta regla: sin ella
+   el nombre se quedaba en su marrón de siempre sobre una celda oscura,
+   perdiéndose. padding/max-width compensan que el stroke pinta por fuera
+   del glyph sin ensanchar la caja (mismo bug ya resuelto en
+   .card-light-text/.cell-light-text de los otros paneles). */
+.lobby-member-row.cell-light-text .lobby-member-name {
+  color: #fff;
+  -webkit-text-stroke: 0.4cqmin #4a3b00;
+  paint-order: stroke fill;
+  padding: 0 0.4cqmin;
+}
 .lobby-member-badge { font-size: 1.9cqmin; color: #fff; background: #f0b800; border-radius: 0.8cqmin; padding: 0.3cqmin 1cqmin; }
 .lobby-member-playing-badge {
   font-size: 1.9cqmin; color: #fff; background: #e8a020;
@@ -7259,19 +8046,62 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
 .lobby-copylink-btn { padding: 0.9cqmin 3cqmin; }
 .lobby-invite-list { width: 78cqmin; height: 34cqmin; }
 
-/* Estado "jugando": texto ámbar titilante + punto que pulsa */
-.versus-friend-status.playing { color: #c87000; animation: vs-playing-blink 1.2s ease-in-out infinite; }
-.versus-friend-dot.playing { background: #e8a020; box-shadow: 0 0 1.2cqmin #e8a020; }
+/* Estado "jugando": texto verde titilante + punto que pulsa — mismo verde
+   que el panel de Amigos (.loading-social-status .dot.playing #2bd14b,
+   .loading-social-row.status-playing .loading-social-status #1ea53a), no
+   ámbar como estaba acá. */
+.versus-friend-status.playing { color: #1ea53a; animation: vs-playing-blink 1.2s ease-in-out infinite; }
+.versus-friend-dot.playing { background: #2bd14b; box-shadow: 0 0 1.2cqmin #2bd14b; }
 @keyframes vs-playing-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-/* Fila completa titilando en ámbar cuando el amigo está jugando */
-.versus-friend-row.playing {
-  border-color: #e8a020;
-  background: #fff3d4;
-  animation: vs-playing-row 1.4s ease-in-out infinite;
+/* Fila completa titilando en VERDE cuando el amigo está jugando — mismo
+   mecanismo que .loading-social-row.status-playing (panel social): la
+   celda ahora se pinta con background-image (var(--cust-cell)), así que un
+   background-color animado (lo de antes) nunca se llegaba a ver detrás del
+   PNG. Tinte genérico (::before, mix-blend) para celdas sin variante
+   -green propia; crossfade real (::after) para las que sí la tienen (ver
+   CUSTOMIZE_CELL_GREEN_VARIANTS/applyCellForStatus en js/sb.js). El
+   contenido real (avatar/info/botón) necesita z-index:1 explícito para que
+   estos overlays (z-index:-1) no le peguen encima del texto en vez de
+   quedar detrás — mismo bug ya resuelto en el panel social. */
+.versus-friend-avatar-wrap,
+.versus-friend-info,
+.versus-challenge-btn {
+  position: relative;
+  z-index: 1;
 }
-@keyframes vs-playing-row {
-  0%, 100% { background-color: #fff3d4; }
-  50%      { background-color: #ffe0a0; }
+.versus-friend-row.playing:not(.cell-green-asset)::before {
+  content: '';
+  position: absolute;
+  /* inset:0 (no -0.9cqmin): a diferencia de .loading-social-row, acá la
+     celda se pinta con background-image lleno (sin franja de border-image
+     que compensar) — con el inset negativo este overlay se pasaba de los
+     bordes reales de la fila, viéndose más grande de lo que corresponde. */
+  inset: 0;
+  border-radius: inherit;
+  background: #2bd14b;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  /* z-index:0 (NO negativo) — mismo motivo que .loading-social-row
+     .status-playing::before: con z-index negativo, en algunos navegadores
+     este overlay queda sin capa de composición propia y la animación no se
+     repinta sola (solo con algo que fuerce recompositar, como :hover). El
+     contenido real (avatar-wrap/info/botón) ya tiene z-index:1 explícito
+     más arriba, así que 0 alcanza para quedar debajo sin ambigüedad. */
+  z-index: 0;
+  animation: social-playing-tint 1.4s ease-in-out infinite;
+}
+.versus-friend-row.playing.cell-green-asset::after {
+  content: '';
+  position: absolute;
+  inset: 0; /* mismo motivo que el ::before de arriba */
+  background-image: var(--cust-cell-green);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0; /* mismo motivo que el ::before de arriba */
+  will-change: opacity;
+  animation: cell-green-fade 1.4s ease-in-out infinite;
 }
 
 /* Notificación (banner) de invitación entrante: baja desde arriba, no bloquea el menú */
@@ -7429,7 +8259,10 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
 }
 .lobby-result-row.is-me { background: rgba(255,231,74,0.18); border: 0.3cqmin solid #ffe14a; }
 .lobby-result-pos { font-family: 'VAGRoundBold','Arial Black',sans-serif; font-size: 3cqmin; color: #fffbe6; min-width: 5cqmin; text-align: center; }
-.lobby-result-avatar { width: 6cqmin; height: 6cqmin; border-radius: 50%; object-fit: cover; border: 0.35cqmin solid #fffbe6; }
+/* Wrap: mismo criterio que .lobby-member-avatar-wrap — el marco real
+   (.cust-frame-wrap::after) necesita su propio contenedor posicionado. */
+.lobby-result-avatar-wrap { flex: none; width: 6cqmin; height: 6cqmin; position: relative; }
+.lobby-result-avatar { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
 .lobby-result-name { flex: 1; font-family: 'VAGRoundBold','Arial Black',sans-serif; font-size: 2.6cqmin; color: #fffbe6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lobby-result-score { font-family: 'VAGRoundBold','Arial Black',sans-serif; font-size: 3cqmin; color: #fff700; }
 
@@ -7438,21 +8271,38 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   align-items: center;
   gap: 1.4cqmin;
   padding: 1.2cqmin 1.4cqmin;
-  background: #fffef5;
-  border: 0.3cqmin solid #d8c47e;
   border-radius: 1cqmin;
   position: relative;
   transition: transform 0.1s;
+  /* Celda personalizable real (images/customize/cells/<code>.png), seteada
+     por _renderInviteList/_renderOnlineFriends (js/lobby.js, js/vs.js) —
+     mismo criterio que .lobby-member-row: background-image simple (no
+     border-image), porque esta celda es una cápsula ya terminada de punta a
+     punta, no un patrón de borde+relleno para 9-slice (cortarla en franjas
+     duplicaba el degradé). --cust-cell-default (ver _initDefaultCellVar en
+     js/sb.js) cubre las filas que NO son una persona con cell_code propio
+     (la lista de salas públicas, .versus-friend-row sin avatar/frame real,
+     ver _renderPublicRooms) — sin esto se quedaban totalmente sin fondo. */
+  background-image: var(--cust-cell, var(--cust-cell-default, none));
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
 }
 .versus-friend-row:hover { transform: scale(1.012); }
-.versus-friend-avatar {
+/* Wrap: mismo criterio que .lobby-member-avatar-wrap — el marco real
+   (.cust-frame-wrap::after) necesita su propio contenedor posicionado. */
+.versus-friend-avatar-wrap {
   flex: none;
   width: 7cqmin;
   height: 7cqmin;
+  position: relative;
+}
+.versus-friend-avatar {
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
   object-fit: cover;
   background: #d6ecff;
-  border: 0.4cqmin solid #8b6a00;
+  display: block;
 }
 .public-room-name-row {
   display: flex;
@@ -7489,6 +8339,27 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* "Modo oscuro" (ver CUSTOMIZE_CELL_LIGHT_TEXT en js/sb.js) — mismo criterio
+   que .cell-light-text en las filas de Rankings/Amigos: si la celda
+   equipada tiene fondo oscuro/ocupado, nombre y estado pasan a blanco con
+   contorno del color que tendrían normalmente. padding/max-width en el
+   nombre: el stroke pinta por fuera del glyph sin ensanchar la caja, y
+   overflow:hidden lo recortaba a los lados (mismo bug ya resuelto en
+   .card-light-text/.cell-light-text). */
+.versus-friend-row.cell-light-text .versus-friend-name {
+  color: #fff;
+  -webkit-text-stroke: 0.4cqmin #4a3b00;
+  paint-order: stroke fill;
+  padding: 0 0.4cqmin;
+}
+.versus-friend-row.cell-light-text .versus-friend-status {
+  color: #fff;
+  /* Mismo verde para online y jugando (antes .playing pisaba esto con un
+     contorno ámbar, ver .versus-friend-status.playing arriba — ya no hace
+     falta ese override, el estado "jugando" también es verde ahora). */
+  -webkit-text-stroke: 0.3cqmin #2e9c3a;
+  paint-order: stroke fill;
 }
 .versus-friend-status {
   font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
@@ -7583,12 +8454,23 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   animation: welcomePopIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both;
   min-width: 50cqmin;
 }
-.vs-popup-pic {
+/* Wrap: mismo criterio que .vs-result-pic-wrap — el marco real
+   (CustomizeAssets.applyFrame) necesita su propio contenedor posicionado;
+   el <img> ya no lleva tamaño/borde propio. Compartido por los 4 popups de
+   vs.js: selector de modo, esperando respuesta, invitación entrante y
+   duelo aceptado. */
+.vs-popup-pic-wrap {
+  display: inline-block;
   width: 14cqmin;
   height: 14cqmin;
+  position: relative;
+}
+.vs-popup-pic {
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
   object-fit: cover;
-  border: 0.5cqmin solid #fffbe6;
+  display: block;
 }
 .vs-popup-name {
   font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
@@ -7702,6 +8584,19 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   border-radius: 50%;
   object-fit: cover;
   border: 0.5cqmin solid #fffbe6;
+}
+/* El aro crema fijo de arriba se reemplaza por el marco de personalización
+   real de cada jugador (CustomizeAssets.applyFrame) — mismo criterio que el
+   resto de la app, el marco NO se hardcodea nunca. Clase compartida por el
+   espectador (spectator-host/guest-pic, ver js/spectate.js) Y por la
+   pantalla de resultado final ganaste/perdiste (vs-result-me/opp-pic, ver
+   js/vs.js). */
+.vs-result-pic-wrap {
+  display: inline-block;
+  position: relative;
+}
+.vs-result-pic-wrap .vs-result-pic {
+  border: none;
 }
 .vs-result-name {
   font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
@@ -7867,7 +8762,7 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 1cqmin;
+  gap: 2.5cqmin;
 }
 /* Modo GRUPAL (flechas visibles, ver _showGroupPovArrows en spectate.js):
    las flechas se anclan por POSICIÓN ABSOLUTA a los bordes de un ancho FIJO
@@ -7926,12 +8821,21 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
 .spectator-mini-row.group-pov .spectator-mini-pov-next { right: 0; }
 .spectator-mini-pov-arrow:active { transform: scale(0.85); }
 .spectator-mini-pov-arrow.disabled { opacity: 0.35; pointer-events: none; }
-.spectator-mini-avatar {
+/* Wrap: mismo criterio que .loading-profile-pic-wrap/.lobby-member-avatar-wrap
+   — el marco real (.cust-frame-wrap::after, aplicado en spectate.js) necesita
+   su propio contenedor posicionado; el <img> ya no lleva tamaño/borde propio. */
+.spectator-mini-avatar-wrap {
   width: 6.5cqmin;
   height: 6.5cqmin;
+  position: relative;
+  flex: none;
+}
+.spectator-mini-avatar {
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
   object-fit: cover;
-  border: 0.25cqmin solid #fffbe6;
+  display: block;
   box-shadow: 0 0.2cqmin 0.6cqmin rgba(0,0,0,0.5);
 }
 /* Mismo tamaño que .loading-player-name (panel de perfil). */

@@ -542,10 +542,9 @@ window.Spectate = (() => {
   // trabado en "Cargando partida..." sin error ni éxito nunca (ni conecta ni
   // falla), el reportado. Con timeout, a los 2s sigue de largo igual.
   function _withTimeout(promise, ms) {
-    return Promise.race([
-      promise,
-      new Promise(resolve => setTimeout(resolve, ms)),
-    ]);
+    let timer;
+    const timeout = new Promise(resolve => { timer = setTimeout(resolve, ms); });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
   }
   async function stop() {
     if (_channel) {
@@ -695,7 +694,7 @@ window.GroupSpectate = (() => {
 
   async function _fetchMembers(lobbyId) {
     const { data, error } = await window.sb.from('lobby_members')
-      .select('user_id, score, live_state, p:user_id(username, avatar_url)').eq('lobby_id', lobbyId).order('joined_at');
+      .select('user_id, score, live_state, p:user_id(username, avatar_url, frame_code, card_code)').eq('lobby_id', lobbyId).order('joined_at');
     if (error) console.warn('[spec] GroupSpectate._fetchMembers error', error);
     if (error || !data) return [];
     return data.map(m => {
@@ -732,6 +731,13 @@ window.GroupSpectate = (() => {
         name: (m.p && m.p.username) || '?',
         avatar: (m.p && m.p.avatar_url) || 'images/profilepic/ppdefault.png',
         score: _scores[m.user_id] || 0,
+        // frameCode: usado por el mini-HUD (spectator-mini-avatar) al mirar a
+        // este miembro por POV. cardCode: usado por _renderGroupLeaderboardInner
+        // para la ficha de cada miembro en el leaderboard — antes ninguno de
+        // los dos se pedía acá, así que el espectador grupal siempre veía todo
+        // en default sin importar qué tuviera cada jugador equipado de verdad.
+        frameCode: (m.p && m.p.frame_code) || '0001',
+        cardCode: (m.p && m.p.card_code) || '0001',
       };
     });
   }
@@ -1255,9 +1261,11 @@ window.GroupSpectate = (() => {
   if (!screen) return;
   const titleEl      = document.getElementById('spectator-title');
   const hostPic      = document.getElementById('spectator-host-pic');
+  const hostPicWrap  = document.getElementById('spectator-host-pic-wrap');
   const hostNameEl   = document.getElementById('spectator-host-name');
   const hostScoreEl  = document.getElementById('spectator-host-score');
   const guestPic     = document.getElementById('spectator-guest-pic');
+  const guestPicWrap = document.getElementById('spectator-guest-pic-wrap');
   const guestNameEl  = document.getElementById('spectator-guest-name');
   const guestScoreEl = document.getElementById('spectator-guest-score');
   const promptEl     = document.getElementById('spectator-prompt');
@@ -1267,6 +1275,7 @@ window.GroupSpectate = (() => {
 
   const miniHud       = document.getElementById('spectator-mini-hud');
   const miniAvatarEl  = document.getElementById('spectator-mini-avatar');
+  const miniAvatarWrap = document.getElementById('spectator-mini-avatar-wrap');
   const miniNameEl    = document.getElementById('spectator-mini-name');
 
   const loadingEl      = document.getElementById('spectator-loading');
@@ -1356,12 +1365,26 @@ window.GroupSpectate = (() => {
   let _activeRealUIMode = null;
   let _friendName   = '';
   let _friendAvatar = '';
+  // Código de card (images/customize/cards/<code>.png) del amigo espectado —
+  // usado por *SpectatorSetPlayerCard (flags.js/shapes.js/monuments.js) para
+  // que la ficha REAL de leaderboard que ve el espectador muestre la carta
+  // que ese jugador tiene equipada de verdad, no el default. El marco NO va
+  // acá a propósito (regla establecida: frame solo en la foto grande de
+  // perfil, nunca en un avatar tipo card/leaderboard).
+  let _friendCardCode = '0001';
+  // Código de frame (images/customize/frames/<code>.png) del amigo
+  // espectado — este SÍ va en el mini-HUD (spectator-mini-avatar), a
+  // diferencia de _friendCardCode: acá es la foto de identidad "quién estoy
+  // mirando", no un avatar tipo card/leaderboard, así que el marco real
+  // aplica igual que en la foto grande de perfil.
+  let _friendFrameCode = '0001';
   let _friendIsHost = true; // en solo siempre "host" (único jugador); en versus se resuelve al conectar
   let _lastHost = 0, _lastGuest = 0;
   // Identidad del RIVAL del amigo espectado (solo versus) — se resuelve una
   // vez al conectar (ver openSpectator/onSnapshot), consultando profiles por
   // el lado de la partida que no es el amigo. null en modo solo (no aplica).
   let _oppName = null, _oppAvatar = null;
+  let _oppCardCode = '0001';
   // true cuando quien "espectea" es EL PROPIO JUGADOR mirando a su rival de
   // prestado (vs.js _enterWaitAsSpectator, opts.instant en openSpectator) —
   // ver comentario largo en el onEnd de _wireCommonCallbacks: sin esto, el
@@ -1702,7 +1725,7 @@ window.GroupSpectate = (() => {
     // uno ve su propio marcador + la fila del rival en el leaderboard).
     const oppScore = window.Spectate.isSolo() ? null : (_friendIsHost ? _lastGuest : _lastHost);
     if (fns && typeof window[fns.setPlayerCard] === 'function') {
-      window[fns.setPlayerCard](_friendName, _friendAvatar, friendScore, _oppName, _oppAvatar, oppScore);
+      window[fns.setPlayerCard](_friendName, _friendAvatar, friendScore, _oppName, _oppAvatar, oppScore, _friendCardCode, _oppCardCode);
     }
   }
 
@@ -1728,6 +1751,7 @@ window.GroupSpectate = (() => {
     window[fns.enter]();
     miniNameEl.textContent = _friendName || 'Jugador';
     if (_friendAvatar) miniAvatarEl.src = _friendAvatar;
+    window.CustomizeAssets?.applyFrame(miniAvatarWrap, _friendFrameCode);
     // _updateMiniScores() arma la tarjeta de 2 filas fijas amigo/rival
     // (flagsSpectatorSetPlayerCard) — pensada solo para 1v1/solo. En modo
     // GRUPAL esa tarjeta terminaba conviviendo con las N filas que arma
@@ -1837,6 +1861,12 @@ window.GroupSpectate = (() => {
       _groupInstant = false;
       if (typeof window._hideVsWaitSpinner === 'function') window._hideVsWaitSpinner();
       _exitRealUI();
+      // _exitRealUI() solo apaga el HUD si _usingRealUI era true — si el
+      // espectado estaba en pregame/splash (nunca se montó una UI real de
+      // ronda), esa función corta con un return temprano y esta línea nunca
+      // se ejecuta, dejando "ESPECTANDO A..." pegado incluso de vuelta en
+      // el menú. Se apaga acá también, sin condición.
+      if (miniHud) miniHud.style.display = 'none';
       _hideSplashMirror();
       screen.style.display = 'none';
       window._isSpectating = false;
@@ -1866,6 +1896,7 @@ window.GroupSpectate = (() => {
         window.Spectate.stop();
       }
       _exitRealUI();
+      if (miniHud) miniHud.style.display = 'none'; // ver comentario largo más abajo en el camino principal
       // El cierre SILENCIOSO (silent=true) solo lo usa vs.js
       // (_exitWaitAsSpectator/_onOpponentAbandoned) para sacar al jugador del
       // modo "mirando al rival de prestado" JUSTO antes de mostrar SU PROPIA
@@ -1955,6 +1986,14 @@ window.GroupSpectate = (() => {
       // queda el desmontaje VISUAL, que sí se demora a propósito detrás de la
       // pantalla de carga.
       _exitRealUI();
+      // _exitRealUI() empieza con "if (!_usingRealUI) return" — si el
+      // espectado estaba en pregame/splash cuando se cerró la sesión (nunca
+      // llegó a montarse una UI real de ronda, _usingRealUI seguía en
+      // false), esa función corta ahí mismo SIN llegar a apagar miniHud
+      // (esa línea vive adentro, después del guard). El cartel "ESPECTANDO
+      // A..." quedaba pegado en pantalla incluso de vuelta en el menú
+      // principal. Se apaga acá también, sin depender de ese guard.
+      if (miniHud) miniHud.style.display = 'none';
       _hideSplashMirror();
       screen.style.display = 'none';
       // _exitRealUI() ya apaga esto de rebote cuando SÍ había UI real montada
@@ -2015,9 +2054,11 @@ window.GroupSpectate = (() => {
     _hideSplashMirror();
     _friendName   = friend && friend.name   ? friend.name   : '';
     _friendAvatar = friend && friend.avatar ? friend.avatar : '';
+    _friendCardCode = (friend && friend.cardCode) || '0001';
+    _friendFrameCode = (friend && friend.frameCode) || '0001';
     _friendIsHost = true;
     _lastHost = _lastGuest = 0;
-    _oppName = null; _oppAvatar = null;
+    _oppName = null; _oppAvatar = null; _oppCardCode = '0001';
     _suppressGenericEnd = false;
     miniHud.style.display = 'none';
     // Vs.js (_enterWaitAsSpectator) pisa este texto con "esperando a los
@@ -2039,6 +2080,13 @@ window.GroupSpectate = (() => {
     guestScoreEl.textContent = '0';
     hostPic.src  = 'images/profilepic/ppdefault.png';
     guestPic.src = 'images/profilepic/ppdefault.png';
+    // Arranca en el marco default — cada lado lo pisa con el suyo propio
+    // (friend.frameCode / el del rival, resuelto via oppId más abajo) apenas
+    // se sepa quién es quién.
+    if (window.CustomizeAssets) {
+      window.CustomizeAssets.applyFrame(hostPicWrap, '0001');
+      window.CustomizeAssets.applyFrame(guestPicWrap, '0001');
+    }
   }
 
   function _wireCommonCallbacks() {
@@ -2332,6 +2380,7 @@ window.GroupSpectate = (() => {
         _friendAvatar = swapAvatar || _friendAvatar;
         miniNameEl.textContent = _friendName || 'Jugador';
         if (_friendAvatar) miniAvatarEl.src = _friendAvatar;
+        window.CustomizeAssets?.applyFrame(miniAvatarWrap, _friendFrameCode);
         _resetIdleWatchdog();
         if (_usingRealUI) _updateMiniScores();
       });
@@ -2377,6 +2426,7 @@ window.GroupSpectate = (() => {
       // _exitRealUI ni siquiera llega a ejecutar por el guard de arriba).
       miniNameEl.textContent = _friendName || 'Jugador';
       if (_friendAvatar) miniAvatarEl.src = _friendAvatar;
+      window.CustomizeAssets?.applyFrame(miniAvatarWrap, _friendFrameCode);
       miniHud.style.display = 'flex';
       _showSplashMirror(payload && payload.mode, payload && payload.step);
       // Misma música que suena en la pantalla real de instrucciones (ver los
@@ -2424,24 +2474,35 @@ window.GroupSpectate = (() => {
       _mode = match.mode || 'flags';
       _friendIsHost = !!(friend && friend.id === match.host_id);
       if (friend) {
-        if (_friendIsHost) { hostNameEl.textContent = friend.name || 'Host'; if (friend.avatar) hostPic.src = friend.avatar; }
-        else               { guestNameEl.textContent = friend.name || 'Guest'; if (friend.avatar) guestPic.src = friend.avatar; }
+        if (_friendIsHost) {
+          hostNameEl.textContent = friend.name || 'Host';
+          if (friend.avatar) hostPic.src = friend.avatar;
+          window.CustomizeAssets?.applyFrame(hostPicWrap, friend.frameCode || '0001');
+        } else {
+          guestNameEl.textContent = friend.name || 'Guest';
+          if (friend.avatar) guestPic.src = friend.avatar;
+          window.CustomizeAssets?.applyFrame(guestPicWrap, friend.frameCode || '0001');
+        }
       }
       _lastHost = match.host_score  || 0;
       _lastGuest = match.guest_score || 0;
       hostScoreEl.textContent  = _lastHost;
       guestScoreEl.textContent = _lastGuest;
       // Identidad del rival — la partida solo trae host_id/guest_id (ids),
-      // no nombre/foto; sin esto el espectador nunca sabía quién era la otra
-      // persona (ver citiesSpectatorSetPlayerCard etc., que ahora también
-      // muestran su fila). Se resuelve una sola vez por sesión.
+      // no nombre/foto (ni frame_code, ver applyFrame más abajo); sin esto
+      // el espectador nunca sabía quién era la otra persona (ver
+      // citiesSpectatorSetPlayerCard etc., que ahora también muestran su
+      // fila). Se resuelve una sola vez por sesión.
       const oppId = _friendIsHost ? match.guest_id : match.host_id;
       if (oppId && window.sb) {
-        window.sb.from('profiles').select('username, avatar_url').eq('id', oppId).single()
+        window.sb.from('profiles').select('username, avatar_url, frame_code, card_code').eq('id', oppId).single()
           .then(({ data }) => {
             if (!data || _closing) return;
+            const oppWrap = _friendIsHost ? guestPicWrap : hostPicWrap;
+            window.CustomizeAssets?.applyFrame(oppWrap, data.frame_code || '0001');
             _oppName = data.username || 'Rival';
             _oppAvatar = data.avatar_url || null;
+            _oppCardCode = data.card_code || '0001';
             if (_usingRealUI) _updateMiniScores();
           })
           .catch(() => {});
@@ -2520,6 +2581,7 @@ window.GroupSpectate = (() => {
     screen.classList.add('spectator-solo');
     hostNameEl.textContent = friend && friend.name ? friend.name : 'Jugador';
     if (friend && friend.avatar) hostPic.src = friend.avatar;
+    window.CustomizeAssets?.applyFrame(hostPicWrap, (friend && friend.frameCode) || '0001');
     // Antes esto quedaba en false hasta que flagsSpectatorEnter/
     // shapesSpectatorEnter lo prendían (recién al montar la ronda real) — si
     // el jugador espectado estaba en instrucciones o en el 3-2-1 largo rato,
@@ -2580,8 +2642,10 @@ window.GroupSpectate = (() => {
   function _applyGroupPovMember(member) {
     _friendName   = member && member.name   ? member.name   : '';
     _friendAvatar = member && member.avatar ? member.avatar : '';
+    _friendFrameCode = (member && member.frameCode) || '0001';
     miniNameEl.textContent = _friendName || 'Jugador';
     if (_friendAvatar) miniAvatarEl.src = _friendAvatar;
+    window.CustomizeAssets?.applyFrame(miniAvatarWrap, _friendFrameCode);
     _fitGroupPovName();
   }
 
@@ -2717,6 +2781,10 @@ window.GroupSpectate = (() => {
       if (nameEl) nameEl.textContent = m.name || '?';
       const scoreEl = el.querySelector('.lb-score');
       if (scoreEl) scoreEl.textContent = (m.score || 0).toLocaleString();
+      // cardCode real de cada miembro (ver _fetchMembers más arriba) — sin
+      // esto, cualquiera que espectara una sala grupal desde afuera veía la
+      // carta default de todos, sin importar qué tuviera cada uno equipado.
+      window.CustomizeAssets?.applyCard(el, m.cardCode || '0001');
     });
     // Miembros que ya no están en la sala (se fueron a mitad de partida).
     Array.from(lb.querySelectorAll('[id^="group-spec-lb-"]')).forEach(el => {
@@ -3100,6 +3168,7 @@ window.GroupSpectate = (() => {
       _mode = (payload && payload.mode) || _mode;
       miniNameEl.textContent = _friendName || 'Jugador';
       if (_friendAvatar) miniAvatarEl.src = _friendAvatar;
+      window.CustomizeAssets?.applyFrame(miniAvatarWrap, _friendFrameCode);
       miniHud.style.display = 'flex';
       _showSplashMirror(payload && payload.mode, payload && payload.step);
       if (typeof playMusic === 'function' && typeof sfxPregame !== 'undefined') playMusic(sfxPregame);

@@ -718,6 +718,7 @@ window.refreshVsSpectatorBadge = function (n) {
   let _inTimer  = null;
   let _pendingOppName   = null; // nombre del oponente guardado para ambos lados
   let _pendingOppAvatar = null;
+  let _pendingOppFrameCode = null; // marco real del oponente, ver _showDuelAcceptedPopup
 
   // ── Navegación de pantallas del panel ─────────────────────────────────────
   const T = (k, d) => (typeof t === 'function' ? t(k) : d);
@@ -902,7 +903,12 @@ window.refreshVsSpectatorBadge = function (n) {
   // Crear sala: si ya tengo una activa, pedir confirmación para abandonarla
   async function _doCreateRoom(isPublic, btn) {
     _setBtnLoading(btn, true);
-    try { await window.LB.create(isPublic); versusGoTo('lobby'); window.Lobby.enterLobby(); }
+    try {
+      const _p = window.LB.create(isPublic);
+      const result = typeof window.withConnTimeout === 'function' ? await window.withConnTimeout(_p, 6000) : await _p;
+      if (result === undefined) return; // timeout: ya se mostró la viñeta de error de conexión
+      versusGoTo('lobby'); window.Lobby.enterLobby();
+    }
     catch (e) { window.showVersusToast(T('lobby.createError', 'No se pudo crear la sala')); }
     finally { _setBtnLoading(btn, false); }
   }
@@ -917,11 +923,50 @@ window.refreshVsSpectatorBadge = function (n) {
     }
   }
 
+  // Diff incremental (no destruye/recrea todo cada vez, ver comentario largo
+  // más abajo en _renderOnlineFriends) — reusa la fila existente de un
+  // amigo si su estado "jugando" no cambió, solo actualizando texto/foto.
+  // Recrearla de cero reiniciaba la animación CSS del titileo verde desde
+  // 0% en cada refresco (el "se corta de golpe y reinicia" reportado — la
+  // lista se refresca sola cada pocos segundos vía onFriendsUpdate/
+  // setInterval, así que el corte se notaba tipo "heartbeat").
+  function _buildFriendRow(f, playing, T) {
+    const statusTxt = playing ? T('social.playing', 'Jugando') : T('versus.online', 'Conectado');
+    const row = document.createElement('div');
+    row.dataset.friendId = f.id;
+    row.innerHTML =
+      `<div class="versus-friend-avatar-wrap"><img class="versus-friend-avatar" src="${f.avatar || 'images/profilepic/ppdefault.png'}" draggable="false" oncontextmenu="return false"></div>` +
+      `<div class="versus-friend-info">` +
+        `<span class="versus-friend-name">${f.name}</span>` +
+        `<span class="versus-friend-status${playing ? ' playing' : ''}"><span class="versus-friend-dot${playing ? ' playing' : ''}"></span>${statusTxt}</span>` +
+      `</div>` +
+      `<button class="versus-challenge-btn${playing ? ' disabled' : ''}" ${playing ? 'disabled' : ''} data-id="${f.id}" data-name="${f.name}" data-avatar="${f.avatar || ''}">${playing ? T('social.playing', 'Jugando') : T('versus.challenge', 'Retar')}</button>`;
+    row.querySelector('.versus-challenge-btn').addEventListener('click', function () {
+      if (this.disabled) return;
+      if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+      if (window._lobbyCountingDown) {
+        window.showGlobalToast?.(typeof t === 'function' ? t('lobby.cdBlocked') : 'The room is about to start — wait or cancel the countdown');
+        return;
+      }
+      _showModeSelector(this.dataset.id, this.dataset.name, this.dataset.avatar);
+    });
+    _applyFriendRowCustomize(row, f, playing);
+    return row;
+  }
+  function _applyFriendRowCustomize(row, f, playing) {
+    row.className = 'versus-friend-row' + (playing ? ' playing' : '')
+      + (window.CUSTOMIZE_CELL_LIGHT_TEXT?.has(f.cellCode) ? ' cell-light-text' : '');
+    // Marco real (aro de la pfp) + celda real de fondo. applyCellForStatus
+    // (no cellUrl directo) para que si está jugando y la celda tiene
+    // variante -green (ver CUSTOMIZE_CELL_GREEN_VARIANTS en js/sb.js)
+    // titile igual que en el panel social.
+    window.CustomizeAssets?.applyFrame(row.querySelector('.versus-friend-avatar-wrap'), f.frameCode || '0001');
+    window.CustomizeAssets?.applyCellForStatus(row, f.cellCode || '0001', playing ? 'playing' : 'online');
+  }
   function _renderOnlineFriends() {
     const list    = document.getElementById('versus-friends-list');
     const emptyEl = document.getElementById('versus-empty-msg');
     if (!list) return;
-    list.innerHTML = '';
 
     const friends = (typeof getFriends === 'function') ? getFriends() : [];
     const statusOf = f => (typeof getStatusObj === 'function')
@@ -930,40 +975,55 @@ window.refreshVsSpectatorBadge = function (n) {
     const online = friends.filter(f => statusOf(f) !== 'offline'); // conectados Y jugando
 
     if (online.length === 0) {
+      list.innerHTML = '';
       if (emptyEl) emptyEl.style.display = 'block';
       return;
     }
     if (emptyEl) emptyEl.style.display = 'none';
 
     const T = (k, d) => (typeof t === 'function' ? t(k) : d);
+    const existingRows = new Map();
+    list.querySelectorAll('.versus-friend-row[data-friend-id]').forEach(el => existingRows.set(el.dataset.friendId, el));
+
+    let prevEl = null;
     online.forEach(f => {
       const playing = statusOf(f) === 'playing';
-      const statusTxt = playing ? T('social.playing', 'Jugando') : T('versus.online', 'Conectado');
-      const row = document.createElement('div');
-      row.className = 'versus-friend-row' + (playing ? ' playing' : '');
-      row.innerHTML =
-        `<img class="versus-friend-avatar" src="${f.avatar || 'images/profilepic/ppdefault.png'}" draggable="false" oncontextmenu="return false">` +
-        `<div class="versus-friend-info">` +
-          `<span class="versus-friend-name">${f.name}</span>` +
-          `<span class="versus-friend-status${playing ? ' playing' : ''}"><span class="versus-friend-dot${playing ? ' playing' : ''}"></span>${statusTxt}</span>` +
-        `</div>` +
-        `<button class="versus-challenge-btn${playing ? ' disabled' : ''}" ${playing ? 'disabled' : ''} data-id="${f.id}" data-name="${f.name}" data-avatar="${f.avatar || ''}">${playing ? T('social.playing', 'Jugando') : T('versus.challenge', 'Retar')}</button>`;
-      list.appendChild(row);
-    });
-
-    list.querySelectorAll('.versus-challenge-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
-        if (window._lobbyCountingDown) {
-          window.showGlobalToast?.(typeof t === 'function' ? t('lobby.cdBlocked') : 'The room is about to start — wait or cancel the countdown');
-          return;
+      let row = existingRows.get(String(f.id));
+      if (row) {
+        existingRows.delete(String(f.id));
+        const wasPlaying = row.classList.contains('playing');
+        // Nombre/foto/celda pueden cambiar sin que cambie el estado
+        // "jugando" (ej. equipó otra celda) — se actualizan siempre, pero
+        // SOLO se toca className/animación si el estado realmente cambió,
+        // para no cortar la animación en curso por nada.
+        const nameEl = row.querySelector('.versus-friend-name');
+        if (nameEl && nameEl.textContent !== f.name) nameEl.textContent = f.name;
+        const avatarEl = row.querySelector('.versus-friend-avatar');
+        const newAvatar = f.avatar || 'images/profilepic/ppdefault.png';
+        if (avatarEl && avatarEl.src !== newAvatar) avatarEl.src = newAvatar;
+        if (wasPlaying !== playing) {
+          // Transición real de estado (empezó o dejó de jugar) — acá SÍ
+          // corresponde recrear la fila (btn/texto/clases cambian de
+          // verdad), la animación arranca de cero porque es una fila
+          // "nueva" en ese estado, no un refresco de lo mismo.
+          const fresh = _buildFriendRow(f, playing, T);
+          list.replaceChild(fresh, row);
+          row = fresh;
+        } else {
+          _applyFriendRowCustomize(row, f, playing);
         }
-        const guestId   = btn.dataset.id;
-        const guestName = btn.dataset.name;
-        const guestAvatar = btn.dataset.avatar;
-        _showModeSelector(guestId, guestName, guestAvatar);
-      });
+      } else {
+        row = _buildFriendRow(f, playing, T);
+        list.appendChild(row);
+      }
+      // Reordenar sin recrear: insertBefore de un nodo YA EN EL DOM no
+      // reinicia sus animaciones CSS (solo crear el nodo de nuevo lo hace).
+      const wantedNext = prevEl ? prevEl.nextSibling : list.firstChild;
+      if (wantedNext !== row) list.insertBefore(row, wantedNext);
+      prevEl = row;
     });
+    // Amigos que ya no están online/existen — sacarlos.
+    existingRows.forEach(el => el.remove());
   }
 
   // Estado de amigos en vivo en el panel de duelo 1v1 (igual que el panel social)
@@ -992,6 +1052,9 @@ window.refreshVsSpectatorBadge = function (n) {
     if (!pop) { _sendInvite(guestId, guestName, guestAvatar, 'flags'); return; }
     document.getElementById('vs-mode-sel-name').textContent = guestName;
     document.getElementById('vs-mode-sel-pic').src = guestAvatar || 'images/profilepic/ppdefault.png';
+    // Marco real del amigo invitado — antes siempre quedaba en el default.
+    const guestFriend = (typeof getFriends === 'function') ? getFriends().find(f => f.id === guestId) : null;
+    window.CustomizeAssets?.applyFrame(document.getElementById('vs-mode-sel-pic-wrap'), guestFriend?.frameCode || '0001');
     pop.style.display = 'flex';
     pop.dataset.guestId     = guestId;
     pop.dataset.guestName   = guestName;
@@ -1002,15 +1065,17 @@ window.refreshVsSpectatorBadge = function (n) {
 
   async function _sendInvite(guestId, guestName, guestAvatar, mode) {
     mode = mode || 'flags';
+    const guestFriend = (typeof getFriends === 'function') ? getFriends().find(f => f.id === guestId) : null;
     _pendingOppName   = guestName;
     _pendingOppAvatar = guestAvatar;
+    _pendingOppFrameCode = guestFriend?.frameCode || '0001';
     try {
       await window.VS.invite(guestId, mode);
     } catch(e) { console.warn('[VS] invite error:', e); return; }
 
     // NO cerrar el panel competitivo: el popup de "esperando" se muestra encima y al
     // cancelar/expirar volvés al panel de amigos, no al panel 2.
-    _showOutgoingPopup(guestName, guestAvatar);
+    _showOutgoingPopup(guestName, guestAvatar, _pendingOppFrameCode);
 
     window.VS.onStart(match => {
       _hideOutgoingPopup();
@@ -1018,12 +1083,13 @@ window.refreshVsSpectatorBadge = function (n) {
     });
   }
 
-  function _showOutgoingPopup(name, avatar) {
+  function _showOutgoingPopup(name, avatar, frameCode) {
     const pop  = document.getElementById('vs-outgoing-popup');
     const bar  = document.getElementById('vs-out-bar');
     if (!pop) return;
     document.getElementById('vs-out-name').textContent = name;
     document.getElementById('vs-out-pic').src = avatar || 'images/profilepic/ppdefault.png';
+    window.CustomizeAssets?.applyFrame(document.getElementById('vs-out-pic-wrap'), frameCode || '0001');
     pop.style.display = 'flex';
     // Barra de countdown
     bar.style.transition = 'none';
@@ -1053,6 +1119,10 @@ window.refreshVsSpectatorBadge = function (n) {
     // Guardar para el leaderboard versus (el guest puede no tener la caché cargada)
     _pendingOppName   = name;
     _pendingOppAvatar = avatar;
+    _pendingOppFrameCode = host?.frameCode || '0001';
+    document.getElementById('vs-in-name').textContent = name;
+    document.getElementById('vs-in-pic').src = avatar;
+    window.CustomizeAssets?.applyFrame(document.getElementById('vs-in-pic-wrap'), _pendingOppFrameCode);
 
     // Guardar en inbox para que el usuario pueda recuperar la invitación si perdió el banner
     if (typeof window.addVersusNotif === 'function') {
@@ -1129,7 +1199,12 @@ window.refreshVsSpectatorBadge = function (n) {
       _sfx();
       const code = (document.getElementById('versus-join-code')?.value || '').trim();
       if (!code) return;
-      try { await window.LB.joinByCode(code); versusGoTo('lobby'); window.Lobby.enterLobby(); }
+      try {
+        const _p = window.LB.joinByCode(code);
+        const result = typeof window.withConnTimeout === 'function' ? await window.withConnTimeout(_p, 6000) : await _p;
+        if (result === undefined) return; // timeout: ya se mostró la viñeta de error de conexión
+        versusGoTo('lobby'); window.Lobby.enterLobby();
+      }
       catch (e) {
         const msg = (e && e.message === 'started') ? T('lobby.started', 'La partida ya empezó')
                   : (e && e.message === 'not_found') ? T('lobby.notFound', 'Sala no encontrada')
@@ -1210,6 +1285,12 @@ window.refreshVsSpectatorBadge = function (n) {
       id:     oppId,
       name:   opp ? opp.name   : (_pendingOppName   || 'Rival'),
       avatar: opp ? opp.avatar : (_pendingOppAvatar || 'images/profilepic/ppdefault.png'),
+      // Usado por openSpectator (js/spectate.js) para aplicarle su marco
+      // real al espectarlo desde acá (_armSpectatorFallback más abajo) — sin
+      // esto quedaba siempre en el default, sin importar qué tuviera
+      // equipado de verdad.
+      frameCode: opp ? opp.frameCode : '0001',
+      cardCode:  opp ? opp.cardCode  : '0001',
     };
     window._vsOppScore = 0;
   }
@@ -1592,10 +1673,12 @@ window.refreshVsSpectatorBadge = function (n) {
     document.getElementById('vs-result-me-name').textContent  = localStorage.getItem('playerName') || T('vs.result.you', 'Tú');
     document.getElementById('vs-result-me-pic').src           = localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png';
     document.getElementById('vs-result-me-score').textContent = (myScore || 0).toLocaleString();
+    window.CustomizeAssets?.applyFrame(document.getElementById('vs-result-me-pic-wrap'), window._sbProfile?.frame_code || '0001');
     const opp = window._vsOpponent || {};
     document.getElementById('vs-result-opp-name').textContent  = opp.name || 'Rival';
     document.getElementById('vs-result-opp-pic').src           = opp.avatar || 'images/profilepic/ppdefault.png';
     document.getElementById('vs-result-opp-score').textContent = (oppScore || 0).toLocaleString();
+    window.CustomizeAssets?.applyFrame(document.getElementById('vs-result-opp-pic-wrap'), opp.frameCode || '0001');
     if (screen) screen.style.display = 'flex';
     try {
       if (typeof playMusic === 'function' && typeof sfxPostgame !== 'undefined') playMusic(sfxPostgame);
@@ -1731,6 +1814,7 @@ window.refreshVsSpectatorBadge = function (n) {
     const picEl  = document.getElementById('vs-duel-accepted-pic');
     if (nameEl) nameEl.textContent = _pendingOppName || 'Rival';
     if (picEl) picEl.src = _pendingOppAvatar || 'images/profilepic/ppdefault.png';
+    window.CustomizeAssets?.applyFrame(document.getElementById('vs-duel-accepted-pic-wrap'), _pendingOppFrameCode || '0001');
     pop.style.display = 'flex';
   }
   function _hideDuelAcceptedPopup() {

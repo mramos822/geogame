@@ -531,7 +531,7 @@ window.flagsSpectatorExit = function (switchingMode) {
 // tarjeta como si estuvieras jugando vos.
 // oppName/oppAvatar/oppScore: en versus, el rival del amigo espectado — ver
 // comentario largo en citiesSpectatorSetPlayerCard (mismo motivo/patrón).
-window.flagsSpectatorSetPlayerCard = function (name, avatar, score, oppName, oppAvatar, oppScore) {
+window.flagsSpectatorSetPlayerCard = function (name, avatar, score, oppName, oppAvatar, oppScore, cardCode, oppCardCode) {
   if (!_flagsSpecMode) return;
   const lb = document.getElementById('flags-leaderboard');
   if (!lb) return;
@@ -564,6 +564,7 @@ window.flagsSpectatorSetPlayerCard = function (name, avatar, score, oppName, opp
   const avatarEl = document.getElementById('flags-spec-lb-avatar');
   if (avatarEl && avatar) avatarEl.src = avatar;
   document.getElementById('flags-spec-lb-score').textContent = (score || 0).toLocaleString();
+  window.CustomizeAssets?.applyCard(el, cardCode || '0001');
 
   let oppEl = document.getElementById('flags-spec-lb-opp');
   if (showOpp) {
@@ -578,6 +579,7 @@ window.flagsSpectatorSetPlayerCard = function (name, avatar, score, oppName, opp
         + `<span class="lb-score" id="flags-spec-lb-opp-score">0</span>`;
       lb.appendChild(oppEl);
     }
+    window.CustomizeAssets?.applyCard(oppEl, oppCardCode || '0001');
     document.getElementById('flags-spec-lb-opp-name').textContent = oppName || 'Rival';
     const oppAvatarEl = document.getElementById('flags-spec-lb-opp-avatar');
     if (oppAvatarEl && oppAvatar) oppAvatarEl.src = oppAvatar;
@@ -1468,6 +1470,7 @@ function buildFlagsFriendPlayers() {
       avatar: m.avatar || '',
       color: FLAGS_LB_COLORS[i % FLAGS_LB_COLORS.length],
       initial: (m.name && m.name[0]) ? m.name[0].toUpperCase() : '?',
+      cardCode: m.cardCode || '0001',
     }));
   }
   // En modo versus 1v1 el leaderboard compite SOLO contra el oponente, en vivo.
@@ -1480,6 +1483,7 @@ function buildFlagsFriendPlayers() {
       avatar: o.avatar || '',
       color: FLAGS_LB_COLORS[0],
       initial: (o.name && o.name[0]) ? o.name[0].toUpperCase() : '?',
+      cardCode: o.cardCode || '0001',
     }];
   }
   const src = (typeof getFriends === 'function') ? getFriends() : [];
@@ -1490,6 +1494,7 @@ function buildFlagsFriendPlayers() {
     avatar: f.avatar || '',
     color: FLAGS_LB_COLORS[i % FLAGS_LB_COLORS.length],
     initial: (f.name && f.name[0]) ? f.name[0].toUpperCase() : '?',
+    cardCode: f.cardCode || '0001',
   }));
 }
 let flagsMockPlayers = buildFlagsFriendPlayers();
@@ -1528,6 +1533,11 @@ function initFlagsLeaderboard() {
         + `<span class="lb-score">${p.score.toLocaleString()}</span>`;
       el.style.transition = 'none';
       el.style.top = '-9999px';
+      // Todas las filas traen su cardCode real ahora (mismo fix que
+      // buildFriendPlayers/initLeaderboard en monuments.js) — antes los
+      // amigos reales de la barra ingame en Gira Mundial solo se quedaban
+      // afuera de este chequeo y siempre mostraban la carta default.
+      window.CustomizeAssets?.applyCard(el, p.cardCode || '0001');
       flagsLbElements[el.id] = el;
       lb.appendChild(el);
     });
@@ -1545,6 +1555,7 @@ function initFlagsLeaderboard() {
   playerEl.style.top = '-9999px';
   flagsLbElements['flags-lb-player'] = playerEl;
   lb.appendChild(playerEl);
+  if (typeof window._applyFounderFrame === 'function') window._applyFounderFrame();
 
   requestAnimationFrame(() => {
     flagsPositionLeaderboard(0, false);
@@ -2004,6 +2015,7 @@ function startFlagsRound() {
   // Si la animación termina sin que se haya seleccionado nada → wrong
   const onFindLuggageEnd = () => {
     flagsFindLuggage.removeEventListener('animationend', onFindLuggageEnd);
+    clearTimeout(flagsRoundFallbackTimeout);
     clearFlagsElimination();
     if (!flagsRunning) return;
     flagsPicked = true; // bloquear clicks hasta la siguiente pregunta
@@ -2059,6 +2071,21 @@ function startFlagsRound() {
     }
   };
   flagsFindLuggage.addEventListener('animationend', onFindLuggageEnd);
+  // Respaldo por reloj real (mismo patrón que _flagsTimerTick con
+  // Date.now()): esta ventana de 8.15s por pregunta depende ÚNICAMENTE del
+  // evento animationend de findluggage-scroll para avanzar — a diferencia
+  // del timer general del juego, no tenía ningún respaldo. Si ese evento no
+  // llega bien al volver de una pestaña en 2do plano (reanudación de
+  // animaciones CSS/compositor), la pregunta quedaba congelada para siempre
+  // sin ningún aviso visual (reportado: "vuelvo y el juego no responde, se
+  // ve todo normal"). Con este timeout de respaldo, si por lo que sea el
+  // evento nunca llega, se fuerza el mismo camino de "wrong por tiempo" a
+  // los pocos ms de que debería haber terminado.
+  clearTimeout(flagsRoundFallbackTimeout);
+  flagsRoundFallbackTimeout = setTimeout(() => {
+    flagsFindLuggage.removeEventListener('animationend', onFindLuggageEnd);
+    onFindLuggageEnd();
+  }, FLAGS_ROUND_TIME * 1000 + 600);
 
   const _practiceContFilter = c => {
     if (!window.practiceConfig || !window.practiceConfig.active) return true;
@@ -2625,6 +2652,7 @@ function hideFlagsMode() {
 
 // ── PREGAME COUNTDOWN ─────────────────────────────────────────────────────────
 let flagsPregameTimeout = null;
+let flagsRoundFallbackTimeout = null;
 let flagsAborted = false;
 
 // elapsedMs (opcional): cuánto del 3-2-1 ya pasó del lado del jugador REAL —
@@ -2687,6 +2715,7 @@ function flagsHardReset() {
   flagsRunning = false;
   flagsDots = 0;
   clearTimeout(flagsEndTimeout1); clearTimeout(flagsEndTimeout2);
+  clearTimeout(flagsRoundFallbackTimeout); flagsRoundFallbackTimeout = null;
   if (flagsProgressDots) flagsProgressDots.forEach(d => d.classList.remove('filled'));
   if (flagsProgressContainer) flagsProgressContainer.classList.remove('train-animation', 'dots-fade-out');
   clearTimeout(flagsPregameTimeout); flagsPregameTimeout = null;
@@ -2741,6 +2770,13 @@ window.flagsHardReset = flagsHardReset;
 // tickear (o la pestaña vuelve a primer plano), en vez de arrastrar el
 // atraso.
 function _flagsTimerTick() {
+  // Guarda defensiva — mismo motivo que la de _timerTick en monuments.js: si
+  // por lo que sea flagsTimerIntervalId no se limpió a tiempo (pestaña
+  // minimizada mucho rato, etc.), un tick fantasma de una ronda ya
+  // terminada podía disparar endFlagsGame() y el TIMES UP gigante encima
+  // del menú. flagsRunning ya se pone en false al terminar/salir de la
+  // ronda real.
+  if (!flagsRunning) { clearInterval(flagsTimerIntervalId); return; }
   const _flagsInfinite = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
   if (_flagsInfinite) return;
   const elapsed = Math.floor((Date.now() - flagsTimerStartedAt) / 1000);

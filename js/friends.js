@@ -30,6 +30,14 @@ async function loadFriends() {
       avatar: f.avatar || '', last_active: f.last_active || null,
       is_playing: f.is_playing || false,
       is_practicing: f.is_practicing || false,
+      // frameCode/cardCode ya venían en sbLoadSocialData pero se
+      // descartaban acá — sin esto, el rival de VS (vs.js _setupVsOpponent
+      // busca acá con getFriends()) siempre quedaba con marco/card default
+      // al espectarlo, sin importar qué tuviera equipado de verdad.
+      frameCode: f.frameCode || '0001',
+      cardCode: f.cardCode || '0001',
+      cellCode: f.cellCode || '0001',
+      panelCode: f.panelCode || '0001',
     }));
   } catch (e) {
     console.warn('[friends] error cargando:', e.message);

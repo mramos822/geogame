@@ -301,11 +301,21 @@ function _centerBadgeWithText(textEl, badgeEl, side) {
   textEl.style.left = '';
   if (badgeEl.style.display === 'none') return;
 
+  // getBoundingClientRect() da coordenadas de PANTALLA (post transform/zoom del
+  // #app-stage, ver letterbox.js), pero `left` inline se mide en el espacio
+  // LOCAL sin escalar del stage (1920×911, contra el que se calculan las cq).
+  // Sin dividir por --app-fit, esta cuenta solo daba bien con la ventana al
+  // tamaño de referencia exacto y se desalineaba (nombre/bandera/copa
+  // "reaccionando" al resize/zoom) en cualquier otro tamaño. offsetWidth/
+  // offsetHeight ya están en local (los transforms no afectan al layout), así
+  // que esos no se tocan — solo los deltas que salen de getBoundingClientRect().
+  const fit = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--app-fit')) || 1;
+
   const parentRect      = parent.getBoundingClientRect();
   const naturalRect     = textEl.getBoundingClientRect();
-  const naturalCenterX  = (naturalRect.left - parentRect.left) + naturalRect.width / 2;
+  const naturalCenterX  = (naturalRect.left - parentRect.left) / fit + textEl.offsetWidth / 2;
   const badgeW  = badgeEl.offsetWidth;
-  const textW   = naturalRect.width;
+  const textW   = textEl.offsetWidth;
   const shift   = (badgeW + BADGE_TEXT_GAP) / 2;
 
   let textCenterX, badgeLeftPx;
@@ -322,8 +332,8 @@ function _centerBadgeWithText(textEl, badgeEl, side) {
   // centrarlo sobre este punto (mismo mecanismo que su 'left:50%' original).
   textEl.style.left = textCenterX + 'px';
   badgeEl.style.left = badgeLeftPx + 'px';
-  const textRect = textEl.getBoundingClientRect(); // ya en su posición final
-  badgeEl.style.top = (textRect.top - parentRect.top + textRect.height / 2) + 'px';
+  const textRect = textEl.getBoundingClientRect(); // ya en su posición final (pantalla)
+  badgeEl.style.top = (textRect.top - parentRect.top) / fit + textEl.offsetHeight / 2 + 'px';
 }
 window._centerBadgeWithText = _centerBadgeWithText;
 
@@ -488,6 +498,8 @@ window.refreshProfileStats = function () {
       _centerBadgeWithText(nameWrap, flagBadge, 'after');
     }
   }
+
+  if (typeof window._applyFounderFrame === 'function') window._applyFounderFrame();
 };
 
 // ── SFX ───────────────────────────────────────────────────────────────────────
@@ -1095,6 +1107,14 @@ window.startCampaign = function () {
   document.getElementById('login-welcome-ok')?.addEventListener('click', () => {
     sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
     closeModal();
+    // Login manual (no restauración de sesión al recargar, esa pasa por
+    // _onSessionReady): si la cuenta ya calificaba de antes (founder con al
+    // menos 1 Vuelta Mundial jugada), se la mostramos apenas cierra este
+    // modal y pisa el menú — mismo criterio que _onSessionReady.
+    const p = window._sbProfile;
+    if (p && p.is_founder && !p.founder_popup_seen && (p.play_count || 0) > 0) {
+      setTimeout(() => { if (typeof window.showFounderWelcomePopup === 'function') window.showFounderWelcomePopup(); }, 500);
+    }
   });
 
   ['login-user','login-pass'].forEach(id => {
@@ -1131,8 +1151,9 @@ window.startCampaign = function () {
     if (ok) {
       sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
       showView(viewLoading);
-      window.sbLogin(uVal, pVal)
+      (typeof window.withConnTimeout === 'function' ? window.withConnTimeout(window.sbLogin(uVal, pVal), 6000) : window.sbLogin(uVal, pVal))
         .then(async data => {
+          if (!data) { showView(viewLogin); return; } // timeout: ya se mostró la viñeta de error de conexión
           window._accountLoggedIn = true;
           window._sbUserId = data.user.id;
           document.body.classList.add('account-logged');
@@ -1194,6 +1215,20 @@ window.startCampaign = function () {
     }
   });
 
+  // Contraseña == usuario + variación trivial (ej. "mateo" / "Mateo01") no
+  // debería pasar de "débil" nunca, por más que sume puntos de largo/dígitos/
+  // mayúsculas — el username es de por sí público (aparece en Rankings,
+  // Amigos, etc.), así que agregarle un sufijo simple no suma seguridad
+  // real. Basta con que la contraseña CONTENGA el usuario completo
+  // (normalizando mayúsculas) para considerarla insegura; variaciones que no
+  // incluyan el usuario entero (anagramas, palabras distintas, etc.) no caen
+  // en esta regla. Usuario de 1-2 caracteres no cuenta (demasiado corto para
+  // que "contenerlo" signifique algo).
+  function _passContainsUsername(pass, username) {
+    if (!pass || !username || username.length < 3) return false;
+    return pass.toLowerCase().includes(username.toLowerCase());
+  }
+
   document.getElementById('reg-pass')?.addEventListener('input', function () {
     const wrap  = document.getElementById('pass-strength-wrap');
     const fill  = document.getElementById('pass-strength-fill');
@@ -1212,10 +1247,18 @@ window.startCampaign = function () {
     const isCommon    = commonPasswords.includes(v.toLowerCase());
     const isRepeating = /^(.)\1+$/.test(v);
     const isSequential = /^(0123|1234|2345|3456|4567|5678|6789|abcd|bcde|cdef|qwer|asdf|zxcv)/i.test(v);
-    if (isCommon || isRepeating || isSequential) score = 0;
+    const usernameEl = document.getElementById('reg-username');
+    const hasUsername = _passContainsUsername(v, usernameEl ? usernameEl.value.trim() : '');
+    if (isCommon || isRepeating || isSequential || hasUsername) score = 0;
     if (score <= 1)      { fill.style.width = '33%';  fill.style.background = '#e74c3c'; label.style.color = '#e74c3c'; label.textContent = t('account.passWeak'); }
     else if (score <= 3) { fill.style.width = '66%';  fill.style.background = '#f39c12'; label.style.color = '#c87800'; label.textContent = t('account.passMedium'); }
     else                 { fill.style.width = '100%'; fill.style.background = '#2bd14b'; label.style.color = '#1a7a30'; label.textContent = t('account.passStrong'); }
+  });
+  // Si el usuario termina de escribir el username DESPUÉS de la contraseña,
+  // el meter quedó calculado con el username viejo (vacío) — reevaluar la
+  // contraseña también cuando cambia el usuario.
+  document.getElementById('reg-username')?.addEventListener('input', () => {
+    document.getElementById('reg-pass')?.dispatchEvent(new Event('input'));
   });
 
   document.getElementById('reg-submit')?.addEventListener('click', () => {
@@ -1250,6 +1293,8 @@ window.startCampaign = function () {
     const pVal = pass.value;
     if (pVal.length < 6)
       setErr(pass, errP, t('account.errPassShort'));
+    else if (_passContainsUsername(pVal, uVal))
+      setErr(pass, errP, t('account.errPassContainsUser'));
     else setErr(pass, errP, '');
 
     const p2Val = pass2.value;
@@ -1260,11 +1305,13 @@ window.startCampaign = function () {
     if (ok) {
       sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
       showView(viewLoading);
-      window.sbRegister(
+      const _regPromise = window.sbRegister(
         document.getElementById('reg-username').value.trim(),
         document.getElementById('reg-email').value.trim(),
         document.getElementById('reg-pass').value
-      ).then(() => showView(viewVerify))
+      );
+      (typeof window.withConnTimeout === 'function' ? window.withConnTimeout(_regPromise, 6000) : _regPromise)
+       .then(result => { if (result) showView(viewVerify); else showView(viewRegister); }) // undefined = timeout, viñeta ya mostrada
        .catch(err => {
          showView(viewRegister);
          const errU = document.getElementById('reg-err-username');
@@ -1354,7 +1401,8 @@ window.startCampaign = function () {
     if (/[0-9]/.test(v)) score++;
     if (/[^a-zA-Z0-9]/.test(v)) score++;
     const _common2 = ['123456','1234567','12345678','123456789','password','contraseña','111111','000000','qwerty','abc123','654321','987654','112233','123123','aaaaaa','888888','666666','999999','pass123'];
-    if (_common2.includes(v.toLowerCase()) || /^(.)\1+$/.test(v) || /^(0123|1234|2345|3456|4567|5678|6789|abcd|bcde|cdef|qwer|asdf|zxcv)/i.test(v)) score = 0;
+    const hasUsername2 = _passContainsUsername(v, window._sbProfile?.username || '');
+    if (_common2.includes(v.toLowerCase()) || /^(.)\1+$/.test(v) || /^(0123|1234|2345|3456|4567|5678|6789|abcd|bcde|cdef|qwer|asdf|zxcv)/i.test(v) || hasUsername2) score = 0;
     if (score <= 1)      { fill.style.width = '33%';  fill.style.background = '#e74c3c'; label.style.color = '#e74c3c'; label.textContent = t('account.passWeak'); }
     else if (score <= 3) { fill.style.width = '66%';  fill.style.background = '#f39c12'; label.style.color = '#c87800'; label.textContent = t('account.passMedium'); }
     else                 { fill.style.width = '100%'; fill.style.background = '#2bd14b'; label.style.color = '#1a7a30'; label.textContent = t('account.passStrong'); }
@@ -1377,6 +1425,7 @@ window.startCampaign = function () {
     }
 
     if (newInp.value.length < 6) setErr(newInp, errNew, t('account.errPassShort'));
+    else if (_passContainsUsername(newInp.value, window._sbProfile?.username || '')) setErr(newInp, errNew, t('account.errPassContainsUser'));
     else setErr(newInp, errNew, '');
 
     if (conf.value !== newInp.value) setErr(conf, errConf, t('account.errPassMismatch'));
@@ -1559,6 +1608,17 @@ async function _onSessionReady(userId) {
     _ensureCountryCode(profile);
     if (typeof loadFriends === 'function') loadFriends();  // poblar barra ingame con amigos reales
     _updateProfileBtnLabel();
+    // Popup de Fundador: NO se dispara con solo loguearse en general — hace
+    // falta al menos 1 Vuelta Mundial jugada (play_count > 0). Si la cuenta
+    // ya calificaba de antes (jugó antes de que existiera este popup), se
+    // muestra directo acá al llegar al menú. Si todavía tiene 0 partidas, no
+    // sale acá — recién se pone elegible al terminar su primera Vuelta
+    // Mundial y volver al menú (ver window._pendingFounderPopupCheck, puesta
+    // en la rama de campaña completa de este archivo y consumida en
+    // js/final.js al volver al menú).
+    if (profile.is_founder && !profile.founder_popup_seen && (profile.play_count || 0) > 0) {
+      setTimeout(() => { if (typeof window.showFounderWelcomePopup === 'function') window.showFounderWelcomePopup(); }, 800);
+    }
   } catch(e) {}
   _subscribeFriendshipChanges(userId);
   _startSocialListPoll();
@@ -1749,6 +1809,56 @@ function showWelcomePopup(nombre) {
   }
 }
 
+// Popup de bienvenida para cuentas Fundador (primeras 100), una sola vez —
+// el paquete (frame/card/panel/cell 0002) NO está puesto de entrada, se
+// entrega recién al confirmar acá (ver el onClick del botón). Se marca
+// founder_popup_seen en Supabase al cerrar para que no vuelva a salir en
+// otro dispositivo/navegador (ver _onSessionReady, que llama a esto cuando
+// profile.is_founder && !profile.founder_popup_seen).
+function showFounderWelcomePopup() {
+  const popup    = document.getElementById('founder-popup');
+  const confirmW = document.getElementById('founder-popup-confirm');
+  if (!popup) return;
+  const CA = window.CustomizeAssets;
+  if (CA) {
+    const frameImg = document.getElementById('founder-popup-frame-img');
+    if (frameImg) frameImg.src = localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png';
+    CA.applyFrame(document.getElementById('founder-popup-frame'), '0002');
+    const cardSq = document.getElementById('founder-popup-card');
+    if (cardSq) cardSq.style.backgroundImage = `url('${CA.cardUrl('0002')}')`;
+    const panelSq = document.getElementById('founder-popup-panel');
+    if (panelSq) panelSq.style.backgroundImage = `url('${CA.panelUrl('0002')}')`;
+    const cellSq = document.getElementById('founder-popup-cell');
+    if (cellSq) cellSq.style.backgroundImage = `url('${CA.cellUrl('0002')}')`;
+  }
+  popup.classList.add('visible');
+  if (confirmW) {
+    const onClick = () => {
+      try { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); } catch (e) {}
+      confirmW.classList.add('confirm-pressed');
+      setTimeout(() => {
+        confirmW.classList.remove('confirm-pressed');
+        popup.classList.remove('visible');
+      }, 120);
+      confirmW.removeEventListener('click', onClick);
+      // Acá solo se DESBLOQUEA (aparece seleccionable en Personalización,
+      // ver isFounder en _renderGrid) — no se equipa nada solo. El jugador
+      // elige ponérselo o no como cualquier otro ítem del catálogo.
+      // sbClaimFounderPack (RPC atómico), NO sbUpdateProfile directo: hay un
+      // trigger en la base que bloquea en silencio cualquier UPDATE de
+      // is_founder/founder_popup_seen que no pase por ese RPC — y además es
+      // el que lleva la cuenta de "primeros 100 reclamos" y cierra la
+      // elegibilidad del resto al llegar al cupo.
+      if (window._sbProfile) window._sbProfile.founder_popup_seen = true;
+      if (window._sbUserId && typeof window.sbClaimFounderPack === 'function') {
+        window.sbClaimFounderPack(window._sbUserId).catch(() => {});
+      }
+    };
+    confirmW.addEventListener('click', onClick);
+  }
+}
+window.showFounderWelcomePopup = showFounderWelcomePopup;
+
 function _updateProfileBtnLabel() {
   const el = document.getElementById('profile-btn-label');
   if (!el) return;
@@ -1784,6 +1894,7 @@ function _patchFriendStatusInDOM(friendId) {
     if (row.querySelector('.loading-social-status')) {
       const prevCls = (row.className.match(/status-(\w+)/) || [])[1];
       row.className = row.className.replace(/status-\w+/, 'status-' + st.cls);
+      if (prevCls !== st.cls) window.CustomizeAssets.applyCellForStatus(row, f.cellCode, st.cls);
       const statusEl = row.querySelector('.loading-social-status');
       if (statusEl && prevCls !== st.cls) {
         statusEl.innerHTML = `<span class="dot ${st.cls}"></span>${socialStatusText(f)}`;
@@ -2001,6 +2112,304 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
   loadSocialData();
 });
 
+// ── Panel de personalización (items por código, preparado para la tienda) ─────
+// 3 slots independientes (cada uno su propia columna en profiles, ver
+// migración customize_item_codes): marco de foto, tarjeta del leaderboard
+// in-game, y el "recuadro" (skin del tablero, antes siempre howtoplaytable.png).
+// Cada valor es un código de archivo — images/customize/<categoria>/<code>.png.
+// Un solo panel con tabs arriba a la derecha + grilla de opciones, y a la
+// izquierda una vista previa fija que se actualiza en vivo.
+(function () {
+  const CATS = {
+    photo:       { field: 'frame_code' },
+    leaderboard: { field: 'card_code' },
+    table:       { field: 'panel_code' },
+    cell:        { field: 'cell_code' },
+  };
+  // Catálogo de ítems disponibles por categoría. Hoy solo existe el default
+  // ('0001', gratis para todos); a futuro se suma acá cada código nuevo a
+  // medida que haya arte + se sume la tienda (founderOnly, price, etc.).
+  const CATALOG = {
+    photo:       [{ code: '0001', founderOnly: false }, { code: '0002', founderOnly: true }],
+    leaderboard: [{ code: '0001', founderOnly: false }, { code: '0002', founderOnly: true }],
+    table:       [{ code: '0001', founderOnly: false }, { code: '0002', founderOnly: true }],
+    cell:        [{ code: '0001', founderOnly: false }, { code: '0002', founderOnly: true }],
+  };
+  let _activeCat = 'photo';
+
+  // Aplica los 3 ítems elegidos en los lugares donde se ven en vivo: la foto
+  // del panel de perfil, la fila propia del leaderboard in-game (#lb-player
+  // se recrea cada partida — ver initLeaderboard acá mismo — y #flags-lb-player,
+  // que flags.js maneja aparte porque Banderas no reusa #lb-player) y el
+  // tablero del panel de perfil. También refresca la vista previa del panel
+  // de personalización si está abierto.
+  function _applyFounderFrame() {
+    const p = window._sbProfile;
+    const CA = window.CustomizeAssets;
+    if (!CA) return;
+    // Respaldo local: si hay perfil de verdad, se guarda el último código
+    // conocido; si no lo hay (sin conexión, todavía no cargó), se usa lo
+    // último guardado — y si tampoco hay nada guardado, CustomizeAssets ya
+    // cae a '0001' (el default) para que nunca quede vacío/roto.
+    let frameCode, cardCode, panelCode, cellCode;
+    if (p) {
+      frameCode = p.frame_code || '0001';
+      cardCode  = p.card_code  || '0001';
+      panelCode = p.panel_code || '0001';
+      cellCode  = p.cell_code  || '0001';
+      try {
+        localStorage.setItem('cust_frame_code', frameCode);
+        localStorage.setItem('cust_card_code',  cardCode);
+        localStorage.setItem('cust_panel_code', panelCode);
+        localStorage.setItem('cust_cell_code',  cellCode);
+      } catch (e) {}
+    } else {
+      frameCode = localStorage.getItem('cust_frame_code') || '0001';
+      cardCode  = localStorage.getItem('cust_card_code')  || '0001';
+      panelCode = localStorage.getItem('cust_panel_code') || '0001';
+      cellCode  = localStorage.getItem('cust_cell_code')  || '0001';
+    }
+
+    // El marco (frame) es solo para LA FOTO GRANDE del perfil — la ficha del
+    // leaderboard in-game lleva la foto plana, sin marco (ver también
+    // _swatchPreview/_refreshLeftPreview, mismo criterio para las vistas
+    // previas del panel de Personalizar).
+    CA.applyFrame(document.getElementById('loading-profile-pic-wrap'), frameCode);
+    CA.applyCard(document.getElementById('lb-player'), cardCode);
+    CA.applyCard(document.getElementById('flags-lb-player'), cardCode);
+    const panelImg = document.querySelector('#loading-table-group .loading-howtotable');
+    if (panelImg) panelImg.src = CA.panelUrl(panelCode);
+
+    _refreshLeftPreview();
+  }
+  window._applyFounderFrame = _applyFounderFrame;
+
+  // Extrae el color dominante de un PNG de panel (promedio de píxeles
+  // opacos, muestreado en baja resolución) para tematizar las tabs y la
+  // grilla de opciones de Personalización acorde al panel equipado.
+  // Cacheado por URL porque cada panel no cambia en runtime.
+  const _panelColorCache = {};
+  function _extractPanelColor(url) {
+    if (_panelColorCache[url] !== undefined) return Promise.resolve(_panelColorCache[url]);
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        let rgb = null;
+        try {
+          const w = 24, h = 24;
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          const data = ctx.getImageData(0, 0, w, h).data;
+          let r = 0, g = 0, b = 0, n = 0;
+          for (let i = 0; i < data.length; i += 4) {
+            if (data[i + 3] < 200) continue;
+            r += data[i]; g += data[i + 1]; b += data[i + 2]; n++;
+          }
+          if (n > 0) rgb = [Math.round(r / n), Math.round(g / n), Math.round(b / n)];
+        } catch (e) { /* canvas tainted (file://) -> sin tema, se usa el fallback CSS */ }
+        _panelColorCache[url] = rgb;
+        resolve(rgb);
+      };
+      img.onerror = () => { _panelColorCache[url] = null; resolve(null); };
+      img.src = url;
+    });
+  }
+  function _mixRgb(rgb, target, amount) {
+    return rgb.map((c, i) => Math.round(c + (target[i] - c) * amount));
+  }
+  let _panelThemeToken = 0;
+  async function _applyPanelTheme(panelCode) {
+    const CA = window.CustomizeAssets;
+    const right = document.querySelector('.customize-right');
+    if (!CA || !right) return;
+    const token = ++_panelThemeToken;
+    const rgb = await _extractPanelColor(CA.panelUrl(panelCode));
+    if (token !== _panelThemeToken) return; // llegó una llamada más nueva mientras cargaba
+    if (!rgb) {
+      ['--panel-border', '--panel-tab-bg', '--panel-tab-hover-bg', '--panel-tab-active-bg', '--panel-grid-bg', '--panel-tab-text']
+        .forEach(v => right.style.removeProperty(v));
+      return;
+    }
+    right.style.setProperty('--panel-border', `rgb(${_mixRgb(rgb, [0, 0, 0], 0.35).join(',')})`);
+    right.style.setProperty('--panel-tab-text', `rgb(${_mixRgb(rgb, [0, 0, 0], 0.65).join(',')})`);
+    right.style.setProperty('--panel-tab-bg', `rgb(${_mixRgb(rgb, [255, 255, 255], 0.55).join(',')})`);
+    right.style.setProperty('--panel-tab-hover-bg', `rgb(${_mixRgb(rgb, [255, 255, 255], 0.4).join(',')})`);
+    right.style.setProperty('--panel-tab-active-bg', `rgb(${_mixRgb(rgb, [255, 255, 255], 0.78).join(',')})`);
+    right.style.setProperty('--panel-grid-bg', `rgb(${_mixRgb(rgb, [255, 255, 255], 0.78).join(',')})`);
+  }
+
+  function _refreshLeftPreview() {
+    const p = window._sbProfile;
+    const CA = window.CustomizeAssets;
+    const name  = localStorage.getItem('playerName') || 'John';
+    const photo = localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png';
+    const frameCode = p?.frame_code || localStorage.getItem('cust_frame_code') || '0001';
+    const cardCode  = p?.card_code  || localStorage.getItem('cust_card_code')  || '0001';
+    const panelCode = p?.panel_code || localStorage.getItem('cust_panel_code') || '0001';
+
+    const customizePanelImg = document.querySelector('#loading-customize-group .loading-howtotable');
+    if (customizePanelImg) customizePanelImg.src = CA?.panelUrl(panelCode);
+    _applyPanelTheme(panelCode);
+
+    const avatarImg = document.getElementById('customize-preview-avatar-img');
+    if (avatarImg) avatarImg.src = photo;
+    CA?.applyFrame(document.getElementById('customize-preview-avatar-wrap'), frameCode);
+    const nameEl = document.getElementById('customize-preview-name');
+    if (nameEl) nameEl.textContent = name;
+    const lbImg = document.getElementById('customize-preview-lb-avatar-img');
+    if (lbImg) lbImg.src = photo;
+    const lbName = document.getElementById('customize-preview-lb-name');
+    if (lbName) lbName.textContent = name;
+    // El marco (frame) es solo para LA FOTO GRANDE del perfil — la ficha del
+    // leaderboard/card lleva la foto plana, sin marco, aunque tenga uno
+    // equipado.
+    CA?.applyCard(document.getElementById('customize-preview-lb-card'), cardCode);
+  }
+
+  // Miniatura representativa de un código, para las tarjetas de la grilla.
+  // La de "leaderboard" reusa las clases reales del juego (.lb-entry.lb-player,
+  // .lb-avatar, .lb-name, .lb-score) para que sea la ficha de verdad, no una
+  // inventada — mismo truco que .customize-lb-preview: se resetea position a
+  // relative acá adentro porque .lb-entry es absolute para la animación in-game.
+  function _swatchPreview(cat, code) {
+    const CA = window.CustomizeAssets;
+    const photo = localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png';
+    const name  = localStorage.getItem('playerName') || 'John';
+    if (cat === 'photo') {
+      const frameInset = window.CUSTOMIZE_FRAME_INSET[code] || '-14.5%';
+      // Tamaño fijo en cqmin, NO en % — el swatch tiene padding-bottom (deja
+      // lugar al label) así que su ancho y alto de contenido ya no son
+      // iguales; un width/height en % de esa caja da un óvalo en vez de
+      // círculo. cqmin es relativo al contenedor de arriba (mismo para
+      // ambas dimensiones), así que siempre da un cuadrado real.
+      return `<div class="customize-preview-avatar-wrap cust-frame-wrap" style="width:7.5cqmin;height:7.5cqmin;--cust-frame:url('${CA.frameUrl(code)}');--cust-frame-inset:${frameInset}">`
+        + `<img src="${photo}"></div>`;
+    }
+    if (cat === 'leaderboard') {
+      // transform:scale (no width%) para que el texto se achique proporcional
+      // con el resto de la ficha — igual que se ve en el juego, no una copia
+      // aplastada con la misma tipografía de tamaño real metida en una caja chica.
+      // Foto PLANA, sin marco — el marco es solo de la foto grande de perfil,
+      // no de la ficha del leaderboard/card.
+      return `<div class="customize-swatch-lb-scale">`
+        + `<div class="lb-entry lb-player${window.CUSTOMIZE_CARD_LIGHT_TEXT?.has(code) ? ' card-light-text' : ''}" style="position:relative;top:auto;left:auto;width:12cqmin;transition:none;--cust-card:url('${CA.cardUrl(code)}')">`
+        + `<div class="lb-avatar"><img class="lb-avatar-img" src="${photo}"></div>`
+        + `<span class="lb-name">${name}</span><span class="lb-score">1234</span>`
+        + `</div></div>`;
+    }
+    if (cat === 'cell') {
+      // Mini maqueta de la fila COMPLETA de Rankings/Amigos (avatar+nombre),
+      // no solo el circulito — la celda es toda la tarjeta. Tamaño FIJO
+      // (no depende del largo del nombre): mismo ancho/alto para las dos
+      // tarjetas de la grilla, con el nombre recortado si no entra.
+      return `<div style="width:90%;height:5.4cqmin;box-sizing:border-box;display:flex;align-items:center;gap:0.8cqmin;padding:0 1cqmin;border-radius:0.8cqmin;overflow:hidden;`
+        + `background-image:url('${CA.cellUrl(code)}');background-size:100% 100%;background-repeat:no-repeat;">`
+        + `<img src="${photo}" style="width:4.2cqmin;height:4.2cqmin;border-radius:50%;object-fit:cover;border:0.3cqmin solid #8b6a00;flex:none;">`
+        + `<span style="font-family:'VAGRoundBold','Arial Black',sans-serif;font-size:1.6cqmin;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`
+          + (window.CUSTOMIZE_CELL_LIGHT_TEXT?.has(code)
+            ? `color:#fff;-webkit-text-stroke:0.4cqmin #4a3b00;paint-order:stroke fill;`
+            : `color:#5a4400;`)
+          + `">${name}</span>`
+        + `</div>`;
+    }
+    return `<img src="${CA.panelUrl(code)}" style="width:100%;height:100%;object-fit:cover;">`;
+  }
+
+  function _renderGrid(cat) {
+    const grid = document.getElementById('customize-grid');
+    if (!grid) return;
+    const p = window._sbProfile;
+    // No alcanza con is_founder: el paquete queda oculto hasta que confirma
+    // el popup de bienvenida (founder_popup_seen, ver showFounderWelcomePopup)
+    // — ese click solo DESBLOQUEA, no equipa nada solo; recién ahí puede
+    // elegir ponérselo o no acá como cualquier otro ítem.
+    const isFounder = !!(p && p.is_founder && p.founder_popup_seen);
+    const field = CATS[cat].field;
+    const currentCode = p?.[field] || '0001';
+    grid.innerHTML = '';
+
+    CATALOG[cat].forEach(item => {
+      // Fundador es un caso especial: no es "conseguible" (nadie lo suma
+      // después de las primeras 100 cuentas), así que a quien no lo tiene ni
+      // se le muestra — no tiene sentido mostrar bloqueado algo que jamás va
+      // a poder desbloquear. Los ítems de logro/tienda sí se muestran
+      // bloqueados (con 🔒) para generar incentivo a conseguirlos.
+      if (item.founderOnly && !isFounder) return;
+      const locked   = item.locked && !item.unlocked;
+      const selected = currentCode === item.code;
+      const sw = document.createElement('div');
+      sw.className = 'customize-swatch' + (selected ? ' selected' : '') + (locked ? ' locked' : '');
+      sw.innerHTML = _swatchPreview(cat, item.code)
+        + `<span class="customize-swatch-label">${item.code === '0001' ? t('customize.optDefault') : (item.code === '0002' ? t('customize.frameFounder') : item.code)}</span>`
+        + (locked ? `<span class="customize-swatch-lock">🔒</span>` : `<div class="customize-swatch-check">✓</div>`);
+      if (locked) sw.title = t('customize.locked');
+      else sw.addEventListener('click', () => _selectOption(cat, item.code));
+      grid.appendChild(sw);
+    });
+  }
+
+  async function _selectOption(cat, code) {
+    if (!window._sbProfile || !window._sbUserId) return;
+    const field = CATS[cat].field;
+    const prev = window._sbProfile[field];
+    if (prev === code) return; // ya está seleccionado
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    window._sbProfile[field] = code; // optimista
+    _applyFounderFrame();
+    _renderGrid(cat);
+    try {
+      await window.sbUpdateProfile(window._sbUserId, { [field]: code });
+    } catch (err) {
+      window._sbProfile[field] = prev;
+      _applyFounderFrame();
+      _renderGrid(cat);
+    }
+  }
+
+  document.querySelectorAll('.customize-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+      document.querySelectorAll('.customize-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _activeCat = btn.dataset.cat;
+      _renderGrid(_activeCat);
+    });
+  });
+
+  document.getElementById('loading-customize-btn')?.addEventListener('click', () => {
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    const btn = document.getElementById('loading-customize-btn');
+    btn?.classList.add('confirm-pressed');
+    setTimeout(() => btn?.classList.remove('confirm-pressed'), 50);
+    if (!window._accountLoggedIn) { if (typeof window.openAccountModal === 'function') window.openAccountModal(); return; }
+    _refreshLeftPreview();
+    _renderGrid(_activeCat);
+    document.getElementById('loading-customize-group')?.classList.remove('table-gone');
+  });
+
+  document.getElementById('customize-back-wrap')?.addEventListener('click', () => {
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    const wrap = document.getElementById('customize-back-wrap');
+    wrap.classList.add('confirm-pressed');
+    setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
+    document.getElementById('loading-customize-group')?.classList.add('table-gone');
+  });
+
+  // Las etiquetas de la grilla ("Sin personalizar"/"Marco de Fundador") se
+  // arman en JS con t(), no son data-i18n estático — el refresco genérico de
+  // idioma no las toca. Si el panel está abierto al cambiar de idioma, hay
+  // que re-renderizar la tab activa a mano.
+  if (typeof onLangChange === 'function') {
+    onLangChange(() => {
+      const group = document.getElementById('loading-customize-group');
+      if (!group || group.classList.contains('table-gone')) return;
+      _renderGrid(_activeCat);
+    });
+  }
+})();
+
 // ── Rankings panel ─────────────────────────────────────────────────────────────
 (function () {
   let _activeRTab = 'top100';
@@ -2009,7 +2418,7 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
   let _rankingsRTChannel = null; // realtime channel
   let _allGlobalRows = null;     // full sorted list for rank computation
 
-  const SEL = 'id, username, avatar_url, hs_flags, hs_shapes, hs_cities, hs_monuments, hs_total, play_count, vs_wins, vs_losses, is_supporter, avg_sum_flags, avg_sum_shapes, avg_sum_cities, avg_sum_monuments, play_count_flags, play_count_shapes, play_count_cities, play_count_monuments, country_code';
+  const SEL = 'id, username, avatar_url, hs_flags, hs_shapes, hs_cities, hs_monuments, hs_total, play_count, vs_wins, vs_losses, is_supporter, avg_sum_flags, avg_sum_shapes, avg_sum_cities, avg_sum_monuments, play_count_flags, play_count_shapes, play_count_cities, play_count_monuments, country_code, is_founder, cell_code, frame_code, panel_code';
 
   function _totalScore(p) {
     const fromCols = (p.hs_flags||0)+(p.hs_shapes||0)+(p.hs_cities||0)+(p.hs_monuments||0);
@@ -2028,6 +2437,9 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
       play_count_cities: p.play_count_cities||0, play_count_monuments: p.play_count_monuments||0,
       play_count: p.play_count||0, vs_wins: p.vs_wins||0, vs_losses: p.vs_losses||0,
       is_supporter: p.is_supporter||false, country_code: p.country_code || null,
+      cellCode: p.cell_code || '0001',
+      frameCode: p.frame_code || '0001',
+      panelCode: p.panel_code || '0001',
     };
   }
   function _sortAndRank(profiles) {
@@ -2038,12 +2450,17 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
   }
 
   // ── fetchers ──────────────────────────────────────────────────────────────────
+  // window.withConnCheck (final.js) envuelve el pedido con timeout: si tarda
+  // demasiado o no hay internet, muestra la viñeta de error de conexión sola y
+  // devuelve null acá, en vez de dejar el panel de Rankings cargando para siempre.
   async function fetchTop100() {
     if (_rankingsCache.top100) return _rankingsCache.top100;
     if (!window.sb) return [];
-    const { data } = await window.sb.from('profiles')
-      .select(SEL)
-      .eq('hidden_from_rankings', false);
+    const res = typeof window.withConnCheck === 'function'
+      ? await window.withConnCheck(window.sb.from('profiles').select(SEL).eq('hidden_from_rankings', false), 6000)
+      : await window.sb.from('profiles').select(SEL).eq('hidden_from_rankings', false);
+    if (!res) return [];
+    const data = res.data;
     const rows = _sortAndRank(data || []).slice(0, 100);
     _rankingsCache.top100 = rows;
     _rankingsRawMap.top100 = Object.fromEntries((data||[]).map(p => [p.id, p]));
@@ -2054,9 +2471,11 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
     if (_rankingsCache.global) return _rankingsCache.global;
     if (!window.sb) return [];
     const myId = window._sbProfile?.id;
-    const { data: all } = await window.sb.from('profiles')
-      .select(SEL)
-      .eq('hidden_from_rankings', false);
+    const res = typeof window.withConnCheck === 'function'
+      ? await window.withConnCheck(window.sb.from('profiles').select(SEL).eq('hidden_from_rankings', false), 6000)
+      : await window.sb.from('profiles').select(SEL).eq('hidden_from_rankings', false);
+    if (!res) return [];
+    const all = res.data;
     _allGlobalRows = _sortAndRank(all || []);
     const allRows = _allGlobalRows;
     let start = 0, end = 30;
@@ -2081,7 +2500,11 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
     const myId = window._sbProfile?.id;
     const allIds = myId ? [...new Set([...friendIds, myId])] : friendIds;
     if (!allIds.length) { _rankingsCache.friends = []; return []; }
-    const { data } = await window.sb.from('profiles').select(SEL).in('id', allIds);
+    const res = typeof window.withConnCheck === 'function'
+      ? await window.withConnCheck(window.sb.from('profiles').select(SEL).in('id', allIds), 6000)
+      : await window.sb.from('profiles').select(SEL).in('id', allIds);
+    if (!res) return [];
+    const data = res.data;
     const rows = _sortAndRank(data || []);
     _rankingsCache.friends = rows;
     _rankingsRawMap.friends = Object.fromEntries((data||[]).map(p => [p.id, p]));
@@ -2114,6 +2537,20 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
   }
   window._cupForRank = _cupForRank;
 
+  // Avatar circular con marco de personalización para las filas de Rankings/
+  // Amigos (.loading-social-avatar) — a diferencia del .lb-avatar in-game
+  // (ver _refreshLeftPreview), acá SÍ se muestra el marco equipado por cada
+  // usuario, del mismo modo que en la foto grande del perfil.
+  function _socialAvatarHtml(avatarUrl, frameCode) {
+    const CA = window.CustomizeAssets;
+    const code = frameCode || '0001';
+    const inset = (window.CUSTOMIZE_FRAME_INSET && window.CUSTOMIZE_FRAME_INSET[code]) || '-14.5%';
+    return `<span class="loading-social-avatar-wrap cust-frame-wrap" style="--cust-frame:url('${CA.frameUrl(code)}');--cust-frame-inset:${inset}">` +
+      `<img class="loading-social-avatar" src="${avatarUrl}" onerror="this.src='images/profilepic/ppdefault.png'" alt="" draggable="false" oncontextmenu="return false">` +
+      `</span>`;
+  }
+  window._socialAvatarHtml = _socialAvatarHtml;
+
   // ── renderer ──────────────────────────────────────────────────────────────────
   function renderRankings(rows, tab) {
     const list = document.getElementById('loading-rankings-list');
@@ -2130,11 +2567,12 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
       const rk   = (typeof getRank === 'function') ? getRank(r.score) : { name: '', img: 'images/ranks/1.png' };
       const medalCls = r.rank === 1 ? ' rk-gold' : r.rank === 2 ? ' rk-silver' : r.rank === 3 ? ' rk-bronze' : '';
       const el = document.createElement('div');
-      el.className = 'loading-social-row' + (isMe ? ' is-me-row' : '');
+      el.className = 'loading-social-row' + (isMe ? ' is-me-row' : '') + (window.CUSTOMIZE_CELL_LIGHT_TEXT?.has(r.cellCode) ? ' cell-light-text' : '');
+      el.style.setProperty('--cust-cell', `url('${window.CustomizeAssets.cellUrl(r.cellCode)}')`);
       const flagUrl = window.flagUrlForCountryCode?.(r.country_code);
       el.innerHTML =
         `<span class="rankings-pos${medalCls}">#${r.rank}</span>` +
-        `<img class="loading-social-avatar" src="${r.avatar}" onerror="this.src='images/profilepic/ppdefault.png'" alt="" draggable="false" oncontextmenu="return false">` +
+        _socialAvatarHtml(r.avatar, r.frameCode) +
         `<div class="loading-social-info"><span class="loading-social-name">${r.name}</span></div>` +
         `<div class="loading-social-score">` +
           (flagUrl ? `<img class="loading-social-flag" src="${flagUrl}" alt="" draggable="false" oncontextmenu="return false">` : '') +
@@ -2298,6 +2736,12 @@ let socialSort = localStorage.getItem('socialSort') || 'conn';
 // Cache de datos sociales cargado desde Supabase
 let socialData = { friends: [], requests: [], sent: [], blocked: [], blockedMe: [] };
 
+// Respaldo local (ver loadSocialData): si el pedido al servidor falla, se usa
+// lo último guardado acá en vez de dejar el panel de amigos vacío.
+function _loadCachedSocialData() {
+  try { return JSON.parse(localStorage.getItem('cachedSocialData') || 'null'); } catch (e) { return null; }
+}
+
 // Favoritos persistidos en localStorage por user ID
 function getSocialFavs() {
   try { return new Set(JSON.parse(localStorage.getItem('socialFavs') || '[]')); } catch { return new Set(); }
@@ -2333,7 +2777,12 @@ function socialStatusText(f) {
   const daysAgo  = hoursAgo / 24;
   const monthsAgo = daysAgo / 30.5;
   const yearsAgo  = daysAgo / 365;
-  if (secsAgo <= 20 && f.is_playing) return t('social.playing') || 'Jugando';
+  // is_playing usa la misma ventana de 120s que getStatusObj (no los 20s de
+  // "online" de acá abajo) — sin esto, un jugador inactivo un rato en plena
+  // partida (sin tocar nada 20-120s) seguía con la celda titilando en verde
+  // (getStatusObj todavía lo clasifica "playing") pero el texto ya cambiaba
+  // a "Hace 1 minuto" en vez de "Jugando", pese a seguir jugando de verdad.
+  if (f.is_playing && secsAgo <= 120) return t('social.playing') || 'Jugando';
   if (secsAgo <= 20) return t('social.online') || 'En línea';
   let n, unit;
   if (yearsAgo >= 1)       { n = Math.round(yearsAgo);  unit = t(n === 1 ? 'social.unitYear'  : 'social.unitYears');  }
@@ -2465,10 +2914,21 @@ async function loadSocialData(showLoader = true) {
   }
   if (showLoader) {
     const list = document.getElementById('loading-social-list');
-    if (list) list.innerHTML = '<div class="loading-social-empty">···</div>';
+    if (list) list.innerHTML = `<div class="loading-social-empty">${t('social.loadingUsers')}</div>`;
   }
   try {
-    socialData = await window.sbLoadSocialData(window._sbUserId);
+    const _social = typeof window.withConnCheck === 'function'
+      ? await window.withConnCheck(window.sbLoadSocialData(window._sbUserId), 6000)
+      : await window.sbLoadSocialData(window._sbUserId);
+    if (!_social) {
+      // Sin conexión (viñeta de error ya mostrada): caer al último dato
+      // guardado localmente en vez de dejar el panel vacío.
+      const cached = _loadCachedSocialData();
+      if (cached) socialData = cached;
+      renderSocial(); updateSocialTabCounts(); return;
+    }
+    socialData = _social;
+    try { localStorage.setItem('cachedSocialData', JSON.stringify(socialData)); } catch (e) {}
     if (typeof window.Friends !== 'undefined') {
       // Conservar id/last_active/is_playing: los paneles de invitar usan getFriends()
       // y necesitan el estado en vivo (conectado/jugando), igual que el panel social.
@@ -2508,12 +2968,20 @@ function renderSocialRequests(filter = '') {
   updateSocialTabCounts();
   const reqs = socialData.requests.filter(f => f.name.toLowerCase().includes(filter.toLowerCase()));
   list.innerHTML = '';
+  if (reqs.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'loading-social-empty';
+    empty.textContent = t('social.noData');
+    list.appendChild(empty);
+    return;
+  }
   reqs.forEach((f) => {
     const row = document.createElement('div');
-    row.className = 'loading-social-row loading-social-request';
+    row.className = 'loading-social-row loading-social-request' + (window.CUSTOMIZE_CELL_LIGHT_TEXT?.has(f.cellCode) ? ' cell-light-text' : '');
     row.dataset.friendId = f.id;
+    row.style.setProperty('--cust-cell', `url('${window.CustomizeAssets.cellUrl(f.cellCode)}')`);
     row.innerHTML =
-      `<img class="loading-social-avatar" src="${f.avatar}" alt="" draggable="false" oncontextmenu="return false">` +
+      window._socialAvatarHtml(f.avatar, f.frameCode) +
       `<div class="loading-social-info">` +
         `<span class="loading-social-name">${f.name}</span>` +
         `<span class="loading-social-status">${t('social.sentYouRequest')}</span>` +
@@ -2622,14 +3090,22 @@ function renderSocialFriends(filter = '') {
       return (fa - fb) || baseSort(a, b);
     });
   list.innerHTML = '';
+  if (friends.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'loading-social-empty';
+    empty.textContent = t('social.noData');
+    list.appendChild(empty);
+    return;
+  }
   friends.forEach(({ f }) => {
     const fav = favs.has(f.id);
     const st = getStatusObj(f);
     const row = document.createElement('div');
-    row.className = 'loading-social-row status-' + st.cls + (fav ? ' is-fav' : '');
+    row.className = 'loading-social-row status-' + st.cls + (fav ? ' is-fav' : '') + (window.CUSTOMIZE_CELL_LIGHT_TEXT?.has(f.cellCode) ? ' cell-light-text' : '');
     row.dataset.friendId = f.id;
+    window.CustomizeAssets.applyCellForStatus(row, f.cellCode, st.cls);
     row.innerHTML =
-      `<img class="loading-social-avatar" src="${f.avatar}" alt="" draggable="false" oncontextmenu="return false">` +
+      window._socialAvatarHtml(f.avatar, f.frameCode) +
       `<div class="loading-social-info">` +
         `<div class="loading-social-name-row">` +
           `<span class="loading-social-name">${fav ? '★ ' : ''}${f.name}</span>` +
@@ -2658,7 +3134,7 @@ function renderSocialFriends(filter = '') {
       const row = document.createElement('div');
       row.className = 'loading-social-row status-offline is-blocked-row';
       row.innerHTML =
-        `<img class="loading-social-avatar" src="${b.avatar}" alt="" draggable="false" oncontextmenu="return false">` +
+        window._socialAvatarHtml(b.avatar, b.frameCode) +
         `<div class="loading-social-info">` +
           `<span class="loading-social-name">${b.name}</span>` +
           `<span class="loading-social-status">${t('social.blockedStatus')}</span>` +
@@ -2721,6 +3197,9 @@ function openFriendProfile(friend) {
 
   const pic = document.getElementById('loading-friend-pic');
   if (pic) pic.src = friend.avatar;
+  window.CustomizeAssets?.applyFrame(document.getElementById('loading-friend-pic-wrap'), friend.frameCode || '0001');
+  const friendPanelImg = document.querySelector('#loading-friend-group .loading-howtotable');
+  if (friendPanelImg) friendPanelImg.src = window.CustomizeAssets?.panelUrl(friend.panelCode || '0001');
   const fBadge = document.getElementById('loading-friend-supporter-badge');
   if (fBadge) fBadge.style.display = friend.is_supporter ? '' : 'none';
   setText('loading-friend-name', friend.name);
@@ -3100,7 +3579,12 @@ document.getElementById('loading-social-invite')?.addEventListener('click', () =
   input?.focus();
 });
 
+let _sendingFriendRequest = false;
 async function sendFriendRequest() {
+  // Guard real: el botón se deshabilita pero el input tiene su propio listener
+  // de Enter que llama esta función directo (sin pasar por el <button>), así
+  // que "disabled" solo no alcanza para evitar pedidos superpuestos.
+  if (_sendingFriendRequest) return;
   const input = document.getElementById('loading-addfriend-input');
   const fb = document.getElementById('loading-addfriend-feedback');
   const name = (input?.value || '').trim();
@@ -3121,18 +3605,40 @@ async function sendFriendRequest() {
     fb.className = 'loading-addfriend-feedback err show';
     return;
   }
+  if (socialData.sent.some(s => s.name.toLowerCase() === name.toLowerCase())) {
+    fb.textContent = t('social.alreadySent');
+    fb.className = 'loading-addfriend-feedback err show';
+    return;
+  }
   if (socialData.friends.some(f => f.name.toLowerCase() === name.toLowerCase()) ||
-      socialData.sent.some(s => s.name.toLowerCase() === name.toLowerCase()) ||
       socialData.requests.some(r => r.name.toLowerCase() === name.toLowerCase())) {
     fb.textContent = t('social.alreadyInList');
     fb.className = 'loading-addfriend-feedback err show';
     return;
   }
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
-  fb.textContent = '···';
-  fb.className = 'loading-addfriend-feedback show';
+  _sendingFriendRequest = true;
+  const sendBtn = document.getElementById('loading-addfriend-send');
+  // Nada de texto de feedback acá: el botón ya dice "Enviando..." — mostrar lo
+  // mismo abajo (sin color definido en el CSS para este estado, salía en
+  // blanco/ilegible) era redundante y confuso.
+  fb.textContent = '';
+  fb.className = 'loading-addfriend-feedback';
+  if (sendBtn) {
+    sendBtn.disabled = true;
+    sendBtn.textContent = t('social.sending');
+    sendBtn.style.opacity = '0.6';
+    sendBtn.style.cursor = 'not-allowed';
+    sendBtn.style.pointerEvents = 'none';
+  }
+  if (input) input.disabled = true;
   try {
-    await window.sbSendFriendRequest(window._sbUserId, name);
+    // .then(() => true): sbSendFriendRequest resuelve undefined en éxito (no
+    // retorna nada), que chocaría con el undefined que usa withConnTimeout
+    // para marcar timeout — con esto, éxito real siempre es `true`.
+    const _p = window.sbSendFriendRequest(window._sbUserId, name).then(() => true);
+    const result = typeof window.withConnTimeout === 'function' ? await window.withConnTimeout(_p, 6000) : await _p;
+    if (result === undefined) return; // timeout: viñeta de error ya mostrada, no hay nada más que decir acá
     fb.textContent = t('social.requestSent', { name });
     fb.className = 'loading-addfriend-feedback ok show';
     if (input) input.value = '';
@@ -3140,6 +3646,16 @@ async function sendFriendRequest() {
   } catch (e) {
     fb.textContent = e.message === 'Usuario no encontrado' ? 'Usuario no encontrado' : 'Ha ocurrido un error, por favor inténtelo más tarde';
     fb.className = 'loading-addfriend-feedback err show';
+  } finally {
+    _sendingFriendRequest = false;
+    if (input) input.disabled = false;
+    if (sendBtn) {
+      sendBtn.disabled = false;
+      sendBtn.textContent = t('social.sendRequest');
+      sendBtn.style.opacity = '';
+      sendBtn.style.cursor = '';
+      sendBtn.style.pointerEvents = '';
+    }
   }
 }
 
@@ -3176,10 +3692,11 @@ function renderBlockedList() {
   }
   entries.forEach((b) => {
     const row = document.createElement('div');
-    row.className = 'loading-social-row is-blocked-row';
+    row.className = 'loading-social-row is-blocked-row' + (window.CUSTOMIZE_CELL_LIGHT_TEXT?.has(b.cellCode) ? ' cell-light-text' : '');
     row.dataset.friendId = b.id;
+    row.style.setProperty('--cust-cell', `url('${window.CustomizeAssets.cellUrl(b.cellCode)}')`);
     row.innerHTML =
-      `<img class="loading-social-avatar" src="${b.avatar}" alt="" draggable="false" oncontextmenu="return false">` +
+      window._socialAvatarHtml(b.avatar, b.frameCode) +
       `<div class="loading-social-info">` +
         `<span class="loading-social-name">${b.name}</span>` +
         `<span class="loading-social-status">${t('social.blockedStatus')}</span>` +
@@ -3253,10 +3770,11 @@ function renderSentList() {
   }
   entries.forEach((s) => {
     const row = document.createElement('div');
-    row.className = 'loading-social-row';
+    row.className = 'loading-social-row' + (window.CUSTOMIZE_CELL_LIGHT_TEXT?.has(s.cellCode) ? ' cell-light-text' : '');
     row.dataset.friendId = s.id;
+    row.style.setProperty('--cust-cell', `url('${window.CustomizeAssets.cellUrl(s.cellCode)}')`);
     row.innerHTML =
-      `<img class="loading-social-avatar" src="${s.avatar}" alt="" draggable="false" oncontextmenu="return false">` +
+      window._socialAvatarHtml(s.avatar, s.frameCode) +
       `<div class="loading-social-info">` +
         `<span class="loading-social-name">${s.name}</span>` +
         `<span class="loading-social-status">${t('social.pendingStatus')}</span>` +
@@ -3354,6 +3872,17 @@ window.gameStoppers.push(() => {
     try { if (canvas) canvas.style.pointerEvents = 'none'; } catch (e) {}
     // Detener el titilo del countdown
     try { if (countdownImg) countdownImg.style.animationPlayState = 'paused'; } catch (e) {}
+  } else {
+    // Sin este else, un endGame() legítimo (timeLeft llegó a 0 de verdad,
+    // recalculado al volver de una pestaña en 2do plano, ver visibilitychange
+    // más abajo) deja canvas.style.pointerEvents='none' puesto — startGame()
+    // lo restaura recién al arrancar una ronda nueva, así que si quedaba algo
+    // a medio camino (secuencia de TIMES UP interrumpida por el propio quit)
+    // el canvas quedaba sordo a los clicks para siempre sin ningún indicio
+    // visual (reportado: "vuelvo de otra pestaña y no puedo clickear nada,
+    // se ve todo normal"). mapGameOver también se reseteaba solo en startGame().
+    try { mapGameOver = false; } catch (e) {}
+    try { if (canvas) canvas.style.pointerEvents = ''; } catch (e) {}
   }
   try { if (typeof pregameCountdownEl !== 'undefined' && pregameCountdownEl) pregameCountdownEl.style.display = 'none'; } catch (e) {}
   try { if (typeof timeupOverlay !== 'undefined' && timeupOverlay) { timeupOverlay.style.display = 'none'; timeupOverlay.classList.remove('timeup-in','timeup-out'); } } catch (e) {}
@@ -3828,7 +4357,7 @@ const DOTS_NEEDED     = 10;
 const SPEED_BONUS_WIN = 3;
 
 // Pixel thresholds on the DISPLAYED canvas
-const PERFECT_PX = 4;
+const PERFECT_PX = 5;
 const GOOD_PX    = 20;
 const FAIR_PX    = 45;
 
@@ -4344,6 +4873,7 @@ function buildFriendPlayers() {
       avatar: m.avatar || '',
       color: '#888',
       initial: (m.name && m.name[0]) ? m.name[0].toUpperCase() : '?',
+      cardCode: m.cardCode || '0001',
     }));
   }
   // En VS 1v1 (shapes): solo el rival
@@ -4356,6 +4886,7 @@ function buildFriendPlayers() {
       avatar: o.avatar || '',
       color: '#888',
       initial: (o.name && o.name[0]) ? o.name[0].toUpperCase() : '?',
+      cardCode: o.cardCode || '0001',
     }];
   }
   const src = (typeof getFriends === 'function') ? getFriends() : [];
@@ -4366,6 +4897,7 @@ function buildFriendPlayers() {
     avatar: f.avatar || '',
     color: LB_COLORS[i % LB_COLORS.length],
     initial: (f.name && f.name[0]) ? f.name[0].toUpperCase() : '?',
+    cardCode: f.cardCode || '0001',
   }));
 }
 
@@ -5007,9 +5539,9 @@ let _citiesSpecLastCard = null;
 // lado. Ahora arma una SEGUNDA fila (mismo estilo lb-vsopp que usa el
 // jugador real para el suyo), para que el espectador vea las dos casillas
 // actualizándose en vivo, igual que ven los jugadores reales.
-window.citiesSpectatorSetPlayerCard = function (name, avatar, score, oppName, oppAvatar, oppScore) {
+window.citiesSpectatorSetPlayerCard = function (name, avatar, score, oppName, oppAvatar, oppScore, cardCode, oppCardCode) {
   if (!_citiesSpecMode) return;
-  _citiesSpecLastCard = { name, avatar, score, oppName, oppAvatar, oppScore };
+  _citiesSpecLastCard = { name, avatar, score, oppName, oppAvatar, oppScore, cardCode, oppCardCode };
   const lb = document.getElementById('leaderboard');
   if (!lb) return;
   const rowH = getLbRowHeight();
@@ -5043,6 +5575,7 @@ window.citiesSpectatorSetPlayerCard = function (name, avatar, score, oppName, op
   if (avatarEl && avatar) avatarEl.src = avatar;
   const scoreEl = document.getElementById('cities-spec-lb-score');
   if (scoreEl) scoreEl.textContent = (score || 0).toLocaleString();
+  window.CustomizeAssets?.applyCard(el, cardCode || '0001');
 
   let oppEl = document.getElementById('cities-spec-lb-opp');
   if (showOpp) {
@@ -5056,6 +5589,7 @@ window.citiesSpectatorSetPlayerCard = function (name, avatar, score, oppName, op
         + `<span class="lb-score" id="cities-spec-lb-opp-score">0</span>`;
       lb.appendChild(oppEl);
     }
+    window.CustomizeAssets?.applyCard(oppEl, oppCardCode || '0001');
     const oppNameEl = document.getElementById('cities-spec-lb-opp-name');
     if (oppNameEl) oppNameEl.textContent = oppName || 'Rival';
     const oppAvatarEl = document.getElementById('cities-spec-lb-opp-avatar');
@@ -5537,9 +6071,9 @@ window.monumentsSpectatorUpdateScore = function (score, dots) {
 
 let _monumentsSpecLastCard = null;
 // oppName/oppAvatar/oppScore: ver comentario largo en citiesSpectatorSetPlayerCard.
-window.monumentsSpectatorSetPlayerCard = function (name, avatar, score, oppName, oppAvatar, oppScore) {
+window.monumentsSpectatorSetPlayerCard = function (name, avatar, score, oppName, oppAvatar, oppScore, cardCode, oppCardCode) {
   if (!_monumentsSpecMode) return;
-  _monumentsSpecLastCard = { name, avatar, score, oppName, oppAvatar, oppScore };
+  _monumentsSpecLastCard = { name, avatar, score, oppName, oppAvatar, oppScore, cardCode, oppCardCode };
   const lb = document.getElementById('leaderboard');
   if (!lb) return;
   const rowH = getLbRowHeight();
@@ -5566,6 +6100,7 @@ window.monumentsSpectatorSetPlayerCard = function (name, avatar, score, oppName,
   if (avatarEl && avatar) avatarEl.src = avatar;
   const scoreEl = document.getElementById('monuments-spec-lb-score');
   if (scoreEl) scoreEl.textContent = (score || 0).toLocaleString();
+  window.CustomizeAssets?.applyCard(el, cardCode || '0001');
 
   let oppEl = document.getElementById('monuments-spec-lb-opp');
   if (showOpp) {
@@ -5579,6 +6114,7 @@ window.monumentsSpectatorSetPlayerCard = function (name, avatar, score, oppName,
         + `<span class="lb-score" id="monuments-spec-lb-opp-score">0</span>`;
       lb.appendChild(oppEl);
     }
+    window.CustomizeAssets?.applyCard(oppEl, oppCardCode || '0001');
     const oppNameEl = document.getElementById('monuments-spec-lb-opp-name');
     if (oppNameEl) oppNameEl.textContent = oppName || 'Rival';
     const oppAvatarEl = document.getElementById('monuments-spec-lb-opp-avatar');
@@ -5839,6 +6375,13 @@ function initLeaderboard() {
       el.innerHTML = `<span class="lb-rank rank-other"></span>` + avatarHTML + `<span class="lb-name">${p.name}</span>` + `<span class="lb-score">${p.score.toLocaleString()}</span>`;
       el.style.transition = 'none';
       el.style.top = '-9999px';
+      // Todas las filas traen su cardCode real ahora (ver buildFriendPlayers:
+      // rival de VS 1v1, cada rival de lobby grupal, Y los amigos reales de
+      // la barra ingame en Gira Mundial solo — antes esto último se
+      // quedaba afuera, con la carta default sin importar qué tuviera
+      // equipado de verdad cada amigo). applyCard ya cae a '0001' si no hay
+      // cardCode, así que aplicarlo siempre es seguro.
+      window.CustomizeAssets?.applyCard(el, p.cardCode || '0001');
       lbElements[el.id] = el;
       lb.appendChild(el);
     });
@@ -5881,6 +6424,7 @@ function initLeaderboard() {
   playerEl.style.top = '-9999px';
   lbElements['lb-player'] = playerEl;
   lb.appendChild(playerEl);
+  if (typeof window._applyFounderFrame === 'function') window._applyFounderFrame();
 
   requestAnimationFrame(() => {
     positionLeaderboard(0, false);
@@ -7207,6 +7751,17 @@ document.addEventListener('visibilitychange', () => {
 // TIMES UP comparado con el resto).
 function _timerTick() {
   if (!state) return;
+  // Guarda por fase (no solo "!state"): quitToMenu() reemplaza state por uno
+  // nuevo en 'idle' (resetState), no lo anula — así que este chequeo NO
+  // frenaba un tick perdido de la ronda anterior si por lo que sea
+  // timerIntervalId no se llegó a limpiar a tiempo (ej. una pestaña
+  // minimizada mucho rato, donde el navegador puede tardar en aplicar el
+  // clearInterval real). Sin esto, ese tick fantasma podía llegar a
+  // state.timeLeft<=0 y llamar a endGame(), mostrando el TIMES UP gigante
+  // encima del menú (reportado: "salgo un rato minimizado y vuelvo con un
+  // times up gigante"). Con la guarda, cualquier tick que dispare estando
+  // en 'idle' se autoelimina en vez de actuar.
+  if (state.phase === 'idle') { clearInterval(timerIntervalId); timerIntervalId = null; return; }
   const _practiceInfinite = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
   if (_practiceInfinite) return;
   const elapsed = Math.floor((Date.now() - state.timerStartedAt) / 1000);
@@ -7736,6 +8291,11 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
       // terminada (vuelve solo a la pantalla de carga). El otro camino (no
       // campaña, más abajo) sí lo llama — acá faltaba.
       window._setPlaying(false);
+      // Recién acá se completó una Vuelta Mundial entera de verdad (las 4
+      // modalidades) — es el único punto donde vale chequear elegibilidad
+      // para el popup de Fundador (se consume al volver al menú, ver
+      // js/final.js "final-confirm-back-wrap").
+      window._pendingFounderPopupCheck = true;
       if (typeof showResultsScreen === 'function') showResultsScreen();
     }
     return;
@@ -8015,7 +8575,7 @@ document.getElementById('vol-btn')?.addEventListener('click', () => {
 (function () {
   const warning  = document.getElementById('screen-warning');
   const isMobile = navigator.maxTouchPoints > 1;
-  const MIN_W = 480, MIN_H = 320, MAX_RATIO = 2.8;
+  const MIN_W = 320, MIN_H = 220, MAX_RATIO = 2.8;
 
   if (isMobile) {
     document.body.classList.add('is-mobile');

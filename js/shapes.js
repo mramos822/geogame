@@ -856,7 +856,7 @@ window.shapesSpectatorUpdateScore = function (score, dots) {
 // el leaderboard normal (positionLeaderboard) mete tu propio perfil como "vos",
 // que acá sería incorrecto, así que se arma una fila a mano.
 // oppName/oppAvatar/oppScore: ver comentario largo en citiesSpectatorSetPlayerCard.
-window.shapesSpectatorSetPlayerCard = function (name, avatar, score, oppName, oppAvatar, oppScore) {
+window.shapesSpectatorSetPlayerCard = function (name, avatar, score, oppName, oppAvatar, oppScore, cardCode, oppCardCode) {
   if (!_shapesSpecMode) return;
   const lb = document.getElementById('leaderboard');
   if (!lb) return;
@@ -886,6 +886,7 @@ window.shapesSpectatorSetPlayerCard = function (name, avatar, score, oppName, op
   const avatarEl = document.getElementById('shapes-spec-lb-avatar');
   if (avatarEl && avatar) avatarEl.src = avatar;
   document.getElementById('shapes-spec-lb-score').textContent = (score || 0).toLocaleString();
+  window.CustomizeAssets?.applyCard(el, cardCode || '0001');
 
   let oppEl = document.getElementById('shapes-spec-lb-opp');
   if (showOpp) {
@@ -900,6 +901,7 @@ window.shapesSpectatorSetPlayerCard = function (name, avatar, score, oppName, op
         + `<span class="lb-score" id="shapes-spec-lb-opp-score">0</span>`;
       lb.appendChild(oppEl);
     }
+    window.CustomizeAssets?.applyCard(oppEl, oppCardCode || '0001');
     document.getElementById('shapes-spec-lb-opp-name').textContent = oppName || 'Rival';
     const oppAvatarEl = document.getElementById('shapes-spec-lb-opp-avatar');
     if (oppAvatarEl && oppAvatar) oppAvatarEl.src = oppAvatar;
@@ -1997,6 +1999,15 @@ function runShapesPregame(onDone, elapsedMs) {
 // Detiene y resetea TODO el modo siluetas (sin scoring ni gameover). Lo usa quitToMenu.
 function shapesHardReset() {
   shapesAborted = true;
+  // Sin esto, un tick de _shapesTimerTick que ya estaba en cola cuando se
+  // llamó clearInterval() de abajo (tab en background mucho tiempo, el
+  // browser lo tenía throttled/encolado) pasaba el guard "!shapesRunning" de
+  // _shapesTimerTick igual y disparaba el TIMES UP de verdad ya vueltos al
+  // menú — y como shapesAborted queda en true hasta la próxima ronda, los
+  // setTimeout que esconden el overlay (ver más abajo en el timer real)
+  // también se abortaban solos, dejando el overlay bloqueando toda la
+  // página para siempre (ver flagsHardReset, mismo patrón ahí).
+  shapesRunning = false;
   const _cwImgReset = document.getElementById('shapes-timer-img');
   if (_cwImgReset) _cwImgReset.style.animationPlayState = 'paused';
   clearTimeout(shapesPregameTimeout); shapesPregameTimeout = null;
@@ -2069,6 +2080,11 @@ function shapesPracticePickNext(exc) {
 // tiempo real; acá se autocorrige de una sola vez en cuanto vuelve a
 // tickear (o la pestaña vuelve a primer plano), en vez de arrastrar el atraso.
 function _shapesTimerTick() {
+  // Guarda defensiva — mismo motivo que _timerTick (monuments.js) y
+  // _flagsTimerTick (flags.js): un tick fantasma de una ronda ya terminada,
+  // si el interval no se limpió a tiempo, podía mostrar el TIMES UP gigante
+  // encima del menú.
+  if (!shapesRunning) { clearInterval(shapesTimerIntervalId); return; }
   const _shapesInfinite = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
   if (_shapesInfinite) return;
   const tEl  = document.getElementById('shapes-timer-number');

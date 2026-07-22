@@ -322,6 +322,9 @@ function showResultsScreen() {
         .then(profile => {
           window._sbProfile = profile;
           if (typeof window.syncHsFromProfile === 'function') window.syncHsFromProfile(profile);
+          // El popup de Fundador NO se muestra acá — recién cuando vuelve al
+          // menú (ver js/final.js, click de "final-confirm-back-wrap"), que
+          // ya encuentra window._sbProfile fresco gracias a este refresh.
         })
         .catch(e => console.warn('[scores] upload:', e));
     }

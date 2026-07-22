@@ -5,6 +5,148 @@ const _SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 const sb = supabase.createClient(_SB_URL, _SB_ANON);
 window.sb = sb;
 
+// ── PERSONALIZACIÓN (items por código, preparado para la futura tienda) ───────
+// images/customize/{frames,cards,panels,emotes,cells}/<code>.png — '0001' es
+// el default gratis para todos. frame_code/card_code/panel_code/cell_code
+// viven en profiles (ver migraciones customize_item_codes y
+// customize_cell_code). Un solo lugar para construir las URLs y aplicar el
+// marco/tarjeta/celda, para no repetir el patrón en cada archivo.
+// frame = anillo de la foto (tanto la FOTO GRANDE del perfil propio como el
+// circulito de cada fila en Rankings/Amigos). cell = el fondo de TODA LA FILA
+// (.loading-social-row) donde aparece en Rankings/Amigos — no solo el
+// circulito del avatar, toda la tarjeta con nombre/puntaje/etc.
+// NOTA: _abs() devuelve una URL absoluta completa (protocolo+host+path),
+// resuelta contra document.baseURI (que ya incluye el <base href="../">) —
+// NO una ruta relativa ni una con "/" inicial a secas. Es necesario porque
+// estos códigos se usan de dos formas distintas: (a) como <img src>, que
+// respeta <base>, y (b) dentro de var(--cust-frame) consumida por
+// background-image en css/style.css, donde un url() relativo se resuelve
+// contra la ubicación DE LA HOJA DE ESTILOS (css/), ignorando <base> —
+// terminaba pidiendo css/images/... (404, marco invisible). Una ruta con "/"
+// inicial a secas arregla (b) pero rompe (a) si el sitio no está servido
+// justo en la raíz del dominio (deploys en subcarpeta). Una URL absoluta ya
+// resuelta en JS sirve para ambos casos sin asumir dónde vive el dominio.
+// Cuánto tiene que sobresalir la caja del ::after del marco respecto al wrap
+// (ver .cust-frame-wrap::after en style.css) para que el borde INTERNO del
+// aro de cada PNG quede al ras del borde de la foto, sin pisarla ni flotar
+// de más adentro. Cada código tiene su propia proporción de aro dentro del
+// canvas (medida con muestreo radial, no a ojo — ver images/customize/frames/):
+//   0001.png (129×129): aro simple parejo, radio interno 50 de 64.5 de
+//     semi-lienzo (~77.5%) → inset -14.5%.
+//   0002.png (152×148, Founder): radio interno ~47.5 de 74 (~64.2%) →
+//     mínimo -27.9%, subido a -30% a pedido (un toque más grande).
+// Si se agrega un frame code nuevo, medirle el radio interno del aro de la
+// misma forma y sumar su entrada acá — no reusar un valor de otro asset.
+window.CUSTOMIZE_FRAME_INSET = {
+  '0001': '-14.5%',
+  '0002': '-30%',
+};
+
+// Cells (images/customize/cells/<code>.png) en "modo oscuro": fondo lo
+// bastante oscuro u "ocupado" (textura, degradé) como para que el texto de
+// posición/nombre en su color normal (marrón #8b6a00/#4a3b00) se pierda —
+// para esas, el nombre pasa a blanco con contorno del color que tendría
+// normalmente (ver .cell-light-text en style.css y _swatchPreview en
+// monuments.js). '0001' (fondo claro/beige) no es modo oscuro. Si se agrega
+// un cell code nuevo de fondo oscuro, sumarlo acá — no hace falta tocar CSS
+// ni el JS de cada renderer, todos leen de esta lista.
+window.CUSTOMIZE_CELL_LIGHT_TEXT = new Set(['0002', '0009']);
+
+// Mismo "modo oscuro" pero para cards (images/customize/cards/<code>.png,
+// la ficha del leaderboard in-game): cuando el fondo de la carta es oscuro,
+// el nombre/puntaje pasan a blanco con contorno del color que tendrían
+// normalmente (ver .card-light-text en style.css). applyCard() abajo agrega
+// la clase sola, así que los 3 lugares que llaman a applyCard (#lb-player,
+// #flags-lb-player, #customize-preview-lb-card) la reciben gratis; el único
+// lugar que NO pasa por applyCard es el swatch de la grilla
+// (_swatchPreview 'leaderboard' en monuments.js, arma el HTML a mano), que
+// chequea este mismo set directamente.
+window.CUSTOMIZE_CARD_LIGHT_TEXT = new Set(['0002']);
+
+// Cells que tienen una variante "-green" propia (images/customize/cells/
+// <code>-green.png) para el estado "jugando" — cuando existe, se usa esa
+// imagen tal cual en vez del tinte animado genérico (::before + mix-blend
+// en style.css, ver .status-playing). Cualquier código NO listado acá sigue
+// funcionando con el tinte de siempre — no hace falta pintar una variante
+// para cada cell nueva, es opcional.
+window.CUSTOMIZE_CELL_GREEN_VARIANTS = new Set(['0002']);
+
+window.CustomizeAssets = {
+  _abs(path) { return new URL(path, document.baseURI).href; },
+  frameUrl(code) { return this._abs(`images/customize/frames/${code || '0001'}.png`); },
+  cardUrl(code)  { return this._abs(`images/customize/cards/${code || '0001'}.png`); },
+  panelUrl(code) { return this._abs(`images/customize/panels/${code || '0001'}.png`); },
+  emoteUrl(code) { return this._abs(`images/customize/emotes/${code || '0001'}.png`); },
+  cellUrl(code)  { return this._abs(`images/customize/cells/${code || '0001'}.png`); },
+  // URL de celda a usar cuando la fila está "jugando": la variante -green
+  // dedicada si existe para ese código, si no la celda normal de siempre
+  // (con el tinte CSS haciéndose cargo, ver applyCellForStatus más abajo).
+  cellUrlPlaying(code) {
+    return window.CUSTOMIZE_CELL_GREEN_VARIANTS.has(code)
+      ? this._abs(`images/customize/cells/${code}-green.png`)
+      : this.cellUrl(code);
+  },
+  // Setea --cust-cell (arte normal, siempre) y --cust-cell-green (variante
+  // -green, solo tiene sentido si existe para ese código) + la clase
+  // cell-green-asset que le dice a style.css si hay que titilar ENTRE las
+  // dos (ver @keyframes cell-green-blink) en vez del tinte genérico. Un
+  // solo lugar para esta decisión — evita repetirla en cada sitio que
+  // renderiza una fila (renderRankings, loadSocialData render,
+  // _patchFriendStatusInDOM, etc., ver monuments.js).
+  applyCellForStatus(el, code, statusCls) {
+    if (!el) return;
+    const playing = statusCls === 'playing';
+    const hasGreenAsset = playing && window.CUSTOMIZE_CELL_GREEN_VARIANTS.has(code);
+    el.style.setProperty('--cust-cell', `url('${this.cellUrl(code)}')`);
+    if (hasGreenAsset) el.style.setProperty('--cust-cell-green', `url('${this.cellUrlPlaying(code)}')`);
+    el.classList.toggle('cell-green-asset', hasGreenAsset);
+  },
+  // Fallback global para filas que nunca llaman a applyCard (bots del
+  // leaderboard, que no son cuentas reales y no tienen card_code propio) —
+  // sin esto, --cust-card queda sin setear en esas filas y la tarjeta se ve
+  // en blanco (ver .lb-entry en style.css, que ya no tiene background-color
+  // de respaldo). Seteado una sola vez acá en :root, vía JS para poder usar
+  // _abs() (un url() relativo en el CSS estático se resuelve contra la
+  // ubicación de la hoja de estilos, no contra la raíz del sitio — ver nota
+  // más abajo en este archivo sobre frameUrl/cardUrl).
+  _initDefaultCardVar() {
+    document.documentElement.style.setProperty('--cust-card-default', `url('${this.cardUrl('0001')}')`);
+  },
+  // Mismo motivo, para --cust-cell: filas que muestran una CELDA pero no una
+  // persona con cell_code propio (ej. la lista de salas públicas en
+  // .versus-friend-row, ver _renderPublicRooms en js/lobby.js) nunca llaman
+  // a applyCell/applyCellForStatus — sin este default quedaban sin fondo
+  // visible ("solo texto plano" reportado) apenas .versus-friend-row dejó
+  // de tener un background-color hardcodeado de respaldo.
+  _initDefaultCellVar() {
+    document.documentElement.style.setProperty('--cust-cell-default', `url('${this.cellUrl('0001')}')`);
+  },
+  // El marco es un ::after (ver .cust-frame-wrap en style.css) para poder
+  // sobresalir del contenedor si el diseño lo pide; se aplica vía CSS var
+  // en vez de <img> nuevo para no tocar la estructura HTML de cada avatar.
+  // --cust-frame-inset viaja aparte de --cust-frame porque cada PNG tiene su
+  // propia proporción de aro (ver CUSTOMIZE_FRAME_INSET arriba) — un solo
+  // inset compartido para todos los códigos no sirve.
+  applyFrame(el, code) {
+    if (!el) return;
+    el.classList.add('cust-frame-wrap');
+    el.style.setProperty('--cust-frame', `url('${this.frameUrl(code)}')`);
+    el.style.setProperty('--cust-frame-inset', window.CUSTOMIZE_FRAME_INSET[code] || '-14.5%');
+  },
+  applyCard(el, code) {
+    if (!el) return;
+    el.style.setProperty('--cust-card', `url('${this.cardUrl(code)}')`);
+    el.classList.toggle('card-light-text', window.CUSTOMIZE_CARD_LIGHT_TEXT.has(code));
+  },
+  applyCell(el, code) {
+    if (!el) return;
+    el.classList.add('cust-cell-wrap');
+    el.style.setProperty('--cust-cell', `url('${this.cellUrl(code)}')`);
+  },
+};
+window.CustomizeAssets._initDefaultCardVar();
+window.CustomizeAssets._initDefaultCellVar();
+
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 
 // País por IP para guardarlo en la cuenta desde su creación (ver handle_new_user
@@ -141,6 +283,19 @@ window.sbUpdateProfile = async function(userId, fields) {
   if (error) throw error;
 };
 
+// Reclamo del paquete de Fundador — NO usar sbUpdateProfile para esto: hay un
+// trigger (protect_is_founder) que bloquea en silencio cualquier UPDATE directo
+// de is_founder/founder_popup_seen desde el cliente. Este RPC es atómico del
+// lado del server: marca el reclamo solo si la cuenta sigue elegible y no había
+// reclamado antes, y si este reclamo llega a 100 en total, cierra la
+// elegibilidad para todo el resto (revoca is_founder a quien no llegó a
+// reclamar). Devuelve true si el reclamo se aplicó de verdad.
+window.sbClaimFounderPack = async function(userId) {
+  const { data, error } = await sb.rpc('claim_founder_pack', { p_user_id: userId });
+  if (error) throw error;
+  return !!data;
+};
+
 window.sbSaveScores = async function(userId, scores, sessionId) {
   const { error } = await sb.rpc('add_game_score', {
     p_user_id:    userId,
@@ -275,8 +430,8 @@ window.sbUploadAvatar = async function(userId, blob) {
 window.sbLoadSocialData = async function(userId) {
   const { data, error } = await sb.from('friendships')
     .select(`id, status, initiated_by, user_a, user_b,
-      pa:user_a(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing,is_practicing,vs_wins,vs_losses,is_supporter,avg_sum_flags,avg_sum_shapes,avg_sum_cities,avg_sum_monuments,play_count_flags,play_count_shapes,play_count_cities,play_count_monuments,country_code),
-      pb:user_b(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing,is_practicing,vs_wins,vs_losses,is_supporter,avg_sum_flags,avg_sum_shapes,avg_sum_cities,avg_sum_monuments,play_count_flags,play_count_shapes,play_count_cities,play_count_monuments,country_code)`)
+      pa:user_a(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing,is_practicing,vs_wins,vs_losses,is_supporter,avg_sum_flags,avg_sum_shapes,avg_sum_cities,avg_sum_monuments,play_count_flags,play_count_shapes,play_count_cities,play_count_monuments,country_code,is_founder,cell_code,frame_code,card_code,panel_code),
+      pb:user_b(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing,is_practicing,vs_wins,vs_losses,is_supporter,avg_sum_flags,avg_sum_shapes,avg_sum_cities,avg_sum_monuments,play_count_flags,play_count_shapes,play_count_cities,play_count_monuments,country_code,is_founder,cell_code,frame_code,card_code,panel_code)`)
     .or(`user_a.eq.${userId},user_b.eq.${userId}`);
   if (error) throw error;
   function toEntry(row) {
@@ -299,6 +454,10 @@ window.sbLoadSocialData = async function(userId) {
       vs_wins: p.vs_wins||0, vs_losses: p.vs_losses||0,
       is_supporter: p.is_supporter || false,
       country_code: p.country_code || null,
+      cellCode: p.cell_code || '0001',
+      frameCode: p.frame_code || '0001',
+      cardCode: p.card_code || '0001',
+      panelCode: p.panel_code || '0001',
     };
   }
   const rows = data || [];
@@ -430,14 +589,27 @@ sb.auth.onAuthStateChange((event, session) => {
   window._accountLoggedIn = true;
   window._sbUserId = session.user.id;
   document.body.classList.add('account-logged');
+  // Mostrar el nombre guardado localmente YA, sin esperar la respuesta del
+  // servidor: antes el botón se quedaba mostrando "Cuenta" hasta que el fetch
+  // del perfil resolvía (y colgado indefinidamente si no había conexión).
+  if (typeof window._updateProfileBtnLabel === 'function') window._updateProfileBtnLabel();
   window.sbClaimAnonymousEvents();
   try {
-    const profile = await window.sbGetProfile(session.user.id);
-    window._sbProfile = profile;
-    if (profile.username) localStorage.setItem('playerName', profile.username);
-    if (profile.avatar_url) {
-      localStorage.setItem('profilePhoto', profile.avatar_url);
-      if (typeof window.applyStoredProfilePic === 'function') window.applyStoredProfilePic();
+    // Con timeout: un perfil que tarda/cuelga no debe frenar el resto del
+    // arranque de sesión (heartbeat, evento sbSessionReady) más abajo.
+    const profilePromise = window.sbGetProfile(session.user.id);
+    const profile = typeof window.withConnTimeout === 'function'
+      ? await window.withConnTimeout(profilePromise, 6000)
+      : await profilePromise;
+    if (profile) {
+      window._sbProfile = profile;
+      if (profile.username) localStorage.setItem('playerName', profile.username);
+      if (profile.avatar_url) {
+        localStorage.setItem('profilePhoto', profile.avatar_url);
+        if (typeof window.applyStoredProfilePic === 'function') window.applyStoredProfilePic();
+      }
+      if (typeof window._updateProfileBtnLabel === 'function') window._updateProfileBtnLabel();
+      if (typeof window._applyFounderFrame === 'function') window._applyFounderFrame();
     }
   } catch(e) {}
   window.sbUpdateLastActive(session.user.id).catch(() => {});

@@ -132,7 +132,7 @@ window.LB = (() => {
   async function _fetchMembers() {
     if (!_lobbyId) return;
     const { data, error } = await window.sb.from('lobby_members')
-      .select('user_id, score, joined_at, p:user_id(username, avatar_url, is_playing, last_active)')
+      .select('user_id, score, joined_at, p:user_id(username, avatar_url, is_playing, last_active, frame_code, card_code, cell_code)')
       .eq('lobby_id', _lobbyId).order('joined_at');
     if (error) { console.warn('[LB] fetchMembers:', error.message); return; }
     _members = (data || []).map(m => ({
@@ -143,6 +143,12 @@ window.LB = (() => {
       isHost:    m.user_id === _hostId,
       is_playing: _isActuallyPlaying(m.p),
       joined_at: m.joined_at,
+      // Personalización real de cada miembro (frame=aro de la pfp, card=
+      // ficha del leaderboard in-game, cell=fondo de la fila en la sala de
+      // espera) — ver _renderMembers y buildFriendPlayers/buildFlagsFriendPlayers.
+      frameCode: (m.p && m.p.frame_code) || '0001',
+      cardCode:  (m.p && m.p.card_code)  || '0001',
+      cellCode:  (m.p && m.p.cell_code)  || '0001',
     }));
     // Si la sala quedó totalmente vacía (todos se fueron sin avisar), cerrarla.
     if (_members.length === 0 && _lobbyId && !window._lobbyActive) {
@@ -967,6 +973,64 @@ window.Lobby = (() => {
   const T = (k, d) => (typeof t === 'function' ? t(k) : d);
 
   // ── Roster del lobby ──────────────────────────────────────────────────────────
+  function _buildMemberRow(m, host, myId) {
+    const row = document.createElement('div');
+    row.className = 'lobby-member-row' + (m.isHost ? ' is-host' : '') + (m.id !== myId ? ' clickable' : '') + (m.is_playing ? ' is-playing' : '')
+      + (window.CUSTOMIZE_CELL_LIGHT_TEXT?.has(m.cellCode) ? ' cell-light-text' : '');
+    row.dataset.memberId = m.id;
+    row.innerHTML =
+      `<div class="lobby-member-avatar-wrap"><img class="lobby-member-avatar" src="${m.avatar}" draggable="false" oncontextmenu="return false"></div>` +
+      `<span class="lobby-member-name">${m.name}${m.id === myId ? ' (' + T('lobby.you', 'tú') + ')' : ''}</span>` +
+      (m.isHost    ? `<span class="lobby-member-badge">${T('lobby.host', 'HOST')}</span>` : '') +
+      (m.is_playing ? `<span class="lobby-member-playing-badge">${T('social.playing', 'Jugando')}</span>` : '') +
+      ((host && !m.isHost) ? `<button class="lobby-host-btn" data-id="${m.id}" title="${T('lobby.makeHost', 'Hacer host')}">👑</button>` : '') +
+      ((host && !m.isHost) ? `<button class="lobby-kick-btn" data-id="${m.id}" title="${T('lobby.kick', 'Expulsar')}">✕</button>` : '');
+    // Marco real de cada miembro (aro de la pfp) + celda real de fondo de la
+    // fila. applyCellForStatus (no applyCell) para que titile con la
+    // variante -green mientras is_playing, igual que en el panel de "Retar"/
+    // invitar.
+    window.CustomizeAssets?.applyFrame(row.querySelector('.lobby-member-avatar-wrap'), m.frameCode || '0001');
+    window.CustomizeAssets?.applyCellForStatus(row, m.cellCode || '0001', m.is_playing ? 'playing' : 'online');
+    if (m.id !== myId) {
+      row.addEventListener('click', async e => {
+        if (e.target.closest('.lobby-kick-btn, .lobby-host-btn')) return;
+        if (typeof window.openFriendProfile !== 'function' || !window.sbGetProfile) return;
+        try {
+          const p = await window.sbGetProfile(m.id);
+          window.openFriendProfile({
+            id: p.id,
+            name: p.username || m.name,
+            avatar: p.avatar_url || m.avatar || 'images/profilepic/ppdefault.png',
+            score: p.hs_total || ((p.hs_flags||0)+(p.hs_shapes||0)+(p.hs_cities||0)+(p.hs_monuments||0)),
+            play_count: p.play_count || 0,
+            vs_wins: p.vs_wins || 0,
+            vs_losses: p.vs_losses || 0,
+            hs_flags: p.hs_flags || 0,
+            hs_shapes: p.hs_shapes || 0,
+            hs_cities: p.hs_cities || 0,
+            hs_monuments: p.hs_monuments || 0,
+            last_active: p.last_active || null,
+            is_playing: p.is_playing || false,
+            frameCode: p.frame_code || '0001',
+          });
+        } catch (err) {
+          console.warn('[lobby] no se pudo abrir perfil:', err);
+        }
+      });
+    }
+    const kickBtn = row.querySelector('.lobby-kick-btn');
+    if (kickBtn) kickBtn.addEventListener('click', () => {
+      if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+      window.LB.kick(kickBtn.dataset.id);
+    });
+    const hostBtn = row.querySelector('.lobby-host-btn');
+    if (hostBtn) hostBtn.addEventListener('click', () => {
+      if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+      window.LB.transferHost(hostBtn.dataset.id);
+      if (typeof window.showVersusToast === 'function') window.showVersusToast(T('lobby.hostTransferred', 'Host transferido'));
+    });
+    return row;
+  }
   function _renderMembers(members) {
     const list = document.getElementById('lobby-members');
     if (!list) return;
@@ -1001,59 +1065,57 @@ window.Lobby = (() => {
       }
     }
     _prevMemberIds = members.map(m => m.id);
-    list.innerHTML = '';
+
+    // Diff incremental (no list.innerHTML='' + reconstruir todo) — mismo fix
+    // que _renderOnlineFriends (js/vs.js): esta lista se re-renderiza sola
+    // seguido (cada cambio de score/is_playing/presence de CUALQUIER
+    // miembro), y recrear el nodo DOM de una fila reinicia su animación CSS
+    // desde 0% aunque nada haya cambiado en ESA fila puntual — el "titilo
+    // verde se reinicia cada rato random" reportado.
+    const hostChanged = host !== _prevHostFlag;
+    _prevHostFlag = host;
+    const existingRows = hostChanged ? new Map() : new Map(
+      Array.from(list.querySelectorAll('.lobby-member-row[data-member-id]')).map(el => [el.dataset.memberId, el])
+    );
+    if (hostChanged) list.innerHTML = ''; // los botones host/kick dependen de "host" global, no de esta fila puntual
+
+    let prevEl = null;
     members.forEach(m => {
-      const row = document.createElement('div');
-      row.className = 'lobby-member-row' + (m.isHost ? ' is-host' : '') + (m.id !== myId ? ' clickable' : '') + (m.is_playing ? ' is-playing' : '');
-      row.dataset.memberId = m.id;
-      row.innerHTML =
-        `<img class="lobby-member-avatar" src="${m.avatar}" draggable="false" oncontextmenu="return false">` +
-        `<span class="lobby-member-name">${m.name}${m.id === myId ? ' (' + T('lobby.you', 'tú') + ')' : ''}</span>` +
-        (m.isHost    ? `<span class="lobby-member-badge">${T('lobby.host', 'HOST')}</span>` : '') +
-        (m.is_playing ? `<span class="lobby-member-playing-badge">${T('social.playing', 'Jugando')}</span>` : '') +
-        ((host && !m.isHost) ? `<button class="lobby-host-btn" data-id="${m.id}" title="${T('lobby.makeHost', 'Hacer host')}">👑</button>` : '') +
-        ((host && !m.isHost) ? `<button class="lobby-kick-btn" data-id="${m.id}" title="${T('lobby.kick', 'Expulsar')}">✕</button>` : '');
-      if (m.id !== myId) {
-        row.addEventListener('click', async e => {
-          if (e.target.closest('.lobby-kick-btn, .lobby-host-btn')) return;
-          if (typeof window.openFriendProfile !== 'function' || !window.sbGetProfile) return;
-          try {
-            const p = await window.sbGetProfile(m.id);
-            window.openFriendProfile({
-              id: p.id,
-              name: p.username || m.name,
-              avatar: p.avatar_url || m.avatar || 'images/profilepic/ppdefault.png',
-              score: p.hs_total || ((p.hs_flags||0)+(p.hs_shapes||0)+(p.hs_cities||0)+(p.hs_monuments||0)),
-              play_count: p.play_count || 0,
-              vs_wins: p.vs_wins || 0,
-              vs_losses: p.vs_losses || 0,
-              hs_flags: p.hs_flags || 0,
-              hs_shapes: p.hs_shapes || 0,
-              hs_cities: p.hs_cities || 0,
-              hs_monuments: p.hs_monuments || 0,
-              last_active: p.last_active || null,
-              is_playing: p.is_playing || false,
-            });
-          } catch (err) {
-            console.warn('[lobby] no se pudo abrir perfil:', err);
-          }
-        });
+      const key = String(m.id);
+      let row = existingRows.get(key);
+      if (row) {
+        existingRows.delete(key);
+        const samePlaying = row.classList.contains('is-playing') === !!m.is_playing;
+        const sameHostBadge = row.classList.contains('is-host') === !!m.isHost;
+        if (samePlaying && sameHostBadge) {
+          // Solo actualizar lo que puede cambiar sin afectar clases/animación.
+          const nameEl = row.querySelector('.lobby-member-name');
+          const wantedName = m.name + (m.id === myId ? ' (' + T('lobby.you', 'tú') + ')' : '');
+          if (nameEl && nameEl.textContent !== wantedName) nameEl.textContent = wantedName;
+          const avatarEl = row.querySelector('.lobby-member-avatar');
+          if (avatarEl && avatarEl.src !== m.avatar) avatarEl.src = m.avatar;
+          const wantsLightText = !!window.CUSTOMIZE_CELL_LIGHT_TEXT?.has(m.cellCode);
+          row.classList.toggle('cell-light-text', wantsLightText);
+          window.CustomizeAssets?.applyFrame(row.querySelector('.lobby-member-avatar-wrap'), m.frameCode || '0001');
+          window.CustomizeAssets?.applyCellForStatus(row, m.cellCode || '0001', m.is_playing ? 'playing' : 'online');
+        } else {
+          // Transición real (empezó/dejó de jugar, o cambió el host) — acá
+          // sí corresponde recrear, las clases/botones cambian de verdad.
+          const fresh = _buildMemberRow(m, host, myId);
+          list.replaceChild(fresh, row);
+          row = fresh;
+        }
+      } else {
+        row = _buildMemberRow(m, host, myId);
+        list.appendChild(row);
       }
-      list.appendChild(row);
+      // Reordenar sin recrear: insertBefore de un nodo YA EN EL DOM no
+      // reinicia sus animaciones CSS.
+      const wantedNext = prevEl ? prevEl.nextSibling : list.firstChild;
+      if (wantedNext !== row) list.insertBefore(row, wantedNext);
+      prevEl = row;
     });
-    list.querySelectorAll('.lobby-kick-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
-        window.LB.kick(btn.dataset.id);
-      });
-    });
-    list.querySelectorAll('.lobby-host-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
-        window.LB.transferHost(btn.dataset.id);
-        if (typeof window.showVersusToast === 'function') window.showVersusToast(T('lobby.hostTransferred', 'Host transferido'));
-      });
-    });
+    existingRows.forEach(el => el.remove()); // miembros que ya no están
     // Contador y estado del botón empezar
     const cnt = document.getElementById('lobby-count');
     if (cnt) cnt.textContent = members.length + '/10';
@@ -1179,6 +1241,7 @@ window.Lobby = (() => {
   // Tracking de miembros previos para detectar joins/leaves y mostrar toasts
   let _prevMemberIds = [];
   let _memberNameCache = {}; // id → name, para recuperar el nombre de quien salió
+  let _prevHostFlag = null; // último "¿soy host?" — ver _renderMembers, fuerza rebuild completo si cambió
 
   // ── Entrar al lobby (tras crear/unirse) ────────────────────────────────────────
   function _updateInviteBtn() {
@@ -1273,7 +1336,14 @@ window.Lobby = (() => {
     }
 
     let rooms = [];
-    try { rooms = await window.LB.listPublic(); } catch (e) {}
+    try {
+      const _p = window.LB.listPublic();
+      // Viñeta de conexión solo en la carga inicial (silent=false); el polling en
+      // segundo plano no debe interrumpir al jugador por un timeout puntual.
+      rooms = (!silent && typeof window.withConnCheck === 'function')
+        ? (await window.withConnCheck(_p, 6000)) || []
+        : await _p;
+    } catch (e) {}
     _publicListLoading = false;
 
     // Construir el nuevo contenido en un fragment para un swap atómico (sin flicker)
@@ -1512,7 +1582,10 @@ window.Lobby = (() => {
     const myId = window._sbUserId;
     window._lobbyMembers = window.LB.getMembers()
       .filter(m => m.id !== myId)
-      .map(m => ({ id: m.id, name: m.name, avatar: m.avatar, score: m.score || 0 }));
+      .map(m => ({
+        id: m.id, name: m.name, avatar: m.avatar, score: m.score || 0,
+        cardCode: m.cardCode || '0001',
+      }));
   }
 
   // Reporte de respuesta desde flags.js / shapes.js
@@ -1719,9 +1792,13 @@ window.Lobby = (() => {
         row.className = 'lobby-result-row' + (m.id === myId ? ' is-me' : '');
         row.innerHTML =
           `<span class="lobby-result-pos">${medals[i] || (i + 1)}</span>` +
-          `<img class="lobby-result-avatar" src="${m.avatar}" draggable="false" oncontextmenu="return false">` +
+          `<div class="lobby-result-avatar-wrap"><img class="lobby-result-avatar" src="${m.avatar}" draggable="false" oncontextmenu="return false"></div>` +
           `<span class="lobby-result-name">${m.name}${m.id === myId ? ' (' + T('lobby.you', 'tú') + ')' : ''}</span>` +
           `<span class="lobby-result-score">${(m.score || 0).toLocaleString()}</span>`;
+        // Marco real de cada miembro — antes esta fila siempre mostraba el
+        // aro crema hardcodeado de siempre (mismo bug ya resuelto en
+        // .lobby-member-row/.lobby-result-avatar).
+        window.CustomizeAssets?.applyFrame(row.querySelector('.lobby-result-avatar-wrap'), m.frameCode || '0001');
         list.appendChild(row);
       });
     }
@@ -2132,9 +2209,10 @@ window.Lobby = (() => {
       row.className = 'lobby-result-row' + (m.id === myId ? ' is-me' : '');
       row.innerHTML =
         `<span class="lobby-result-pos">${medals[i] || (i + 1)}</span>` +
-        `<img class="lobby-result-avatar" src="${m.avatar}" draggable="false" oncontextmenu="return false">` +
+        `<div class="lobby-result-avatar-wrap"><img class="lobby-result-avatar" src="${m.avatar}" draggable="false" oncontextmenu="return false"></div>` +
         `<span class="lobby-result-name">${m.name}${m.id === myId ? ' (' + T('lobby.you', 'tú') + ')' : ''}</span>` +
         `<span class="lobby-result-score">${(m.score || 0).toLocaleString()}</span>`;
+      window.CustomizeAssets?.applyFrame(row.querySelector('.lobby-result-avatar-wrap'), m.frameCode || '0001');
       list.appendChild(row);
     });
     screen.style.display = 'flex';
@@ -2666,15 +2744,23 @@ window.Lobby = (() => {
       const playing = statusOf(f) === 'playing';
       const statusTxt = playing ? T('social.playing', 'Jugando') : T('versus.online', 'Conectado');
       const row = document.createElement('div');
-      row.className = 'versus-friend-row' + (playing ? ' playing' : '');
+      row.className = 'versus-friend-row' + (playing ? ' playing' : '')
+        + (window.CUSTOMIZE_CELL_LIGHT_TEXT?.has(f.cellCode) ? ' cell-light-text' : '');
       const btnHtml = inRoom
         ? `<button class="versus-challenge-btn disabled" disabled>${T('lobby.inRoom', 'En la sala')}</button>`
         : `<button class="versus-challenge-btn" data-id="${f.id}" data-name="${f.name}">${T('lobby.invite', '+ Invitar')}</button>`;
       row.innerHTML =
-        `<img class="versus-friend-avatar" src="${f.avatar || 'images/profilepic/ppdefault.png'}" draggable="false" oncontextmenu="return false">` +
+        `<div class="versus-friend-avatar-wrap"><img class="versus-friend-avatar" src="${f.avatar || 'images/profilepic/ppdefault.png'}" draggable="false" oncontextmenu="return false"></div>` +
         `<div class="versus-friend-info"><span class="versus-friend-name">${f.name}</span>` +
         `<span class="versus-friend-status${playing ? ' playing' : ''}"><span class="versus-friend-dot${playing ? ' playing' : ''}"></span>${statusTxt}</span></div>` +
         btnHtml;
+      // Marco real (aro de la pfp) + celda real de fondo — antes esta fila
+      // siempre mostraba el aro/fondo hardcodeados de siempre (mismo bug ya
+      // resuelto en _renderMembers/.lobby-member-row). applyCellForStatus
+      // (no cellUrl directo) para que titile con la variante -green si
+      // está jugando, igual que en el panel social.
+      window.CustomizeAssets?.applyFrame(row.querySelector('.versus-friend-avatar-wrap'), f.frameCode || '0001');
+      window.CustomizeAssets?.applyCellForStatus(row, f.cellCode || '0001', playing ? 'playing' : 'online');
       list.appendChild(row);
     });
     list.querySelectorAll('.versus-challenge-btn[data-id]').forEach(btn => {
@@ -2845,33 +2931,10 @@ window.Lobby = (() => {
     _notifPanelOpen = false;
   }
 
-  async function _renderNotifPanel() {
-    const panel = document.getElementById('versus-notif-panel');
+  function _renderNotifList() {
     const list  = document.getElementById('versus-notif-list');
     const empty = document.getElementById('versus-notif-empty');
-    if (!panel || !list) return;
-
-    // Consultar DB por VS pendientes no cacheados aún
-    const uid = window._sbUserId;
-    if (uid && window.sb) {
-      try {
-        const { data } = await window.sb.from('matches')
-          .select('id, host_id, created_at').eq('guest_id', uid).eq('status', 'pending')
-          .order('created_at', { ascending: false }).limit(5);
-        if (data) {
-          data.forEach(m => {
-            const friends = (typeof getFriends === 'function') ? getFriends() : [];
-            const host = friends.find(f => f.id === m.host_id);
-            _pushToInbox({
-              type: 'vs', id: m.id, matchId: m.id,
-              fromName: host ? host.name : 'Alguien',
-              fromAvatar: host ? host.avatar : 'images/profilepic/ppdefault.png',
-              ts: new Date(m.created_at).getTime() || Date.now()
-            });
-          });
-        }
-      } catch {}
-    }
+    if (!list) return;
 
     const inbox = _loadInbox();
     list.innerHTML = '';
@@ -2929,12 +2992,45 @@ window.Lobby = (() => {
         const item = _loadInbox().find(x => x.id === btn.dataset.id);
         _removeFromInbox(btn.dataset.id);
         if (item && item.type === 'vs' && window.VS) window.VS.decline(item.matchId);
-        _renderNotifPanel();
+        _renderNotifList();
       });
     });
+  }
 
+  // Abre el panel YA con lo que hay en caché (sessionStorage) — no espera al
+  // servidor para eso, así el botón de campanita nunca "no hace nada" si la
+  // conexión está colgada. La consulta a la DB por invitaciones nuevas corre
+  // aparte, con timeout, y actualiza la lista si llega a tiempo.
+  async function _renderNotifPanel() {
+    const panel = document.getElementById('versus-notif-panel');
+    if (!panel) return;
+    _renderNotifList();
     panel.style.display = '';
     _notifPanelOpen = true;
+
+    const uid = window._sbUserId;
+    if (uid && window.sb) {
+      try {
+        const _p = window.sb.from('matches')
+          .select('id, host_id, created_at').eq('guest_id', uid).eq('status', 'pending')
+          .order('created_at', { ascending: false }).limit(5);
+        const res = typeof window.withConnCheck === 'function' ? await window.withConnCheck(_p, 6000) : await _p;
+        const data = res ? res.data : null;
+        if (data) {
+          data.forEach(m => {
+            const friends = (typeof getFriends === 'function') ? getFriends() : [];
+            const host = friends.find(f => f.id === m.host_id);
+            _pushToInbox({
+              type: 'vs', id: m.id, matchId: m.id,
+              fromName: host ? host.name : 'Alguien',
+              fromAvatar: host ? host.avatar : 'images/profilepic/ppdefault.png',
+              ts: new Date(m.created_at).getTime() || Date.now()
+            });
+          });
+          if (_notifPanelOpen) _renderNotifList();
+        }
+      } catch {}
+    }
   }
 
   // Invitación a sala (grupo): usa el banner genérico

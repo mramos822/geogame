@@ -21,6 +21,7 @@ let finalBackTimeout = null;
 let _finalRanking = null;
 let _finalPos = 0;
 let _finalTotal = 0;
+let _guestRankPromise = null;
 
 function _onFinalResize() {
   if (!finalScreen || finalScreen.style.display === 'none') return;
@@ -30,7 +31,9 @@ function _onFinalResize() {
 function showFinalScreen() {
   finalScreen.style.display = 'block';
   if (typeof window._setPlaying === 'function') window._setPlaying(false);
-  if (!window._accountLoggedIn) localStorage.setItem('playCount', String(parseInt(localStorage.getItem('playCount') || '0', 10) + 1));
+  // Espejo local SIEMPRE (con cuenta o sin ella): si falla el guardado en el
+  // servidor (sin conexión), el perfil no debe mostrar 0 — cae a este respaldo.
+  localStorage.setItem('playCount', String(parseInt(localStorage.getItem('playCount') || '0', 10) + 1));
   const backWrap = document.getElementById('final-confirm-back-wrap');
   if (backWrap) {
     backWrap.classList.remove('visible');
@@ -42,14 +45,18 @@ function showFinalScreen() {
   const hs2  = (cs.shapes    != null) ? cs.shapes    : (parseInt(localStorage.getItem('shapesHighscore'))        || 0);
   const hs3  = (cs.game      != null) ? cs.game      : (parseInt(localStorage.getItem('geochallenge_highscore')) || 0);
   const hs4  = (cs.monuments != null) ? cs.monuments : (parseInt(localStorage.getItem('monumentsHighscore'))     || 0);
-  // Acumular para promedios por modo (segunda columna del loading)
-  if (!window._accountLoggedIn) {
-    [['flags', hs1], ['shapes', hs2], ['game', hs3], ['monuments', hs4]].forEach(([k, v]) => {
-      localStorage.setItem('avgSum_' + k,   String(parseInt(localStorage.getItem('avgSum_' + k)   || '0', 10) + v));
-      localStorage.setItem('avgCount_' + k, String(parseInt(localStorage.getItem('avgCount_' + k) || '0', 10) + 1));
-    });
-  }
+  // Acumular para promedios por modo (segunda columna del loading) — espejo
+  // local siempre, misma razón que playCount arriba.
+  [['flags', hs1], ['shapes', hs2], ['game', hs3], ['monuments', hs4]].forEach(([k, v]) => {
+    localStorage.setItem('avgSum_' + k,   String(parseInt(localStorage.getItem('avgSum_' + k)   || '0', 10) + v));
+    localStorage.setItem('avgCount_' + k, String(parseInt(localStorage.getItem('avgCount_' + k) || '0', 10) + 1));
+  });
   const total = hs1 + hs2 + hs3 + hs4;
+  // Precarga la posición en el ranking real ni bien se muestra la pantalla final
+  // (no cuando se abre el popup): así, para cuando el jugador toca "atrás" —que
+  // suele tardar unos segundos por las animaciones— el dato ya está listo y el
+  // popup no se abre con el mensaje en blanco esperando la consulta a Supabase.
+  if (!window._accountLoggedIn) _guestRankPromise = _guestRankPosition(total);
   const rank  = typeof getRank === 'function' ? getRank(total) : null;
   const label = document.getElementById('final-rank-label');
   if (label && rank) { label.textContent = rank.name; fitRankLabel('final-rank-label', 52.7); }
@@ -265,6 +272,17 @@ document.getElementById('final-confirm-back-wrap')?.addEventListener('click', ()
   if (!window._accountLoggedIn && localStorage.getItem('hideGuestRankPopup') !== '1') {
     showGuestRankPopup(_finalTotal || 0);
   }
+  // Popup de Fundador: recién acá, de vuelta en el menú tras terminar una
+  // Vuelta Mundial completa (flag puesta en js/monuments.js al cerrar la
+  // campaña) — window._sbProfile ya viene fresco del guardado de resultados
+  // (ver js/results.js). Solo desbloquea, no equipa nada (ver showFounderWelcomePopup).
+  if (window._pendingFounderPopupCheck) {
+    window._pendingFounderPopupCheck = false;
+    const p = window._sbProfile;
+    if (p && p.is_founder && !p.founder_popup_seen && typeof window.showFounderWelcomePopup === 'function') {
+      setTimeout(() => window.showFounderWelcomePopup(), 500);
+    }
+  }
 });
 document.getElementById('final-confirm-back-wrap')?.addEventListener('mouseenter', () => { if (typeof playSelect === 'function') playSelect(); });
 document.getElementById('final-confirm-back-wrap')?.addEventListener('mouseleave', () => { if (typeof playSelect === 'function') playSelect(); });
@@ -286,23 +304,91 @@ async function _guestRankPosition(total) {
   } catch (e) { return null; }
 }
 
-function showGuestRankPopup(total) {
+// Corta la espera si el pedido tarda demasiado (sin internet, servidor caído, etc.):
+// sin esto un fetch colgado dejaría el popup esperando indefinidamente antes de
+// poder abrirse, ya que ahora se espera el dato antes de mostrar la viñeta.
+function _withTimeout(promise, ms) {
+  let timer;
+  const timeout = new Promise(resolve => { timer = setTimeout(() => resolve(null), ms); });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+function showConnErrorPopup() {
+  const popup = document.getElementById('conn-error-popup');
+  if (!popup || popup.classList.contains('open')) return; // no duplicar si ya está abierta
+  popup.classList.add('open');
+}
+window.showConnErrorPopup = showConnErrorPopup;
+document.getElementById('conn-error-popup-close')?.addEventListener('click', () => {
+  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; sfxCheck.play(); }
+  document.getElementById('conn-error-popup')?.classList.remove('open');
+});
+
+// Utilidad reusable: envuelve cualquier pedido a Supabase con el mismo timeout +
+// viñeta de error de conexión que ya usa el popup de invitado. Cualquier otra
+// parte del juego que cargue algo del servidor puede usarla:
+//   const data = await window.withConnCheck(window.sb.from(...).select(...), 6000);
+//   if (data === null) return; // ya se mostró la viñeta de error, no seguir
+// IMPORTANTE: en ambas variantes de abajo hay que cancelar el setTimeout una vez
+// que la carrera termina. Si el pedido real resuelve rápido (ej. "usuario no
+// encontrado" en unos ms) pero el timer de 6s sigue vivo sin cancelar, dispara
+// solo más tarde y muestra la viñeta de error igual — aunque ya haya terminado
+// bien. Con varios clics seguidos, esos timers "fantasma" se van acumulando y
+// la viñeta termina apareciendo sola, de la nada, varias veces.
+const _CONN_TIMEOUT = Symbol('conn-timeout');
+window.withConnCheck = function (promise, ms = 6000) {
+  let timer;
+  const timeout = new Promise(resolve => { timer = setTimeout(() => resolve(_CONN_TIMEOUT), ms); });
+  return Promise.race([Promise.resolve(promise).catch(() => _CONN_TIMEOUT), timeout])
+    .then(result => {
+      clearTimeout(timer);
+      if (result === _CONN_TIMEOUT) { showConnErrorPopup(); return null; }
+      return result;
+    });
+};
+
+// Variante para flujos con errores de negocio legítimos (login: contraseña
+// incorrecta; registro: usuario ya existe, etc.) que NO deben tratarse como
+// falla de conexión. A diferencia de withConnCheck, esta NO atrapa el rechazo
+// original — solo corta la espera si nadie respondió (ni éxito ni error) en
+// `ms`, mostrando la viñeta y devolviendo undefined; los .then/.catch del
+// caller siguen funcionando igual que siempre para errores reales.
+window.withConnTimeout = function (promise, ms = 6000) {
+  let timer;
+  promise.catch(() => {}); // evita "unhandled rejection" si el original rechaza después del timeout
+  const timeout = new Promise(resolve => { timer = setTimeout(() => { showConnErrorPopup(); resolve(undefined); }, ms); });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+};
+
+// Detección automática: en cuanto el navegador pierde la conexión (evento nativo
+// 'offline', no depende de que algo la pida), se muestra la viñeta sola, sin
+// esperar a que el jugador dispare alguna acción que necesite internet.
+window.addEventListener('offline', () => showConnErrorPopup());
+
+async function showGuestRankPopup(total) {
+  // Espera el dato ANTES de decidir qué popup abrir. Usa la precarga arrancada
+  // en showFinalScreen() si está lista (lo normal, dado el tiempo que pasa
+  // hasta tocar "atrás"); si no, la pide en el momento. Con timeout: si no hay
+  // internet o el servidor no responde a tiempo, no se cuelga esperando.
+  const r = await _withTimeout(_guestRankPromise || _guestRankPosition(total), 6000);
+  if (!r) { showConnErrorPopup(); return; }
+
   const popup = document.getElementById('guest-rank-popup');
   if (!popup) return;
+  const titleEl = document.getElementById('guest-rank-popup-title');
+  if (titleEl) titleEl.textContent = t('guestPopup.title', { name: localStorage.getItem('playerName') || 'John' });
   const rank = typeof getRank === 'function' ? getRank(total) : null;
   const imgEl = document.getElementById('guest-rank-popup-rankimg');
   if (imgEl && rank) imgEl.src = rank.img;
+  const nameEl = document.getElementById('guest-rank-popup-rankname');
+  if (nameEl && rank) nameEl.textContent = rank.name;
   const scoreEl = document.getElementById('guest-rank-popup-score');
   if (scoreEl) scoreEl.textContent = total.toLocaleString();
   const msgEl = document.getElementById('guest-rank-popup-msg');
-  if (msgEl) msgEl.textContent = '';
+  if (msgEl) msgEl.textContent = t('guestPopup.msg', { pos: r.pos, total: r.total });
   const dontshow = document.getElementById('guest-rank-popup-dontshow');
   if (dontshow) dontshow.checked = false;
   popup.classList.add('open');
-  _guestRankPosition(total).then(r => {
-    if (!popup.classList.contains('open') || !msgEl) return;
-    if (r) msgEl.textContent = t('guestPopup.msg', { pos: r.pos, total: r.total });
-  });
 }
 
 function hideGuestRankPopup() {
@@ -312,6 +398,7 @@ function hideGuestRankPopup() {
   }
   popup?.classList.remove('open');
 }
+window.showGuestRankPopup = showGuestRankPopup;
 
 document.getElementById('guest-rank-popup-close')?.addEventListener('click', () => {
   if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; sfxCheck.play(); }
