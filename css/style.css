@@ -6334,12 +6334,20 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
 .mode-monuments .game-bg-city-monuments2 { display: block; }
 .mode-monuments .game-bg-city-monuments2 { animation: monuments-flicker 0.2s steps(1, end) infinite; }
 .mode-monuments .game-bg-city:not(.game-bg-city-monuments):not(.game-bg-city-monuments2) { display: none; }
-/* REINSTALADO (se había perdido en algún punto — ver aa189af "Quitar el
-   titileo de monuments del splash"): 2 capas full-screen componiendo una
-   animación infinita justo en el momento de entrada a monuments agotaba la
-   GPU/IOSurface de iOS y crasheaba. El titileo solo hace falta en el
-   gameover; en el splash alcanza con el fondo estático. */
-#splash-screen.mode-monuments .game-bg-city-monuments2 { display: none; }
+/* El titileo INFINITO es lo que agota la GPU/IOSurface de iOS mientras el
+   jugador se queda leyendo las instrucciones del splash (ver aa189af,
+   Ver.1.57.0) — pero cortarlo del todo se ve feo/estático. Punto medio: en
+   el splash titila un rato corto (20 pasos × 0.2s ≈ 4s de bienvenida) y
+   ahí se queda quieto — con `forwards` la última keyframe (opacity:0, la
+   base .game-bg-city-monuments de abajo queda visible) es la que se
+   mantiene, así que no vuelve a componer nada después de esos 4s. El
+   gameover conserva el titileo infinito de siempre (mode-monuments general,
+   arriba) porque ahí no hace falta correr toda la campaña detrás.
+   IS_MOBILE marca `body.is-mobile` en el <body> (monuments.js), así que en
+   desktop el splash sigue con el titileo infinito de siempre. */
+body.is-mobile #splash-screen.mode-monuments .game-bg-city-monuments2 {
+  animation: monuments-flicker 0.2s steps(1, end) 20 forwards;
+}
 .mode-monuments .game-bg-sky-monuments { display: block; }
 .mode-monuments .game-bg-sky:not(.game-bg-sky-monuments) { display: none; }
 
