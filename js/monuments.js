@@ -615,7 +615,13 @@ window.swapHowtoVideo = function (newSrc) {
     fresh.setAttribute('preload', 'none');
     old.replaceWith(fresh);
     fresh.src = newSrc;
-    fresh.load();
+    // NO fresh.load() acá — el crash-log mostró que sigue crasheando en el
+    // mismo punto aun recreando el elemento, así que además de recrearlo se
+    // difiere el decode: con preload="none" el navegador no baja/decodifica
+    // nada hasta que se pide reproducir de verdad. Eso pasa recién en el
+    // segundo tap del splash (confirmStep 0→1, más abajo en este archivo,
+    // `howtoVideo.play()`) — un momento bien separado del burst síncrono de
+    // la transición de modo, no en el medio de él.
   } catch (e) {}
   window._crumb?.('swapHowtoVideo-done');
 };
