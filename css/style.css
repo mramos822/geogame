@@ -50,6 +50,24 @@ body.is-mobile .loading-secondary-btn {
   transform: none !important;
   backface-visibility: visible !important;
 }
+/* Los paneles de amigos/lobby/retar se ocultan con transform (translateY),
+   no display:none, así que sus filas ".status-playing/.is-playing/.playing"
+   siguen en el DOM y sus ::before/::after con `animation: ... infinite` +
+   mix-blend-mode NUNCA paran de animar/componer aunque el panel esté fuera
+   de pantalla — una animación infinita se queda promovida a su propia capa
+   GPU pase lo que pase con will-change. Si el jugador abrió el panel una vez
+   durante la sesión (aunque sea antes de empezar la Vuelta Mundial), esa
+   capa quedaba viva el resto de la sesión y se sumaba a las de los otros 3
+   modos → REGRESIÓN del crash cities→monuments. En iOS/mobile: pausar la
+   animación (y con ella la promoción) apenas el panel se cierra. */
+body.is-mobile #loading-social-group.table-gone .loading-social-row.status-playing::before,
+body.is-mobile #loading-social-group.table-gone .loading-social-row.status-playing::after,
+body.is-mobile #loading-versus-group.table-gone .lobby-member-row.is-playing::before,
+body.is-mobile #loading-versus-group.table-gone .lobby-member-row.is-playing::after,
+body.is-mobile #loading-versus-group.table-gone .versus-friend-row.playing::before,
+body.is-mobile #loading-versus-group.table-gone .versus-friend-row.playing::after {
+  animation-play-state: paused !important;
+}
 
 html, body, #app-stage-outer { background: #ffffff; }
 /* Aislar repaints de cada pantalla para que no invaliden el resto del árbol */

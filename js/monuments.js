@@ -8315,13 +8315,24 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
         document.getElementById(_nextBtn).click();
         setTimeout(() => { sfxCheck.volume = isMuted ? 0 : 1; }, 150);
       };
-      // Transición instantánea (el crash de iOS era el will-change bajo el #app-stage,
-      // ya resuelto; los respiros/delays que metimos persiguiendo eso se revirtieron).
+      // Transición instantánea en general (el crash de iOS era el will-change
+      // bajo el #app-stage, ya resuelto; los respiros/delays que metimos
+      // persiguiendo eso se revirtieron). EXCEPCIÓN: cities y monuments
+      // comparten el mismo canvas/motor (monuments.js, solo cambia
+      // pendingGameMode) — al salir de cities con IS_MOBILE el canvas se
+      // encoge a 1×1 (endGame) y startGame lo vuelve a agrandar a
+      // DISPLAY_W/H, todo en el mismo tick síncrono sin que iOS llegue a
+      // liberar/realocar esa superficie GPU. Un respiro de 2 frames antes de
+      // reconstruirlo evita el shrink+regrow de golpe.
+      const _sharedCanvasHop = IS_MOBILE && (_nextBtn === 'loading-mode4-btn' || _nextBtn === 'loading-play-btn');
+      const _next = _sharedCanvasHop
+        ? () => requestAnimationFrame(() => requestAnimationFrame(_fireNext))
+        : _fireNext;
       if (window.__loadingReady) {
-        _fireNext();
+        _next();
       } else {
         const _pollId = setInterval(() => {
-          if (window.__loadingReady) { clearInterval(_pollId); _fireNext(); }
+          if (window.__loadingReady) { clearInterval(_pollId); _next(); }
         }, 100);
       }
     } else {
