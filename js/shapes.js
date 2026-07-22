@@ -2442,6 +2442,7 @@ document.getElementById('loading-mode4-btn').addEventListener('mouseenter', () =
 });
 
 document.getElementById('loading-mode4-btn').addEventListener('click', () => {
+  window._crumb?.('mode4-btn-click-start');
   window._autoDismissVsInvites?.();
   if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
   if (typeof window._setPlaying === 'function') window._setPlaying(true);
@@ -2479,6 +2480,7 @@ document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   document.querySelectorAll('.game-bg-city-monuments2').forEach(el => el.src = 'images/bg/level4complete2.png');
   document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check4.png');
   document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong4.png');
+  window._crumb?.('mode4-btn-bgs-assigned');
   const label = document.querySelector('.splash-text2-label');
   { const _pk = (window.practiceConfig && window.practiceConfig.active) ? 'splash.practice.monuments.1' : 'splash.monuments.1'; if (label) { label.textContent = t(_pk); label.classList.remove('step2'); } }
   const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
@@ -2494,5 +2496,6 @@ document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   animEls.forEach(el => el.classList.add('animate-in'));
   if (typeof playMusic !== 'undefined') playMusic(sfxPregame);
   window.swapHowtoVideo?.('images/howtoplay/howtoplay4.mp4');
+  window._crumb?.('mode4-btn-click-end');
 });
 
