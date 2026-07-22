@@ -4342,7 +4342,17 @@ window.quitToMenu = quitToMenu;
 // ranks.js se carga después de este archivo; esperamos a que todo esté listo
 // para que getRank() exista al pintar los rangos de cada amigo.
 window.addEventListener('load', () => renderSocial());
-if (typeof onFriendsUpdate === 'function') onFriendsUpdate(() => renderSocial());
+// Igual que initLeaderboard más abajo: un evento de red puede llegar en
+// cualquier momento, incluso mid-partida/mid-transición de campaña. Antes
+// esto reconstruía TODA la lista de amigos (con sus tarjetas/celdas Founder)
+// aunque el panel estuviera cerrado — trabajo de golpe sin motivo, sumado a
+// lo que ya está pasando en la transición. Si el panel no está abierto, no
+// hay nada visible que actualizar: se salta y renderSocial() ya se llama
+// solo al abrir el panel (ver loading-social-btn).
+if (typeof onFriendsUpdate === 'function') onFriendsUpdate(() => {
+  const panelOpen = !document.getElementById('loading-social-group')?.classList.contains('table-gone');
+  if (panelOpen) renderSocial();
+});
 
 let sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus, sfxTickdown, sfxTimesUp;
 
@@ -6548,7 +6558,18 @@ function sortLeaderboard(playerScore) {
 initLeaderboard();
 // Cuando la capa de datos refresque la lista (p.ej. al llegar amigos reales del
 // servidor vía loadFriends), reconstruir la barra automáticamente.
-if (typeof onFriendsUpdate === 'function') onFriendsUpdate(() => initLeaderboard());
+// Guard: durante una Vuelta Mundial en curso, un evento de red (status/score
+// de un amigo cambiando en tiempo real) puede llegar en CUALQUIER momento,
+// incluso justo en medio de una transición entre modos — y esta reconstrucción
+// tira TODA la barra y la vuelve a armar (imágenes/tarjetas Founder incluidas),
+// sumando trabajo de golpe justo donde ya hay más carga por el cambio de modo.
+// No hace falta precisión en vivo ahí: cada modo ya llama a initLeaderboard()
+// por su cuenta al arrancar, así que alcanza con saltear el rebuild reactivo
+// mientras la campaña está activa y dejar que el próximo modo la refresque.
+if (typeof onFriendsUpdate === 'function') onFriendsUpdate(() => {
+  if (window.campaign && window.campaign.active) return;
+  initLeaderboard();
+});
 if (typeof loadFriends === 'function') loadFriends();
 
 function practiceGetCityPool() {
