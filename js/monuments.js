@@ -585,12 +585,38 @@ window.waitForHowtoVideo = function () {
   setTimeout(reveal, 5000); // fallback de seguridad
 };
 
-// Cambia el video de howtoplay (swap simple, como en la baseline 1.15).
+// Cambia el video de howtoplay. En mobile RECREA el elemento entero (no
+// reusa el mismo <video> con src+load) — el crash-log de una sesión real
+// (18 pasos, ver project_ios_crash_investigation) mostró que el swap
+// flags→shapes es LITERALMENTE lo último que corre antes del crash de iOS:
+// WebKit no libera de forma confiable el decoder/IOSurface del video
+// anterior al pisarle el src mientras sigue montado. Esto ya se había
+// confirmado y arreglado así en la investigación original (1.64) para
+// justo esta transición temprana; se había revertido a swap simple en el
+// cleanup de 1.71 asumiendo que ya no hacía falta — hace falta.
 window.swapHowtoVideo = function (newSrc) {
   window._crumb?.('swapHowtoVideo:' + newSrc);
-  const v = document.querySelector('.splash-howtoplay-video');
-  if (!v) return;
-  try { v.src = newSrc; v.load(); } catch (e) {}
+  const old = document.querySelector('.splash-howtoplay-video');
+  if (!old) return;
+  if (!IS_MOBILE) {
+    try { old.src = newSrc; old.load(); } catch (e) {}
+    window._crumb?.('swapHowtoVideo-done');
+    return;
+  }
+  try {
+    old.pause();
+    old.removeAttribute('src');
+    old.load();
+    const fresh = document.createElement('video');
+    fresh.className = old.className;
+    fresh.loop = true;
+    fresh.muted = true;
+    fresh.setAttribute('playsinline', '');
+    fresh.setAttribute('preload', 'none');
+    old.replaceWith(fresh);
+    fresh.src = newSrc;
+    fresh.load();
+  } catch (e) {}
   window._crumb?.('swapHowtoVideo-done');
 };
 
