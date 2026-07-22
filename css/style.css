@@ -6334,6 +6334,12 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
 .mode-monuments .game-bg-city-monuments2 { display: block; }
 .mode-monuments .game-bg-city-monuments2 { animation: monuments-flicker 0.2s steps(1, end) infinite; }
 .mode-monuments .game-bg-city:not(.game-bg-city-monuments):not(.game-bg-city-monuments2) { display: none; }
+/* REINSTALADO (se había perdido en algún punto — ver aa189af "Quitar el
+   titileo de monuments del splash"): 2 capas full-screen componiendo una
+   animación infinita justo en el momento de entrada a monuments agotaba la
+   GPU/IOSurface de iOS y crasheaba. El titileo solo hace falta en el
+   gameover; en el splash alcanza con el fondo estático. */
+#splash-screen.mode-monuments .game-bg-city-monuments2 { display: none; }
 .mode-monuments .game-bg-sky-monuments { display: block; }
 .mode-monuments .game-bg-sky:not(.game-bg-sky-monuments) { display: none; }
 
