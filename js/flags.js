@@ -2851,6 +2851,7 @@ function endFlagsGame() {
 
 // ── BOTÓN DE INICIO ───────────────────────────────────────────────────────────
 document.getElementById('loading-flags-btn').addEventListener('click', () => {
+  window._crumb?.('flags-btn-click-start');
   window._autoDismissVsInvites?.();
   if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
   if (typeof window._setPlaying === 'function') window._setPlaying(true);
@@ -2880,8 +2881,10 @@ document.getElementById('loading-flags-btn').addEventListener('click', () => {
   void splashEl.offsetWidth;
   animEls.forEach(el => el.classList.add('animate-in'));
   if (typeof playMusic !== 'undefined') playMusic(sfxPregame);
+  window._crumb?.('flags-btn-click-sync-end');
   // Setup no visual diferido
   requestAnimationFrame(() => {
+    window._crumb?.('flags-btn-raf-start');
     document.getElementById('splash-screen').classList.add('mode-flags');
     document.getElementById('splash-screen').classList.remove('mode-shapes', 'mode-monuments');
     document.getElementById('gameover-screen').classList.add('mode-flags');
@@ -2893,15 +2896,18 @@ document.getElementById('loading-flags-btn').addEventListener('click', () => {
     document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl4.png');
     document.querySelectorAll('.game-bg-women1').forEach(el => el.src = 'images/characters/women2.png');
     document.querySelectorAll('.game-bg-women2').forEach(el => el.src = 'images/characters/women3.png');
+    window._crumb?.('flags-btn-raf-characters-done');
     document.querySelectorAll('.game-bg-city').forEach(el => el.src = 'images/bg/level1complete.png');
     document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check1.png');
     document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong1.png');
+    window._crumb?.('flags-btn-raf-bgs-done');
     const label = document.querySelector('.splash-text2-label');
     { const _pk = (window.practiceConfig && window.practiceConfig.active) ? 'splash.practice.flags.1' : 'splash.flags.1'; if (label) { label.textContent = t(_pk); label.classList.remove('step2'); } }
     const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
     if (howtoWrap) howtoWrap.classList.remove('slide-down');
     const howtoTitle = document.querySelector('.splash-howtoplay-title');
     if (howtoTitle) howtoTitle.textContent = 'Suitcase Shuffle';
+    window._crumb?.('flags-btn-raf-end');
   });
 });
 
