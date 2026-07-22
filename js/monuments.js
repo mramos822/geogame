@@ -8388,23 +8388,20 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
         window._crumb?.('nextBtn-click-done:' + _nextBtn);
         setTimeout(() => { sfxCheck.volume = isMuted ? 0 : 1; }, 150);
       };
-      // El crash en iOS pasa SIEMPRE en el hop de modo a modo (nunca a mitad
-      // de una ronda ni en ningún otro momento) — es el propio bloque de
-      // _fireNext + el handler del botón siguiente (esconder gameover,
-      // resetear splash, reconstruir leaderboard, aplicar cosméticos
-      // Founder, swap de fondos/video, y en el caso cities/monuments
-      // encoger+reagrandar el canvas compartido) corriendo TODO síncrono en
-      // el mismo tick de JS sin ceder nunca el control al compositor de
-      // iOS. Se le da un respiro de 2 frames en TODOS los hops (no solo
-      // cities/monuments) antes de disparar el modo siguiente.
-      const _next = IS_MOBILE
-        ? () => requestAnimationFrame(() => requestAnimationFrame(_fireNext))
-        : _fireNext;
+      // REVERTIDO (ver project_ios_crash_investigation): el respiro de 2
+      // frames antes de disparar el modo siguiente (agregado creyendo que
+      // le daba tiempo a iOS de liberar GPU) resultó sospechoso de EMPEORAR
+      // las cosas — extiende la ventana de tiempo bajo presión de GPU en vez
+      // de acortarla, dándole al watchdog de memoria de iOS más chances de
+      // matar el proceso, en vez de terminar rápido el trabajo pesado y
+      // salir del punto de riesgo. Vuelta a transición instantánea; el
+      // crash-log (window._crumb) sigue activo para localizar la causa real
+      // por datos en vez de por delays especulativos.
       if (window.__loadingReady) {
-        _next();
+        _fireNext();
       } else {
         const _pollId = setInterval(() => {
-          if (window.__loadingReady) { clearInterval(_pollId); _next(); }
+          if (window.__loadingReady) { clearInterval(_pollId); _fireNext(); }
         }, 100);
       }
     } else {
