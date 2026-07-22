@@ -2339,7 +2339,14 @@ function hideShapesMode() {
   const newHSBanner = document.getElementById('new-highscore-banner');
   const newHSScore  = document.getElementById('new-highscore-score');
   if (finalScore > prevHS) {
-    localStorage.setItem(LS_HS, String(finalScore));
+    // Durante una campaña en curso no se persiste todavía: se guarda como
+    // pendiente y solo se confirma en localStorage al completar la Vuelta
+    // Mundial entera (ver window._commitCampaignHighscores en monuments.js).
+    if (window.campaign && window.campaign.active) {
+      window.campaign.pendingHS.shapes = finalScore;
+    } else {
+      localStorage.setItem(LS_HS, String(finalScore));
+    }
     if (newHSBanner) newHSBanner.style.display = 'flex';
     if (newHSScore)  newHSScore.textContent = finalScore.toLocaleString();
   } else {

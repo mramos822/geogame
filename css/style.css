@@ -40,7 +40,11 @@
    (1920px). En 1.15 (sin el stage) esos mismos hints no costaban nada. Acumuladas
    entre los 4 modos agotan la GPU de iOS y reinician WebContent. En iOS no hay
    hover ni se necesita la promoción: se anulan. (PC sigue igual.) */
-body.is-mobile * { will-change: auto !important; }
+/* :: before/::after NO matchean con `*` — sin esto, los indicadores animados
+   "amigo jugando" (status-playing/is-playing/playing, agregados después de
+   este fix) quedaban afuera de la neutralización y volvían a crear capas GPU
+   permanentes en iOS → REGRESIÓN del crash cities→monuments/shapes→cities. */
+body.is-mobile *, body.is-mobile *::before, body.is-mobile *::after { will-change: auto !important; }
 body.is-mobile .loading-play-single,
 body.is-mobile .loading-secondary-btn {
   transform: none !important;

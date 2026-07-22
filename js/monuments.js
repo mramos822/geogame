@@ -886,10 +886,40 @@ window.campaign = {
   btns:  ['loading-flags-btn', 'loading-shapes-btn', 'loading-play-btn', 'loading-mode4-btn'],
   modes: ['flags', 'shapes', 'game', 'monuments'],
   scores: {},
+  // Highscores por-modo conseguidos DURANTE una campaña en curso: se guardan acá
+  // en lugar de en localStorage hasta que la Vuelta Mundial se completa entera.
+  // Si se abandona a mitad de camino, se descartan (ver quitToMenu) y el
+  // highscore persistido no cambia.
+  pendingHS: {},
 };
 // puntaje acumulado de rondas anteriores (0 si no hay campaña activa)
 window.campaignBase = function () {
   return (window.campaign && window.campaign.active) ? (window.campaign.base || 0) : 0;
+};
+// Confirma en localStorage los highscores por-modo que se lograron durante la
+// campaña recién completada. Solo se llama cuando se terminaron los 4 modos.
+window._commitCampaignHighscores = function () {
+  const pending = window.campaign && window.campaign.pendingHS;
+  if (!pending) return;
+  const LS_KEYS = { flags: 'flagsHighscore', shapes: 'shapesHighscore', game: 'geochallenge_highscore', monuments: 'monumentsHighscore' };
+  Object.keys(pending).forEach(mode => {
+    const key = LS_KEYS[mode];
+    if (!key) return;
+    const prev = parseInt(localStorage.getItem(key) || '0', 10);
+    if (pending[mode] > prev) {
+      localStorage.setItem(key, String(pending[mode]));
+      if (mode === 'game' && typeof highscore !== 'undefined') {
+        highscore = pending[mode];
+        const hsEl = document.getElementById('highscore-value');
+        if (hsEl) hsEl.textContent = highscore.toLocaleString();
+        if (typeof updateSplashHighscore === 'function') updateSplashHighscore();
+      }
+      if (mode === 'monuments' && typeof monumentsHighscore !== 'undefined') {
+        monumentsHighscore = pending[mode];
+      }
+    }
+  });
+  window.campaign.pendingHS = {};
 };
 
 document.getElementById('loading-results-btn')?.addEventListener('click', () => {
@@ -966,6 +996,7 @@ window.startCampaign = function () {
   window.campaign.idx = 0;
   window.campaign.base = 0;
   window.campaign.scores = {};
+  window.campaign.pendingHS = {};
   window.lastModeScore = 0;
   document.getElementById('loading-flags-btn').click();
 };
@@ -4118,7 +4149,9 @@ function quitToMenu() {
     .forEach(el => el.classList.remove('animate-in'));
 
   // 6) Cortar música/animaciones de campaña
-  if (window.campaign) window.campaign.active = false;
+  // Se abandona a mitad de camino: se descartan los highscores pendientes de
+  // esta corrida (no se persisten hasta completar la Vuelta Mundial entera).
+  if (window.campaign) { window.campaign.active = false; window.campaign.pendingHS = {}; }
 
   // 7) Ocultar todas las pantallas de juego/resultados y el HUD
   ['game-wrapper','flags-wrapper','splash-screen','gameover-screen','results-screen',
@@ -7855,25 +7888,41 @@ function endGame() {
       }
       window.lastModeScore = state.score;
       finalScoreEl.textContent = (state.score + (window.campaignBase ? window.campaignBase() : 0)).toLocaleString();
+      // Durante una campaña en curso no se persiste el highscore todavía: se
+      // muestra el banner como preview, pero el guardado real (localStorage +
+      // var en memoria) se difiere a window._commitCampaignHighscores(),
+      // llamado solo cuando se termina la Vuelta Mundial entera.
+      const _inCampaign = !!(window.campaign && window.campaign.active);
       let isNewHighscore = false;
+      let _bannerScore = 0;
       if (window.pendingGameMode === 'monuments') {
         isNewHighscore = state.score > monumentsHighscore;
         if (isNewHighscore) {
-          monumentsHighscore = state.score;
-          localStorage.setItem('monumentsHighscore', monumentsHighscore);
+          _bannerScore = state.score;
+          if (_inCampaign) {
+            window.campaign.pendingHS.monuments = state.score;
+          } else {
+            monumentsHighscore = state.score;
+            localStorage.setItem('monumentsHighscore', monumentsHighscore);
+          }
         }
       } else {
         isNewHighscore = state.score > highscore;
         if (isNewHighscore) {
-          highscore = state.score;
-          localStorage.setItem('geochallenge_highscore', highscore);
-          highscoreEl.textContent = highscore.toLocaleString();
-          updateSplashHighscore();
+          _bannerScore = state.score;
+          if (_inCampaign) {
+            window.campaign.pendingHS.game = state.score;
+          } else {
+            highscore = state.score;
+            localStorage.setItem('geochallenge_highscore', highscore);
+            highscoreEl.textContent = highscore.toLocaleString();
+            updateSplashHighscore();
+          }
         }
       }
       newHighscoreBanner.style.display = isNewHighscore ? 'flex' : 'none';
       if (isNewHighscore) {
-        newHighscoreScore.textContent = (window.pendingGameMode === 'monuments' ? monumentsHighscore : highscore).toLocaleString();
+        newHighscoreScore.textContent = _bannerScore.toLocaleString();
       }
       if ((window.pendingGameMode === 'game' || window.pendingGameMode === 'monuments') && typeof window._specReportPostgame === 'function') {
         window._specReportPostgame({
@@ -8277,6 +8326,9 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
       }
     } else {
       window.campaign.active = false;
+      // Vuelta Mundial completa: recién ahora se confirman en localStorage los
+      // highscores por-modo logrados durante esta campaña.
+      if (typeof window._commitCampaignHighscores === 'function') window._commitCampaignHighscores();
       if (window.Analytics && typeof window.Analytics.logCampaign === 'function') {
         window.Analytics.logCampaign(window.campaign.base || 0);
       }
