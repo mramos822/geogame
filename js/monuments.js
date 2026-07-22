@@ -595,12 +595,10 @@ window.waitForHowtoVideo = function () {
 // justo esta transición temprana; se había revertido a swap simple en el
 // cleanup de 1.71 asumiendo que ya no hacía falta — hace falta.
 window.swapHowtoVideo = function (newSrc) {
-  window._crumb?.('swapHowtoVideo:' + newSrc);
   const old = document.querySelector('.splash-howtoplay-video');
   if (!old) return;
   if (!IS_MOBILE) {
     try { old.src = newSrc; old.load(); } catch (e) {}
-    window._crumb?.('swapHowtoVideo-done');
     return;
   }
   try {
@@ -623,7 +621,6 @@ window.swapHowtoVideo = function (newSrc) {
     // `howtoVideo.play()`) — un momento bien separado del burst síncrono de
     // la transición de modo, no en el medio de él.
   } catch (e) {}
-  window._crumb?.('swapHowtoVideo-done');
 };
 
 // Resetea el estado del splash al ENTRAR a un modo (antes de mostrarlo). Necesario
@@ -818,7 +815,6 @@ window._setPlaying = function(playing) {
 };
 
 document.getElementById('loading-play-btn').addEventListener('click', () => {
-  window._crumb?.('play-btn-click-start');
   window._autoDismissVsInvites?.();
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   window._setPlaying(true);
@@ -843,10 +839,8 @@ document.getElementById('loading-play-btn').addEventListener('click', () => {
   void splashElCity.offsetWidth;
   animElsCity.forEach(el => el.classList.add('animate-in'));
   playMusic(sfxPregame);
-  window._crumb?.('play-btn-click-end-sync');
   // Setup no visual diferido al siguiente frame para no bloquear la transición
   requestAnimationFrame(() => {
-    window._crumb?.('play-btn-raf-start');
     document.getElementById('splash-screen').classList.remove('mode-flags', 'mode-shapes', 'mode-monuments');
     document.getElementById('gameover-screen').classList.remove('mode-flags', 'mode-shapes', 'mode-monuments');
     document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men1.png');
@@ -863,7 +857,6 @@ document.getElementById('loading-play-btn').addEventListener('click', () => {
     if (howtoTitleCity) howtoTitleCity.textContent = 'City Blitz';
     const label = document.querySelector('.splash-text2-label');
     { const _pk = (window.practiceConfig && window.practiceConfig.active) ? 'splash.practice.cities.1' : 'splash.cities.1'; if (label) { label.textContent = t(_pk); label.classList.remove('step2'); } }
-    window._crumb?.('play-btn-raf-end');
   });
 });
 
@@ -4711,7 +4704,6 @@ gameWrapper.appendChild(badgeOverlay);
 // vuelven a setear solas cuando el modo siguiente arranca (los handlers asignan sus
 // src), así que limpiar acá es seguro: el menú no usa estos <img> de juego.
 window.releaseGameMemory = function () {
-  window._crumb?.('releaseGameMemory-start');
   try {
     // Fondos, personajes, check/wrong, cielos, monumento, banderas de país.
     // OJO: no incluir .game-bg-sky-monuments — el cielo de monuments no lo re-asigna
@@ -4732,7 +4724,6 @@ window.releaseGameMemory = function () {
     const v = document.querySelector('.splash-howtoplay-video');
     if (v) { try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) {} }
   } catch (e) {}
-  window._crumb?.('releaseGameMemory-done');
 };
 
 // ── ASSETS ───────────────────────────────────────────────────────────────────
@@ -6432,7 +6423,6 @@ function getLbRowHeight() {
 }
 
 function initLeaderboard() {
-  window._crumb?.('initLeaderboard-start');
   // #leaderboard es compartido con el espectador de siluetas/etc. — sin este
   // guard, cualquier actualización de la lista de amigos (onFriendsUpdate,
   // que dispara seguido mientras se espeta a un amigo cuyo score/estado
@@ -6508,9 +6498,7 @@ function initLeaderboard() {
   playerEl.style.top = '-9999px';
   lbElements['lb-player'] = playerEl;
   lb.appendChild(playerEl);
-  window._crumb?.('initLeaderboard-preFounderFrame');
   if (typeof window._applyFounderFrame === 'function') window._applyFounderFrame();
-  window._crumb?.('initLeaderboard-end');
 
   requestAnimationFrame(() => {
     positionLeaderboard(0, false);
@@ -7922,7 +7910,6 @@ function endGame() {
       cancelAnimationFrame(animFrameId);
       animFrameId = null;
       if (IS_MOBILE) {
-        window._crumb?.('canvas-shrink:' + window.pendingGameMode);
         canvas.width = 1; canvas.height = 1;
         badgeOverlay.width = 1; badgeOverlay.height = 1;
       }
@@ -8172,12 +8159,10 @@ function startGame() {
   canvas.style.pointerEvents = '';
   // Restaurar tamaño del canvas si fue liberado en iOS al final de la ronda anterior.
   if (canvas.width < DISPLAY_W) {
-    window._crumb?.('canvas-regrow:' + window.pendingGameMode);
     canvas.width = DISPLAY_W; canvas.height = DISPLAY_H;
   }
   if (badgeOverlay.width < DISPLAY_W) { badgeOverlay.width = DISPLAY_W; badgeOverlay.height = DISPLAY_H; }
 
-  window._crumb?.('startGame:' + window.pendingGameMode);
   playMusic(null);
   splashScreen.style.display    = 'none';
   gameoverScreen.style.display  = 'none';
@@ -8371,10 +8356,8 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
       // en el mismo bloque sincrónico (sin frame intermedio en blanco).
       sfxCheck.volume = 0;
       const _nextBtn = window.campaign.btns[window.campaign.idx];
-      window._crumb?.('confirm-click:' + mode + '->' + _nextBtn);
       const _fireNext = () => {
         // Ocultar gameover + resetear splash + mostrar siguiente — todo de una.
-        window._crumb?.('fireNext-start:' + _nextBtn);
         gameoverScreen.style.display = 'none';
         confirmStep = 0;
         const howtoWrapC = document.querySelector('.splash-howtoplay-wrap');
@@ -8383,20 +8366,9 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
         if (labelC) { labelC.classList.remove('step2'); labelC.textContent = ''; }
         document.querySelectorAll('#splash-screen .flightatt-splash, .splash-text2-wrap')
           .forEach(el => el.classList.remove('animate-in'));
-        window._crumb?.('nextBtn-click:' + _nextBtn);
         document.getElementById(_nextBtn).click();
-        window._crumb?.('nextBtn-click-done:' + _nextBtn);
         setTimeout(() => { sfxCheck.volume = isMuted ? 0 : 1; }, 150);
       };
-      // REVERTIDO (ver project_ios_crash_investigation): el respiro de 2
-      // frames antes de disparar el modo siguiente (agregado creyendo que
-      // le daba tiempo a iOS de liberar GPU) resultó sospechoso de EMPEORAR
-      // las cosas — extiende la ventana de tiempo bajo presión de GPU en vez
-      // de acortarla, dándole al watchdog de memoria de iOS más chances de
-      // matar el proceso, en vez de terminar rápido el trabajo pesado y
-      // salir del punto de riesgo. Vuelta a transición instantánea; el
-      // crash-log (window._crumb) sigue activo para localizar la causa real
-      // por datos en vez de por delays especulativos.
       if (window.__loadingReady) {
         _fireNext();
       } else {

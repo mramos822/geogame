@@ -2387,7 +2387,6 @@ function hideShapesMode() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 document.getElementById('loading-shapes-btn').addEventListener('click', () => {
-  window._crumb?.('shapes-btn-click-start');
   window._autoDismissVsInvites?.();
   if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
   if (typeof window._setPlaying === 'function') window._setPlaying(true);
@@ -2409,9 +2408,7 @@ document.getElementById('loading-shapes-btn').addEventListener('click', () => {
   void splashEl.offsetWidth;
   animEls.forEach(el => el.classList.add('animate-in'));
   if (typeof playMusic !== 'undefined') playMusic(sfxPregame);
-  window._crumb?.('shapes-btn-click-sync-end');
   requestAnimationFrame(() => {
-    window._crumb?.('shapes-btn-raf-start');
     document.getElementById('splash-screen').classList.add('mode-flags', 'mode-shapes');
     document.getElementById('splash-screen').classList.remove('mode-monuments');
     document.getElementById('gameover-screen').classList.add('mode-flags', 'mode-shapes');
@@ -2423,18 +2420,15 @@ document.getElementById('loading-shapes-btn').addEventListener('click', () => {
     document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl6.png');
     document.querySelectorAll('.game-bg-women1').forEach(el => el.src = 'images/characters/women4.png');
     document.querySelectorAll('.game-bg-women2').forEach(el => el.src = 'images/characters/women5.png');
-    window._crumb?.('shapes-btn-raf-characters-done');
     document.querySelectorAll('.game-bg-city').forEach(el => el.src = 'images/bg/level2complete.png');
     document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check2.png');
     document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong2.png');
-    window._crumb?.('shapes-btn-raf-bgs-done');
     const label = document.querySelector('.splash-text2-label');
     { const _pk = (window.practiceConfig && window.practiceConfig.active) ? 'splash.practice.shapes.1' : 'splash.shapes.1'; if (label) { label.textContent = t(_pk); label.classList.remove('step2'); } }
     const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
     if (howtoWrap) howtoWrap.classList.remove('slide-down');
     const howtoTitle = document.querySelector('.splash-howtoplay-title');
     if (howtoTitle) howtoTitle.textContent = 'Map Mayhem';
-    window._crumb?.('shapes-btn-raf-end');
   });
 });
 
@@ -2448,7 +2442,6 @@ document.getElementById('loading-mode4-btn').addEventListener('mouseenter', () =
 });
 
 document.getElementById('loading-mode4-btn').addEventListener('click', () => {
-  window._crumb?.('mode4-btn-click-start');
   window._autoDismissVsInvites?.();
   if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
   if (typeof window._setPlaying === 'function') window._setPlaying(true);
@@ -2486,7 +2479,6 @@ document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   document.querySelectorAll('.game-bg-city-monuments2').forEach(el => el.src = 'images/bg/level4complete2.png');
   document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check4.png');
   document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong4.png');
-  window._crumb?.('mode4-btn-bgs-assigned');
   const label = document.querySelector('.splash-text2-label');
   { const _pk = (window.practiceConfig && window.practiceConfig.active) ? 'splash.practice.monuments.1' : 'splash.monuments.1'; if (label) { label.textContent = t(_pk); label.classList.remove('step2'); } }
   const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
@@ -2502,6 +2494,5 @@ document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   animEls.forEach(el => el.classList.add('animate-in'));
   if (typeof playMusic !== 'undefined') playMusic(sfxPregame);
   window.swapHowtoVideo?.('images/howtoplay/howtoplay4.mp4');
-  window._crumb?.('mode4-btn-click-end');
 });
 
