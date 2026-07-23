@@ -4818,14 +4818,11 @@ body.is-mobile #screen-warning-icon {
   /* Color blanco puro para el interior */
   color: white;
 
-  /* Efecto del borde negro grueso (Outline) */
-  -webkit-text-stroke: 0.27cqmin black;
-  /* Sombra para rellenar los bordes exteriores y darle un poco más de solidez */
-  text-shadow: 2px 2px 0 #000, 
-              -1px -1px 0 #000, 
-               1px -1px 0 #000, 
-              -1px  1px 0 #000, 
-               1px  1px 0 #000;
+  /* Efecto del borde negro grueso (Outline) — paint-order para que el stroke
+     quede DETRÁS del fill (si no, en dígitos con curvas cerradas como 4/3/9
+     el stroke se comía el fill por dentro y se veía doblado/borroso). */
+  -webkit-text-stroke: 0.8cqmin black;
+  paint-order: stroke fill;
 
   pointer-events: none;
   min-width: 4.8cqmin;
@@ -4842,8 +4839,8 @@ body.is-mobile #screen-warning-icon {
   font-weight: 900;
   font-family: 'Arial Black', Impact, sans-serif;
   color: white;
-  -webkit-text-stroke: 0.27cqmin black;
-  text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+  -webkit-text-stroke: 0.8cqmin black;
+  paint-order: stroke fill;
   pointer-events: none;
   min-width: 4.8cqmin;
   text-align: center;
@@ -5573,8 +5570,8 @@ body.is-mobile #screen-warning-icon {
   font-weight: 900;
   font-family: 'Arial Black', Impact, sans-serif;
   color: white;
-  -webkit-text-stroke: 0.27cqmin black;
-  text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+  -webkit-text-stroke: 0.8cqmin black;
+  paint-order: stroke fill;
   pointer-events: none;
   min-width: 4.8cqmin;
   text-align: center;

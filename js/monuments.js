@@ -1348,7 +1348,7 @@ window.startCampaign = function () {
     else setErr(username, errU, '');
 
     const eVal = email.value.trim();
-    if (!/^[^\s@]+@[^\s@]+\.(com|net|edu|org|io|co|es|mx|ar|uk|de|fr|br|ca|jp|au)(\.[a-z]{2})?$/i.test(eVal))
+    if (!/^[a-zA-Z0-9_%+-]+(\.[a-zA-Z0-9_%+-]+)*@[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.(com|net|edu|org|io|co|es|mx|ar|uk|de|fr|br|ca|jp|au)(\.[a-z]{2})?$/i.test(eVal))
       setErr(email, errE, t('account.errEmailInvalid'));
     else setErr(email, errE, '');
 
@@ -1532,7 +1532,7 @@ window.startCampaign = function () {
     const inp = document.getElementById('chemail-new');
     const err = document.getElementById('chemail-err');
     const eVal = inp.value.trim();
-    if (!/^[^\s@]+@[^\s@]+\.(com|net|edu|org|io|co|es|mx|ar|uk|de|fr|br|ca|jp|au)(\.[a-z]{2})?$/i.test(eVal)) {
+    if (!/^[a-zA-Z0-9_%+-]+(\.[a-zA-Z0-9_%+-]+)*@[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.(com|net|edu|org|io|co|es|mx|ar|uk|de|fr|br|ca|jp|au)(\.[a-z]{2})?$/i.test(eVal)) {
       err.textContent = t('account.errEmailInvalid');
       inp.classList.add('input-error');
       return;
@@ -4153,6 +4153,11 @@ function quitToMenu() {
   reset('monument-img',     el => { el.style.display = 'none'; });
   reset('speed-bonus-text', el => el.classList.remove('visible'));
   reset('flags-speed-bonus-text', el => el.classList.remove('visible'));
+  // Refrescar amigos antes de reconstruir la barra — mismo motivo que en
+  // flags.js: sin esto, el cardCode/avatar de cada amigo quedaba pegado al
+  // de la última vez que se cargó la lista (login o panel social), y un
+  // cambio de carta reciente del amigo no se reflejaba en toda la sesión.
+  if (typeof loadFriends === 'function') loadFriends();
   // Reconstruir la barra de amigos (no vaciarla: shapes/cities no la re-inicializan
   // por partida, solo la reposicionan, así que vaciarla la dejaría vacía).
   try { initLeaderboard(); } catch (e) {}

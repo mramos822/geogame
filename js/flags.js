@@ -137,6 +137,11 @@ function showFlagsMode() {
   flagsScoreEl.textContent = (((typeof window.campaignBase === 'function') ? window.campaignBase() : 0)).toLocaleString();
   flagsLastLbScore = -1;
 
+  // Refrescar amigos antes de armar la barra: si no se recarga acá, la lista
+  // queda con el cardCode/avatar de la última vez que se hizo login (o de la
+  // última vez que se abrió el panel social) — un amigo que cambió de carta
+  // recién en su sesión anterior se seguía viendo con la vieja acá.
+  if (typeof loadFriends === 'function') loadFriends();
   initFlagsLeaderboard();
 
   if (typeof window._specReportPregame === 'function') {
@@ -2235,7 +2240,11 @@ function startFlagsRound() {
   const nonsimilar = flagsShuffle(_distractorBase.filter(c => c !== chosen && !similarAvailable.includes(c)));
   flagsShuffle(similarAvailable);
   // Fill distractors with similars first, then pad with filtered pool, then pad with easy (continent-filtered in practice)
-  let distractorPool = [...similarAvailable, ...nonsimilar];
+  // Dedupe: si un país aparece dos veces en las listas de origen (ej. en más de
+  // un tier), acá se filtraba a duplicado en dos maletines distintos con la
+  // MISMA bandera — el índice de asignación (más abajo) no vuelve a chequear
+  // unicidad, así que tiene que quedar garantizada acá antes de usarse.
+  let distractorPool = [...new Set([...similarAvailable, ...nonsimilar])];
   if (distractorPool.length < flagsGroupIds.length - 1) {
     const fallbackBase = _inPractice
       ? _distractorBase
@@ -2271,7 +2280,16 @@ function startFlagsRound() {
     const country = i === correctSlot ? chosen : (distractorPool[i < correctSlot ? i : i - 1] || '');
     _flagsSlotCountries[i] = country;
     if (!img) return;
-    img.src = COUNTRY_FLAGS[country] || '';
+    const flagUrl = COUNTRY_FLAGS[country] || '';
+    // Reintento en error de carga (ej. imagen evictada de memoria en mobile,
+    // hiccup de red): sin esto, un fallo de red dejaba el maletín con la
+    // imagen VIEJA de la ronda anterior (o en blanco) el resto de la ronda,
+    // sin ningún indicio visual de que era un país distinto al mostrado.
+    img.onerror = () => {
+      img.onerror = null;
+      setTimeout(() => { if (img.src !== flagUrl) img.src = flagUrl; else { img.src = ''; img.src = flagUrl; } }, 400);
+    };
+    img.src = flagUrl;
     img.style.display = 'block';
     if (img.decode) img.decode().catch(() => {}); // fire-and-forget: precalienta textura GPU
   });

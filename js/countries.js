@@ -21,7 +21,6 @@ const COUNTRIES = {
     "Francia",
     "Alemania",
     "Italia",
-    "Inglaterra",
     "España",
     "México",
     "Argentina",
