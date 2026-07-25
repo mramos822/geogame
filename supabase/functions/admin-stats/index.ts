@@ -143,6 +143,7 @@ Deno.serve(async (req) => {
       lbFlags, lbShapes, lbCities, lbMonuments, lbTotal, lbVersus,
       allProfilesRes, countryEventsRes, allEventsRes,
       founderEligibleRes, founderClaimedRes,
+      versusFunnelRes, friendshipsRes,
     ] = await Promise.all([
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true })),
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true }).gte('last_active', onlineISO)),
@@ -205,6 +206,15 @@ Deno.serve(async (req) => {
         .select('username, founder_claimed_at')
         .eq('founder_popup_seen', true)
         .order('founder_claimed_at', { ascending: true }),
+      // ── Funnel de invitaciones VS (ver logVersusFunnel en js/analytics.js) ──
+      // session_type acá guarda el outcome (sent/accepted/declined/expired/
+      // abandoned), no el tipo de sesión de partida individual como en 'game'.
+      sb.from('analytics_events')
+        .select('created_at, session_type, mode, user_id')
+        .eq('type', 'versus_funnel').gte('created_at', windowISO).limit(50000),
+      // ── Amistades: para detectar spam de solicitudes y medir conectividad ──
+      sb.from('friendships')
+        .select('user_a, user_b, status, initiated_by, created_at'),
     ]);
 
     const regRows      = profilesRes.data || [];
@@ -450,6 +460,40 @@ Deno.serve(async (req) => {
       .sort((a, b) => b.days_inactive - a.days_inactive)
       .slice(0, 15);
 
+    // ── Funnel de invitaciones VS: dónde se pierde la gente entre "invitó" y
+    // "terminó la partida" (ver logVersusFunnel, js/analytics.js). 'finished'
+    // no viene de acá: se reusa el conteo de versusRows (evento 'versus' ya
+    // existente, logueado por el host en finish()).
+    const funnelCounts = { sent: 0, accepted: 0, accept_failed: 0, declined: 0, expired: 0, abandoned: 0 };
+    for (const r of (versusFunnelRes.data || []) as any[]) {
+      const k = r.session_type as string;
+      if (k && k in funnelCounts) (funnelCounts as any)[k]++;
+    }
+    const versusFunnel = { ...funnelCounts, finished: versusRows.length };
+
+    // ── Amistades: pendientes vs aceptadas + quién manda solicitudes en masa ──
+    // (detecta el patrón "una cuenta le pide amistad a toda la tabla de una",
+    // que infla 'pending' sin ser actividad social real).
+    const friendshipRows = (friendshipsRes.data || []) as any[];
+    const friendCounts: Record<string, number> = { pending: 0, accepted: 0, blocked: 0 };
+    const requestsBySender: Record<string, number> = {};
+    for (const f of friendshipRows) {
+      friendCounts[f.status] = (friendCounts[f.status] || 0) + 1;
+      if (f.status === 'pending' && f.initiated_by) {
+        requestsBySender[f.initiated_by] = (requestsBySender[f.initiated_by] || 0) + 1;
+      }
+    }
+    const topSenders = Object.entries(requestsBySender)
+      .map(([uid, count]) => ({ username: usernameById[uid] || uid, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+    const social = {
+      pending: friendCounts.pending || 0,
+      accepted: friendCounts.accepted || 0,
+      blocked: friendCounts.blocked || 0,
+      topPendingSenders: topSenders,
+    };
+
     // ── Insights narrativos (todos all-time, sirven para el resumen ejecutivo) ─
     const everPlayed = (allProfiles as any[]).filter((p) => (p.play_count || 0) > 0).length;
     const neverPlayedCount = allProfiles.length - everPlayed;
@@ -485,6 +529,8 @@ Deno.serve(async (req) => {
       registrationsList,
       gamesByMode: byMode,
       versusByMode,
+      versusFunnel,
+      social,
       topCountries,
       cohortRetention,
       playBuckets,

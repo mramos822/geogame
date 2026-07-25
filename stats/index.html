@@ -379,6 +379,14 @@
     <section class="tab-page" data-page="versus">
       <div class="cards" id="cards-versus"></div>
       <div class="grid">
+        <div class="box wide">
+          <h2>¿Dónde se pierde la gente al invitar a un 1v1?
+            <span class="sub" id="versus-funnel-sub">
+              <span class="help" title="Cada invitación 1v1 pasa por: enviada → aceptada/rechazada/expirada (30s sin respuesta) → terminada, o abandonada a mitad de partida. Se instrumentó recién, así que el histórico 'all-time' antes de esta fecha no tiene estos datos granulares.">ⓘ</span>
+            </span>
+          </h2>
+          <div class="funnel" id="versus-funnel"></div>
+        </div>
         <div class="box">
           <h2>Partidas versus por modo</h2>
           <div class="chart-wrap short"><canvas id="chart-versus-modes"></canvas></div>
@@ -386,6 +394,19 @@
         <div class="box">
           <h2>Top jugadores (record versus)</h2>
           <div class="table-scroll"><table id="tbl-versus"><tbody></tbody></table></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── SOCIAL ── -->
+    <section class="tab-page" data-page="social">
+      <div class="cards" id="cards-social"></div>
+      <div class="grid">
+        <div class="box wide">
+          <h2>Cuentas que más solicitudes pendientes mandaron
+            <span class="sub">top 10 <span class="help" title="Si una sola cuenta concentra decenas de solicitudes en pocos segundos, no es actividad social orgánica — suele ser spam o un bug de UI (botón que agrega a todos de una).">ⓘ</span></span>
+          </h2>
+          <div class="table-scroll"><table id="tbl-friend-senders"><tbody></tbody></table></div>
         </div>
       </div>
     </section>
@@ -494,7 +515,7 @@ const RANGES = [
 const RANGE_LABEL = Object.fromEntries(RANGES);
 const PAGES = [
   ['resumen','📊 Resumen'], ['retencion','🔁 Retención'], ['leaderboards','🏆 Leaderboards'],
-  ['versus','⚔️ Versus'], ['cuentas','👤 Cuentas'], ['fundador','👑 Fundador'],
+  ['versus','⚔️ Versus'], ['social','🤝 Social'], ['cuentas','👤 Cuentas'], ['fundador','👑 Fundador'],
 ];
 const MODE_TABS = [
   ['total','Total'], ['flags','Banderas'], ['shapes','Figuras'], ['cities','Ciudades'], ['monuments','Monumentos'],
@@ -661,7 +682,9 @@ function render(data){
   renderLeaderboard(data.leaderboards||{});
   renderVersusCards(data.totals||{}, data.period||{}, rl);
   renderVersusModes(data.versusByMode||{});
+  renderVersusFunnel(data.versusFunnel||{}, rl);
   renderVersusTop((data.leaderboards||{}).versus||[]);
+  renderSocial(data.social||{});
   renderAccounts(data.accounts||[]);
   renderFounder(data.founder||{});
 }
@@ -936,6 +959,45 @@ function renderVersusModes(m){
   };
   if(charts.versusModes){ charts.versusModes.data = cfg.data; charts.versusModes.update('none'); }
   else charts.versusModes = new Chart($('chart-versus-modes'), cfg);
+}
+
+function renderVersusFunnel(vf, rl){
+  $('versus-funnel-sub').innerHTML = `(${rl}) <span class="help" title="Cada invitación 1v1 pasa por: enviada → aceptada/rechazada/expirada (30s sin respuesta) → terminada, o abandonada a mitad de partida. Se instrumentó recién, así que el histórico 'all-time' antes de esta fecha no tiene estos datos granulares.">ⓘ</span>`;
+  const sent = vf.sent||0, accepted = vf.accepted||0, finished = vf.finished||0;
+  const declined = vf.declined||0, expired = vf.expired||0, abandoned = vf.abandoned||0;
+  const pAccepted = sent>0 ? Math.round(accepted/sent*100) : 0;
+  const pFinished = accepted>0 ? Math.round(finished/accepted*100) : 0;
+  if(!sent){
+    $('versus-funnel').innerHTML = '<div class="empty" style="width:100%">Sin invitaciones 1v1 en este período.</div>';
+    return;
+  }
+  $('versus-funnel').innerHTML = `
+    <div class="funnel-step"><div class="v">${sent.toLocaleString('es')}</div><div class="l">Invitaciones enviadas</div></div>
+    <div class="funnel-arrow">→</div>
+    <div class="funnel-step"><div class="v">${accepted.toLocaleString('es')}</div><div class="l">Aceptadas</div><div class="p">${pAccepted}%</div>
+      <div class="l" style="margin-top:6px;color:var(--red)">${declined} rechazadas · ${expired} expiradas (30s)</div></div>
+    <div class="funnel-arrow">→</div>
+    <div class="funnel-step"><div class="v">${finished.toLocaleString('es')}</div><div class="l">Terminadas</div><div class="p">${pFinished}%</div>
+      <div class="l" style="margin-top:6px;color:var(--red)">${abandoned} abandonadas a mitad</div></div>
+  `;
+}
+
+function renderSocial(s){
+  const pending = s.pending||0, accepted = s.accepted||0, blocked = s.blocked||0;
+  $('cards-social').innerHTML = [
+    ['🤝', accepted, 'Amistades activas'],
+    ['⏳', pending, 'Solicitudes pendientes'],
+    ['🚫', blocked, 'Bloqueos'],
+  ].map(([icon,v,l])=>`<div class="card"><div class="icon">${icon}</div><div class="v">${v.toLocaleString('es')}</div><div class="l">${l}</div></div>`).join('');
+
+  const tb = $('tbl-friend-senders');
+  const rows = s.topPendingSenders || [];
+  if(!rows.length){ tb.innerHTML = '<tr><td class="empty">Sin solicitudes pendientes.</td></tr>'; return; }
+  tb.innerHTML = '<tr><th>Usuario</th><th style="text-align:right">Solicitudes pendientes enviadas</th></tr>' +
+    rows.map(r=>{
+      const flagRow = r.count >= 10 ? ' ⚠️' : '';
+      return `<tr><td>${escapeHtml(r.username||'—')}${flagRow}</td><td class="n">${r.count}</td></tr>`;
+    }).join('');
 }
 
 function renderCountries(rows){

@@ -99,6 +99,25 @@
     });
   }
 
+  // Funnel de invitaciones 1v1: 1 evento por cada transición de estado de un
+  // match (enviada/aceptada/rechazada/expirada/abandonada). `matches` es
+  // estado efímero (se borra en la limpieza de salas, ver logVersus arriba)
+  // así que sin esto no hay forma de reconstruir en qué paso se pierde la
+  // gente entre "invitó" y "terminó la partida" (ver logVersus, que solo
+  // cubre el desenlace final). `outcome` es uno de:
+  //   sent | accepted | accept_failed | declined | expired | abandoned
+  async function logVersusFunnel(outcome, mode) {
+    const cc = (localStorage.getItem('_an_country') || null) || null;
+    insertEvent({
+      type: 'versus_funnel',
+      session_type: outcome,
+      mode: mode || null,
+      visitor_id: visitorId,
+      country_code: cc,
+      user_id: window._sbUserId || null,
+    });
+  }
+
   // 1 evento por Gira Mundial completa (los 4 modos terminados sin salir antes).
   // Llamado por monuments.js justo cuando la campaña llega al último modo y
   // window.campaign.active pasa a false. `score` es el puntaje acumulado total.
@@ -134,7 +153,7 @@
     });
   }
 
-  window.Analytics = { logVisit, logGame, logVersus, logCampaign, logGlobequiz };
+  window.Analytics = { logVisit, logGame, logVersus, logVersusFunnel, logCampaign, logGlobequiz };
 
   // Registrar la visita en cuanto el cliente sb esté listo.
   function tryVisit(attempt) {

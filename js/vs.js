@@ -241,6 +241,7 @@ window.VS = (() => {
     _role    = 'host';
     _match   = data;
     _subscribe(_matchId);
+    if (window.Analytics && typeof window.Analytics.logVersusFunnel === 'function') window.Analytics.logVersusFunnel('sent', mode);
     // Auto-expirar si el guest no responde en 30s
     setTimeout(() => expire(), 30000);
     return data;
@@ -274,7 +275,9 @@ window.VS = (() => {
       if (error) throw error;
       if (!updated || !updated.length) throw new Error('match_not_available');
       _match = updated[0];
+      if (window.Analytics && typeof window.Analytics.logVersusFunnel === 'function') window.Analytics.logVersusFunnel('accepted', _match.mode);
     } catch (e) {
+      if (window.Analytics && typeof window.Analytics.logVersusFunnel === 'function') window.Analytics.logVersusFunnel('accept_failed');
       cleanup(); // limpiar estado sucio si falló a mitad
       throw e;
     }
@@ -285,6 +288,7 @@ window.VS = (() => {
   async function decline(matchId) {
     await window.sb.from('matches')
       .update({ status: 'declined' }).eq('id', matchId || _matchId);
+    if (window.Analytics && typeof window.Analytics.logVersusFunnel === 'function') window.Analytics.logVersusFunnel('declined');
     cleanup();
   }
 
@@ -296,6 +300,7 @@ window.VS = (() => {
     if (current.status === 'pending') {
       await window.sb.from('matches')
         .update({ status: 'expired' }).eq('id', _matchId);
+      if (window.Analytics && typeof window.Analytics.logVersusFunnel === 'function') window.Analytics.logVersusFunnel('expired', current.mode);
       cleanup();
     }
   }
@@ -530,6 +535,7 @@ window.VS = (() => {
     try {
       await window.sb.from('matches')
         .update({ status: 'abandoned', winner_id: winnerId || null }).eq('id', _matchId);
+      if (window.Analytics && typeof window.Analytics.logVersusFunnel === 'function') window.Analytics.logVersusFunnel('abandoned', _match && _match.mode);
     } catch (e) {}
     cleanup();
   }
