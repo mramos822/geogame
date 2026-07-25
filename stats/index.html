@@ -187,6 +187,46 @@
   th.sortable .arrow{opacity:.5;margin-left:3px;}
   th.sortable.sorted .arrow{opacity:1;color:var(--accent);}
 
+  /* ── Invitados (tarjetas) ── */
+  .guests-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;}
+  .guest-card{background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;
+    display:flex;flex-direction:column;gap:10px;transition:border-color .15s;}
+  .guest-card:hover{border-color:var(--dim);}
+  .guest-card.flagged{border-color:rgba(255,122,122,.5);background:rgba(255,122,122,.06);}
+  .guest-card-head{display:flex;align-items:center;gap:10px;}
+  .guest-avatar{width:38px;height:38px;border-radius:50%;background:var(--panel3);display:flex;
+    align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+  .guest-card.flagged .guest-avatar{background:rgba(255,122,122,.18);}
+  .guest-card-title{min-width:0;flex:1;}
+  .guest-card-name{font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .guest-card-name.noname{color:var(--dim);font-weight:400;font-style:italic;}
+  .guest-card-vid{font-size:10.5px;color:var(--muted);font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .guest-card-stats{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);}
+  .guest-card-stats b{color:var(--text);font-variant-numeric:tabular-nums;}
+  .guest-card-coins{font-size:12.5px;color:var(--accent);font-weight:700;}
+  .guest-candidates{display:flex;flex-direction:column;gap:6px;}
+  .guest-candidate{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--border);
+    border-radius:8px;padding:6px 8px;}
+  .guest-candidate-bar{flex:1;min-width:0;}
+  .guest-candidate-name{font-size:12px;font-weight:700;color:var(--text);}
+  .guest-candidate-conf{font-size:10.5px;color:var(--muted);}
+  .guest-candidate-track{height:4px;border-radius:2px;background:var(--border);margin-top:3px;overflow:hidden;}
+  .guest-candidate-fill{height:100%;border-radius:2px;background:var(--green);}
+  .guest-candidate.high .guest-candidate-fill{background:var(--green);}
+  .guest-candidate.mid .guest-candidate-fill{background:var(--accent);}
+  .guest-candidate.low .guest-candidate-fill{background:var(--dim);}
+  .guest-link-btn{flex-shrink:0;background:var(--blue);border:none;color:#fff;border-radius:6px;
+    padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;}
+  .guest-link-btn:hover{filter:brightness(1.1);}
+  .guest-link-btn:disabled{opacity:.6;cursor:default;}
+  .guest-card-toggle{background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;
+    padding:6px 10px;font-size:11.5px;cursor:pointer;align-self:flex-start;}
+  .guest-card-toggle:hover{color:var(--text);border-color:var(--dim);}
+  .guest-history{display:none;border-top:1px solid var(--border);padding-top:8px;margin-top:2px;}
+  .guest-history.open{display:block;}
+  .guest-history table{font-size:11.5px;}
+  .guest-history th{font-size:9.5px;}
+
   /* ── Tabla de cuentas ── */
   .accounts-toolbar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center;}
   #accounts-search{flex:1;min-width:200px;max-width:320px;background:var(--panel2);border:1px solid var(--border);
@@ -493,32 +533,18 @@
     <section class="tab-page" data-page="invitados">
       <div class="insights" id="guests-status"></div>
       <div class="box wide">
-        <h2>Jugadores sin cuenta
-          <span class="sub">agrupado por visitor_id, dentro del período elegido arriba
-            <span class="help" title="Gente jugando sin crearse cuenta, identificada por el mismo visitor_id que usa claim_anonymous_events() para vincularlos si algún día se registran. 'Nombre puesto' es lo que escribieron en el input de nombre del juego (si lo cambiaron). 'Posible cuenta' sugiere una cuenta existente con ese mismo nombre — es solo una sugerencia, hay que aprobarla a mano. 'Se llevaría' es cuánto tiene acumulado con la fórmula de Gira Mundial. 🚩 = tiene partidas flagueadas en Integridad.">ⓘ</span></span>
+        <h2>👻 Jugadores sin cuenta
+          <span class="sub">dentro del período elegido arriba
+            <span class="help" title="Gente jugando sin crearse cuenta, identificada por visitor_id (el mismo que usa claim_anonymous_events para vincularlos si algún día se registran). Cada candidato de cuenta combina señales débiles (nombre idéntico o parecido, país + registro reciente) en un % de confianza — nunca se aplica solo, hay que apretar 'Vincular' a mano.">ⓘ</span></span>
         </h2>
         <div class="accounts-toolbar">
-          <input id="guests-search" type="text" placeholder="Buscar por nombre o visitor_id…">
+          <input id="guests-search" type="text" placeholder="Buscar por nombre, visitor_id o cuenta sugerida…">
+          <div class="filter-chips" id="guests-filters"></div>
           <span class="spacer" style="flex:1"></span>
+          <div class="rangebar" id="guests-sortbar"></div>
           <span class="accounts-count" id="guests-count"></span>
         </div>
-        <div class="table-scroll">
-          <table id="tbl-guests">
-            <thead><tr>
-              <th>Visitor ID</th>
-              <th>Nombre puesto</th>
-              <th>Posible cuenta</th>
-              <th>País</th>
-              <th class="sortable" data-sort="visits" style="text-align:right">Visitas <span class="arrow">↕</span></th>
-              <th class="sortable" data-sort="campaigns" style="text-align:right">Giras completas <span class="arrow">↕</span></th>
-              <th class="sortable" data-sort="games" style="text-align:right">Modos sueltos <span class="arrow">↕</span></th>
-              <th class="sortable sorted" data-sort="campaignCoins" style="text-align:right">Se llevaría <span class="arrow">↓</span></th>
-              <th class="sortable" data-sort="last_seen" style="text-align:right">Última actividad <span class="arrow">↕</span></th>
-              <th>Acción</th>
-            </tr></thead>
-            <tbody id="guests-body"></tbody>
-          </table>
-        </div>
+        <div class="guests-grid" id="guests-grid"></div>
       </div>
     </section>
 
@@ -1218,80 +1244,136 @@ function renderIntegrity(flags, rl){
 }
 
 let guestsData = [];
-let guestsSort = { key:'campaignCoins', dir:'desc' };
+let guestsFilter = 'all';
+let guestsSortKey = 'last_seen';
+const GUESTS_FILTERS = [
+  ['all','Todos'], ['candidates','🔗 Con candidato'], ['flagged','🚩 Flagueados'],
+  ['campaigns','🌍 Giras completas'], ['recent','🕐 Últimas 24h'], ['noname','Sin nombre'],
+];
+const GUESTS_SORTS = [
+  ['last_seen','Más reciente'], ['campaignCoins','Más monedas'], ['campaigns','Más Giras'],
+  ['visits','Más visitas'], ['confidence','Mejor candidato'],
+];
 function renderGuests(guests, rl){
   guestsData = guests.filter(g=>g.campaigns>0 || g.games>0 || g.visits>0);
   const flaggedCount = guestsData.filter(g=>g.flagged).length;
-  const matchCount = guestsData.filter(g=>g.possibleMatch).length;
+  const matchCount = guestsData.filter(g=>g.candidates && g.candidates.length).length;
   if(!guestsData.length){
     $('guests-status').innerHTML = `<div class="insight-card ok">👻 Sin invitados con actividad en este período (${rl}).</div>`;
   } else {
     const cards = [`<div class="insight-card ok">👻 <b>${guestsData.length}</b> invitado${guestsData.length===1?'':'s'} jugando sin cuenta en este período (${rl}).</div>`];
-    if(matchCount>0) cards.push(`<div class="insight-card warn">🔗 <b>${matchCount}</b> tiene${matchCount===1?'':'n'} una posible cuenta coincidente por nombre — revisar antes de vincular.</div>`);
+    if(matchCount>0) cards.push(`<div class="insight-card warn">🔗 <b>${matchCount}</b> tiene${matchCount===1?'':'n'} algún candidato de cuenta — revisar el % de confianza antes de vincular.</div>`);
     if(flaggedCount>0) cards.push(`<div class="insight-card crit">🚩 <b>${flaggedCount}</b> tiene${flaggedCount===1?'':'n'} partidas flagueadas en Integridad.</div>`);
     $('guests-status').innerHTML = cards.join('');
   }
-  buildGuestsSortHandlers();
+  buildGuestsControls();
   applyGuestsView();
 }
-function buildGuestsSortHandlers(){
-  if(document.querySelectorAll('#tbl-guests th.sortable[data-wired]').length) return;
-  document.querySelectorAll('#tbl-guests th.sortable').forEach(th=>{
-    th.setAttribute('data-wired','1');
-    th.addEventListener('click', ()=>{
-      const key = th.dataset.sort;
-      if(guestsSort.key === key) guestsSort.dir = guestsSort.dir === 'asc' ? 'desc' : 'asc';
-      else guestsSort = { key, dir:'desc' };
-      document.querySelectorAll('#tbl-guests th.sortable').forEach(h=>{
-        h.classList.toggle('sorted', h===th);
-        h.querySelector('.arrow').textContent = h===th ? (guestsSort.dir==='asc'?'↑':'↓') : '↕';
+function buildGuestsControls(){
+  const fEl = $('guests-filters');
+  if(!fEl.children.length){
+    fEl.innerHTML = GUESTS_FILTERS.map(([k,l])=>`<button class="chip${k===guestsFilter?' active':''}" data-filter="${k}">${l}</button>`).join('');
+    fEl.querySelectorAll('.chip').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        guestsFilter = btn.dataset.filter;
+        fEl.querySelectorAll('.chip').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        applyGuestsView();
       });
-      applyGuestsView();
     });
-  });
-  $('guests-search').addEventListener('input', applyGuestsView);
+  }
+  const sEl = $('guests-sortbar');
+  if(!sEl.children.length){
+    sEl.innerHTML = GUESTS_SORTS.map(([k,l])=>`<button class="range-btn${k===guestsSortKey?' active':''}" data-sort="${k}">${l}</button>`).join('');
+    sEl.querySelectorAll('.range-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        guestsSortKey = btn.dataset.sort;
+        sEl.querySelectorAll('.range-btn').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        applyGuestsView();
+      });
+    });
+    $('guests-search').addEventListener('input', applyGuestsView);
+  }
 }
 function applyGuestsView(){
   const q = ($('guests-search').value||'').trim().toLowerCase();
   let rows = guestsData.filter(g=>{
-    if(!q) return true;
-    return (g.guest_name||'').toLowerCase().includes(q) || g.visitor_id.toLowerCase().includes(q) || (g.possibleMatch||'').toLowerCase().includes(q);
+    if(q){
+      const inName = (g.guest_name||'').toLowerCase().includes(q);
+      const inVid = g.visitor_id.toLowerCase().includes(q);
+      const inCand = (g.candidates||[]).some(c=>c.username.toLowerCase().includes(q));
+      if(!inName && !inVid && !inCand) return false;
+    }
+    if(guestsFilter==='candidates') return (g.candidates||[]).length>0;
+    if(guestsFilter==='flagged') return g.flagged;
+    if(guestsFilter==='campaigns') return g.campaigns>0;
+    if(guestsFilter==='noname') return !g.guest_name;
+    if(guestsFilter==='recent') return (Date.now()-new Date(g.last_seen).getTime()) < 86400000;
+    return true;
   });
-  const { key, dir } = guestsSort;
-  const mul = dir==='asc' ? 1 : -1;
   rows = rows.slice().sort((a,b)=>{
-    let av = a[key], bv = b[key];
-    if(key==='last_seen'){ av = new Date(av).getTime(); bv = new Date(bv).getTime(); }
-    if(av < bv) return -1*mul;
-    if(av > bv) return 1*mul;
-    return 0;
+    if(guestsSortKey==='last_seen') return new Date(b.last_seen)-new Date(a.last_seen);
+    if(guestsSortKey==='confidence'){
+      const ca = (a.candidates&&a.candidates[0])?a.candidates[0].confidence:-1;
+      const cb = (b.candidates&&b.candidates[0])?b.candidates[0].confidence:-1;
+      return cb-ca;
+    }
+    return (b[guestsSortKey]||0)-(a[guestsSortKey]||0);
   });
   $('guests-count').textContent = rows.length===guestsData.length ? `${guestsData.length} invitado${guestsData.length===1?'':'s'}` : `${rows.length} de ${guestsData.length}`;
-  const tb = $('guests-body');
-  if(!rows.length){ tb.innerHTML = '<tr><td class="empty" colspan="10">Sin invitados que coincidan.</td></tr>'; return; }
-  tb.innerHTML = rows.map(g=>{
-    const vid = escapeHtml(g.visitor_id.slice(0,16)) + '…' + (g.flagged ? ' 🚩' : '');
-    const name = g.guest_name ? escapeHtml(g.guest_name) : '<span style="color:var(--dim)">—</span>';
-    const match = g.possibleMatch
-      ? `<span class="status-pill stale"><span class="dotstat"></span>${escapeHtml(g.possibleMatch)}</span>`
-      : '<span style="color:var(--dim)">—</span>';
-    const action = g.possibleMatch
-      ? `<button class="btn guest-link-btn" data-vid="${escapeHtml(g.visitor_id)}" data-target="${escapeHtml(g.possibleMatch)}" style="font-size:11px;padding:5px 10px">Vincular</button>`
-      : '';
-    return `<tr${g.flagged?' style="background:rgba(255,122,122,.08)"':''}>` +
-      `<td style="font-family:monospace;font-size:11.5px">${vid}</td>` +
-      `<td>${name}</td>` +
-      `<td>${match}</td>` +
-      `<td>${countryCell(g.country_code)}</td>` +
-      `<td class="n">${g.visits}</td>` +
-      `<td class="n">${g.campaigns}</td>` +
-      `<td class="n">${g.games}</td>` +
-      `<td class="n">${g.campaignCoins.toLocaleString('es')} / ${g.campaignXp.toLocaleString('es')}</td>` +
-      `<td class="n">${timeAgo(g.last_seen)}</td>` +
-      `<td>${action}</td>` +
-    `</tr>`;
+  const grid = $('guests-grid');
+  if(!rows.length){ grid.innerHTML = '<div class="empty">Sin invitados que coincidan.</div>'; return; }
+  grid.innerHTML = rows.map((g,i)=>{
+    const vid = escapeHtml(g.visitor_id.slice(0,20)) + '…';
+    const name = g.guest_name ? escapeHtml(g.guest_name) : 'Sin nombre puesto';
+    const nameCls = g.guest_name ? '' : ' noname';
+    const candidatesHtml = (g.candidates||[]).map(c=>{
+      const lvl = c.confidence>=70?'high':c.confidence>=40?'mid':'low';
+      return `<div class="guest-candidate ${lvl}">
+        <div class="guest-candidate-bar">
+          <div class="guest-candidate-name">${escapeHtml(c.username)}</div>
+          <div class="guest-candidate-conf" title="${escapeHtml(c.reasons.join(' · '))}">${c.confidence}% · ${escapeHtml(c.reasons[0])}${c.reasons.length>1?' +'+(c.reasons.length-1):''}</div>
+          <div class="guest-candidate-track"><div class="guest-candidate-fill" style="width:${c.confidence}%"></div></div>
+        </div>
+        <button class="guest-link-btn" data-vid="${escapeHtml(g.visitor_id)}" data-target="${escapeHtml(c.username)}">Vincular</button>
+      </div>`;
+    }).join('');
+    const historyRows = (g.history||[]).slice(0,50).map(h=>{
+      const fecha = new Date(h.created_at).toLocaleString('es');
+      const tipo = h.type==='campaign' ? '🌍 Gira Mundial' : (MODE_LABELS[h.mode]||h.mode||'—');
+      return `<tr><td>${fecha}</td><td>${tipo}</td><td class="n">${h.score!=null?h.score.toLocaleString('es'):'—'}</td></tr>`;
+    }).join('');
+    return `<div class="guest-card${g.flagged?' flagged':''}" data-idx="${i}">
+      <div class="guest-card-head">
+        <div class="guest-avatar">${g.flagged?'🚩':'👻'}</div>
+        <div class="guest-card-title">
+          <div class="guest-card-name${nameCls}">${name}</div>
+          <div class="guest-card-vid">${vid}</div>
+        </div>
+        ${countryCell(g.country_code)}
+      </div>
+      <div class="guest-card-stats">
+        <span>👁 <b>${g.visits}</b></span>
+        <span>🌍 <b>${g.campaigns}</b></span>
+        <span>🎮 <b>${g.games}</b></span>
+        <span>🕐 <b>${timeAgo(g.last_seen)}</b></span>
+      </div>
+      <div class="guest-card-coins">🪙 ${g.campaignCoins.toLocaleString('es')} monedas · ✨ ${g.campaignXp.toLocaleString('es')} XP (si se registra)</div>
+      ${candidatesHtml ? `<div class="guest-candidates">${candidatesHtml}</div>` : ''}
+      ${g.history && g.history.length ? `<button class="guest-card-toggle" data-idx="${i}">Ver ${g.history.length} partida${g.history.length===1?'':'s'} ▾</button>
+      <div class="guest-history" id="guest-history-${i}"><div class="table-scroll"><table><tr><th>Fecha</th><th>Modo</th><th style="text-align:right">Score</th></tr>${historyRows}</table></div></div>` : ''}
+    </div>`;
   }).join('');
-  tb.querySelectorAll('.guest-link-btn').forEach(btn=>{
+  grid.querySelectorAll('.guest-card-toggle').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const idx = btn.dataset.idx;
+      const hist = document.getElementById('guest-history-'+idx);
+      const open = hist.classList.toggle('open');
+      btn.textContent = btn.textContent.replace(open?'▾':'▴', open?'▴':'▾');
+    });
+  });
+  grid.querySelectorAll('.guest-link-btn').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const vid = btn.dataset.vid, target = btn.dataset.target;
       if(!confirm(`¿Aprobar el traspaso de las monedas/XP de este invitado a la cuenta "${target}"?`)) return;

@@ -171,6 +171,7 @@ Deno.serve(async (req) => {
       versusFunnelRes, friendshipsRes, onlineUsersRes,
       currencyLedgerRes, xpConfigRes,
       allCampaignsForXpRes, allGlobequizForXpRes, allCurrencyLedgerRes,
+      visitorUserBridgeRes,
     ] = await Promise.all([
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true })),
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true }).gte('last_active', onlineISO)),
@@ -271,6 +272,17 @@ Deno.serve(async (req) => {
       // desde la consola del navegador, ya que el insert es anon sin
       // validación de monto del lado del server).
       sb.from('currency_ledger').select('user_id, coins, xp').limit(50000),
+      // ── Puente visitor_id → cuenta: el visitor_id NO cambia al crear
+      // cuenta (sigue viajando en cada evento, ver js/analytics.js), así
+      // que si el mismo visitor_id de un invitado aparece en algún evento
+      // CON user_id puesto, es prueba casi certera de que es la misma
+      // persona/dispositivo — mucho más fuerte que adivinar por nombre.
+      // Todo el historial, sin recortar por rango.
+      sb.from('analytics_events')
+        .select('visitor_id, user_id')
+        .not('visitor_id', 'is', null)
+        .not('user_id', 'is', null)
+        .limit(50000),
     ]);
 
     const regRows      = profilesRes.data || [];
@@ -659,12 +671,13 @@ Deno.serve(async (req) => {
       first_seen: string; last_seen: string;
       visits: number; campaigns: number; games: number;
       campaignCoins: number; campaignXp: number;
+      history: { type: string; mode: string | null; score: number | null; created_at: string }[];
     }> = {};
     function touchGuest(visitorId: string, createdAt: string, countryCode: string | null, guestNameVal?: string | null) {
       const g = guestMap[visitorId] = guestMap[visitorId] || {
         visitor_id: visitorId, country_code: countryCode, guest_name: null,
         first_seen: createdAt, last_seen: createdAt,
-        visits: 0, campaigns: 0, games: 0, campaignCoins: 0, campaignXp: 0,
+        visits: 0, campaigns: 0, games: 0, campaignCoins: 0, campaignXp: 0, history: [],
       };
       if (countryCode && !g.country_code) g.country_code = countryCode;
       // Se queda con el nombre más reciente que se haya puesto (pudo
@@ -680,7 +693,9 @@ Deno.serve(async (req) => {
     }
     for (const r of singleRows as any[]) {
       if (r.user_id || !r.visitor_id) continue;
-      touchGuest(r.visitor_id, r.created_at, r.country_code, r.guest_name).games++;
+      const g = touchGuest(r.visitor_id, r.created_at, r.country_code, r.guest_name);
+      g.games++;
+      g.history.push({ type: 'game', mode: r.mode || null, score: r.score ?? null, created_at: r.created_at });
     }
     for (const r of campaignRows as any[]) {
       if (r.user_id || !r.visitor_id) continue;
@@ -689,22 +704,100 @@ Deno.serve(async (req) => {
       g.campaigns++;
       g.campaignCoins += 10 + steps;
       g.campaignXp += 50 + steps * 3;
+      g.history.push({ type: 'campaign', mode: null, score: r.score ?? null, created_at: r.created_at });
     }
     const flaggedGuestIds = new Set(
       integrityFlags
         .map((f) => /^Invitado \(([^)]+)…\)$/.exec(f.username)?.[1])
         .filter(Boolean),
     );
-    // Posible cuenta con la que coincide: mismo nombre (sin importar
-    // mayúsculas) que algún username existente — solo una sugerencia para
-    // que el admin decida a mano con el botón "Vincular", nunca se aplica solo.
-    const usernameLower: Record<string, string> = {};
-    for (const p of allProfiles as any[]) usernameLower[(p.username || '').toLowerCase()] = p.username;
+
+    // ── Análisis de posibles conexiones con cuentas existentes ─────────────
+    // Combina varias señales débiles (ninguna sola alcanza) en un puntaje de
+    // confianza 0-99, y devuelve hasta 3 candidatos por invitado. Nunca se
+    // aplica solo — es insumo para que el admin decida con el botón
+    // "Vincular" (acción link_guest más arriba en este archivo).
+    function levenshtein(a: string, b: string): number {
+      const m = a.length, n = b.length;
+      const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+      for (let i = 0; i <= m; i++) dp[i][0] = i;
+      for (let j = 0; j <= n; j++) dp[0][j] = j;
+      for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+          dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j - 1], dp[i - 1][j], dp[i][j - 1]);
+        }
+      }
+      return dp[m][n];
+    }
+    // visitor_id -> user_id más frecuente con el que apareció ese mismo
+    // visitor_id en algún evento YA logueado (el visitor_id no cambia al
+    // crear cuenta). Si un visitor_id aparece con más de un user_id
+    // distinto (dispositivo compartido entre cuentas) se toma el más
+    // frecuente, pero es un caso raro.
+    const visitorToUserCounts: Record<string, Record<string, number>> = {};
+    for (const r of (visitorUserBridgeRes.data || []) as any[]) {
+      const byUid = visitorToUserCounts[r.visitor_id] = visitorToUserCounts[r.visitor_id] || {};
+      byUid[r.user_id] = (byUid[r.user_id] || 0) + 1;
+    }
+    const visitorToUser: Record<string, string> = {};
+    for (const [vid, counts] of Object.entries(visitorToUserCounts)) {
+      let bestUid = '', bestCount = 0;
+      for (const [uid, c] of Object.entries(counts)) if (c > bestCount) { bestUid = uid; bestCount = c; }
+      if (bestUid) visitorToUser[vid] = bestUid;
+    }
+
+    type Candidate = { username: string; confidence: number; reasons: string[] };
+    function candidatesForGuest(g: { visitor_id: string; guest_name: string | null; country_code: string | null; last_seen: string }): Candidate[] {
+      const byUsername: Record<string, Candidate> = {};
+      function add(username: string, confidence: number, reason: string) {
+        const c = byUsername[username] = byUsername[username] || { username, confidence: 0, reasons: [] };
+        c.confidence = Math.min(99, c.confidence + confidence);
+        c.reasons.push(reason);
+      }
+      // Señal más fuerte de todas: el propio visitor_id ya jugó logueado en
+      // alguna cuenta en otro momento — no depende de que haya puesto
+      // nombre ni de nada más, es casi certeza.
+      const bridgedUid = visitorToUser[g.visitor_id];
+      if (bridgedUid && usernameById[bridgedUid]) {
+        add(usernameById[bridgedUid], 90, 'Este mismo dispositivo ya jugó logueado en esta cuenta');
+      }
+      if (g.guest_name) {
+        const gn = g.guest_name.trim().toLowerCase();
+        if (gn) {
+          for (const p of allProfiles as any[]) {
+            const un = (p.username || '').toLowerCase();
+            if (!un) continue;
+            if (un === gn) { add(p.username, 65, 'Nombre idéntico'); continue; }
+            const dist = levenshtein(gn, un);
+            const maxLen = Math.max(gn.length, un.length) || 1;
+            const sim = 1 - dist / maxLen;
+            if (sim >= 0.7) add(p.username, Math.round(sim * 40), `Nombre parecido (${Math.round(sim * 100)}%)`);
+          }
+        }
+      }
+      if (g.country_code) {
+        const lastSeenMs = new Date(g.last_seen).getTime();
+        for (const p of allProfiles as any[]) {
+          const pCountry = p.country_code || countryByUser[p.id];
+          if (pCountry !== g.country_code) continue;
+          const gapMs = new Date(p.created_at).getTime() - lastSeenMs;
+          // Se registró poco DESPUÉS de la última vez que este invitado
+          // jugó, y todavía casi no jugó con la cuenta — compatible con
+          // "este invitado se registró y siguió jugando ya logueado".
+          if (gapMs >= 0 && gapMs <= 6 * 3600000 && (p.play_count || 0) <= 2) {
+            add(p.username, 30, 'Se creó una cuenta poco después, mismo país');
+          }
+        }
+      }
+      return Object.values(byUsername).sort((a, b) => b.confidence - a.confidence).slice(0, 3);
+    }
+
     const guests = Object.values(guestMap)
       .map((g) => ({
         ...g,
+        history: g.history.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
         flagged: [...flaggedGuestIds].some((prefix) => prefix && g.visitor_id.startsWith(prefix)),
-        possibleMatch: g.guest_name ? (usernameLower[g.guest_name.toLowerCase()] || null) : null,
+        candidates: candidatesForGuest(g),
       }))
       .sort((a, b) => new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime());
 
