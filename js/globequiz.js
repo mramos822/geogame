@@ -1182,8 +1182,16 @@
   async function showEndgameModal() {
     const modal = document.getElementById('gq-endgame-modal');
     if (!modal) return;
+    const currentStreak = await updateStreak();
     const streakEl = document.getElementById('gq-endgame-streak-num');
-    if (streakEl) streakEl.textContent = String(await updateStreak());
+    if (streakEl) streakEl.textContent = String(currentStreak);
+    // Cuenta como partida propia en los totales del dashboard de stats
+    // (junto a campaign/versus) — GlobeQuiz es standalone, no parte de la
+    // Gira Mundial. Va acá (no en submitGuess) para mandar la racha ya
+    // resuelta en vez de duplicar ese cálculo.
+    if (window.Analytics && typeof window.Analytics.logGlobequiz === 'function') {
+      window.Analytics.logGlobequiz(guesses.length + 1, gqFinalElapsedMs, currentStreak);
+    }
     const label = document.getElementById('gq-endgame-country-label');
     if (label) label.textContent = displayName(dailyCountry);
     const flag = document.getElementById('gq-endgame-flag');
@@ -1284,12 +1292,10 @@
       // HTML; pausar solo el <audio> no lo corta y el loop sigue sonando.
       if (typeof playMusic === 'function') playMusic(null);
       if (typeof sfxBonus !== 'undefined' && typeof sfxPlay === 'function') { sfxBonus.currentTime = 0; sfxPlay(sfxBonus); }
-      // Cuenta como partida propia en los totales del dashboard de stats
-      // (junto a campaign/versus) — GlobeQuiz es standalone, no parte de la
-      // Gira Mundial. "score" acá es la cantidad de intentos.
-      if (window.Analytics && typeof window.Analytics.logGlobequiz === 'function') {
-        window.Analytics.logGlobequiz(guesses.length + 1);
-      }
+      // El evento de analytics se manda desde showEndgameModal() (2s después),
+      // una vez que updateStreak() ya resolvió la racha actual — así el
+      // evento sale con duración/racha completas en vez de mandarlas acá y
+      // tener que duplicar el cálculo de racha.
       saveState();
       drawTexture();
       renderGuessList();

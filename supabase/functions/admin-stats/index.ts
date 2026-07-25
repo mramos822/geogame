@@ -169,7 +169,7 @@ Deno.serve(async (req) => {
         .eq('type', 'visit').gte('created_at', windowISO).limit(50000),
       sb.from('analytics_events').select('created_at, score, user_id, country_code')
         .eq('type', 'campaign').gte('created_at', windowISO).limit(50000),
-      sb.from('analytics_events').select('created_at, score, user_id, country_code')
+      sb.from('analytics_events').select('created_at, score, user_id, country_code, duration_ms, streak')
         .eq('type', 'globequiz').gte('created_at', windowISO).limit(50000),
       sb.from('profiles').select('username, hs_flags').order('hs_flags', { ascending: false }).limit(10),
       sb.from('profiles').select('username, hs_shapes').order('hs_shapes', { ascending: false }).limit(10),
@@ -289,6 +289,21 @@ Deno.serve(async (req) => {
         type: r.type, mode: r.mode, score: r.score, created_at: r.created_at,
       });
     }
+    // Giras Mundiales completas y GlobeQuiz ganado también en el historial
+    // por cuenta (antes solo entraban las jugadas sueltas por modo/versus).
+    for (const r of campaignRows as any[]) {
+      if (!r.user_id) continue;
+      (gamesByUser[r.user_id] = gamesByUser[r.user_id] || []).push({
+        type: 'campaign', mode: null, score: r.score, created_at: r.created_at,
+      });
+    }
+    for (const r of globequizRows as any[]) {
+      if (!r.user_id) continue;
+      (gamesByUser[r.user_id] = gamesByUser[r.user_id] || []).push({
+        type: 'globequiz', mode: null, score: r.score, created_at: r.created_at,
+        duration_ms: r.duration_ms ?? null, streak: r.streak ?? null,
+      });
+    }
 
     // ── País de creación de cuenta (aproximado) ───────────────────────────────
     // `profiles` no guarda país propio: se toma el país del evento MÁS ANTIGUO
@@ -305,15 +320,35 @@ Deno.serve(async (req) => {
     // jugador (o "cuenta no registrada" si jugó sin loguearse) y país.
     const usernameById: Record<string, string> = {};
     for (const p of allProfiles as any[]) usernameById[p.id] = p.username;
-    const events = (gameRows as any[]).map((r) => ({
-      created_at: r.created_at, type: r.type, mode: r.mode, score: r.score,
-      // 'campaign' (Gira Mundial) | 'practice' | 'standalone' | null (partidas
-      // viejas de antes de que existiera esta columna, o eventos 'versus' que
-      // no la necesitan porque ya se distinguen por type).
-      session_type: r.session_type || null,
-      username: r.user_id ? (usernameById[r.user_id] || null) : null,
-      country_code: r.country_code || null,
-    }));
+    const events = [
+      ...(gameRows as any[]).map((r) => ({
+        created_at: r.created_at, type: r.type, mode: r.mode, score: r.score,
+        // 'campaign' (Gira Mundial) | 'practice' | 'standalone' | null (partidas
+        // viejas de antes de que existiera esta columna, o eventos 'versus' que
+        // no la necesitan porque ya se distinguen por type).
+        session_type: r.session_type || null,
+        username: r.user_id ? (usernameById[r.user_id] || null) : null,
+        country_code: r.country_code || null,
+        duration_ms: null, streak: null,
+      })),
+      // Giras Mundiales completas y partidas de GlobeQuiz ganadas — antes solo
+      // contaban para los totales/gráficos (finishedRows), no aparecían acá.
+      // duration_ms/streak solo existen para globequiz (null en campaign).
+      ...(campaignRows as any[]).map((r) => ({
+        created_at: r.created_at, type: 'campaign', mode: null, score: r.score,
+        session_type: 'campaign',
+        username: r.user_id ? (usernameById[r.user_id] || null) : null,
+        country_code: r.country_code || null,
+        duration_ms: null, streak: null,
+      })),
+      ...(globequizRows as any[]).map((r) => ({
+        created_at: r.created_at, type: 'globequiz', mode: null, score: r.score,
+        session_type: 'standalone',
+        username: r.user_id ? (usernameById[r.user_id] || null) : null,
+        country_code: r.country_code || null,
+        duration_ms: r.duration_ms ?? null, streak: r.streak ?? null,
+      })),
+    ];
     // Visitas individuales de la ventana (para el mismo panel de detalle: quién
     // entró a la página ese día, esté o no logueado).
     const visits = (visitRows as any[]).map((r) => ({

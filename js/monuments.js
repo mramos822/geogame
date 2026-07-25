@@ -1308,10 +1308,11 @@ window.startCampaign = function () {
     closeModal();
     // Login manual (no restauración de sesión al recargar, esa pasa por
     // _onSessionReady): si la cuenta ya calificaba de antes (founder con al
-    // menos 1 Vuelta Mundial jugada), se la mostramos apenas cierra este
-    // modal y pisa el menú — mismo criterio que _onSessionReady.
+    // menos 1 Vuelta Mundial COMPLETA jugada — campaigns_completed, GlobeQuiz
+    // no cuenta), se la mostramos apenas cierra este modal y pisa el menú —
+    // mismo criterio que _onSessionReady.
     const p = window._sbProfile;
-    if (p && p.is_founder && !p.founder_popup_seen && (p.play_count || 0) > 0) {
+    if (p && p.is_founder && !p.founder_popup_seen && (p.campaigns_completed || 0) > 0) {
       setTimeout(() => { if (typeof window.showFounderWelcomePopup === 'function') window.showFounderWelcomePopup(); }, 500);
     }
   });
@@ -1811,14 +1812,15 @@ async function _onSessionReady(userId) {
     if (typeof loadFriends === 'function') loadFriends();  // poblar barra ingame con amigos reales
     _updateProfileBtnLabel();
     // Popup de Fundador: NO se dispara con solo loguearse en general — hace
-    // falta al menos 1 Vuelta Mundial jugada (play_count > 0). Si la cuenta
-    // ya calificaba de antes (jugó antes de que existiera este popup), se
-    // muestra directo acá al llegar al menú. Si todavía tiene 0 partidas, no
-    // sale acá — recién se pone elegible al terminar su primera Vuelta
-    // Mundial y volver al menú (ver window._pendingFounderPopupCheck, puesta
-    // en la rama de campaña completa de este archivo y consumida en
-    // js/final.js al volver al menú).
-    if (profile.is_founder && !profile.founder_popup_seen && (profile.play_count || 0) > 0) {
+    // falta al menos 1 Vuelta Mundial COMPLETA jugada (campaigns_completed >
+    // 0; GlobeQuiz NO cuenta para esto). Si la cuenta ya calificaba de antes
+    // (jugó antes de que existiera este popup), se muestra directo acá al
+    // llegar al menú. Si todavía tiene 0 Vueltas Mundiales, no sale acá —
+    // recién se pone elegible al terminar su primera Vuelta Mundial y volver
+    // al menú (ver window._pendingFounderPopupCheck, puesta en la rama de
+    // campaña completa de este archivo y consumida en js/final.js al volver
+    // al menú).
+    if (profile.is_founder && !profile.founder_popup_seen && (profile.campaigns_completed || 0) > 0) {
       setTimeout(() => { if (typeof window.showFounderWelcomePopup === 'function') window.showFounderWelcomePopup(); }, 800);
     }
   } catch(e) {}

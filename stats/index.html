@@ -801,8 +801,18 @@ function bucketLabelPretty(rawKey, granularity){
 const SESSION_LABELS = { campaign:'🌍 Gira Mundial', practice:'🎯 Práctica', standalone:'🎮 Individual' };
 function contextBadge(e){
   if(e.type === 'versus') return '<span class="mode-pill versus">⚔️ Compe</span>';
+  if(e.type === 'globequiz') return '<span class="mode-pill session-campaign">🌎 GlobeQuiz</span>';
   const label = SESSION_LABELS[e.session_type] || '❔ Sin datos';
   return `<span class="mode-pill session-${e.session_type||'unknown'}">${label}</span>`;
+}
+function eventScoreCell(e){
+  if(e.type === 'globequiz'){
+    const attempts = e.score!=null ? `${e.score} intento${e.score===1?'':'s'}` : '—';
+    const secs = e.duration_ms!=null ? `${(e.duration_ms/1000).toFixed(1)}s` : null;
+    const streak = e.streak!=null ? `🔥${e.streak}` : null;
+    return [attempts, secs, streak].filter(Boolean).join(' · ');
+  }
+  return e.score!=null ? e.score.toLocaleString('es') : '—';
 }
 function playerCell(username){
   return username ? escapeHtml(username) : '<span style="color:var(--dim);font-style:italic">Cuenta no registrada</span>';
@@ -836,10 +846,11 @@ function openDayPanel(rawKey, granularity){
   } else {
     tb.innerHTML = events.map(e=>{
       const hora = new Date(e.created_at).toLocaleTimeString('es', { hour:'2-digit', minute:'2-digit' });
-      const modeLabel = MODE_LABELS[e.mode] || e.mode || '—';
-      const score = e.score!=null ? e.score.toLocaleString('es') : '—';
+      const modeLabel = e.type === 'campaign' ? '🌍 Gira Mundial' : e.type === 'globequiz' ? '🌎 GlobeQuiz' : (MODE_LABELS[e.mode] || e.mode || '—');
+      const modePillClass = e.type === 'campaign' || e.type === 'globequiz' ? 'session-campaign' : (e.mode||'');
+      const score = eventScoreCell(e);
       return `<tr><td>${hora}</td><td>${playerCell(e.username)}</td><td>${countryCell(e.country_code)}</td>` +
-        `<td><span class="mode-pill ${e.mode||''}">${modeLabel}</span></td><td>${contextBadge(e)}</td><td class="n">${score}</td></tr>`;
+        `<td><span class="mode-pill ${modePillClass}">${modeLabel}</span></td><td>${contextBadge(e)}</td><td class="n">${score}</td></tr>`;
     }).join('');
   }
 
@@ -1183,10 +1194,11 @@ function renderAccountGames(games){
   if(!games.length) return '<div class="empty">Sin partidas en este período</div>';
   const rows = games.slice(0, 200).map(g=>{
     const d = new Date(g.created_at).toLocaleString('es');
-    const modeLabel = MODE_LABELS[g.mode] || g.mode || '—';
+    const modeLabel = g.type === 'campaign' ? '🌍 Gira Mundial' : g.type === 'globequiz' ? '🌎 GlobeQuiz' : (MODE_LABELS[g.mode] || g.mode || '—');
+    const modePillClass = g.type === 'campaign' || g.type === 'globequiz' ? 'session-campaign' : (g.mode||'');
     const typeLabel = g.type === 'versus' ? ' <span class="mode-pill versus">VS</span>' : '';
-    const score = (g.score!=null) ? g.score.toLocaleString('es') : '—';
-    return `<tr><td>${d}</td><td><span class="mode-pill ${g.mode||''}">${modeLabel}</span>${typeLabel}</td><td class="n">${score}</td></tr>`;
+    const score = eventScoreCell(g);
+    return `<tr><td>${d}</td><td><span class="mode-pill ${modePillClass}">${modeLabel}</span>${typeLabel}</td><td class="n">${score}</td></tr>`;
   }).join('');
   return `<div class="table-scroll"><table><tr><th>Fecha</th><th>Modo</th><th style="text-align:right">Score</th></tr>${rows}</table></div>`;
 }

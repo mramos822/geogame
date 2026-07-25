@@ -117,11 +117,17 @@
   // 1 evento por partida de GlobeQuiz GANADA. Cuenta como "1 partida" propia
   // en los totales del dashboard (junto a campaign/versus) — no es parte de
   // la Gira Mundial de 4 modos, es un modo standalone independiente.
-  async function logGlobequiz(score) {
+  // `score` = cantidad de intentos, `durationMs` = tiempo hasta acertar,
+  // `streak` = racha de días jugados en el momento de esta partida (0 si es
+  // invitado o no se pudo leer) — para poder ver en /stats quién juega este
+  // modo, cuánto tarda y qué tan seguido vuelve.
+  async function logGlobequiz(score, durationMs, streak) {
     const cc = (localStorage.getItem('_an_country') || null) || null;
     insertEvent({
       type: 'globequiz',
       score: (typeof score === 'number' && isFinite(score)) ? Math.round(score) : null,
+      duration_ms: (typeof durationMs === 'number' && isFinite(durationMs)) ? Math.round(durationMs) : null,
+      streak: (typeof streak === 'number' && isFinite(streak)) ? Math.round(streak) : null,
       visitor_id: visitorId,
       country_code: cc,
       user_id: window._sbUserId || null,
