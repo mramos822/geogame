@@ -621,6 +621,59 @@ Deno.serve(async (req) => {
 
     integrityFlags.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
+    // ── Invitados: gente jugando SIN cuenta, para tener registro/alerta de
+    // ellos aunque nunca se registren. Junta todo lo que dejan (visitas,
+    // Giras Mundiales, modos sueltos) agrupado por visitor_id — el mismo ID
+    // que usa claim_anonymous_events() para vincularlos si algún día crean
+    // cuenta. "Monedas/XP que se llevaría" usa la misma fórmula que
+    // js/analytics.js, para saber cuánto tiene acumulado ese invitado
+    // aunque currency_ledger todavía no le haya asignado nada (sigue con
+    // user_id null hasta que reclame).
+    const guestMap: Record<string, {
+      visitor_id: string; country_code: string | null;
+      first_seen: string; last_seen: string;
+      visits: number; campaigns: number; games: number;
+      campaignCoins: number; campaignXp: number;
+    }> = {};
+    function touchGuest(visitorId: string, createdAt: string, countryCode: string | null) {
+      const g = guestMap[visitorId] = guestMap[visitorId] || {
+        visitor_id: visitorId, country_code: countryCode,
+        first_seen: createdAt, last_seen: createdAt,
+        visits: 0, campaigns: 0, games: 0, campaignCoins: 0, campaignXp: 0,
+      };
+      if (countryCode && !g.country_code) g.country_code = countryCode;
+      if (createdAt < g.first_seen) g.first_seen = createdAt;
+      if (createdAt > g.last_seen) g.last_seen = createdAt;
+      return g;
+    }
+    for (const r of visitRows as any[]) {
+      if (r.user_id || !r.visitor_id) continue;
+      touchGuest(r.visitor_id, r.created_at, r.country_code).visits++;
+    }
+    for (const r of singleRows as any[]) {
+      if (r.user_id || !r.visitor_id) continue;
+      touchGuest(r.visitor_id, r.created_at, r.country_code).games++;
+    }
+    for (const r of campaignRows as any[]) {
+      if (r.user_id || !r.visitor_id) continue;
+      const steps = Math.floor((r.score || 0) / 250);
+      const g = touchGuest(r.visitor_id, r.created_at, r.country_code);
+      g.campaigns++;
+      g.campaignCoins += 10 + steps;
+      g.campaignXp += 50 + steps * 3;
+    }
+    const flaggedGuestIds = new Set(
+      integrityFlags
+        .map((f) => /^Invitado \(([^)]+)…\)$/.exec(f.username)?.[1])
+        .filter(Boolean),
+    );
+    const guests = Object.values(guestMap)
+      .map((g) => ({
+        ...g,
+        flagged: [...flaggedGuestIds].some((prefix) => prefix && g.visitor_id.startsWith(prefix)),
+      }))
+      .sort((a, b) => new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime());
+
     // ── Funnel de invitaciones VS: dónde se pierde la gente entre "invitó" y
     // "terminó la partida" (ver logVersusFunnel, js/analytics.js). 'finished'
     // no viene de acá: se reusa el conteo de versusRows (evento 'versus' ya
@@ -795,6 +848,7 @@ Deno.serve(async (req) => {
       social,
       economy,
       integrityFlags,
+      guests,
       topCountries,
       cohortRetention,
       playBuckets,

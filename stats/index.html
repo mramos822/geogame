@@ -489,6 +489,18 @@
       </div>
     </section>
 
+    <!-- ── INVITADOS (sin cuenta) ── -->
+    <section class="tab-page" data-page="invitados">
+      <div class="insights" id="guests-status"></div>
+      <div class="box wide">
+        <h2>Jugadores sin cuenta
+          <span class="sub">agrupado por visitor_id, dentro del período elegido arriba
+            <span class="help" title="Gente jugando sin crearse cuenta, identificada por el mismo visitor_id que usa claim_anonymous_events() para vincularlos si algún día se registran. 'Se llevaría' es cuánto tiene acumulado con la fórmula de Gira Mundial, aunque currency_ledger todavía no se lo haya asignado a ninguna cuenta. 🚩 = tiene alguna partida flagueada en la pestaña Integridad.">ⓘ</span></span>
+        </h2>
+        <div class="table-scroll"><table id="tbl-guests"><tbody></tbody></table></div>
+      </div>
+    </section>
+
     <!-- ── CUENTAS ── -->
     <section class="tab-page" data-page="cuentas">
       <div class="box wide">
@@ -594,7 +606,7 @@ const RANGE_LABEL = Object.fromEntries(RANGES);
 const PAGES = [
   ['resumen','📊 Resumen'], ['retencion','🔁 Retención'], ['leaderboards','🏆 Leaderboards'],
   ['versus','⚔️ Versus'], ['social','🤝 Social'], ['economia','💰 Economía'], ['integridad','🚩 Integridad'],
-  ['cuentas','👤 Cuentas'], ['fundador','👑 Fundador'],
+  ['invitados','👻 Invitados'], ['cuentas','👤 Cuentas'], ['fundador','👑 Fundador'],
 ];
 const MODE_TABS = [
   ['total','Total'], ['flags','Banderas'], ['shapes','Figuras'], ['cities','Ciudades'], ['monuments','Monumentos'],
@@ -767,6 +779,7 @@ function render(data){
   renderSocial(data.social||{});
   renderEconomy(data.economy||{}, rl);
   renderIntegrity(data.integrityFlags||[], rl);
+  renderGuests(data.guests||[], rl);
   renderAccounts(data.accounts||[]);
   renderFounder(data.founder||{});
 }
@@ -1180,6 +1193,25 @@ function renderIntegrity(flags, rl){
         ? '<span class="status-pill churned"><span class="dotstat"></span>🔴 Crítico</span>'
         : '<span class="status-pill stale"><span class="dotstat"></span>🟡 Revisar</span>';
       return `<tr${f.severity==='crit'?' style="background:rgba(255,122,122,.08)"':''}><td style="white-space:nowrap">${fecha}</td><td>${escapeHtml(f.username||'—')}</td><td>${tipo}</td><td class="n">${f.score!=null?f.score.toLocaleString('es'):'—'}</td><td style="white-space:normal">${escapeHtml(f.reason)}</td><td>${sevPill}</td></tr>`;
+    }).join('');
+}
+
+function renderGuests(guests, rl){
+  const withActivity = guests.filter(g=>g.campaigns>0 || g.games>0 || g.visits>0);
+  const flaggedCount = guests.filter(g=>g.flagged).length;
+  if(!withActivity.length){
+    $('guests-status').innerHTML = `<div class="insight-card ok">👻 Sin invitados con actividad en este período (${rl}).</div>`;
+  } else {
+    const cards = [`<div class="insight-card ok">👻 <b>${withActivity.length}</b> invitado${withActivity.length===1?'':'s'} jugando sin cuenta en este período (${rl}).</div>`];
+    if(flaggedCount>0) cards.push(`<div class="insight-card crit">🚩 <b>${flaggedCount}</b> de ellos tiene partidas flagueadas en Integridad.</div>`);
+    $('guests-status').innerHTML = cards.join('');
+  }
+  const tb = $('tbl-guests');
+  if(!withActivity.length){ tb.innerHTML = '<tr><td class="empty">Sin datos.</td></tr>'; return; }
+  tb.innerHTML = '<tr><th>Visitor ID</th><th>País</th><th style="text-align:right">Visitas</th><th style="text-align:right">Giras completas</th><th style="text-align:right">Modos sueltos</th><th style="text-align:right">Se llevaría (monedas/XP)</th><th style="text-align:right">Última actividad</th></tr>' +
+    withActivity.map(g=>{
+      const vid = escapeHtml(g.visitor_id.slice(0,16)) + '…' + (g.flagged ? ' 🚩' : '');
+      return `<tr${g.flagged?' style="background:rgba(255,122,122,.08)"':''}><td style="font-family:monospace;font-size:11.5px">${vid}</td><td>${countryCell(g.country_code)}</td><td class="n">${g.visits}</td><td class="n">${g.campaigns}</td><td class="n">${g.games}</td><td class="n">${g.campaignCoins.toLocaleString('es')} / ${g.campaignXp.toLocaleString('es')}</td><td class="n">${timeAgo(g.last_seen)}</td></tr>`;
     }).join('');
 }
 
