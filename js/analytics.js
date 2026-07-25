@@ -23,6 +23,18 @@
     localStorage.setItem('_devstats_vid', visitorId);
   }
 
+  // Se llama al cerrar sesión (ver _doLogout, monuments.js): genera un
+  // visitor_id NUEVO para este dispositivo. Sin esto, dos cuentas distintas
+  // usando el mismo dispositivo como invitado (sin loguearse) compartirían
+  // el mismo visitor_id, y claim_anonymous_events() podría mezclar las
+  // partidas de invitado de ambas al vincular la primera cuenta que se
+  // loguee (el RPC solo protege eventos que YA tienen user_id asignado, no
+  // los que todavía están sueltos como invitado).
+  function resetVisitorId() {
+    visitorId = 'v-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+    try { localStorage.setItem('_devstats_vid', visitorId); } catch (e) {}
+  }
+
   // País vía IP (cacheado en localStorage; solo se pide una vez por dispositivo).
   async function getCountryCode() {
     const cached = localStorage.getItem('_an_country');
@@ -208,7 +220,7 @@
 
   window.Analytics = {
     logVisit, logGame, logVersus, logVersusFunnel, logCampaign, logGlobequiz,
-    logCampaignCurrency, logGlobequizCurrency,
+    logCampaignCurrency, logGlobequizCurrency, resetVisitorId,
   };
 
   // Registrar la visita en cuanto el cliente sb esté listo.

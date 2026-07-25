@@ -166,13 +166,13 @@ Deno.serve(async (req) => {
       sb.from('profiles')
         .select('id, username, created_at, last_active, play_count, hs_total, vs_wins, vs_losses, is_supporter')
         .gte('created_at', windowISO).limit(50000),
-      sb.from('analytics_events').select('created_at, type, mode, score, user_id, country_code, session_type')
+      sb.from('analytics_events').select('created_at, type, mode, score, user_id, visitor_id, country_code, session_type')
         .in('type', ['game', 'versus']).gte('created_at', windowISO).limit(50000),
       sb.from('analytics_events').select('created_at, visitor_id, country_code, user_id')
         .eq('type', 'visit').gte('created_at', windowISO).limit(50000),
-      sb.from('analytics_events').select('created_at, score, user_id, country_code')
+      sb.from('analytics_events').select('created_at, score, user_id, visitor_id, country_code')
         .eq('type', 'campaign').gte('created_at', windowISO).limit(50000),
-      sb.from('analytics_events').select('created_at, score, user_id, country_code, duration_ms, streak')
+      sb.from('analytics_events').select('created_at, score, user_id, visitor_id, country_code, duration_ms, streak')
         .eq('type', 'globequiz').gte('created_at', windowISO).limit(50000),
       sb.from('profiles').select('username, hs_flags').order('hs_flags', { ascending: false }).limit(10),
       sb.from('profiles').select('username, hs_shapes').order('hs_shapes', { ascending: false }).limit(10),
@@ -491,6 +491,136 @@ Deno.serve(async (req) => {
       .sort((a, b) => b.days_inactive - a.days_inactive)
       .slice(0, 15);
 
+    // ── Integridad: detectar juego ilegítimo (automatizado o puntaje fuera
+    // de rango) cada vez que alguien juega. Se recalcula en cada carga del
+    // panel, sobre la ventana de tiempo elegida (mismo período que el resto
+    // del dashboard), y sobre TODOS los eventos crudos — así que cubre solo
+    // con volver a cargar la página. Heurísticas, no certezas — cada flag
+    // trae el motivo para revisar a ojo, no es un ban automático.
+    //
+    // Incluye partidas de INVITADOS (sin cuenta, identificados por
+    // visitor_id): analytics_events guarda visitor_id en cada evento desde
+    // antes de crear cuenta, y claim_anonymous_events() les pone user_id
+    // recién al vincular. Como este cálculo relee los eventos crudos en
+    // cada carga (no una foto vieja), en cuanto alguien reclama sus
+    // partidas de invitado, esas partidas empiezan a aparecer acá con su
+    // username real sin tocar nada de este código.
+    function meanStd(values: number[]): { mean: number; std: number } {
+      if (!values.length) return { mean: 0, std: 0 };
+      const mean = values.reduce((a, b) => a + b, 0) / values.length;
+      const variance = values.reduce((a, b) => a + (b - mean) * (b - mean), 0) / values.length;
+      return { mean, std: Math.sqrt(variance) };
+    }
+    // Identidad de un evento: cuenta real si tiene user_id, si no un alias
+    // corto de visitor_id ("Invitado abc123…"); null solo si no hay ninguno
+    // de los dos (no debería pasar, pero por las dudas no se flaguea).
+    function identityOf(r: { user_id?: string | null; visitor_id?: string | null }): string | null {
+      if (r.user_id) return usernameById[r.user_id] || r.user_id;
+      if (r.visitor_id) return `Invitado (${r.visitor_id.slice(0, 14)}…)`;
+      return null;
+    }
+    function groupKey(r: { user_id?: string | null; visitor_id?: string | null }): string | null {
+      return r.user_id || r.visitor_id || null;
+    }
+    const MIN_SAMPLE = 8; // no confiar en el z-score con muy pocos datos
+    const integrityFlags: { username: string; type: string; mode: string | null; score: number | null; reason: string; created_at: string; severity: 'warn' | 'crit' }[] = [];
+
+    // A) Score de un modo suelto muy por encima del promedio de ESE modo
+    // (posible trampa client-side, ej. editar el score antes de mandarlo).
+    const scoresByMode: Record<string, number[]> = {};
+    for (const r of singleRows as any[]) {
+      if (r.score == null) continue;
+      (scoresByMode[r.mode || 'otro'] = scoresByMode[r.mode || 'otro'] || []).push(r.score);
+    }
+    const modeStats: Record<string, { mean: number; std: number }> = {};
+    for (const [mode, arr] of Object.entries(scoresByMode)) modeStats[mode] = meanStd(arr);
+    for (const r of singleRows as any[]) {
+      const identity = identityOf(r);
+      if (r.score == null || !identity) continue;
+      const mode = r.mode || 'otro';
+      const st = modeStats[mode];
+      if (!st || st.std === 0 || scoresByMode[mode].length < MIN_SAMPLE) continue;
+      const z = (r.score - st.mean) / st.std;
+      if (z > 4) {
+        integrityFlags.push({
+          username: identity, type: 'game', mode,
+          score: r.score,
+          reason: `Score de ${mode} muy por encima del promedio (z=${z.toFixed(1)}, promedio ${Math.round(st.mean)})`,
+          created_at: r.created_at, severity: z > 6 ? 'crit' : 'warn',
+        });
+      }
+    }
+
+    // B) Score de Gira Mundial muy por encima del promedio.
+    const campaignScores = (campaignRows as any[]).map((r) => r.score).filter((s: any) => s != null);
+    const campaignStats = meanStd(campaignScores);
+    if (campaignScores.length >= MIN_SAMPLE && campaignStats.std > 0) {
+      for (const r of campaignRows as any[]) {
+        const identity = identityOf(r);
+        if (r.score == null || !identity) continue;
+        const z = (r.score - campaignStats.mean) / campaignStats.std;
+        if (z > 4) {
+          integrityFlags.push({
+            username: identity, type: 'campaign', mode: null,
+            score: r.score,
+            reason: `Score de Gira Mundial muy por encima del promedio (z=${z.toFixed(1)}, promedio ${Math.round(campaignStats.mean)})`,
+            created_at: r.created_at, severity: z > 6 ? 'crit' : 'warn',
+          });
+        }
+      }
+    }
+
+    // C) GlobeQuiz resuelto demasiado rápido o con demasiados intentos por
+    // segundo para ser un humano tipeando/clickeando.
+    for (const r of globequizRows as any[]) {
+      const identity = identityOf(r);
+      if (!identity || r.duration_ms == null) continue;
+      const attempts = r.score || 1;
+      const seconds = r.duration_ms / 1000;
+      if (r.duration_ms < 3000) {
+        integrityFlags.push({
+          username: identity, type: 'globequiz', mode: null,
+          score: attempts,
+          reason: `Ganó GlobeQuiz en ${seconds.toFixed(1)}s — demasiado rápido para un humano`,
+          created_at: r.created_at, severity: 'crit',
+        });
+      } else if (attempts / seconds > 2) {
+        integrityFlags.push({
+          username: identity, type: 'globequiz', mode: null,
+          score: attempts,
+          reason: `${attempts} intentos en ${seconds.toFixed(1)}s (${(attempts / seconds).toFixed(1)}/seg) — ritmo no humano`,
+          created_at: r.created_at, severity: 'warn',
+        });
+      }
+    }
+
+    // D) Misma cuenta (o mismo invitado) completando Giras Mundiales con
+    // menos de 3 minutos de diferencia — una Gira Mundial real implica
+    // jugar 4 modos completos, no se puede repetir tan seguido jugando de
+    // verdad.
+    const campaignsByKeyForBot: Record<string, any[]> = {};
+    for (const r of campaignRows as any[]) {
+      const key = groupKey(r);
+      if (!key) continue;
+      (campaignsByKeyForBot[key] = campaignsByKeyForBot[key] || []).push(r);
+    }
+    for (const rows of Object.values(campaignsByKeyForBot)) {
+      const sorted = (rows as any[]).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+      for (let i = 1; i < sorted.length; i++) {
+        const gapMs = new Date(sorted[i].created_at).getTime() - new Date(sorted[i - 1].created_at).getTime();
+        if (gapMs < 3 * 60000) {
+          integrityFlags.push({
+            username: identityOf(sorted[i]) || '—', type: 'campaign', mode: null,
+            score: sorted[i].score,
+            reason: `Completó 2 Giras Mundiales con solo ${Math.round(gapMs / 1000)}s de diferencia — ritmo no humano`,
+            created_at: sorted[i].created_at, severity: 'crit',
+          });
+        }
+      }
+    }
+
+    integrityFlags.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
     // ── Funnel de invitaciones VS: dónde se pierde la gente entre "invitó" y
     // "terminó la partida" (ver logVersusFunnel, js/analytics.js). 'finished'
     // no viene de acá: se reusa el conteo de versusRows (evento 'versus' ya
@@ -664,6 +794,7 @@ Deno.serve(async (req) => {
       versusFunnel,
       social,
       economy,
+      integrityFlags,
       topCountries,
       cohortRetention,
       playBuckets,

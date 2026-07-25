@@ -477,6 +477,18 @@
       </div>
     </section>
 
+    <!-- ── INTEGRIDAD (anti-cheat) ── -->
+    <section class="tab-page" data-page="integridad">
+      <div class="insights" id="integrity-status"></div>
+      <div class="box wide">
+        <h2>Partidas flagueadas
+          <span class="sub">se recalcula en cada carga, dentro del período elegido arriba
+            <span class="help" title="Heurísticas, no certezas: outlier de score (z-score por modo), GlobeQuiz resuelto imposiblemente rápido o con demasiados intentos por segundo, y Giras Mundiales completadas por la misma cuenta con menos de 3 minutos de diferencia. Cada fila trae el motivo para revisar a ojo — esto no banea a nadie solo.">ⓘ</span></span>
+        </h2>
+        <div class="table-scroll"><table id="tbl-integrity"><tbody></tbody></table></div>
+      </div>
+    </section>
+
     <!-- ── CUENTAS ── -->
     <section class="tab-page" data-page="cuentas">
       <div class="box wide">
@@ -581,7 +593,7 @@ const RANGES = [
 const RANGE_LABEL = Object.fromEntries(RANGES);
 const PAGES = [
   ['resumen','📊 Resumen'], ['retencion','🔁 Retención'], ['leaderboards','🏆 Leaderboards'],
-  ['versus','⚔️ Versus'], ['social','🤝 Social'], ['economia','💰 Economía'],
+  ['versus','⚔️ Versus'], ['social','🤝 Social'], ['economia','💰 Economía'], ['integridad','🚩 Integridad'],
   ['cuentas','👤 Cuentas'], ['fundador','👑 Fundador'],
 ];
 const MODE_TABS = [
@@ -754,6 +766,7 @@ function render(data){
   renderVersusTop((data.leaderboards||{}).versus||[]);
   renderSocial(data.social||{});
   renderEconomy(data.economy||{}, rl);
+  renderIntegrity(data.integrityFlags||[], rl);
   renderAccounts(data.accounts||[]);
   renderFounder(data.founder||{});
 }
@@ -1145,6 +1158,29 @@ function renderEconomy(e, rl){
         `<td style="font-family:monospace;font-size:11px;color:var(--muted);max-width:260px">${escapeHtml(JSON.stringify(r.value))}</td>` +
         `<td style="max-width:420px;white-space:normal">${escapeHtml(r.description)}</td></tr>`).join('');
   }
+}
+
+const INTEGRITY_TYPE_LABELS = { game:'Modo suelto', campaign:'🌍 Gira Mundial', globequiz:'🌎 GlobeQuiz' };
+function renderIntegrity(flags, rl){
+  const critCount = flags.filter(f=>f.severity==='crit').length;
+  const warnCount = flags.filter(f=>f.severity==='warn').length;
+  if(!flags.length){
+    $('integrity-status').innerHTML = `<div class="insight-card ok">✅ Ninguna partida flagueada en este período (${rl}).</div>`;
+  } else {
+    $('integrity-status').innerHTML =
+      `<div class="insight-card ${critCount?'crit':'warn'}">🚩 <b>${flags.length}</b> partida${flags.length===1?'':'s'} flagueada${flags.length===1?'':'s'} en este período (${rl}) — <b>${critCount}</b> crítica${critCount===1?'':'s'}, <b>${warnCount}</b> a revisar.</div>`;
+  }
+  const tb = $('tbl-integrity');
+  if(!flags.length){ tb.innerHTML = '<tr><td class="empty">Sin partidas flagueadas.</td></tr>'; return; }
+  tb.innerHTML = '<tr><th>Fecha</th><th>Jugador</th><th>Tipo</th><th style="text-align:right">Score</th><th>Motivo</th><th>Severidad</th></tr>' +
+    flags.map(f=>{
+      const fecha = new Date(f.created_at).toLocaleString('es');
+      const tipo = INTEGRITY_TYPE_LABELS[f.type] || f.type;
+      const sevPill = f.severity==='crit'
+        ? '<span class="status-pill churned"><span class="dotstat"></span>🔴 Crítico</span>'
+        : '<span class="status-pill stale"><span class="dotstat"></span>🟡 Revisar</span>';
+      return `<tr${f.severity==='crit'?' style="background:rgba(255,122,122,.08)"':''}><td style="white-space:nowrap">${fecha}</td><td>${escapeHtml(f.username||'—')}</td><td>${tipo}</td><td class="n">${f.score!=null?f.score.toLocaleString('es'):'—'}</td><td style="white-space:normal">${escapeHtml(f.reason)}</td><td>${sevPill}</td></tr>`;
+    }).join('');
 }
 
 function renderCountries(rows){

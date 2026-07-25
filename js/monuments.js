@@ -1567,6 +1567,13 @@ window.startCampaign = function () {
     document.body.classList.remove('account-logged');
     localStorage.removeItem('profilePhoto');
     applyStoredProfilePic();
+    // Racha de invitado de GlobeQuiz + visitor_id: si no se resetean acá,
+    // el próximo que juegue de invitado en este mismo dispositivo (sin
+    // loguearse) hereda la racha y el visitor_id de la cuenta que se
+    // acaba de ir, mezclando su historial con el de otra persona.
+    localStorage.removeItem('gq_streak_count');
+    localStorage.removeItem('gq_streak_last_date');
+    window.Analytics?.resetVisitorId?.();
     if (typeof window.gqRefreshMenuStreakBadge === 'function') window.gqRefreshMenuStreakBadge();
     clearLocalScores(true);
     if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
