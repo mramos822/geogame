@@ -4517,10 +4517,15 @@ window.quitToMenu = quitToMenu;
       if (lock && lock.classList.contains('open')) { document.getElementById('social-lock-close')?.click(); return true; }
       return false;
     };
+    const gqQuitPopup = document.getElementById('gq-quit-popup');
     const _modeSelPop = document.getElementById('vs-mode-select-popup');
     if (_modeSelPop && _modeSelPop.style.display !== 'none') {
       sfxSelect.currentTime = 0; sfxPlay(sfxSelect);
       _modeSelPop.style.display = 'none';
+    } else if (gqQuitPopup && gqQuitPopup.style.display === 'flex') {
+      _clickBack('gq-quit-cancel');
+    } else if (document.getElementById('globequiz-screen')?.style.display === 'block') {
+      _clickBack('gq-power-btn');
     } else if (quitPopup && quitPopup.style.display === 'flex') {
       sfxSelect.currentTime = 0; sfxPlay(sfxSelect);
       quitPopup.style.display = 'none';
