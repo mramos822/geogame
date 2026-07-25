@@ -1064,7 +1064,7 @@ function renderOnlineUsers(rows){
   const playing = rows.filter(r=>r.is_playing);
   const idle = rows.filter(r=>!r.is_playing);
   tb.innerHTML = '<tr><th>Usuario</th><th>Estado</th><th style="text-align:right">Última actividad</th></tr>' +
-    playing.map(r=>`<tr><td>${escapeHtml(r.username||'—')}</td><td><span class="status-pill active"><span class="dotstat"></span>🎮 Jugando</span></td><td class="n">${timeAgo(r.last_active)}</td></tr>`).join('') +
+    playing.map(r=>`<tr><td>${escapeHtml(r.username||'—')}</td><td><span class="status-pill active"><span class="dotstat"></span>🎮 Jugando${r.playing_mode?' · '+escapeHtml(r.playing_mode):''}</span></td><td class="n">${timeAgo(r.last_active)}</td></tr>`).join('') +
     idle.map(r=>`<tr><td>${escapeHtml(r.username||'—')}</td><td><span class="status-pill stale"><span class="dotstat"></span>🟢 Conectado</span></td><td class="n">${timeAgo(r.last_active)}</td></tr>`).join('');
 }
 

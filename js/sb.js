@@ -414,6 +414,14 @@ window.sbSetPlaying = async function(userId, playing, practicing) {
     .eq('id', userId);
 };
 
+// Qué modo específico está jugando (ver /stats "Quién está conectado ahora").
+// Separado de sbSetPlaying: se llama un instante después, una vez que el
+// contexto (campaña/vs/práctica/modo elegido) ya quedó seteado — ver el
+// comentario del microtask en _setPlaying (monuments.js).
+window.sbSetPlayingMode = async function(userId, label) {
+  await sb.from('profiles').update({ playing_mode: label || null }).eq('id', userId);
+};
+
 window.sbUploadAvatar = async function(userId, blob) {
   const path = `${userId}/avatar.jpg`;
   const { error } = await sb.storage.from('avatars').upload(path, blob, {

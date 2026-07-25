@@ -791,6 +791,19 @@ window.showGlobalToast = function(msg) {
   }, 3200);
 };
 
+// Etiqueta legible de "qué está jugando" para /stats (ver sbSetPlayingMode
+// en sb.js) — best-effort a partir del contexto disponible en el momento
+// del microtask (después de que quien llamó a _setPlaying ya terminó de
+// setear pendingGameMode/campaign/_vsActive en su misma función síncrona).
+const _MODE_NAME_LABELS = { flags: 'Banderas', shapes: 'Figuras', game: 'Ciudades', monuments: 'Monumentos' };
+function _computePlayingLabel(isPracticing) {
+  const modeName = _MODE_NAME_LABELS[window.pendingGameMode] || null;
+  if (window._vsActive) return 'VS' + (modeName ? ' · ' + modeName : '');
+  if (window.campaign && window.campaign.active) return 'Gira Mundial';
+  if (isPracticing) return 'Práctica' + (modeName ? ' · ' + modeName : '');
+  return modeName || 'Jugando';
+}
+
 // Helper global: actualiza is_playing en Supabase si hay sesión activa
 window._setPlaying = function(playing) {
   window._isPlaying = !!playing;
@@ -810,9 +823,13 @@ window._setPlaying = function(playing) {
       if (window._isPlaying && !window._vsActive && !window._lobbyActive && !isPracticing && typeof window.SoloSpectate !== 'undefined') {
         window.SoloSpectate.start();
       }
+      if (window._isPlaying && window._sbUserId && typeof window.sbSetPlayingMode === 'function') {
+        window.sbSetPlayingMode(window._sbUserId, _computePlayingLabel(isPracticing)).catch(() => {});
+      }
     });
   } else {
     if (typeof window.SoloSpectate !== 'undefined') window.SoloSpectate.stop();
+    if (window._sbUserId && typeof window.sbSetPlayingMode === 'function') window.sbSetPlayingMode(window._sbUserId, null).catch(() => {});
     // Al volver de una partida, entregar invitaciones que llegaron mientras jugaba
     if (typeof window.flushQueuedInvite === 'function') window.flushQueuedInvite();
   }
@@ -1068,6 +1085,7 @@ document.getElementById('gq-quit-confirm')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   window._isPlaying = false;
   if (window._sbUserId) window.sbSetPlaying(window._sbUserId, false).catch(() => {});
+  if (window._sbUserId && typeof window.sbSetPlayingMode === 'function') window.sbSetPlayingMode(window._sbUserId, null).catch(() => {});
   // Cortar TODO lo de GlobeQuiz (timer, rotación automática, música/sfx) —
   // mismo criterio que quitToMenu() para los demás modos.
   if (typeof window.stopGlobeQuizTimer === 'function') window.stopGlobeQuizTimer();
@@ -1555,6 +1573,7 @@ window.startCampaign = function () {
 
   async function _doLogout() {
     if (window._sbUserId) window.sbSetPlaying(window._sbUserId, false).catch(() => {});
+    if (window._sbUserId && typeof window.sbSetPlayingMode === 'function') window.sbSetPlayingMode(window._sbUserId, null).catch(() => {});
     if (window.LB?.getId?.()) { try { await window.LB.leave(); } catch (e) {} }
     window.sbStopSessionGuard?.();
     localStorage.removeItem('_sbSessionToken');
@@ -1802,6 +1821,7 @@ async function _onSessionReady(userId) {
   if (!userId) return;
   // Resetear is_playing por si quedó stale (ej: browser cerrado durante partida)
   if (typeof window.sbSetPlaying === 'function') window.sbSetPlaying(userId, false).catch(() => {});
+  if (typeof window.sbSetPlayingMode === 'function') window.sbSetPlayingMode(userId, null).catch(() => {});
   try {
     await syncLocalDataToAccount(userId);
     const profile = await window.sbGetProfile(userId);

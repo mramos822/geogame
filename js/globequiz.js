@@ -1475,6 +1475,9 @@
     if (window._sbUserId && typeof window.sbSetPlaying === 'function') {
       window.sbSetPlaying(window._sbUserId, true, true).catch(() => {});
     }
+    if (window._sbUserId && typeof window.sbSetPlayingMode === 'function') {
+      window.sbSetPlayingMode(window._sbUserId, 'GlobeQuiz').catch(() => {});
+    }
     // Se corta la música del menú apenas se entra (no hay que esperar a que
     // termine el 3-2-1-GO para esto, solo gamemusic espera al onDone).
     // playMusic(null) en vez de pausar el <audio> a mano — en iOS el sonido

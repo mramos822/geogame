@@ -248,7 +248,7 @@ Deno.serve(async (req) => {
       // que el panel pueda mostrar nombres, no solo un número — antes no
       // había forma de saber QUIÉN está online desde /stats.
       sb.from('profiles')
-        .select('username, is_playing, last_active')
+        .select('username, is_playing, playing_mode, last_active')
         .gte('last_active', onlineISO)
         .order('is_playing', { ascending: false })
         .order('last_active', { ascending: false })
@@ -953,7 +953,7 @@ Deno.serve(async (req) => {
       range,
       totals: { totalUsers, onlineNow, playingNow, totalGames: totalCampaigns + versusTotal + totalGlobequiz, totalVisits, versusTotal },
       onlineUsers: (onlineUsersRes.data || []).map((p: any) => ({
-        username: p.username, is_playing: !!p.is_playing, last_active: p.last_active,
+        username: p.username, is_playing: !!p.is_playing, playing_mode: p.playing_mode || null, last_active: p.last_active,
       })),
       period: {
         newUsers: registrations, games: finishedRows.length,
