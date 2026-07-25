@@ -820,12 +820,19 @@ window._setPlaying = function(playing) {
     // práctica: no hay ojo para clickear (is_practicing lo oculta) y la sesión
     // no es una partida "real" para mostrarle a nadie.
     Promise.resolve().then(() => {
-      if (window._isPlaying && !window._vsActive && !window._lobbyActive && !isPracticing && typeof window.SoloSpectate !== 'undefined') {
-        window.SoloSpectate.start();
-      }
-      if (window._isPlaying && window._sbUserId && typeof window.sbSetPlayingMode === 'function') {
-        window.sbSetPlayingMode(window._sbUserId, _computePlayingLabel(isPracticing)).catch(() => {});
-      }
+      // sbSetPlayingMode va PRIMERO y en su propio try/catch: si SoloSpectate.start()
+      // más abajo tirara una excepción, no debe cortar esto a mitad de camino (pasó
+      // exactamente eso antes de este cambio — el modo nunca llegaba a /stats).
+      try {
+        if (window._isPlaying && window._sbUserId && typeof window.sbSetPlayingMode === 'function') {
+          window.sbSetPlayingMode(window._sbUserId, _computePlayingLabel(isPracticing)).catch(() => {});
+        }
+      } catch (e) {}
+      try {
+        if (window._isPlaying && !window._vsActive && !window._lobbyActive && !isPracticing && typeof window.SoloSpectate !== 'undefined') {
+          window.SoloSpectate.start();
+        }
+      } catch (e) {}
     });
   } else {
     if (typeof window.SoloSpectate !== 'undefined') window.SoloSpectate.stop();
