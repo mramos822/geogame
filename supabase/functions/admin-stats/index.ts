@@ -798,6 +798,7 @@ Deno.serve(async (req) => {
         history: g.history.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
         flagged: [...flaggedGuestIds].some((prefix) => prefix && g.visitor_id.startsWith(prefix)),
         candidates: candidatesForGuest(g),
+        online: g.last_seen >= onlineISO,
       }))
       .sort((a, b) => new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime());
 

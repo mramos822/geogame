@@ -200,6 +200,9 @@
   .guest-card-title{min-width:0;flex:1;}
   .guest-card-name{font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .guest-card-name.noname{color:var(--dim);font-weight:400;font-style:italic;}
+  .guest-online-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#3ddc73;
+    box-shadow:0 0 0 3px rgba(61,220,115,.2);margin-right:6px;flex-shrink:0;}
+  .guest-online-label{font-size:10.5px;color:#3ddc73;font-weight:700;white-space:nowrap;}
   .guest-card-vid{font-size:10.5px;color:var(--muted);font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .guest-card-stats{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);}
   .guest-card-stats b{color:var(--text);font-variant-numeric:tabular-nums;}
@@ -1247,7 +1250,7 @@ let guestsData = [];
 let guestsFilter = 'all';
 let guestsSortKey = 'last_seen';
 const GUESTS_FILTERS = [
-  ['all','Todos'], ['candidates','🔗 Con candidato'], ['flagged','🚩 Flagueados'],
+  ['all','Todos'], ['online','🟢 En línea ahora'], ['candidates','🔗 Con candidato'], ['flagged','🚩 Flagueados'],
   ['campaigns','🌍 Giras completas'], ['recent','🕐 Últimas 24h'], ['noname','Sin nombre'],
 ];
 const GUESTS_SORTS = [
@@ -1258,10 +1261,12 @@ function renderGuests(guests, rl){
   guestsData = guests.filter(g=>g.campaigns>0 || g.games>0 || g.visits>0);
   const flaggedCount = guestsData.filter(g=>g.flagged).length;
   const matchCount = guestsData.filter(g=>g.candidates && g.candidates.length).length;
+  const onlineCount = guestsData.filter(g=>g.online).length;
   if(!guestsData.length){
     $('guests-status').innerHTML = `<div class="insight-card ok">👻 Sin invitados con actividad en este período (${rl}).</div>`;
   } else {
     const cards = [`<div class="insight-card ok">👻 <b>${guestsData.length}</b> invitado${guestsData.length===1?'':'s'} jugando sin cuenta en este período (${rl}).</div>`];
+    if(onlineCount>0) cards.push(`<div class="insight-card ok">🟢 <b>${onlineCount}</b> invitado${onlineCount===1?'':'s'} en línea ahora mismo.</div>`);
     if(matchCount>0) cards.push(`<div class="insight-card warn">🔗 <b>${matchCount}</b> tiene${matchCount===1?'':'n'} algún candidato de cuenta — revisar el % de confianza antes de vincular.</div>`);
     if(flaggedCount>0) cards.push(`<div class="insight-card crit">🚩 <b>${flaggedCount}</b> tiene${flaggedCount===1?'':'n'} partidas flagueadas en Integridad.</div>`);
     $('guests-status').innerHTML = cards.join('');
@@ -1305,6 +1310,7 @@ function applyGuestsView(){
       const inCand = (g.candidates||[]).some(c=>c.username.toLowerCase().includes(q));
       if(!inName && !inVid && !inCand) return false;
     }
+    if(guestsFilter==='online') return g.online;
     if(guestsFilter==='candidates') return (g.candidates||[]).length>0;
     if(guestsFilter==='flagged') return g.flagged;
     if(guestsFilter==='campaigns') return g.campaigns>0;
@@ -1348,8 +1354,8 @@ function applyGuestsView(){
       <div class="guest-card-head">
         <div class="guest-avatar">${g.flagged?'🚩':'👻'}</div>
         <div class="guest-card-title">
-          <div class="guest-card-name${nameCls}">${name}</div>
-          <div class="guest-card-vid">${vid}</div>
+          <div class="guest-card-name${nameCls}">${g.online?'<span class="guest-online-dot"></span>':''}${name}</div>
+          <div class="guest-card-vid">${g.online?'<span class="guest-online-label">En línea ahora · </span>':''}${vid}</div>
         </div>
         ${countryCell(g.country_code)}
       </div>
