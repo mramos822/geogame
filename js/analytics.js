@@ -114,7 +114,21 @@
     });
   }
 
-  window.Analytics = { logVisit, logGame, logVersus, logCampaign };
+  // 1 evento por partida de GlobeQuiz GANADA. Cuenta como "1 partida" propia
+  // en los totales del dashboard (junto a campaign/versus) — no es parte de
+  // la Gira Mundial de 4 modos, es un modo standalone independiente.
+  async function logGlobequiz(score) {
+    const cc = (localStorage.getItem('_an_country') || null) || null;
+    insertEvent({
+      type: 'globequiz',
+      score: (typeof score === 'number' && isFinite(score)) ? Math.round(score) : null,
+      visitor_id: visitorId,
+      country_code: cc,
+      user_id: window._sbUserId || null,
+    });
+  }
+
+  window.Analytics = { logVisit, logGame, logVersus, logCampaign, logGlobequiz };
 
   // Registrar la visita en cuanto el cliente sb esté listo.
   function tryVisit(attempt) {

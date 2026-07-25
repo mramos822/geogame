@@ -1216,7 +1216,8 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   to   { transform: translate(-50%, -50%) rotate(360deg); }
 }
 
-#gq-quit-popup {
+#gq-quit-popup,
+#globequiz-locked-popup {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -6114,6 +6115,26 @@ body.is-mobile #screen-warning-icon {
 .ingame-quit-btn:active { transform: scale(0.95); }
 .ingame-quit-btn.confirm { background: #2bd14b; border-color: #1c8a32; }
 .ingame-quit-btn.cancel  { background: #e8504a; border-color: #a32a26; }
+
+/* Popup de GlobeQuiz bloqueado (sin cuenta / sin Gira Mundial completa) —
+   planet2.png representa la Gira Mundial, mismo confirm1/2.png del resto
+   del menú (base + hover) en vez del botón ✓ genérico. */
+.globequiz-locked-planet {
+  width: 12cqmin;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.globequiz-locked-confirm {
+  position: relative;
+  width: 12cqmin;
+  cursor: pointer;
+}
+.globequiz-locked-confirm:hover .loading-play-confirm2 { opacity: 1; }
+#globequiz-locked-popup .ingame-quit-box {
+  animation: gq-endgame-pop 0.4s cubic-bezier(0.22,1,0.36,1);
+}
 
 #score-display {
   display: none;

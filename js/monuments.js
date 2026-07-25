@@ -991,6 +991,23 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
 
 document.getElementById('globequiz-btn')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+  // Gate: GlobeQuiz requiere cuenta, y con cuenta requiere haber completado
+  // al menos 1 Gira Mundial alguna vez (ver el incremento de
+  // campaigns_completed al terminar la campaña, más arriba en este archivo).
+  if (!window._accountLoggedIn || !window._sbUserId) {
+    const textEl = document.getElementById('globequiz-locked-text');
+    if (textEl) { textEl.setAttribute('data-i18n', 'globequiz.lockedNoAccount'); textEl.textContent = t('globequiz.lockedNoAccount'); }
+    const popup = document.getElementById('globequiz-locked-popup');
+    if (popup) popup.style.display = 'flex';
+    return;
+  }
+  if (!((window._sbProfile && window._sbProfile.campaigns_completed) || 0)) {
+    const textEl = document.getElementById('globequiz-locked-text');
+    if (textEl) { textEl.setAttribute('data-i18n', 'globequiz.lockedNoCampaign'); textEl.textContent = t('globequiz.lockedNoCampaign'); }
+    const popup = document.getElementById('globequiz-locked-popup');
+    if (popup) popup.style.display = 'flex';
+    return;
+  }
   if (typeof window.preloadGlobeQuiz === 'function') window.preloadGlobeQuiz();
   [
     document.getElementById('loading-actions'),
@@ -1018,6 +1035,12 @@ document.getElementById('globequiz-btn')?.addEventListener('click', () => {
   if (gqDesc) gqDesc.style.display = 'block';
   const gqPlay = document.getElementById('loading-globequiz-play-wrap');
   if (gqPlay) gqPlay.style.display = 'block';
+});
+
+document.getElementById('globequiz-locked-ok')?.addEventListener('click', () => {
+  sfxSelect.currentTime = 0; sfxPlay(sfxSelect);
+  const popup = document.getElementById('globequiz-locked-popup');
+  if (popup) popup.style.display = 'none';
 });
 
 document.getElementById('loading-globequiz-play-wrap')?.addEventListener('click', () => {
@@ -1054,7 +1077,12 @@ document.getElementById('gq-quit-confirm')?.addEventListener('click', () => {
   if (typeof window.stopGlobeQuizEndgameTimer === 'function') window.stopGlobeQuizEndgameTimer();
   const gqEndgameModalEl = document.getElementById('gq-endgame-modal');
   if (gqEndgameModalEl) gqEndgameModalEl.style.display = 'none';
-  [sfxGameMusic, sfxBonus, sfxPostgame].forEach(s => { try { if (s) { s.pause(); s.currentTime = 0; } } catch (e) {} });
+  // playMusic(null) corta también el AudioBufferSourceNode de iOS (Web Audio),
+  // que sigue sonando si solo se pausa el <audio> HTML — mismo motivo que en
+  // el submitGuess() de globequiz.js. sfxBonus es un sfx normal, no música,
+  // así que a ese sí alcanza con pausarlo directo.
+  if (typeof playMusic === 'function') playMusic(null);
+  try { if (sfxBonus) { sfxBonus.pause(); sfxBonus.currentTime = 0; } } catch (e) {}
   const popup = document.getElementById('gq-quit-popup');
   if (popup) popup.style.display = 'none';
   const gqScreen = document.getElementById('globequiz-screen');
@@ -8520,6 +8548,12 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
       if (typeof window._commitCampaignHighscores === 'function') window._commitCampaignHighscores();
       if (window.Analytics && typeof window.Analytics.logCampaign === 'function') {
         window.Analytics.logCampaign(window.campaign.base || 0);
+      }
+      // Requisito para desbloquear GlobeQuiz: haber completado al menos 1 Gira
+      // Mundial alguna vez (ver gate en el click de globequiz-btn más abajo).
+      if (window._sbUserId && window._sbProfile) {
+        window._sbProfile.campaigns_completed = (window._sbProfile.campaigns_completed || 0) + 1;
+        window.sbUpdateProfile(window._sbUserId, { campaigns_completed: window._sbProfile.campaigns_completed }).catch(() => {});
       }
       playMusic(null);
       // Ocultar el gameover de monuments antes de mostrar results; si no, queda

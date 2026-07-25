@@ -1278,8 +1278,18 @@
       // mostrado.
       gqFinalElapsedMs = Math.max(0, Date.now() - gqTimerStart);
       stopTimer();
-      if (typeof sfxGameMusic !== 'undefined') { sfxGameMusic.pause(); sfxGameMusic.currentTime = 0; }
+      // playMusic(null) en vez de sfxGameMusic.pause() directo — en iOS el
+      // audio real de gamemusic corre por un AudioBufferSourceNode aparte
+      // (Web Audio, ver playMusicIOS en monuments.js), no por el <audio>
+      // HTML; pausar solo el <audio> no lo corta y el loop sigue sonando.
+      if (typeof playMusic === 'function') playMusic(null);
       if (typeof sfxBonus !== 'undefined' && typeof sfxPlay === 'function') { sfxBonus.currentTime = 0; sfxPlay(sfxBonus); }
+      // Cuenta como partida propia en los totales del dashboard de stats
+      // (junto a campaign/versus) — GlobeQuiz es standalone, no parte de la
+      // Gira Mundial. "score" acá es la cantidad de intentos.
+      if (window.Analytics && typeof window.Analytics.logGlobequiz === 'function') {
+        window.Analytics.logGlobequiz(guesses.length + 1);
+      }
       saveState();
       drawTexture();
       renderGuessList();
@@ -1450,7 +1460,9 @@
     }
     // Se corta la música del menú apenas se entra (no hay que esperar a que
     // termine el 3-2-1-GO para esto, solo gamemusic espera al onDone).
-    if (typeof sfxMenuMusic !== 'undefined') { sfxMenuMusic.pause(); sfxMenuMusic.currentTime = 0; }
+    // playMusic(null) en vez de pausar el <audio> a mano — en iOS el sonido
+    // real corre por Web Audio (ver playMusicIOS), no por el elemento HTML.
+    if (typeof playMusic === 'function') playMusic(null);
     // sfxBonus (y el resto de los sfx de partida) recién se instancian acá —
     // sin esto, sfxBonus quedaba `undefined` toda la partida si nunca se
     // había jugado otro modo antes en la sesión, y el "if" de abajo lo

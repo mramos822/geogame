@@ -137,9 +137,9 @@ Deno.serve(async (req) => {
     // así que corren todas en paralelo.
     const [
       totalUsers, onlineNow, playingNow,
-      totalCampaigns, totalVisits, versusTotal,
+      totalCampaigns, totalVisits, versusTotal, totalGlobequiz,
       dau, wau, mau,
-      profilesRes, gamesRes, visitsRes, campaignsRes,
+      profilesRes, gamesRes, visitsRes, campaignsRes, globequizRes,
       lbFlags, lbShapes, lbCities, lbMonuments, lbTotal, lbVersus,
       allProfilesRes, countryEventsRes, allEventsRes,
       founderEligibleRes, founderClaimedRes,
@@ -148,13 +148,15 @@ Deno.serve(async (req) => {
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true }).gte('last_active', onlineISO)),
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true }).eq('is_playing', true).gte('last_active', onlineISO)),
       // "Partidas" = Gira Mundial COMPLETA (los 4 modos, evento 'campaign' logueado
-      // recién al terminar el último) + partidas versus terminadas. NO se cuenta por
-      // modo: jugar los 4 modos de una campaña son eventos 'game' individuales (para
-      // el desglose "Partidas por modo"), pero solo 1 'campaign' si se termina, y 0
-      // si el jugador abandona antes de los 4 modos.
+      // recién al terminar el último) + partidas versus terminadas + GlobeQuiz
+      // ganado ('globequiz', standalone, no es parte de la Gira Mundial). NO se
+      // cuenta por modo: jugar los 4 modos de una campaña son eventos 'game'
+      // individuales (para el desglose "Partidas por modo"), pero solo 1
+      // 'campaign' si se termina, y 0 si el jugador abandona antes de los 4 modos.
       cnt(sb.from('analytics_events').select('*', { count: 'exact', head: true }).eq('type', 'campaign')),
       cnt(sb.from('analytics_events').select('*', { count: 'exact', head: true }).eq('type', 'visit')),
       cnt(sb.from('analytics_events').select('*', { count: 'exact', head: true }).eq('type', 'versus')),
+      cnt(sb.from('analytics_events').select('*', { count: 'exact', head: true }).eq('type', 'globequiz')),
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true }).gte('last_active', dauISO)),
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true }).gte('last_active', wauISO)),
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true }).gte('last_active', mauISO)),
@@ -167,6 +169,8 @@ Deno.serve(async (req) => {
         .eq('type', 'visit').gte('created_at', windowISO).limit(50000),
       sb.from('analytics_events').select('created_at, score, user_id, country_code')
         .eq('type', 'campaign').gte('created_at', windowISO).limit(50000),
+      sb.from('analytics_events').select('created_at, score, user_id, country_code')
+        .eq('type', 'globequiz').gte('created_at', windowISO).limit(50000),
       sb.from('profiles').select('username, hs_flags').order('hs_flags', { ascending: false }).limit(10),
       sb.from('profiles').select('username, hs_shapes').order('hs_shapes', { ascending: false }).limit(10),
       sb.from('profiles').select('username, hs_cities').order('hs_cities', { ascending: false }).limit(10),
@@ -206,11 +210,13 @@ Deno.serve(async (req) => {
     const regRows      = profilesRes.data || [];
     const gameRows      = gamesRes.data     || [];
     const visitRows     = visitsRes.data    || [];
-    const campaignRows  = campaignsRes.data || [];
+    const campaignRows  = campaignsRes.data  || [];
+    const globequizRows = globequizRes.data  || [];
     const singleRows    = gameRows.filter((r: any) => r.type === 'game');
     const versusRows    = gameRows.filter((r: any) => r.type === 'versus');
-    // "Partidas" reales del período: Giras Mundiales completas + versus terminados.
-    const finishedRows  = [...campaignRows, ...versusRows];
+    // "Partidas" reales del período: Giras Mundiales completas + versus terminados
+    // + GlobeQuiz ganado (standalone, no es parte de la Gira Mundial de 4 modos).
+    const finishedRows  = [...campaignRows, ...versusRows, ...globequizRows];
 
     // Series por bucket (hora/día/mes según granularidad)
     const seriesRegs     = bucketByKey(regRows, labels, granularity);
@@ -426,7 +432,7 @@ Deno.serve(async (req) => {
       ok: true,
       generated_at: now.toISOString(),
       range,
-      totals: { totalUsers, onlineNow, playingNow, totalGames: totalCampaigns + versusTotal, totalVisits, versusTotal },
+      totals: { totalUsers, onlineNow, playingNow, totalGames: totalCampaigns + versusTotal + totalGlobequiz, totalVisits, versusTotal },
       period: {
         newUsers: registrations, games: finishedRows.length,
         visits: uniqueVisitors, versus: versusRows.length,
