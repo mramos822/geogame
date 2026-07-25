@@ -145,6 +145,9 @@
         mode4Btn.addEventListener('animationend', () => mode4Btn.classList.add('loaded'), { once: true });
         const accountWrap = document.getElementById('profile-account-btn');
         if (accountWrap) accountWrap.style.display = 'block';
+        const globequizWrap = document.getElementById('globequiz-btn');
+        if (globequizWrap) globequizWrap.style.display = 'block';
+        if (typeof window.gqRefreshMenuStreakBadge === 'function') window.gqRefreshMenuStreakBadge();
         const resultsBtn = document.getElementById('loading-results-btn');
         if (resultsBtn) resultsBtn.style.display = 'block';
         // Arrancar menuloop; si autoplay bloqueado, esperar primer gesto
@@ -435,6 +438,7 @@ window.refreshProfileStats = function () {
       vsEl.style.display = 'none';
     }
   }
+  if (typeof window.gqRefreshProfileStreakBadge === 'function') window.gqRefreshProfileStreakBadge();
   const gamesHs = { 1: flagsHs, 2: shapesHs, 3: playHs, 4: monumentsHs };
   [1,2,3,4].forEach(i => {
     const el = document.getElementById('loading-games-avg' + i);
@@ -966,6 +970,7 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
     document.getElementById('loading-version'),
     document.querySelector('.loading-plane-wrap'),
     document.getElementById('profile-account-btn'),
+    document.getElementById('globequiz-btn'),
   ].forEach(el => { if (el) el.style.display = 'none'; });
   const lg = document.querySelector('.loading-logo');
   if (lg) {
@@ -984,6 +989,96 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
   if (t2) t2.style.display = 'block';
 });
 
+document.getElementById('globequiz-btn')?.addEventListener('click', () => {
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+  if (typeof window.preloadGlobeQuiz === 'function') window.preloadGlobeQuiz();
+  [
+    document.getElementById('loading-actions'),
+    document.getElementById('loading-version'),
+    document.querySelector('.loading-plane-wrap'),
+    document.getElementById('profile-account-btn'),
+    document.getElementById('globequiz-btn'),
+  ].forEach(el => { if (el) el.style.display = 'none'; });
+  const lg = document.querySelector('.loading-logo');
+  if (lg) {
+    lg.getAnimations().forEach(a => a.cancel());
+    lg.classList.add('logo-ready', 'panel2-logo');
+  }
+  const back = document.getElementById('loading-panel2-back');
+  if (back) back.style.display = 'block';
+  const t2 = document.getElementById('loading-globequiz-text2');
+  if (t2) t2.style.display = 'block';
+  const gqTable = document.getElementById('loading-globequiz-table');
+  if (gqTable) gqTable.style.display = 'block';
+  const gqTitle = document.getElementById('loading-globequiz-title');
+  if (gqTitle) gqTitle.style.display = 'block';
+  const gqGlobe = document.getElementById('loading-globequiz-globe');
+  if (gqGlobe) gqGlobe.style.display = 'block';
+  const gqDesc = document.getElementById('loading-globequiz-desc');
+  if (gqDesc) gqDesc.style.display = 'block';
+  const gqPlay = document.getElementById('loading-globequiz-play-wrap');
+  if (gqPlay) gqPlay.style.display = 'block';
+});
+
+document.getElementById('loading-globequiz-play-wrap')?.addEventListener('click', () => {
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+  document.getElementById('loading-screen').style.display = 'none';
+  const gqScreen = document.getElementById('globequiz-screen');
+  if (gqScreen) gqScreen.style.display = 'block';
+  if (typeof window.letterboxRefresh === 'function') window.letterboxRefresh();
+  if (typeof window.initGlobeQuiz === 'function') window.initGlobeQuiz();
+});
+
+document.getElementById('gq-power-btn')?.addEventListener('click', () => {
+  sfxSelect.currentTime = 0; sfxPlay(sfxSelect);
+  const popup = document.getElementById('gq-quit-popup');
+  if (popup) popup.style.display = 'flex';
+});
+
+document.getElementById('gq-quit-cancel')?.addEventListener('click', () => {
+  sfxSelect.currentTime = 0; sfxPlay(sfxSelect);
+  const popup = document.getElementById('gq-quit-popup');
+  if (popup) popup.style.display = 'none';
+});
+
+document.getElementById('gq-quit-confirm')?.addEventListener('click', () => {
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+  window._isPlaying = false;
+  if (window._sbUserId) window.sbSetPlaying(window._sbUserId, false).catch(() => {});
+  // Cortar TODO lo de GlobeQuiz (timer, rotación automática, música/sfx) —
+  // mismo criterio que quitToMenu() para los demás modos.
+  if (typeof window.stopGlobeQuizTimer === 'function') window.stopGlobeQuizTimer();
+  if (typeof window.stopGlobeQuizAutoRotate === 'function') window.stopGlobeQuizAutoRotate();
+  if (typeof window.stopGlobeQuizInertia === 'function') window.stopGlobeQuizInertia();
+  if (typeof window.stopGlobeQuizCountdown === 'function') window.stopGlobeQuizCountdown();
+  if (typeof window.stopGlobeQuizEndgameTimer === 'function') window.stopGlobeQuizEndgameTimer();
+  const gqEndgameModalEl = document.getElementById('gq-endgame-modal');
+  if (gqEndgameModalEl) gqEndgameModalEl.style.display = 'none';
+  [sfxGameMusic, sfxBonus, sfxPostgame].forEach(s => { try { if (s) { s.pause(); s.currentTime = 0; } } catch (e) {} });
+  const popup = document.getElementById('gq-quit-popup');
+  if (popup) popup.style.display = 'none';
+  const gqScreen = document.getElementById('globequiz-screen');
+  if (gqScreen) gqScreen.style.display = 'none';
+  document.getElementById('loading-screen').style.display = '';
+  document.getElementById('loading-screen')?.classList.remove('table-shown');
+  // Ocultar el panel de GlobeQuiz del menú (texto/mesa/título/globo/desc/
+  // jugar) — sin esto quedaba mostrándose ENCIMA del menú principal al
+  // volver, porque resetEntranceElements()/replayEntranceAnimations() no
+  // conocen estos elementos (son específicos de este panel, ver el handler
+  // de loading-panel2-back más abajo, que hace lo mismo para ese caso).
+  ['loading-globequiz-text2', 'loading-globequiz-table', 'loading-globequiz-title',
+   'loading-globequiz-globe', 'loading-globequiz-desc', 'loading-globequiz-play-wrap']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+  // Volver al MENÚ PRINCIPAL (panel1) con la MISMA animación de entrada que
+  // usa quitToMenu() en el resto de los modos, no un salto abrupto.
+  if (typeof window.resetEntranceElements === 'function') window.resetEntranceElements();
+  if (typeof window.replayEntranceAnimations === 'function') window.replayEntranceAnimations();
+  if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
+  // Y la música vuelve al loop del menú, como corresponde.
+  if (typeof window.startMenuMusic === 'function') window.startMenuMusic();
+  else if (typeof playMusic === 'function') playMusic(sfxMenuMusic);
+});
+
 document.getElementById('loading-panel2-back')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   document.getElementById('loading-panel2-back').style.display = 'none';
@@ -995,6 +1090,18 @@ document.getElementById('loading-panel2-back')?.addEventListener('click', () => 
   if (prb) prb.style.display = 'none';
   const t2b = document.getElementById('loading-panel2-text2');
   if (t2b) t2b.style.display = 'none';
+  const gqt2b = document.getElementById('loading-globequiz-text2');
+  if (gqt2b) gqt2b.style.display = 'none';
+  const gqTableB = document.getElementById('loading-globequiz-table');
+  if (gqTableB) gqTableB.style.display = 'none';
+  const gqTitleB = document.getElementById('loading-globequiz-title');
+  if (gqTitleB) gqTitleB.style.display = 'none';
+  const gqGlobeB = document.getElementById('loading-globequiz-globe');
+  if (gqGlobeB) gqGlobeB.style.display = 'none';
+  const gqDescB = document.getElementById('loading-globequiz-desc');
+  if (gqDescB) gqDescB.style.display = 'none';
+  const gqPlayB = document.getElementById('loading-globequiz-play-wrap');
+  if (gqPlayB) gqPlayB.style.display = 'none';
   const lgBack = document.querySelector('.loading-logo');
   if (lgBack) {
     lgBack.style.transition = 'none';
@@ -1007,6 +1114,8 @@ document.getElementById('loading-panel2-back')?.addEventListener('click', () => 
   if (ver) ver.style.display = '';
   const acct = document.getElementById('profile-account-btn');
   if (acct) acct.style.display = 'block';
+  const gq = document.getElementById('globequiz-btn');
+  if (gq) gq.style.display = 'block';
   const pw = document.querySelector('.loading-plane-wrap');
   if (pw) { pw.style.display = ''; pw.style.opacity = '1'; pw.style.transform = 'translate(-50%,-50%) translateY(0)'; pw.classList.add('plane-above'); }
   const lg = document.querySelector('.loading-logo');
@@ -1232,6 +1341,7 @@ window.startCampaign = function () {
             syncHsFromProfile(profile);   // hs locales ← max(local, supabase)
             clearLocalScores();           // solo avgs/playcount → 0
             if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
+            if (typeof window.gqRefreshMenuStreakBadge === 'function') window.gqRefreshMenuStreakBadge();
             _ensureCountryCode(profile);
             if (typeof _updateProfileBtnLabel === 'function') _updateProfileBtnLabel();
             if (typeof loadFriends === 'function') loadFriends();
@@ -1428,6 +1538,7 @@ window.startCampaign = function () {
     document.body.classList.remove('account-logged');
     localStorage.removeItem('profilePhoto');
     applyStoredProfilePic();
+    if (typeof window.gqRefreshMenuStreakBadge === 'function') window.gqRefreshMenuStreakBadge();
     clearLocalScores(true);
     if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
     _updateProfileBtnLabel();
@@ -1667,6 +1778,7 @@ async function _onSessionReady(userId) {
     syncHsFromProfile(profile);  // hs locales ← max(local, supabase) para display en partida
     clearLocalScores();          // solo avgs/playcount
     if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
+    if (typeof window.gqRefreshMenuStreakBadge === 'function') window.gqRefreshMenuStreakBadge();
     _ensureCountryCode(profile);
     if (typeof loadFriends === 'function') loadFriends();  // poblar barra ingame con amigos reales
     _updateProfileBtnLabel();
@@ -1935,6 +2047,7 @@ document.getElementById('loading-profile-btn')?.addEventListener('click', () => 
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   document.getElementById('loading-table-group')?.classList.remove('table-gone');
   document.getElementById('loading-screen').classList.add('table-shown');
+  if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
 });
 
 let _friendRealtimeChannel = null;
@@ -2239,6 +2352,7 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
     CA.applyFrame(document.getElementById('loading-profile-pic-wrap'), frameCode);
     CA.applyCard(document.getElementById('lb-player'), cardCode);
     CA.applyCard(document.getElementById('flags-lb-player'), cardCode);
+    CA.applyCard(document.getElementById('gq-lb-player'), cardCode);
     const panelImg = document.querySelector('#loading-table-group .loading-howtotable');
     if (panelImg) panelImg.src = CA.panelUrl(panelCode);
 
@@ -3257,6 +3371,19 @@ function openFriendProfile(friend) {
   currentFriendProfile = friend;
   const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
 
+  // Racha de GloboReto del amigo — no viene en los selects de la lista de
+  // amigos/rankings (son parciales), así que se pide aparte, chiquito.
+  if (window.sb && friend.id) {
+    window.sb.from('profiles').select('gq_streak_count,gq_streak_last_date').eq('id', friend.id).single()
+      .then(({ data }) => {
+        if (typeof window.gqRefreshFriendStreakBadge === 'function') window.gqRefreshFriendStreakBadge(data);
+      }).catch(() => {
+        if (typeof window.gqRefreshFriendStreakBadge === 'function') window.gqRefreshFriendStreakBadge(null);
+      });
+  } else if (typeof window.gqRefreshFriendStreakBadge === 'function') {
+    window.gqRefreshFriendStreakBadge(null);
+  }
+
   const pic = document.getElementById('loading-friend-pic');
   if (pic) pic.src = friend.avatar;
   window.CustomizeAssets?.applyFrame(document.getElementById('loading-friend-pic-wrap'), friend.frameCode || '0001');
@@ -4039,6 +4166,8 @@ window.showEntranceElementsStatic = function () {
   // account-btn solo en panel1 — ocultarlo en panel2
   const acct = document.getElementById('profile-account-btn');
   if (acct) acct.style.display = 'none';
+  const gq = document.getElementById('globequiz-btn');
+  if (gq) gq.style.display = 'none';
   const resultsBtn = document.getElementById('loading-results-btn');
   if (resultsBtn) resultsBtn.style.display = 'none';
 };
@@ -4102,6 +4231,9 @@ window.replayEntranceAnimations = function () {
   if (actions) actions.style.display = 'flex';
   const acct = document.getElementById('profile-account-btn');
   if (acct) acct.style.display = 'block';
+  const gq = document.getElementById('globequiz-btn');
+  if (gq) gq.style.display = 'block';
+  if (typeof window.gqRefreshMenuStreakBadge === 'function') window.gqRefreshMenuStreakBadge();
   const ver = document.getElementById('loading-version');
   if (ver) ver.style.display = '';
 };

@@ -13,7 +13,7 @@
   <link rel="icon" type="image/png" href="images/planet3.png">
   <title>myGeoChallenge</title>
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6238929099865050" crossorigin="anonymous"></script>
-  <link rel="stylesheet" href="css/style.css?v=3.5.16">
+  <link rel="stylesheet" href="css/style.css?v=3.5.17">
   <link rel="preload" href="images/characters/men3.png" as="image">
   <link rel="preload" href="images/characters/men4.png" as="image">
   <link rel="preload" href="images/characters/girl3.png" as="image">
@@ -49,6 +49,17 @@
     <div class="loading-panel2-text2-wrap" id="loading-panel2-text2" style="display:none">
       <img class="loading-panel2-text2-img" src="images/text2.png" alt="" draggable="false" oncontextmenu="return false">
       <div class="loading-panel2-text2-label"><span data-i18n="panel2.welcome1">¡Bienvenido/a a GeoChallenge!</span><br><span data-i18n="panel2.welcome2">¿Qué modo quieres jugar?</span></div>
+    </div>
+    <div class="loading-panel2-text2-wrap" id="loading-globequiz-text2" style="display:none">
+      <img class="loading-panel2-text2-img" src="images/text2.png" alt="" draggable="false" oncontextmenu="return false">
+      <div class="loading-panel2-text2-label"><span data-i18n="panel2.globequizGreet1">¡Cada día, un país nuevo!</span><br><span data-i18n="panel2.globequizGreet2">¿Te animas a encontrarlo?</span></div>
+    </div>
+    <img class="loading-globequiz-table" id="loading-globequiz-table" src="images/howtoplaytable.png" alt="" draggable="false" oncontextmenu="return false" style="display:none">
+    <span class="loading-globequiz-title" id="loading-globequiz-title" data-i18n="panel2.globequizTitle" style="display:none">GloboReto</span>
+    <img class="loading-globequiz-globe" id="loading-globequiz-globe" src="images/globe.png" alt="" draggable="false" oncontextmenu="return false" style="display:none">
+    <div class="loading-globequiz-desc" id="loading-globequiz-desc" data-i18n="panel2.globequizDesc" style="display:none">Adivina el país misterioso del día. Cada intento fallido marca el globo: mientras más caliente el color, más cerca estás.</div>
+    <div class="loading-globequiz-play-wrap" id="loading-globequiz-play-wrap" style="display:none">
+      <img src="images/buttons/es-globeplay.png" alt="" draggable="false" oncontextmenu="return false">
     </div>
     <div class="loading-btn-row" style="display:none">
       <div class="loading-btn-wrap" style="display:none" id="loading-shapes-wrap">
@@ -217,8 +228,22 @@
     <span class="loading-games-hs-label" data-i18n="common.highscore">Highscore</span>
     <img class="loading-games-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">
     <span class="loading-games-total" id="loading-games-total">0</span>
+    <div class="loading-profile-streak" id="loading-profile-streak" style="display:none">
+      <img class="loading-profile-streak-globe" src="images/globe.png" alt="" draggable="false" oncontextmenu="return false">
+      <div class="loading-profile-streak-flame-wrap">
+        <span class="loading-profile-streak-num" id="loading-profile-streak-num">0</span>
+        <img class="loading-profile-streak-img" src="images/streak.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+    </div>
     </div>
 
+    <div class="globequiz-btn-wrap" id="globequiz-btn">
+      <img src="images/buttons/es-globequiz.png" alt="Globequiz" draggable="false" oncontextmenu="return false">
+      <div class="loading-globequiz-streak" id="loading-globequiz-streak" style="display:none">
+        <img class="loading-globequiz-streak-img" src="images/streak.png" alt="" draggable="false" oncontextmenu="return false">
+        <span class="loading-globequiz-streak-num" id="loading-globequiz-streak-num">0</span>
+      </div>
+    </div>
     <div class="profile-account-wrap" id="profile-account-btn">
       <span class="profile-btn-label" id="profile-btn-label"></span>
       <img class="profile-account1" src="images/account1.png" alt="" draggable="false" oncontextmenu="return false">
@@ -1104,6 +1129,13 @@
     <span class="loading-games-hs-label" data-i18n="common.highscore">Highscore</span>
     <img class="loading-games-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">
     <span class="loading-games-total" id="loading-friend-total">0</span>
+    <div class="loading-profile-streak" id="loading-friend-streak" style="display:none">
+      <img class="loading-profile-streak-globe" src="images/globe.png" alt="" draggable="false" oncontextmenu="return false">
+      <div class="loading-profile-streak-flame-wrap">
+        <span class="loading-profile-streak-num" id="loading-friend-streak-num">0</span>
+        <img class="loading-profile-streak-img" src="images/streak.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+    </div>
     <div class="loading-friend-actions" id="loading-friend-actions">
       <img class="loading-friend-act loading-friend-fav"   id="loading-friend-fav"   src="images/bestfriend.png" alt="Mejor amigo" draggable="false" oncontextmenu="return false">
       <img class="loading-friend-act loading-friend-rel"   id="loading-friend-rel"   src="images/friendadd.png"  alt="" draggable="false" oncontextmenu="return false">
@@ -1184,7 +1216,7 @@
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
     </div>
-    <div id="loading-version">Ver. 3.5.16</div>
+    <div id="loading-version">Ver. 3.5.17</div>
   </div>
 
   <!-- Pantalla de resultado versus (W/L) — fuera del loading-screen para verse tras la partida -->
@@ -1378,6 +1410,86 @@
         <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
+    </div>
+  </div>
+
+  <div id="globequiz-screen" style="display:none">
+    <img class="gq-bg" src="images/bg/sky3.png" alt="" draggable="false" oncontextmenu="return false">
+    <div class="gq-edge-bar"></div>
+    <div class="gq-power-wrap" id="gq-power-btn">
+      <img src="images/power.png" alt="" draggable="false" oncontextmenu="return false">
+    </div>
+    <div class="gq-countdown-widget">
+      <img src="images/globecountdown.png" alt="" draggable="false" oncontextmenu="return false">
+      <span id="gq-timer-number">0:00</span>
+    </div>
+    <div class="gq-friends-bar" id="gq-friends-bar">
+      <div class="lb-entry lb-player" id="gq-lb-player">
+        <span class="lb-rank rank-other"></span>
+        <div class="lb-avatar"><img class="lb-avatar-img" id="gq-lb-player-avatar" src="images/profilepic/ppdefault.png" alt=""></div>
+        <span class="lb-name" id="gq-lb-player-name">Tú</span>
+        <span class="lb-score" id="gq-lb-player-time">0:00</span>
+      </div>
+    </div>
+    <div class="gq-guess-row">
+      <input type="text" class="gq-guess-input" id="gq-guess-input" autocomplete="off" spellcheck="false" data-i18n-ph="globequiz.inputPh" placeholder="Escribe un país...">
+      <div class="gq-guess-btn" id="gq-guess-btn">
+        <img class="gq-guess-btn1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
+        <img class="gq-guess-btn2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+    </div>
+    <div class="gq-hint" id="gq-hint" data-i18n="globequiz.hintFirst">Coloca el nombre del país de tu primera opción.</div>
+    <div id="gq-pregame-countdown" style="display:none">
+      <img id="gq-pregame-countdown-img" src="" alt="">
+    </div>
+    <div class="gq-globe-wrap">
+      <canvas id="gq-canvas"></canvas>
+      <div class="gq-loading-spinner" id="gq-loading-spinner"></div>
+    </div>
+    <div class="gq-confetti" id="gq-confetti"></div>
+    <div class="gq-hover-name" id="gq-hover-name"></div>
+    <div id="gq-quit-popup" style="display:none">
+      <div class="ingame-quit-box">
+        <span class="ingame-quit-text" data-i18n="quit.text">¿Quieres terminar la partida y volver al menú principal?</span>
+        <div class="ingame-quit-actions">
+          <button class="ingame-quit-btn confirm" id="gq-quit-confirm" type="button" aria-label="Sí">✓</button>
+          <button class="ingame-quit-btn cancel" id="gq-quit-cancel" type="button" aria-label="No">✕</button>
+        </div>
+      </div>
+    </div>
+    <div id="gq-endgame-modal" style="display:none">
+      <div class="gq-endgame-box">
+        <span class="gq-endgame-title" data-i18n="globequiz.gameOverTitle">¡Juego terminado!</span>
+        <div class="gq-endgame-country">
+          <span class="gq-endgame-country-label" id="gq-endgame-country-label"></span>
+          <img class="gq-endgame-flag" id="gq-endgame-flag" src="" alt="" draggable="false" oncontextmenu="return false">
+        </div>
+        <div class="gq-endgame-stats">
+          <div class="gq-endgame-stat">
+            <span data-i18n="globequiz.timeTaken">Tiempo</span>
+            <span class="gq-endgame-stat-val" id="gq-endgame-time">0:00</span>
+          </div>
+          <div class="gq-endgame-stat">
+            <span data-i18n="globequiz.attempts">Intentos</span>
+            <span class="gq-endgame-stat-val" id="gq-endgame-attempts">0</span>
+          </div>
+        </div>
+        <div class="gq-endgame-table" id="gq-endgame-table"></div>
+        <div class="gq-endgame-footer">
+          <div class="gq-endgame-streak" id="gq-endgame-streak">
+            <img class="gq-endgame-streak-img" src="images/streak.png" alt="" draggable="false" oncontextmenu="return false">
+            <span class="gq-endgame-streak-num" id="gq-endgame-streak-num">0</span>
+          </div>
+          <div class="gq-endgame-confirm" id="gq-endgame-confirm">
+            <img class="gq-guess-btn1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
+            <img class="gq-guess-btn2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="gq-panel">
+      <div class="gq-win-msg" id="gq-win-msg" style="display:none"></div>
+      <div class="gq-guess-list" id="gq-guess-list"></div>
     </div>
   </div>
 
@@ -1844,27 +1956,30 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-  <script src="js/sb.js?v=3.5.16"></script>
-  <script src="js/analytics.js?v=3.5.16"></script>
-  <script src="js/letterbox.js?v=3.5.16"></script>
-  <script src="js/i18n.js?v=3.5.16"></script>
-  <script src="js/i18n-data.js?v=3.5.16"></script>
-  <script src="js/manifest.js?v=3.5.16"></script>
-  <script src="js/practice-data.js?v=3.5.16"></script>
-  <script src="js/cities.js?v=3.5.16"></script>
-  <script src="js/countries.js?v=3.5.16"></script>
-  <script src="js/places.js?v=3.5.16"></script>
-  <script src="js/friends.js?v=3.5.16"></script>
-  <script src="js/vs.js?v=3.5.16"></script>
-  <script src="js/spectate.js?v=3.5.16"></script>
-  <script src="js/lobby.js?v=3.5.16"></script>
-  <script src="js/monuments.js?v=3.5.16"></script>
-  <script src="js/flags.js?v=3.5.16"></script>
-  <script src="js/shapes.js?v=3.5.16"></script>
-  <script src="js/ranks.js?v=3.5.16"></script>
-  <script src="js/results.js?v=3.5.16"></script>
-  <script src="js/final.js?v=3.5.16"></script>
-  <script src="js/memdebug.js?v=3.5.16"></script>
+  <script src="js/sb.js?v=3.5.17"></script>
+  <script src="js/analytics.js?v=3.5.17"></script>
+  <script src="js/letterbox.js?v=3.5.17"></script>
+  <script src="js/i18n.js?v=3.5.17"></script>
+  <script src="js/i18n-data.js?v=3.5.17"></script>
+  <script src="js/manifest.js?v=3.5.17"></script>
+  <script src="js/practice-data.js?v=3.5.17"></script>
+  <script src="js/cities.js?v=3.5.17"></script>
+  <script src="js/countries.js?v=3.5.17"></script>
+  <script src="js/places.js?v=3.5.17"></script>
+  <script src="js/friends.js?v=3.5.17"></script>
+  <script src="js/vs.js?v=3.5.17"></script>
+  <script src="js/spectate.js?v=3.5.17"></script>
+  <script src="js/lobby.js?v=3.5.17"></script>
+  <script src="js/monuments.js?v=3.5.17"></script>
+  <script src="js/globequiz-names-es.js?v=3.5.17"></script>
+  <script src="js/globequiz-countries-data.js?v=3.5.17"></script>
+  <script src="js/globequiz.js?v=3.5.17"></script>
+  <script src="js/flags.js?v=3.5.17"></script>
+  <script src="js/shapes.js?v=3.5.17"></script>
+  <script src="js/ranks.js?v=3.5.17"></script>
+  <script src="js/results.js?v=3.5.17"></script>
+  <script src="js/final.js?v=3.5.17"></script>
+  <script src="js/memdebug.js?v=3.5.17"></script>
 
   <button id="recording-toggle" style="display:none" onclick="document.body.classList.toggle('recording-mode');this.classList.toggle('active')">⏺</button>
 

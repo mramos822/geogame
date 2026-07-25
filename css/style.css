@@ -1002,6 +1002,586 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   transform-origin: 0 0;
 }
 
+/* ── GLOBEQUIZ (globo 3D) ────────────────────────────── */
+#globequiz-screen {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 200;
+  background: #04385c;
+  container-type: size;
+  container-name: stage;
+  touch-action: manipulation;
+  overscroll-behavior: none;
+}
+
+.gq-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Igual que #right-edge-bar (juego real): barra celeste pegada al borde
+   derecho del área visible, detrás del panel de amigos. */
+.gq-edge-bar {
+  position: absolute;
+  right: 15%;
+  top: 0;
+  bottom: 0;
+  width: 19.1cqmin;
+  background-color: rgba(135, 198, 255, 0.90);
+  z-index: 205;
+  pointer-events: none;
+}
+
+.gq-power-wrap {
+  position: absolute;
+  top: 0.5%;
+  left: 74%;
+  transform: translateX(-50%);
+  width: 6.5cqmin;
+  height: 6.5cqmin;
+  cursor: pointer;
+  z-index: 210;
+  transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1);
+}
+.gq-power-wrap:hover { transform: translateX(-50%) scale(1.15); }
+
+/* Misma posición/tamaño universal que #countdown-widget (juego real) */
+/* globecountdown.png tiene proporción nativa 2.67:1 (829x310), muy distinta
+   a countdown.png (1.8:1) — con la caja/object-fit:fill de ese widget
+   quedaba comprimido en X. Acá el ancho respeta la proporción real de la
+   imagen (con object-fit:contain de respaldo), sin importar que se meta
+   debajo de la barra de escribir. */
+/* Posición/tamaño/comportamiento IDÉNTICO a #countdown-widget (juego real) */
+.gq-countdown-widget {
+  position: absolute;
+  top: 1.2cqmin;
+  right: 57.5cqmin;
+  width: 28.93cqmin;
+  height: 15.95cqmin;
+  pointer-events: none;
+  z-index: 1000;
+}
+.gq-countdown-widget img {
+  width: 100%;
+  height: 100%;
+  /* globecountdown.png tiene proporción propia (829x310) distinta a
+     countdown.png — contain respeta su tamaño/forma real en vez de
+     estirarla a la caja del widget. */
+  object-fit: contain;
+  display: block;
+  /* Sin loop CSS propio: js/globequiz.js retriggerea "pulse-img-shadow" a
+     mano en cada tick del cronómetro, para que el titileo quede
+     perfectamente sincronizado con el segundo que cambia. */
+}
+/* Posición/estilo IDÉNTICO a #timer-number (juego real) */
+#gq-timer-number {
+  position: absolute;
+  top: 51.5%;
+  left: 69%;
+  transform: translate(-50%, -50%);
+  font-size: 7.4cqmin;
+  font-weight: 900;
+  font-family: 'Arial Black', Impact, sans-serif;
+  color: white;
+  -webkit-text-stroke: 0.8cqmin black;
+  paint-order: stroke fill;
+  pointer-events: none;
+  min-width: 4.8cqmin;
+  text-align: center;
+  transition: color 0.3s;
+}
+.gq-power-wrap img { display: block; width: 100%; height: auto; pointer-events: none; user-select: none; -webkit-user-drag: none; }
+
+.gq-friends-bar {
+  position: absolute;
+  right: 16.5%;
+  bottom: 3cqmin;
+  width: 12.6cqmin;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.7cqmin;
+  z-index: 210;
+}
+.gq-friends-bar .lb-entry {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 6;
+}
+
+/* Mismo centro/tamaño que .gq-globe-wrap pero SIN recorte circular — las
+   partículas del confeti (ver globequiz.js, showWin) tienen que poder salir
+   más allá del borde del globo. */
+/* Mismo estilo que #pregame-countdown/#pregame-countdown-img (juego real). */
+#gq-pregame-countdown {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 500;
+  pointer-events: none;
+}
+#gq-pregame-countdown-img {
+  /* width/height los pone JS por paso (46cqmin 3-2-1, 54cqmin GO — mismo
+     tamaño que el countdown real, ver PREGAME_STEPS en monuments.js). */
+  object-fit: contain;
+  filter: drop-shadow(0 6px 24px rgba(0,0,0,0.55));
+}
+#gq-pregame-countdown-img.gq-pop {
+  animation: pregame-pop 0.55s cubic-bezier(0.22,1,0.36,1) forwards;
+}
+
+.gq-confetti {
+  position: absolute;
+  top: 46%;
+  left: 45.5%;
+  transform: translate(-50%, -50%);
+  width: 72cqmin;
+  height: 72cqmin;
+  z-index: 230;
+  pointer-events: none;
+}
+.gq-confetti-piece {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0.9cqmin;
+  height: 1.6cqmin;
+  animation: gq-confetti-fall linear forwards;
+}
+@keyframes gq-confetti-fall {
+  0%   { transform: translate(-50%, -50%) translate(var(--cx), var(--cy)) rotate(0deg); opacity: 1; }
+  100% { transform: translate(-50%, -50%) translate(var(--tx), var(--ty)) rotate(var(--rot)); opacity: 0; }
+}
+
+.gq-globe-wrap {
+  position: absolute;
+  top: 46%;
+  /* Centrado entre el borde izquierdo visible (15%, el letterbox del
+     #app-stage) y la barra celeste del leaderboard (empieza en ~75.94%),
+     NO en el centro de la pantalla completa. */
+  left: 45.5%;
+  transform: translate(-50%, -50%);
+  width: 72cqmin;
+  height: 72cqmin;
+  aspect-ratio: 1 / 1;
+  z-index: 201;
+  /* Visor circular: sin esto, al hacer zoom in la esfera desborda el marco
+     cuadrado del canvas y se pierde la silueta redonda (se ve "cuadrado").
+     Con el recorte en círculo el mapa puede acercarse todo lo que sea, el
+     marco siempre se ve esférico. */
+  border-radius: 50%;
+  overflow: hidden;
+}
+.gq-globe-wrap canvas {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 1 / 1;
+  display: block;
+  touch-action: none;
+  cursor: grab;
+}
+.gq-globe-wrap canvas:active { cursor: grabbing; }
+
+.gq-loading-spinner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 7cqmin;
+  height: 7cqmin;
+  border: 0.7cqmin solid rgba(255,255,255,0.35);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  /* Keyframe propio (no acct-spin) que incluye el translate de centrado en
+     cada paso — reusar acct-spin (solo rotate) pisaba el transform de
+     centrado durante la animación y el spinner "saltaba" de posición en
+     cada vuelta. */
+  animation: gq-spinner-spin 0.8s linear infinite;
+  pointer-events: none;
+}
+@keyframes gq-spinner-spin {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to   { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+#gq-quit-popup {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+}
+
+#gq-endgame-modal {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  pointer-events: auto;
+}
+/* Mismo lenguaje visual que .ingame-quit-box (panel de confirmación real). */
+.gq-endgame-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.4cqmin;
+  width: 56cqmin;
+  max-height: 82cqmin;
+  padding: 3cqmin;
+  background: #fffbe6;
+  border: 0.6cqmin solid #8b6a00;
+  border-radius: 2cqmin;
+  box-shadow: 0 0.8cqmin 2cqmin rgba(0,0,0,0.4);
+  animation: gq-endgame-pop 0.4s cubic-bezier(0.22,1,0.36,1);
+}
+@keyframes gq-endgame-pop {
+  0%   { opacity: 0; transform: scale(0.7) translateY(3cqmin); }
+  70%  { opacity: 1; transform: scale(1.03) translateY(0); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+.gq-endgame-title {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 3.4cqmin;
+  color: #5a4400;
+  text-align: center;
+}
+.gq-endgame-country {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8cqmin;
+}
+.gq-endgame-country-label {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2.6cqmin;
+  color: #2fae4a;
+  text-align: center;
+}
+.gq-endgame-flag {
+  width: 14cqmin;
+  height: auto;
+  border-radius: 0.6cqmin;
+  border: 0.25cqmin solid #8b6a00;
+  box-shadow: 0 0.4cqmin 1cqmin rgba(0,0,0,0.3);
+}
+.gq-endgame-stats {
+  display: flex;
+  gap: 3cqmin;
+}
+.gq-endgame-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3cqmin;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 1.7cqmin;
+  color: #5a4400;
+}
+.gq-endgame-stat-val {
+  font-family: 'Arial Black', Impact, sans-serif;
+  font-size: 3.4cqmin;
+  color: #ffffff;
+  -webkit-text-stroke: 0.55cqmin #8b6a00;
+  paint-order: stroke fill;
+}
+.gq-endgame-table {
+  width: 100%;
+  max-height: 26cqmin;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5cqmin;
+  scrollbar-width: none;
+}
+.gq-endgame-table::-webkit-scrollbar { display: none; }
+.gq-endgame-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8cqmin;
+  padding: 0.5cqmin 1cqmin;
+  border-radius: 0.8cqmin;
+  background: rgba(139,106,0,0.1);
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 1.4cqmin;
+  color: #5a4400;
+}
+.gq-endgame-row.correct { background: #8fe3a3; }
+.gq-endgame-row-flag {
+  width: 2.6cqmin;
+  height: 2.6cqmin;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #8b6a00;
+  flex-shrink: 0;
+}
+.gq-endgame-row-name { flex: 1; text-align: left; }
+.gq-endgame-row-dist { opacity: 0.85; }
+.gq-endgame-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 0.6cqmin;
+}
+/* streak.png (racha de días jugados) va acá, a la izquierda del confirm. */
+.gq-endgame-streak {
+  position: relative;
+  width: 8cqmin;
+  margin-left: 5cqmin;
+}
+.gq-endgame-streak-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.gq-endgame-streak-num {
+  position: absolute;
+  top: 64%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Arial Black', Impact, sans-serif;
+  font-size: 4.2cqmin;
+  color: #ffffff;
+  -webkit-text-stroke: 0.6cqmin #d81e0a;
+  paint-order: stroke fill;
+  pointer-events: none;
+}
+.gq-endgame-confirm {
+  position: relative;
+  width: 13cqmin;
+  cursor: pointer;
+  margin-left: auto;
+  margin-right: 7cqmin;
+}
+.gq-endgame-confirm:hover .gq-guess-btn2 { opacity: 1; }
+
+.gq-panel {
+  position: absolute;
+  top: 18%;
+  left: 16%;
+  width: 30cqmin;
+  max-height: 74%;
+  z-index: 201;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2cqmin;
+}
+
+/* Fila arriba al centro (donde antes iba el título "GloboReto") */
+.gq-guess-row {
+  position: absolute;
+  bottom: 4cqmin;
+  left: 45.5%;
+  transform: translateX(-50%);
+  z-index: 210;
+  display: flex;
+  align-items: center;
+  gap: 1cqmin;
+}
+/* Mismo estilo que .loading-name-input (cambiar nombre sin cuenta) */
+.gq-guess-input {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 3cqmin;
+  color: #8b6a00;
+  background: #fffbe6;
+  border: 0.6cqmin solid #8b6a00;
+  border-radius: 1.6cqmin;
+  padding: 0.8cqmin 2cqmin;
+  width: 36cqmin;
+  outline: none;
+  text-align: center;
+}
+.gq-guess-input:disabled { opacity: 0.6; }
+/* Mismo pack que .loading-name-confirm (confirm1/confirm2.png) */
+.gq-guess-btn {
+  position: relative;
+  flex: none;
+  width: 8.5cqmin;
+  cursor: pointer;
+}
+.gq-guess-btn1 {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.gq-guess-btn2 {
+  position: absolute;
+  top: 49%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 118%;
+  height: auto;
+  opacity: 0;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.gq-guess-btn:hover .gq-guess-btn2 { opacity: 1; }
+.gq-guess-btn.gq-disabled { pointer-events: none; opacity: 0.5; }
+
+.gq-suggestion-link {
+  text-decoration: underline;
+  cursor: pointer;
+  font-weight: bold;
+  pointer-events: auto;
+}
+.gq-suggestion-link:hover { color: #ffe87a; }
+
+/* Mismo font que el feedback de "Solicitud de amistad enviada"
+   (.loading-addfriend-feedback): Dimbo. */
+/* Posición (left/top) la pone JS en cada hover, en px del stage de diseño
+   (1920x911) — sigue al cursor en vez de quedar fija abajo del globo. */
+.gq-hover-name {
+  display: none;
+  position: absolute;
+  transform: translateX(-50%);
+  z-index: 220;
+  font-family: 'Dimbo', sans-serif;
+  font-size: 2.2cqmin;
+  color: #ffffff;
+  -webkit-text-stroke: 0.4cqmin #000000;
+  paint-order: stroke fill;
+  text-align: center;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.gq-hint {
+  position: absolute;
+  bottom: 13cqmin;
+  left: 45.5%;
+  transform: translateX(-50%);
+  z-index: 210;
+  font-family: 'Dimbo', sans-serif;
+  font-size: 3.6cqmin;
+  color: #ffffff;
+  -webkit-text-stroke: 0.6cqmin #000000;
+  paint-order: stroke fill;
+  text-align: center;
+  width: max-content;
+  max-width: 90cqmin;
+  white-space: nowrap;
+  line-height: 1.3;
+  pointer-events: none;
+}
+.gq-hint-correct-name {
+  color: #2fae4a;
+}
+
+/* Sin fondo/padding propios: la única celda visible es la
+   .gq-guess-item.correct que arma showWin() adentro. */
+.gq-win-msg {
+  display: flex;
+}
+
+.gq-guess-list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6cqmin;
+  padding-right: 0.4cqmin;
+  /* Scrolleable pero sin barra visible. */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge viejo */
+}
+.gq-guess-list::-webkit-scrollbar { display: none; } /* Chrome/Safari */
+/* Mismo panel "cell" personalizable (images/customize/cells/<code>.png) que
+   usan el resto de las listas del juego (.loading-social-row) — border-image
+   en vez de background para que las esquinas no se deformen al re-escalar. */
+.gq-guess-item {
+  display: flex;
+  align-items: center;
+  /* Ancho FIJO (no fit-content): todas las filas miden lo mismo en X sin
+     importar cuántos dígitos tenga la distancia, en vez de bandera+número
+     pegados a distinto ancho cada una. Suficiente para 5 dígitos ("20000
+     km") sin que el texto se corte a un segundo renglón. */
+  width: 24cqmin;
+  box-sizing: border-box;
+  gap: 0.5cqmin;
+  padding: 0.5cqmin 0.9cqmin;
+  border-radius: 1cqmin;
+  background: rgba(255,255,255,0.12);
+  color: #ffffff;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 1.4cqmin;
+  cursor: pointer;
+  /* --rank-scale la setea JS por fila (estilo "bar chart race": más arriba
+     = más grande). transform también en la transición para que el FLIP al
+     reordenar (limpiar el transform inline que puso el JS) anime suave. */
+  transform: scale(var(--rank-scale, 1));
+  transition: background 0.1s, transform 0.35s ease-out;
+  align-self: flex-start;
+  transform-origin: left top;
+}
+.gq-guess-item:hover { background: rgba(255,255,255,0.22); }
+/* Solo las filas nuevas (ver gq-item-new en globequiz.js) animan — las que
+   ya estaban puestas no repiten la entrada al re-renderizar la lista.
+   scale(var(--rank-scale)) en ambos extremos: solo translateY/opacity
+   animan acá, el tamaño por posición no lo toca esta animación. */
+.gq-guess-item.gq-item-new {
+  animation: gq-item-enter 0.35s ease-out;
+}
+@keyframes gq-item-enter {
+  from { transform: translateY(2.5cqmin) scale(var(--rank-scale, 1)); opacity: 0; }
+  to   { transform: translateY(0) scale(var(--rank-scale, 1)); opacity: 1; }
+}
+/* Bandera circular grande, sin celda personalizable. */
+.gq-guess-flag {
+  width: 5.2cqmin;
+  height: 5.2cqmin;
+  border-radius: 50%;
+  flex-shrink: 0;
+  overflow: hidden;
+  object-fit: cover;
+  border: 0.25cqmin solid #fff;
+  pointer-events: none;
+  user-select: none;
+}
+/* Mismo formato que el contador (#gq-timer-number): blanco con contorno negro. */
+.gq-guess-item .gq-guess-dist {
+  font-family: 'Arial Black', Impact, sans-serif;
+  font-size: 2.4cqmin;
+  font-weight: 900;
+  color: #ffffff;
+  -webkit-text-stroke: 0.4cqmin #000000;
+  paint-order: stroke fill;
+  white-space: nowrap;
+}
+.gq-guess-item.correct {
+  background: #8fe3a3;
+  width: max-content;
+  white-space: nowrap;
+}
+.gq-guess-item.correct .gq-guess-dist { color: #ffffff; -webkit-text-stroke: 0.4cqmin #1c6b32; }
+
 /* Etiqueta de versión: abajo al centro del menú de carga */
 #loading-version {
   position: absolute;
@@ -2976,6 +3556,64 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   pointer-events: none;
 }
 
+/* Racha de GloboReto en el perfil, al lado del bloque de highscore/puntos —
+   globe.png de base (ícono del modo) con streak.png (llamita) como insignia
+   superpuesta en la esquina, número arriba de la llamita. */
+.loading-profile-streak {
+  position: absolute;
+  top: 79%;
+  left: calc(50% + 13cqmin);
+  transform: translate(-50%, -50%);
+  width: 9cqmin;
+  z-index: 500;
+  pointer-events: none;
+}
+.loading-profile-streak-globe {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.loading-profile-streak-flame-wrap {
+  position: absolute;
+  right: -12%;
+  bottom: -10%;
+  width: 58%;
+  pointer-events: none;
+}
+.loading-profile-streak-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.loading-profile-streak-num {
+  position: absolute;
+  top: 64%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Arial Black', Impact, sans-serif;
+  font-size: 2.6cqmin;
+  color: #fff;
+  -webkit-text-stroke: 0.4cqmin #d81e0a;
+  paint-order: stroke fill;
+  letter-spacing: 0.1cqmin;
+  white-space: nowrap;
+  pointer-events: none;
+}
+/* Racha en 0 (o rota) dentro de un panel de PERFIL (propio o de amigo) —
+   a diferencia del botón del menú, acá no se oculta: se muestra apagada
+   (la llamita y el número quedan en blanco y negro, el globo se queda a color). */
+.loading-profile-streak.streak-inactive .loading-profile-streak-img,
+.loading-profile-streak.streak-inactive .loading-profile-streak-num {
+  filter: grayscale(1);
+  opacity: 0.55;
+}
+
 .supporter-badge {
   font-size: 4.5cqmin;
   line-height: 1;
@@ -3795,6 +4433,80 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 .loading-panel2-practice:active img { transform: scale(0.97); }
 
 /* ── LOADING PANEL 2 TEXT2 ──────────────────────────── */
+.loading-globequiz-table {
+  position: absolute;
+  top: 43%;
+  left: 62%;
+  transform: translate(-50%, -50%);
+  width: 94cqmin;
+  height: auto;
+  z-index: 202;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  filter: drop-shadow(4px 6px 8px rgba(0,0,0,0.35));
+}
+.loading-globequiz-title {
+  position: absolute;
+  top: 16.5%;
+  left: 62%;
+  transform: translate(-50%, -50%);
+  z-index: 203;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 5.3cqmin;
+  color: #ffffff;
+  -webkit-text-stroke: 1.1cqmin #755a3d;
+  paint-order: stroke fill;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.loading-globequiz-globe {
+  position: absolute;
+  top: 36%;
+  left: 62%;
+  transform: translate(-50%, -50%);
+  width: 30cqmin;
+  height: auto;
+  z-index: 203;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.loading-globequiz-desc {
+  position: absolute;
+  top: 58%;
+  left: 62%;
+  transform: translate(-50%, -50%);
+  width: 55cqmin;
+  z-index: 203;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2.4cqmin;
+  line-height: 1.4;
+  color: #2a2a2a;
+  text-align: center;
+  pointer-events: none;
+}
+.loading-globequiz-play-wrap {
+  position: absolute;
+  top: 70%;
+  left: 62%;
+  transform: translate(-50%, -50%);
+  width: 35cqmin;
+  z-index: 203;
+  cursor: pointer;
+  pointer-events: all;
+  transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1);
+}
+.loading-globequiz-play-wrap:hover { transform: translate(-50%, -50%) scale(1.08); }
+.loading-globequiz-play-wrap img {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  animation: pop-in 0.35s cubic-bezier(0.34,1.56,0.64,1);
+}
 .loading-panel2-text2-wrap {
   position: absolute;
   top: 42%;
@@ -3900,6 +4612,60 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1);
   transform: translateZ(0);
   backface-visibility: hidden;
+}
+.globequiz-btn-wrap {
+  position: absolute;
+  bottom: 42cqmin;
+  left: calc(50% + 47.5cqmin);
+  width: 19cqmin;
+  z-index: 205;
+  cursor: pointer;
+  pointer-events: all;
+  display: none;
+  transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1);
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+.globequiz-btn-wrap:hover { transform: translateZ(0) scale(1.08); }
+#loading-screen.table-shown .globequiz-btn-wrap { pointer-events: none; }
+.globequiz-btn-wrap img {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  animation: pop-in 0.35s cubic-bezier(0.34,1.56,0.64,1);
+}
+/* Racha de días jugados, arriba del botón de GloboReto en el menú principal
+   — mismo streak.png/número que el panel de fin de partida, ver .gq-endgame-streak. */
+.loading-globequiz-streak {
+  position: absolute;
+  top: -7cqmin;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 8cqmin;
+  pointer-events: none;
+}
+.loading-globequiz-streak-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.loading-globequiz-streak-num {
+  position: absolute;
+  top: 64%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Arial Black', Impact, sans-serif;
+  font-size: 4.2cqmin;
+  color: #ffffff;
+  -webkit-text-stroke: 0.6cqmin #d81e0a;
+  paint-order: stroke fill;
+  pointer-events: none;
 }
 .profile-account-wrap:hover { transform: translateZ(0) scale(1.08); }
 #loading-screen.table-shown .profile-account-wrap { pointer-events: none; }
@@ -7834,7 +8600,8 @@ body.is-mobile #splash-screen.mode-monuments .game-bg-city-monuments2 {
 #loading-screen.lobby-interim-bg #loading-panel2-practice,
 #loading-screen.lobby-interim-bg .loading-panel2-back,
 #loading-screen.lobby-interim-bg #loading-panel2-back,
-#loading-screen.lobby-interim-bg .profile-account-wrap {
+#loading-screen.lobby-interim-bg .profile-account-wrap,
+#loading-screen.lobby-interim-bg .globequiz-btn-wrap {
   display: none !important;
 }
 
@@ -9400,8 +10167,16 @@ body.is-mobile #splash-screen.mode-monuments .game-bg-city-monuments2 {
   z-index: 1;
   padding: 0 3cqmin 2cqmin;
 }
-/* Símbolo ∞ en modo práctica (timer infinito) — doble del tamaño normal */
-.timer-number-infinity { font-size: 14.8cqmin !important; line-height: 1; }
+/* Símbolo ∞ en modo práctica (timer infinito) — doble del tamaño normal.
+   El stroke base (#timer-number/#flags-timer-number/#shapes-timer-number)
+   es 0.8cqmin a 7.4cqmin de font-size (ratio 0.108). Al duplicar el
+   font-size acá sin tocar el stroke, el contorno quedaba a la mitad de
+   grosor relativo — se veía flaco. Escalado proporcional: 14.8*0.108≈1.6cqmin. */
+.timer-number-infinity {
+  font-size: 14.8cqmin !important;
+  line-height: 1;
+  -webkit-text-stroke: 0.8cqmin black !important;
+}
 .practice-score-time-row {
   display: flex;
   align-items: center;
