@@ -51,6 +51,14 @@
     return null;
   }
 
+  // Nombre que el invitado se puso localmente (input de nombre en el splash,
+  // ver monuments.js) — solo tiene sentido mandarlo mientras es invitado; una
+  // vez con cuenta ya se identifica por username real desde profiles.
+  function guestName() {
+    if (window._sbUserId) return null;
+    try { return localStorage.getItem('playerName') || null; } catch (e) { return null; }
+  }
+
   async function insertEvent(row, table) {
     const sb = window.sb;
     if (!sb) return;
@@ -69,6 +77,7 @@
       visitor_id: visitorId,
       country_code: cc,
       user_id: window._sbUserId || null,
+      guest_name: guestName(),
     });
   }
 
@@ -93,6 +102,7 @@
       country_code: cc,
       user_id: window._sbUserId || null,
       session_type: currentSessionType(),
+      guest_name: guestName(),
     });
   }
 
@@ -142,6 +152,7 @@
       country_code: cc,
       user_id: window._sbUserId || null,
       session_type: 'campaign',
+      guest_name: guestName(),
     });
   }
 

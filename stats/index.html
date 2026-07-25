@@ -495,9 +495,30 @@
       <div class="box wide">
         <h2>Jugadores sin cuenta
           <span class="sub">agrupado por visitor_id, dentro del período elegido arriba
-            <span class="help" title="Gente jugando sin crearse cuenta, identificada por el mismo visitor_id que usa claim_anonymous_events() para vincularlos si algún día se registran. 'Se llevaría' es cuánto tiene acumulado con la fórmula de Gira Mundial, aunque currency_ledger todavía no se lo haya asignado a ninguna cuenta. 🚩 = tiene alguna partida flagueada en la pestaña Integridad.">ⓘ</span></span>
+            <span class="help" title="Gente jugando sin crearse cuenta, identificada por el mismo visitor_id que usa claim_anonymous_events() para vincularlos si algún día se registran. 'Nombre puesto' es lo que escribieron en el input de nombre del juego (si lo cambiaron). 'Posible cuenta' sugiere una cuenta existente con ese mismo nombre — es solo una sugerencia, hay que aprobarla a mano. 'Se llevaría' es cuánto tiene acumulado con la fórmula de Gira Mundial. 🚩 = tiene partidas flagueadas en Integridad.">ⓘ</span></span>
         </h2>
-        <div class="table-scroll"><table id="tbl-guests"><tbody></tbody></table></div>
+        <div class="accounts-toolbar">
+          <input id="guests-search" type="text" placeholder="Buscar por nombre o visitor_id…">
+          <span class="spacer" style="flex:1"></span>
+          <span class="accounts-count" id="guests-count"></span>
+        </div>
+        <div class="table-scroll">
+          <table id="tbl-guests">
+            <thead><tr>
+              <th>Visitor ID</th>
+              <th>Nombre puesto</th>
+              <th>Posible cuenta</th>
+              <th>País</th>
+              <th class="sortable" data-sort="visits" style="text-align:right">Visitas <span class="arrow">↕</span></th>
+              <th class="sortable" data-sort="campaigns" style="text-align:right">Giras completas <span class="arrow">↕</span></th>
+              <th class="sortable" data-sort="games" style="text-align:right">Modos sueltos <span class="arrow">↕</span></th>
+              <th class="sortable sorted" data-sort="campaignCoins" style="text-align:right">Se llevaría <span class="arrow">↓</span></th>
+              <th class="sortable" data-sort="last_seen" style="text-align:right">Última actividad <span class="arrow">↕</span></th>
+              <th>Acción</th>
+            </tr></thead>
+            <tbody id="guests-body"></tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -1196,23 +1217,100 @@ function renderIntegrity(flags, rl){
     }).join('');
 }
 
+let guestsData = [];
+let guestsSort = { key:'campaignCoins', dir:'desc' };
 function renderGuests(guests, rl){
-  const withActivity = guests.filter(g=>g.campaigns>0 || g.games>0 || g.visits>0);
-  const flaggedCount = guests.filter(g=>g.flagged).length;
-  if(!withActivity.length){
+  guestsData = guests.filter(g=>g.campaigns>0 || g.games>0 || g.visits>0);
+  const flaggedCount = guestsData.filter(g=>g.flagged).length;
+  const matchCount = guestsData.filter(g=>g.possibleMatch).length;
+  if(!guestsData.length){
     $('guests-status').innerHTML = `<div class="insight-card ok">👻 Sin invitados con actividad en este período (${rl}).</div>`;
   } else {
-    const cards = [`<div class="insight-card ok">👻 <b>${withActivity.length}</b> invitado${withActivity.length===1?'':'s'} jugando sin cuenta en este período (${rl}).</div>`];
-    if(flaggedCount>0) cards.push(`<div class="insight-card crit">🚩 <b>${flaggedCount}</b> de ellos tiene partidas flagueadas en Integridad.</div>`);
+    const cards = [`<div class="insight-card ok">👻 <b>${guestsData.length}</b> invitado${guestsData.length===1?'':'s'} jugando sin cuenta en este período (${rl}).</div>`];
+    if(matchCount>0) cards.push(`<div class="insight-card warn">🔗 <b>${matchCount}</b> tiene${matchCount===1?'':'n'} una posible cuenta coincidente por nombre — revisar antes de vincular.</div>`);
+    if(flaggedCount>0) cards.push(`<div class="insight-card crit">🚩 <b>${flaggedCount}</b> tiene${flaggedCount===1?'':'n'} partidas flagueadas en Integridad.</div>`);
     $('guests-status').innerHTML = cards.join('');
   }
-  const tb = $('tbl-guests');
-  if(!withActivity.length){ tb.innerHTML = '<tr><td class="empty">Sin datos.</td></tr>'; return; }
-  tb.innerHTML = '<tr><th>Visitor ID</th><th>País</th><th style="text-align:right">Visitas</th><th style="text-align:right">Giras completas</th><th style="text-align:right">Modos sueltos</th><th style="text-align:right">Se llevaría (monedas/XP)</th><th style="text-align:right">Última actividad</th></tr>' +
-    withActivity.map(g=>{
-      const vid = escapeHtml(g.visitor_id.slice(0,16)) + '…' + (g.flagged ? ' 🚩' : '');
-      return `<tr${g.flagged?' style="background:rgba(255,122,122,.08)"':''}><td style="font-family:monospace;font-size:11.5px">${vid}</td><td>${countryCell(g.country_code)}</td><td class="n">${g.visits}</td><td class="n">${g.campaigns}</td><td class="n">${g.games}</td><td class="n">${g.campaignCoins.toLocaleString('es')} / ${g.campaignXp.toLocaleString('es')}</td><td class="n">${timeAgo(g.last_seen)}</td></tr>`;
-    }).join('');
+  buildGuestsSortHandlers();
+  applyGuestsView();
+}
+function buildGuestsSortHandlers(){
+  if(document.querySelectorAll('#tbl-guests th.sortable[data-wired]').length) return;
+  document.querySelectorAll('#tbl-guests th.sortable').forEach(th=>{
+    th.setAttribute('data-wired','1');
+    th.addEventListener('click', ()=>{
+      const key = th.dataset.sort;
+      if(guestsSort.key === key) guestsSort.dir = guestsSort.dir === 'asc' ? 'desc' : 'asc';
+      else guestsSort = { key, dir:'desc' };
+      document.querySelectorAll('#tbl-guests th.sortable').forEach(h=>{
+        h.classList.toggle('sorted', h===th);
+        h.querySelector('.arrow').textContent = h===th ? (guestsSort.dir==='asc'?'↑':'↓') : '↕';
+      });
+      applyGuestsView();
+    });
+  });
+  $('guests-search').addEventListener('input', applyGuestsView);
+}
+function applyGuestsView(){
+  const q = ($('guests-search').value||'').trim().toLowerCase();
+  let rows = guestsData.filter(g=>{
+    if(!q) return true;
+    return (g.guest_name||'').toLowerCase().includes(q) || g.visitor_id.toLowerCase().includes(q) || (g.possibleMatch||'').toLowerCase().includes(q);
+  });
+  const { key, dir } = guestsSort;
+  const mul = dir==='asc' ? 1 : -1;
+  rows = rows.slice().sort((a,b)=>{
+    let av = a[key], bv = b[key];
+    if(key==='last_seen'){ av = new Date(av).getTime(); bv = new Date(bv).getTime(); }
+    if(av < bv) return -1*mul;
+    if(av > bv) return 1*mul;
+    return 0;
+  });
+  $('guests-count').textContent = rows.length===guestsData.length ? `${guestsData.length} invitado${guestsData.length===1?'':'s'}` : `${rows.length} de ${guestsData.length}`;
+  const tb = $('guests-body');
+  if(!rows.length){ tb.innerHTML = '<tr><td class="empty" colspan="10">Sin invitados que coincidan.</td></tr>'; return; }
+  tb.innerHTML = rows.map(g=>{
+    const vid = escapeHtml(g.visitor_id.slice(0,16)) + '…' + (g.flagged ? ' 🚩' : '');
+    const name = g.guest_name ? escapeHtml(g.guest_name) : '<span style="color:var(--dim)">—</span>';
+    const match = g.possibleMatch
+      ? `<span class="status-pill stale"><span class="dotstat"></span>${escapeHtml(g.possibleMatch)}</span>`
+      : '<span style="color:var(--dim)">—</span>';
+    const action = g.possibleMatch
+      ? `<button class="btn guest-link-btn" data-vid="${escapeHtml(g.visitor_id)}" data-target="${escapeHtml(g.possibleMatch)}" style="font-size:11px;padding:5px 10px">Vincular</button>`
+      : '';
+    return `<tr${g.flagged?' style="background:rgba(255,122,122,.08)"':''}>` +
+      `<td style="font-family:monospace;font-size:11.5px">${vid}</td>` +
+      `<td>${name}</td>` +
+      `<td>${match}</td>` +
+      `<td>${countryCell(g.country_code)}</td>` +
+      `<td class="n">${g.visits}</td>` +
+      `<td class="n">${g.campaigns}</td>` +
+      `<td class="n">${g.games}</td>` +
+      `<td class="n">${g.campaignCoins.toLocaleString('es')} / ${g.campaignXp.toLocaleString('es')}</td>` +
+      `<td class="n">${timeAgo(g.last_seen)}</td>` +
+      `<td>${action}</td>` +
+    `</tr>`;
+  }).join('');
+  tb.querySelectorAll('.guest-link-btn').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const vid = btn.dataset.vid, target = btn.dataset.target;
+      if(!confirm(`¿Aprobar el traspaso de las monedas/XP de este invitado a la cuenta "${target}"?`)) return;
+      btn.disabled = true; btn.textContent = 'Vinculando…';
+      try {
+        const res = await fetch(FN_URL, {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json', 'apikey':ANON, 'Authorization':'Bearer '+ANON },
+          body: JSON.stringify({ user:creds.user, pass:creds.pass, action:'link_guest', visitor_id:vid, target_username:target }),
+        });
+        const json = await res.json().catch(()=>({}));
+        if(!res.ok || !json.ok) throw new Error(json.error || 'Error al vincular');
+        refresh();
+      } catch(e){
+        alert('No se pudo vincular: ' + (e.message||e));
+        btn.disabled = false; btn.textContent = 'Vincular';
+      }
+    });
+  });
 }
 
 function renderCountries(rows){

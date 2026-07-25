@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const { user, pass, range: rawRange } = body || {};
+    const { user, pass, range: rawRange, action, visitor_id: actionVisitorId, target_username } = body || {};
     const range = (typeof rawRange === 'string' && rawRange in RANGE_DAYS) ? rawRange : '30d';
 
     if (!ADMIN_USER || !ADMIN_PASS) {
@@ -96,6 +96,31 @@ Deno.serve(async (req) => {
     const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
+
+    // ── Acción manual: aprobar el traspaso de un invitado a una cuenta ────
+    // Mismo criterio de seguridad que claim_anonymous_events() (solo filas
+    // con user_id is null, nunca reasigna algo que ya pertenece a otra
+    // cuenta) — pero disparado a mano desde el panel en vez de por login,
+    // para los casos que la vinculación automática no agarra (visitor_id
+    // distinto porque jugó de invitado en OTRO dispositivo del que después
+    // usó para crear la cuenta, por ejemplo).
+    if (action === 'link_guest') {
+      if (!actionVisitorId || !target_username) {
+        return new Response(JSON.stringify({ error: 'missing_params' }), { status: 400, headers: CORS });
+      }
+      const { data: targetProfile, error: profileErr } = await sb
+        .from('profiles').select('id').eq('username', target_username).single();
+      if (profileErr || !targetProfile) {
+        return new Response(JSON.stringify({ error: 'account_not_found' }), { status: 404, headers: CORS });
+      }
+      const { count: n1 } = await sb.from('analytics_events')
+        .update({ user_id: targetProfile.id }, { count: 'exact' })
+        .eq('visitor_id', actionVisitorId).is('user_id', null);
+      const { count: n2 } = await sb.from('currency_ledger')
+        .update({ user_id: targetProfile.id }, { count: 'exact' })
+        .eq('visitor_id', actionVisitorId).is('user_id', null);
+      return new Response(JSON.stringify({ ok: true, linked_events: (n1 || 0) + (n2 || 0) }), { headers: CORS });
+    }
 
     const now = new Date();
     const nowMs = now.getTime();
@@ -166,11 +191,11 @@ Deno.serve(async (req) => {
       sb.from('profiles')
         .select('id, username, created_at, last_active, play_count, hs_total, vs_wins, vs_losses, is_supporter')
         .gte('created_at', windowISO).limit(50000),
-      sb.from('analytics_events').select('created_at, type, mode, score, user_id, visitor_id, country_code, session_type')
+      sb.from('analytics_events').select('created_at, type, mode, score, user_id, visitor_id, country_code, session_type, guest_name')
         .in('type', ['game', 'versus']).gte('created_at', windowISO).limit(50000),
-      sb.from('analytics_events').select('created_at, visitor_id, country_code, user_id')
+      sb.from('analytics_events').select('created_at, visitor_id, country_code, user_id, guest_name')
         .eq('type', 'visit').gte('created_at', windowISO).limit(50000),
-      sb.from('analytics_events').select('created_at, score, user_id, visitor_id, country_code')
+      sb.from('analytics_events').select('created_at, score, user_id, visitor_id, country_code, guest_name')
         .eq('type', 'campaign').gte('created_at', windowISO).limit(50000),
       sb.from('analytics_events').select('created_at, score, user_id, visitor_id, country_code, duration_ms, streak')
         .eq('type', 'globequiz').gte('created_at', windowISO).limit(50000),
@@ -630,34 +655,37 @@ Deno.serve(async (req) => {
     // aunque currency_ledger todavía no le haya asignado nada (sigue con
     // user_id null hasta que reclame).
     const guestMap: Record<string, {
-      visitor_id: string; country_code: string | null;
+      visitor_id: string; country_code: string | null; guest_name: string | null;
       first_seen: string; last_seen: string;
       visits: number; campaigns: number; games: number;
       campaignCoins: number; campaignXp: number;
     }> = {};
-    function touchGuest(visitorId: string, createdAt: string, countryCode: string | null) {
+    function touchGuest(visitorId: string, createdAt: string, countryCode: string | null, guestNameVal?: string | null) {
       const g = guestMap[visitorId] = guestMap[visitorId] || {
-        visitor_id: visitorId, country_code: countryCode,
+        visitor_id: visitorId, country_code: countryCode, guest_name: null,
         first_seen: createdAt, last_seen: createdAt,
         visits: 0, campaigns: 0, games: 0, campaignCoins: 0, campaignXp: 0,
       };
       if (countryCode && !g.country_code) g.country_code = countryCode;
+      // Se queda con el nombre más reciente que se haya puesto (pudo
+      // cambiarlo entre partidas), no el primero.
+      if (guestNameVal && createdAt >= g.last_seen) g.guest_name = guestNameVal;
       if (createdAt < g.first_seen) g.first_seen = createdAt;
       if (createdAt > g.last_seen) g.last_seen = createdAt;
       return g;
     }
     for (const r of visitRows as any[]) {
       if (r.user_id || !r.visitor_id) continue;
-      touchGuest(r.visitor_id, r.created_at, r.country_code).visits++;
+      touchGuest(r.visitor_id, r.created_at, r.country_code, r.guest_name).visits++;
     }
     for (const r of singleRows as any[]) {
       if (r.user_id || !r.visitor_id) continue;
-      touchGuest(r.visitor_id, r.created_at, r.country_code).games++;
+      touchGuest(r.visitor_id, r.created_at, r.country_code, r.guest_name).games++;
     }
     for (const r of campaignRows as any[]) {
       if (r.user_id || !r.visitor_id) continue;
       const steps = Math.floor((r.score || 0) / 250);
-      const g = touchGuest(r.visitor_id, r.created_at, r.country_code);
+      const g = touchGuest(r.visitor_id, r.created_at, r.country_code, r.guest_name);
       g.campaigns++;
       g.campaignCoins += 10 + steps;
       g.campaignXp += 50 + steps * 3;
@@ -667,10 +695,16 @@ Deno.serve(async (req) => {
         .map((f) => /^Invitado \(([^)]+)…\)$/.exec(f.username)?.[1])
         .filter(Boolean),
     );
+    // Posible cuenta con la que coincide: mismo nombre (sin importar
+    // mayúsculas) que algún username existente — solo una sugerencia para
+    // que el admin decida a mano con el botón "Vincular", nunca se aplica solo.
+    const usernameLower: Record<string, string> = {};
+    for (const p of allProfiles as any[]) usernameLower[(p.username || '').toLowerCase()] = p.username;
     const guests = Object.values(guestMap)
       .map((g) => ({
         ...g,
         flagged: [...flaggedGuestIds].some((prefix) => prefix && g.visitor_id.startsWith(prefix)),
+        possibleMatch: g.guest_name ? (usernameLower[g.guest_name.toLowerCase()] || null) : null,
       }))
       .sort((a, b) => new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime());
 
