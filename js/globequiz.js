@@ -37,6 +37,14 @@
   let zoomZ = 3.0;
   const MIN_Z = 1.3, MAX_Z = 6;
   const BASE_Z = 3.0, DRAG_SENSITIVITY = 0.005;
+  // Límite de inclinación vertical al arrastrar. Antes era ±1.3 rad (~74.5°),
+  // que dejaba el polo sur (y Antártida) siempre a ~15° del centro del
+  // globo, nunca alcanzable arrastrando — se veía "recortado" en el borde y
+  // parecía que Antártida no estaba dibujada. 1.55 rad (~88.8°) permite
+  // llevar cualquiera de los dos polos casi al centro sin llegar a los 90°
+  // exactos (ahí el yaw se vuelve puro giro sobre el propio polo, válido
+  // pero mejor no aterrizar justo en el límite matemático).
+  const ROT_X_LIMIT = 1.55;
   const activePointers = new Map();
   let pinchStartDist = 0, pinchStartZ = 0;
   let initialized = false;
@@ -846,7 +854,7 @@
       const sens = DRAG_SENSITIVITY * (zoomZ / BASE_Z);
       const rotDeltaY = dx * sens;
       sphere.rotation.y += rotDeltaY;
-      sphere.rotation.x = Math.max(-1.3, Math.min(1.3, sphere.rotation.x + dy * sens));
+      sphere.rotation.x = Math.max(-ROT_X_LIMIT, Math.min(ROT_X_LIMIT, sphere.rotation.x + dy * sens));
       render();
       // Velocidad angular reciente (rad/ms), para la inercia al soltar —
       // "reciente" porque un arrastre puede frenar justo antes de soltar
@@ -1191,6 +1199,9 @@
     // resuelta en vez de duplicar ese cálculo.
     if (window.Analytics && typeof window.Analytics.logGlobequiz === 'function') {
       window.Analytics.logGlobequiz(guesses.length + 1, gqFinalElapsedMs, currentStreak);
+    }
+    if (window.Analytics && typeof window.Analytics.logGlobequizCurrency === 'function') {
+      window.Analytics.logGlobequizCurrency(currentStreak);
     }
     const label = document.getElementById('gq-endgame-country-label');
     if (label) label.textContent = displayName(dailyCountry);

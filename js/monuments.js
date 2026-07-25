@@ -8551,6 +8551,9 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
       if (window.Analytics && typeof window.Analytics.logCampaign === 'function') {
         window.Analytics.logCampaign(window.campaign.base || 0);
       }
+      if (window.Analytics && typeof window.Analytics.logCampaignCurrency === 'function') {
+        window.Analytics.logCampaignCurrency(window.campaign.base || 0);
+      }
       // Requisito para desbloquear GlobeQuiz: haber completado al menos 1 Gira
       // Mundial alguna vez (ver gate en el click de globequiz-btn más abajo).
       if (window._sbUserId && window._sbProfile) {

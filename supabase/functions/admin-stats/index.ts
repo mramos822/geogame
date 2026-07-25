@@ -143,7 +143,8 @@ Deno.serve(async (req) => {
       lbFlags, lbShapes, lbCities, lbMonuments, lbTotal, lbVersus,
       allProfilesRes, countryEventsRes, allEventsRes,
       founderEligibleRes, founderClaimedRes,
-      versusFunnelRes, friendshipsRes,
+      versusFunnelRes, friendshipsRes, onlineUsersRes,
+      currencyLedgerRes, xpConfigRes, xpSnapshotRes,
     ] = await Promise.all([
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true })),
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true }).gte('last_active', onlineISO)),
@@ -215,6 +216,26 @@ Deno.serve(async (req) => {
       // ── Amistades: para detectar spam de solicitudes y medir conectividad ──
       sb.from('friendships')
         .select('user_a, user_b, status, initiated_by, created_at'),
+      // ── Quién está conectado/jugando AHORA MISMO ─────────────────────────
+      // Lista real (no solo el conteo de onlineNow/playingNow arriba) para
+      // que el panel pueda mostrar nombres, no solo un número — antes no
+      // había forma de saber QUIÉN está online desde /stats.
+      sb.from('profiles')
+        .select('username, is_playing, last_active')
+        .gte('last_active', onlineISO)
+        .order('is_playing', { ascending: false })
+        .order('last_active', { ascending: false })
+        .limit(200),
+      // ── Economía (XP/monedas) — sistema todavía en diseño (ver
+      // xp_system_config), pero el tracking crudo ya corre en vivo desde
+      // js/analytics.js (logCampaignCurrency/logGlobequizCurrency).
+      sb.from('currency_ledger')
+        .select('user_id, coins, xp, reason, ref_value, created_at')
+        .gte('created_at', windowISO).limit(50000),
+      sb.from('xp_system_config').select('rule_key, rule_value, description, status').order('id', { ascending: true }),
+      sb.from('xp_retroactive_snapshot')
+        .select('username, total_xp, level, gameplay_coins, level_bonus_coins, total_coins')
+        .order('total_xp', { ascending: false }),
     ]);
 
     const regRows      = profilesRes.data || [];
@@ -494,6 +515,46 @@ Deno.serve(async (req) => {
       topPendingSenders: topSenders,
     };
 
+    // ── Economía (XP/monedas): sistema todavía sin lanzar (ver
+    // xp_system_config), esto es solo el historial crudo acumulado hasta
+    // ahora para poder ver cómo viene creciendo antes de armar la UI real.
+    const currencyRows = (currencyLedgerRes.data || []) as any[];
+    const currencyByReason: Record<string, { count: number; coins: number; xp: number }> = {};
+    const currencyByUser: Record<string, { coins: number; xp: number }> = {};
+    let currencyTotalCoins = 0, currencyTotalXp = 0;
+    for (const r of currencyRows) {
+      const reason = r.reason || 'otro';
+      const bucket = currencyByReason[reason] = currencyByReason[reason] || { count: 0, coins: 0, xp: 0 };
+      bucket.count++; bucket.coins += r.coins || 0; bucket.xp += r.xp || 0;
+      currencyTotalCoins += r.coins || 0; currencyTotalXp += r.xp || 0;
+      if (r.user_id) {
+        const u = currencyByUser[r.user_id] = currencyByUser[r.user_id] || { coins: 0, xp: 0 };
+        u.coins += r.coins || 0; u.xp += r.xp || 0;
+      }
+    }
+    const currencyTopEarners = Object.entries(currencyByUser)
+      .map(([uid, v]) => ({ username: usernameById[uid] || uid, coins: v.coins, xp: v.xp }))
+      .sort((a, b) => b.coins - a.coins)
+      .slice(0, 15);
+    const economy = {
+      totalCoins: currencyTotalCoins,
+      totalXp: currencyTotalXp,
+      eventCount: currencyRows.length,
+      byReason: currencyByReason,
+      topEarners: currencyTopEarners,
+      config: (xpConfigRes.data || []).map((r: any) => ({
+        key: r.rule_key, value: r.rule_value, description: r.description, status: r.status,
+      })),
+      // Foto fija: qué tendría CADA cuenta hoy (XP/nivel/monedas) si el
+      // sistema hubiera estado activo desde siempre, calculado sobre el
+      // historial real de partidas (ver xp_retroactive_snapshot). No es
+      // saldo real todavía.
+      retroactive: (xpSnapshotRes.data || []).map((r: any) => ({
+        username: r.username, totalXp: r.total_xp, level: r.level,
+        gameplayCoins: r.gameplay_coins, levelBonusCoins: r.level_bonus_coins, totalCoins: r.total_coins,
+      })),
+    };
+
     // ── Insights narrativos (todos all-time, sirven para el resumen ejecutivo) ─
     const everPlayed = (allProfiles as any[]).filter((p) => (p.play_count || 0) > 0).length;
     const neverPlayedCount = allProfiles.length - everPlayed;
@@ -512,6 +573,9 @@ Deno.serve(async (req) => {
       generated_at: now.toISOString(),
       range,
       totals: { totalUsers, onlineNow, playingNow, totalGames: totalCampaigns + versusTotal + totalGlobequiz, totalVisits, versusTotal },
+      onlineUsers: (onlineUsersRes.data || []).map((p: any) => ({
+        username: p.username, is_playing: !!p.is_playing, last_active: p.last_active,
+      })),
       period: {
         newUsers: registrations, games: finishedRows.length,
         visits: uniqueVisitors, versus: versusRows.length,
@@ -531,6 +595,7 @@ Deno.serve(async (req) => {
       versusByMode,
       versusFunnel,
       social,
+      economy,
       topCountries,
       cohortRetention,
       playBuckets,

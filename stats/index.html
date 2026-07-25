@@ -204,7 +204,7 @@
   .acc-games-inner table{font-size:12px;min-width:260px;}
   .acc-games-inner th{font-size:10px;}
   .supporter-star{color:var(--accent);}
-  .mode-pill{display:inline-block;padding:2px 9px;border-radius:10px;font-size:10.5px;font-weight:700;margin-right:4px;}
+  .mode-pill{display:inline-block;padding:2px 9px;border-radius:10px;font-size:10.5px;font-weight:700;margin-right:4px;white-space:nowrap;}
   .mode-pill.flags{background:#3a3010;color:var(--accent);}
   .mode-pill.shapes{background:#0e2e4a;color:var(--blue);}
   .mode-pill.cities{background:#123a1e;color:var(--green);}
@@ -226,11 +226,14 @@
   .modal-overlay{display:none;position:fixed;inset:0;z-index:50;background:rgba(4,10,20,.6);
     align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(2px);}
   .modal-box{background:var(--panel);border:1px solid var(--border);border-radius:14px;
-    width:100%;max-width:640px;max-height:80vh;display:flex;flex-direction:column;
+    width:100%;max-width:min(960px,94vw);max-height:86vh;display:flex;flex-direction:column;
     box-shadow:0 30px 80px rgba(0,0,0,.5);}
   .modal-head{display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--border);}
   .modal-head h3{margin:0;font-size:14.5px;color:#fff;font-weight:700;flex:1;}
   .modal-head .count{font-size:11.5px;color:var(--muted);}
+  #tbl-day-modal td, #tbl-day-modal-visits td, #tbl-day-modal-regs td,
+  #tbl-day-modal th, #tbl-day-modal-visits th, #tbl-day-modal-regs th{white-space:nowrap;}
+  #tbl-day-modal td:nth-child(2), #tbl-day-modal-visits td:nth-child(2){white-space:normal;}
   .modal-close{background:transparent;border:none;color:var(--muted);font-size:20px;cursor:pointer;
     line-height:1;padding:4px 6px;border-radius:6px;}
   .modal-close:hover{color:var(--text);background:var(--panel2);}
@@ -242,9 +245,33 @@
 
   @media (max-width:640px){
     .topbar h1{display:none;}
-    .controlbar-inner{flex-direction:column;align-items:stretch;gap:10px;}
-    .cards{grid-template-columns:repeat(2,1fr);}
-    .card .v{font-size:22px;}
+    .topbar-inner{padding:10px 12px;gap:10px;}
+    .controlbar-inner{flex-direction:column;align-items:stretch;gap:10px;padding:8px 12px;}
+    main{padding:14px 10px 40px;}
+    .cards{grid-template-columns:repeat(2,1fr);gap:8px;}
+    .card{padding:10px 12px;}
+    .card .v{font-size:20px;}
+    .box{padding:12px 12px 10px;}
+    .grid{gap:10px;}
+    .activity-grid{grid-template-columns:1fr;}
+    .funnel{flex-wrap:wrap;}
+    .funnel-step{flex:1 1 40%;padding:10px 4px;}
+    .funnel-step .v{font-size:20px;}
+    .funnel-arrow{display:none;}
+    table{font-size:12px;}
+    .accounts-toolbar{flex-direction:column;align-items:stretch;}
+    #accounts-search{max-width:none;}
+
+    /* ── Modal en celular: casi pantalla completa, sin wrap raro ── */
+    .modal-overlay{padding:0;align-items:flex-end;}
+    .modal-box{max-width:100vw;width:100vw;max-height:92vh;border-radius:14px 14px 0 0;}
+    .modal-head{padding:12px 14px;}
+    .modal-body{padding:4px 12px 14px;}
+    .modal-subtitle{margin:14px 0 6px;}
+    #tbl-day-modal, #tbl-day-modal-visits, #tbl-day-modal-regs{font-size:11.5px;}
+    /* País ocupa mucho y es lo menos crítico en pantallas chicas */
+    #tbl-day-modal th:nth-child(3), #tbl-day-modal td:nth-child(3),
+    #tbl-day-modal-visits th:nth-child(3), #tbl-day-modal-visits td:nth-child(3){display:none;}
   }
 </style>
 </head>
@@ -289,6 +316,13 @@
       <div class="insights" id="insights"></div>
       <div class="cards" id="cards-total"></div>
       <div class="cards" id="cards-period"></div>
+
+      <div class="box wide" style="margin-top:20px">
+        <h2>Quién está conectado ahora
+          <span class="sub"><span class="help" title="Cuentas con actividad en los últimos 5 minutos. 🎮 = tiene is_playing=true (está dentro de una partida ahora mismo); 🟢 = está en la app pero no en medio de un modo de juego (menú, panel social, etc). Se actualiza solo cada 15s.">ⓘ</span></span>
+        </h2>
+        <div class="table-scroll"><table id="tbl-online"><tbody></tbody></table></div>
+      </div>
 
       <div class="section-title">Actividad <span class="sub" id="period-sub"></span></div>
       <div class="grid">
@@ -411,6 +445,38 @@
       </div>
     </section>
 
+    <!-- ── ECONOMÍA (XP/monedas) ── -->
+    <section class="tab-page" data-page="economia">
+      <div class="insights" id="economy-status"></div>
+      <div class="cards" id="cards-economy"></div>
+      <div class="grid">
+        <div class="box">
+          <h2>Monedas/XP por fuente
+            <span class="sub"><span class="help" title="Desglose de todo lo acumulado en currency_ledger hasta ahora, agrupado por el motivo del evento (reason).">ⓘ</span></span>
+          </h2>
+          <div class="table-scroll"><table id="tbl-economy-reasons"><tbody></tbody></table></div>
+        </div>
+        <div class="box">
+          <h2>Top acumulado por cuenta</h2>
+          <div class="table-scroll"><table id="tbl-economy-top"><tbody></tbody></table></div>
+        </div>
+        <div class="box wide">
+          <h2>Cálculo retroactivo por cuenta
+            <span class="sub">qué tendría cada cuenta HOY si el sistema hubiera estado activo desde siempre
+              <span class="help" title="Calculado sobre el historial real: cada Gira Mundial con su score exacto, cada GlobeQuiz con la racha que tenía en el momento de esa victoria puntual. Incluye los premios de nivel que se hubieran cobrado en el camino. Todavía no es saldo real — es una foto de referencia (xp_retroactive_snapshot).">ⓘ</span></span>
+          </h2>
+          <div class="table-scroll"><table id="tbl-economy-retro"><tbody></tbody></table></div>
+        </div>
+        <div class="box wide">
+          <h2>Diseño del sistema (todavía sin lanzar)
+            <span class="sub">guardado en xp_system_config — no hay pagos ni niveles corriendo en el juego, solo se está trackeando el historial crudo
+              <span class="help" title="Cuando se decida lanzar el sistema real de niveles, este es el diseño de referencia acordado.">ⓘ</span></span>
+          </h2>
+          <div class="table-scroll"><table id="tbl-economy-config"><tbody></tbody></table></div>
+        </div>
+      </div>
+    </section>
+
     <!-- ── CUENTAS ── -->
     <section class="tab-page" data-page="cuentas">
       <div class="box wide">
@@ -515,7 +581,8 @@ const RANGES = [
 const RANGE_LABEL = Object.fromEntries(RANGES);
 const PAGES = [
   ['resumen','📊 Resumen'], ['retencion','🔁 Retención'], ['leaderboards','🏆 Leaderboards'],
-  ['versus','⚔️ Versus'], ['social','🤝 Social'], ['cuentas','👤 Cuentas'], ['fundador','👑 Fundador'],
+  ['versus','⚔️ Versus'], ['social','🤝 Social'], ['economia','💰 Economía'],
+  ['cuentas','👤 Cuentas'], ['fundador','👑 Fundador'],
 ];
 const MODE_TABS = [
   ['total','Total'], ['flags','Banderas'], ['shapes','Figuras'], ['cities','Ciudades'], ['monuments','Monumentos'],
@@ -668,6 +735,7 @@ function render(data){
 
   renderInsights(data.insights||{}, data.funnel||{}, rl);
   renderPeriodCards(data.period||{}, rl);
+  renderOnlineUsers(data.onlineUsers||[]);
   renderActivity(data.series||{});
   renderModes(data.gamesByMode||{});
   renderHourly(data.hourly||[]);
@@ -685,6 +753,7 @@ function render(data){
   renderVersusFunnel(data.versusFunnel||{}, rl);
   renderVersusTop((data.leaderboards||{}).versus||[]);
   renderSocial(data.social||{});
+  renderEconomy(data.economy||{}, rl);
   renderAccounts(data.accounts||[]);
   renderFounder(data.founder||{});
 }
@@ -904,6 +973,25 @@ $('day-modal-close').addEventListener('click', closeDayPanel);
 $('day-modal').addEventListener('click', (e)=>{ if(e.target.id === 'day-modal') closeDayPanel(); });
 document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeDayPanel(); });
 
+function timeAgo(iso){
+  if(!iso) return '—';
+  const secs = Math.max(0, Math.round((Date.now() - new Date(iso).getTime())/1000));
+  if(secs < 60) return 'justo ahora';
+  const mins = Math.round(secs/60);
+  if(mins < 60) return `hace ${mins} min`;
+  const hrs = Math.round(mins/60);
+  return `hace ${hrs}h`;
+}
+function renderOnlineUsers(rows){
+  const tb = $('tbl-online');
+  if(!rows.length){ tb.innerHTML = '<tr><td class="empty">Nadie conectado en este momento.</td></tr>'; return; }
+  const playing = rows.filter(r=>r.is_playing);
+  const idle = rows.filter(r=>!r.is_playing);
+  tb.innerHTML = '<tr><th>Usuario</th><th>Estado</th><th style="text-align:right">Última actividad</th></tr>' +
+    playing.map(r=>`<tr><td>${escapeHtml(r.username||'—')}</td><td><span class="status-pill active"><span class="dotstat"></span>🎮 Jugando</span></td><td class="n">${timeAgo(r.last_active)}</td></tr>`).join('') +
+    idle.map(r=>`<tr><td>${escapeHtml(r.username||'—')}</td><td><span class="status-pill stale"><span class="dotstat"></span>🟢 Conectado</span></td><td class="n">${timeAgo(r.last_active)}</td></tr>`).join('');
+}
+
 function renderModes(m){
   const labels = ['Banderas','Figuras','Ciudades','Monumentos'];
   const vals = [m.flags||0, m.shapes||0, m.cities||0, m.monuments||0];
@@ -998,6 +1086,55 @@ function renderSocial(s){
       const flagRow = r.count >= 10 ? ' ⚠️' : '';
       return `<tr><td>${escapeHtml(r.username||'—')}${flagRow}</td><td class="n">${r.count}</td></tr>`;
     }).join('');
+}
+
+const ECONOMY_REASON_LABELS = { campaign_complete:'🌍 Gira Mundial', globequiz_win:'🌎 GlobeQuiz', accept_failed:'—' };
+function renderEconomy(e, rl){
+  const totalCoins = e.totalCoins||0, totalXp = e.totalXp||0, events = e.eventCount||0;
+  $('economy-status').innerHTML = events
+    ? `<div class="insight-card ok">💰 Sistema de niveles todavía <b>sin lanzar</b> en el juego — esto es solo el historial crudo acumulado (${rl}) para no perder datos mientras se termina de diseñar.</div>`
+    : `<div class="insight-card warn">💰 Todavía no hay eventos de monedas/XP registrados en este período. El tracking ya está activo (Gira Mundial + GlobeQuiz); en cuanto haya partidas nuevas va a empezar a llenarse acá.</div>`;
+  $('cards-economy').innerHTML = [
+    ['🪙', totalCoins.toLocaleString('es'), `Monedas acumuladas (${rl})`],
+    ['✨', totalXp.toLocaleString('es'), `XP acumulado (${rl})`],
+    ['📋', events.toLocaleString('es'), `Eventos registrados (${rl})`],
+  ].map(([icon,v,l])=>`<div class="card"><div class="icon">${icon}</div><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
+
+  const tbR = $('tbl-economy-reasons');
+  const reasons = Object.entries(e.byReason||{});
+  if(!reasons.length){ tbR.innerHTML = '<tr><td class="empty">Sin datos todavía.</td></tr>'; }
+  else {
+    tbR.innerHTML = '<tr><th>Fuente</th><th style="text-align:right">Eventos</th><th style="text-align:right">Monedas</th><th style="text-align:right">XP</th></tr>' +
+      reasons.sort((a,b)=>b[1].coins-a[1].coins).map(([reason,v])=>
+        `<tr><td>${ECONOMY_REASON_LABELS[reason]||escapeHtml(reason)}</td><td class="n">${v.count}</td><td class="n">${v.coins.toLocaleString('es')}</td><td class="n">${v.xp.toLocaleString('es')}</td></tr>`
+      ).join('');
+  }
+
+  const tbT = $('tbl-economy-top');
+  const top = e.topEarners || [];
+  if(!top.length){ tbT.innerHTML = '<tr><td class="empty">Sin datos todavía.</td></tr>'; }
+  else {
+    tbT.innerHTML = '<tr><th>#</th><th>Jugador</th><th style="text-align:right">Monedas</th><th style="text-align:right">XP</th></tr>' +
+      top.map((r,i)=>`<tr><td><span class="rank-badge ${rankClass(i)}">${i+1}</span></td><td>${escapeHtml(r.username||'—')}</td><td class="n">${r.coins.toLocaleString('es')}</td><td class="n">${r.xp.toLocaleString('es')}</td></tr>`).join('');
+  }
+
+  const tbRetro = $('tbl-economy-retro');
+  const retro = (e.retroactive || []).filter(r => r.totalXp > 0);
+  if(!retro.length){ tbRetro.innerHTML = '<tr><td class="empty">Ninguna cuenta tiene XP retroactivo todavía.</td></tr>'; }
+  else {
+    tbRetro.innerHTML = '<tr><th>Jugador</th><th style="text-align:right">Nivel</th><th style="text-align:right">XP total</th><th style="text-align:right">Monedas (juego)</th><th style="text-align:right">Monedas (premios nivel)</th><th style="text-align:right">Monedas totales</th></tr>' +
+      retro.map(r=>`<tr><td>${escapeHtml(r.username||'—')}</td><td class="n">${r.level}</td><td class="n">${r.totalXp.toLocaleString('es')}</td><td class="n">${r.gameplayCoins.toLocaleString('es')}</td><td class="n">${r.levelBonusCoins.toLocaleString('es')}</td><td class="n" style="font-weight:800">${r.totalCoins.toLocaleString('es')}</td></tr>`).join('');
+  }
+
+  const tbC = $('tbl-economy-config');
+  const config = e.config || [];
+  if(!config.length){ tbC.innerHTML = '<tr><td class="empty">Sin configuración guardada.</td></tr>'; }
+  else {
+    tbC.innerHTML = '<tr><th>Regla</th><th>Parámetros</th><th>Descripción</th></tr>' +
+      config.map(r=>`<tr><td style="white-space:nowrap;font-weight:700">${escapeHtml(r.key)}</td>` +
+        `<td style="font-family:monospace;font-size:11px;color:var(--muted);max-width:260px">${escapeHtml(JSON.stringify(r.value))}</td>` +
+        `<td style="max-width:420px;white-space:normal">${escapeHtml(r.description)}</td></tr>`).join('');
+  }
 }
 
 function renderCountries(rows){

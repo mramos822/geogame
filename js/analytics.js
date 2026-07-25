@@ -39,11 +39,11 @@
     return null;
   }
 
-  async function insertEvent(row) {
+  async function insertEvent(row, table) {
     const sb = window.sb;
     if (!sb) return;
     try {
-      await sb.from('analytics_events').insert(row);
+      await sb.from(table || 'analytics_events').insert(row);
     } catch (e) { /* silencioso: nunca debe afectar al juego */ }
   }
 
@@ -153,7 +153,63 @@
     });
   }
 
-  window.Analytics = { logVisit, logGame, logVersus, logVersusFunnel, logCampaign, logGlobequiz };
+  // Ledger de XP/monedas (currency_ledger) — arranca antes de que exista la
+  // UI real del sistema de XP/monedas, para no perder historial: cuando se
+  // lance, el saldo de cada cuenta se calcula sumando lo ya acumulado acá.
+  // Versus amistoso NO otorga nada por ahora (a propósito, sin hook acá).
+  //
+  // Gira Mundial: base fija + un extra por cada 250 puntos de score (65
+  // campañas históricas, promedio 17418, rango 2923-45099 → con esta fórmula
+  // da ~21-190 monedas y ~83-590 xp).
+  const CAMPAIGN_BASE_COINS = 10, CAMPAIGN_BASE_XP = 50;
+  const CAMPAIGN_POINTS_STEP = 250, CAMPAIGN_STEP_COINS = 1, CAMPAIGN_STEP_XP = 3;
+  function coinsFromScore(score) {
+    const steps = Math.floor((score || 0) / CAMPAIGN_POINTS_STEP);
+    return CAMPAIGN_BASE_COINS + steps * CAMPAIGN_STEP_COINS;
+  }
+  function xpFromScore(score) {
+    const steps = Math.floor((score || 0) / CAMPAIGN_POINTS_STEP);
+    return CAMPAIGN_BASE_XP + steps * CAMPAIGN_STEP_XP;
+  }
+
+  // GlobeQuiz: base fija por victoria (10 monedas / 20 xp), multiplicada
+  // x1.15 cada 10 días de racha activa, hasta un tope de 10 aplicaciones
+  // (racha >= 100 días ya no sigue multiplicando, mult queda fijo en
+  // 1.15^10 ≈ 4.05x). Con x1.5 el multiplicador llegaba a ~57.7x y una
+  // racha larga por sí sola alcanzaba nivel 50 en ~4 meses sin jugar
+  // ninguna Gira Mundial — x1.15 lo deja como un bonus fuerte pero no
+  // reemplaza jugar el resto de los modos.
+  const GQ_BASE_COINS = 10, GQ_BASE_XP = 20;
+  const GQ_MULT_STEP_DAYS = 10, GQ_MULT_FACTOR = 1.15, GQ_MULT_MAX_STEPS = 10;
+  function gqMultiplier(streakDays) {
+    const steps = Math.min(Math.floor((streakDays || 0) / GQ_MULT_STEP_DAYS), GQ_MULT_MAX_STEPS);
+    return Math.pow(GQ_MULT_FACTOR, steps);
+  }
+
+  async function logCurrencyEvent(coins, xp, reason, refValue) {
+    insertEvent({
+      coins: Math.round(coins) || 0,
+      xp: Math.round(xp) || 0,
+      reason,
+      ref_value: (typeof refValue === 'number' && isFinite(refValue)) ? Math.round(refValue) : null,
+      visitor_id: visitorId,
+      user_id: window._sbUserId || null,
+    }, 'currency_ledger');
+  }
+  function logCampaignCurrency(score) {
+    logCurrencyEvent(coinsFromScore(score), xpFromScore(score), 'campaign_complete', score);
+  }
+  // Se llama en cada victoria de GlobeQuiz (no solo cuando la racha avanza),
+  // con la racha YA resuelta del día — ver showEndgameModal en globequiz.js.
+  function logGlobequizCurrency(streakDays) {
+    const mult = gqMultiplier(streakDays);
+    logCurrencyEvent(GQ_BASE_COINS * mult, GQ_BASE_XP * mult, 'globequiz_win', streakDays);
+  }
+
+  window.Analytics = {
+    logVisit, logGame, logVersus, logVersusFunnel, logCampaign, logGlobequiz,
+    logCampaignCurrency, logGlobequizCurrency,
+  };
 
   // Registrar la visita en cuanto el cliente sb esté listo.
   function tryVisit(attempt) {
