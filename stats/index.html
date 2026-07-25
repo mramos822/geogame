@@ -461,9 +461,9 @@
           <div class="table-scroll"><table id="tbl-economy-top"><tbody></tbody></table></div>
         </div>
         <div class="box wide">
-          <h2>Cálculo retroactivo por cuenta
-            <span class="sub">qué tendría cada cuenta HOY si el sistema hubiera estado activo desde siempre
-              <span class="help" title="Calculado sobre el historial real: cada Gira Mundial con su score exacto, cada GlobeQuiz con la racha que tenía en el momento de esa victoria puntual. Incluye los premios de nivel que se hubieran cobrado en el camino. Todavía no es saldo real — es una foto de referencia (xp_retroactive_snapshot).">ⓘ</span></span>
+          <h2>Cálculo en vivo por cuenta
+            <span class="sub">se recalcula en cada carga, con alerta si currency_ledger tiene más de lo que la fórmula explica
+              <span class="help" title="XP/nivel/monedas esperados según el historial real de partidas (recalculado cada vez que abrís este panel, no una foto vieja). La columna 'ledger real' es lo que currency_ledger tiene efectivamente insertado para esa cuenta — como el insert es anon sin validar el monto, alguien podría intentar pegarse monedas desde la consola del navegador. Si el ledger real supera lo esperado, la fila se marca en rojo.">ⓘ</span></span>
           </h2>
           <div class="table-scroll"><table id="tbl-economy-retro"><tbody></tbody></table></div>
         </div>
@@ -1119,11 +1119,21 @@ function renderEconomy(e, rl){
   }
 
   const tbRetro = $('tbl-economy-retro');
-  const retro = (e.retroactive || []).filter(r => r.totalXp > 0);
-  if(!retro.length){ tbRetro.innerHTML = '<tr><td class="empty">Ninguna cuenta tiene XP retroactivo todavía.</td></tr>'; }
+  const retroAll = e.retroactive || [];
+  const retro = retroAll.filter(r => r.totalXp > 0 || r.ledgerActualCoins > 0);
+  const suspiciousCount = retroAll.filter(r => r.suspicious).length;
+  if(!retro.length){ tbRetro.innerHTML = '<tr><td class="empty">Ninguna cuenta tiene actividad todavía.</td></tr>'; }
   else {
-    tbRetro.innerHTML = '<tr><th>Jugador</th><th style="text-align:right">Nivel</th><th style="text-align:right">XP total</th><th style="text-align:right">Monedas (juego)</th><th style="text-align:right">Monedas (premios nivel)</th><th style="text-align:right">Monedas totales</th></tr>' +
-      retro.map(r=>`<tr><td>${escapeHtml(r.username||'—')}</td><td class="n">${r.level}</td><td class="n">${r.totalXp.toLocaleString('es')}</td><td class="n">${r.gameplayCoins.toLocaleString('es')}</td><td class="n">${r.levelBonusCoins.toLocaleString('es')}</td><td class="n" style="font-weight:800">${r.totalCoins.toLocaleString('es')}</td></tr>`).join('');
+    tbRetro.innerHTML = '<tr><th>Jugador</th><th style="text-align:right">Nivel</th><th style="text-align:right">XP esperado</th><th style="text-align:right">Monedas esperadas</th><th style="text-align:right">Ledger real (monedas)</th><th>Estado</th></tr>' +
+      retro.map(r=>{
+        const statusCell = r.suspicious
+          ? `<span class="status-pill churned"><span class="dotstat"></span>⚠️ +${r.suspiciousCoins.toLocaleString('es')} sin explicar</span>`
+          : `<span class="status-pill active"><span class="dotstat"></span>OK</span>`;
+        return `<tr${r.suspicious?' style="background:rgba(255,122,122,.08)"':''}><td>${escapeHtml(r.username||'—')}</td><td class="n">${r.level}</td><td class="n">${r.totalXp.toLocaleString('es')}</td><td class="n">${r.totalCoins.toLocaleString('es')}</td><td class="n">${r.ledgerActualCoins.toLocaleString('es')}</td><td>${statusCell}</td></tr>`;
+      }).join('');
+  }
+  if(suspiciousCount > 0){
+    $('economy-status').innerHTML += `<div class="insight-card crit">🚨 <b>${suspiciousCount}</b> cuenta${suspiciousCount===1?'':'s'} con más monedas en currency_ledger de las que la fórmula explica — revisar en la tabla de abajo.</div>`;
   }
 
   const tbC = $('tbl-economy-config');

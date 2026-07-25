@@ -144,7 +144,8 @@ Deno.serve(async (req) => {
       allProfilesRes, countryEventsRes, allEventsRes,
       founderEligibleRes, founderClaimedRes,
       versusFunnelRes, friendshipsRes, onlineUsersRes,
-      currencyLedgerRes, xpConfigRes, xpSnapshotRes,
+      currencyLedgerRes, xpConfigRes,
+      allCampaignsForXpRes, allGlobequizForXpRes, allCurrencyLedgerRes,
     ] = await Promise.all([
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true })),
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true }).gte('last_active', onlineISO)),
@@ -233,9 +234,18 @@ Deno.serve(async (req) => {
         .select('user_id, coins, xp, reason, ref_value, created_at')
         .gte('created_at', windowISO).limit(50000),
       sb.from('xp_system_config').select('rule_key, rule_value, description, status').order('id', { ascending: true }),
-      sb.from('xp_retroactive_snapshot')
-        .select('username, total_xp, level, gameplay_coins, level_bonus_coins, total_coins')
-        .order('total_xp', { ascending: false }),
+      // ── Cálculo EN VIVO (no una foto fija) de lo que cada cuenta debería
+      // tener según el historial real de partidas — TODO el historial, sin
+      // recortar por rango, porque un total acumulado no tiene sentido
+      // "por período". Se recalcula en cada carga del panel.
+      sb.from('analytics_events').select('score, user_id').eq('type', 'campaign').not('user_id', 'is', null).limit(50000),
+      sb.from('analytics_events').select('streak, user_id').eq('type', 'globequiz').not('user_id', 'is', null).limit(50000),
+      // Todo lo que currency_ledger tiene acumulado ALGUNA VEZ para cada
+      // cuenta (no solo el rango elegido) — para poder comparar contra el
+      // esperado y detectar inserts manipulados (alguien pegándose monedas
+      // desde la consola del navegador, ya que el insert es anon sin
+      // validación de monto del lado del server).
+      sb.from('currency_ledger').select('user_id, coins, xp').limit(50000),
     ]);
 
     const regRows      = profilesRes.data || [];
@@ -536,6 +546,67 @@ Deno.serve(async (req) => {
       .map(([uid, v]) => ({ username: usernameById[uid] || uid, coins: v.coins, xp: v.xp }))
       .sort((a, b) => b.coins - a.coins)
       .slice(0, 15);
+
+    // ── Retroactivo EN VIVO + detección de manipulación ───────────────────
+    // Mismas fórmulas que js/analytics.js (coinsFromScore/xpFromScore para
+    // Gira Mundial, base+multiplicador de racha para GlobeQuiz) pero
+    // recalculadas acá server-side sobre TODO el historial de
+    // analytics_events, que el cliente solo puede insertar (nunca leer ni
+    // editar) — a diferencia de currency_ledger, cuyo insert es anon sin
+    // validar el monto, así que alguien podría abrir la consola del
+    // navegador y insertarse coins/xp inventados ahí. Comparando el
+    // "esperado" (este cálculo) contra lo que currency_ledger tiene
+    // realmente acumulado, cualquier exceso es sospechoso.
+    function levelFromXp(xp: number): number {
+      return Math.min(Math.floor((25 + Math.sqrt(625 + 100 * xp)) / 50), 100);
+    }
+    function levelUpBonusCoins(level: number): number {
+      let total = 0;
+      for (let lvl = 2; lvl <= level; lvl++) {
+        if (lvl === 100) total += 10000;
+        else if (lvl % 10 === 0) total += Math.round((20 + Math.pow(lvl - 1, 1.6) * 2) * 1.25);
+        else total += Math.round(20 + Math.pow(lvl - 1, 1.6) * 2);
+      }
+      return total;
+    }
+    const expectedByUser: Record<string, { coins: number; xp: number }> = {};
+    for (const r of (allCampaignsForXpRes.data || []) as any[]) {
+      const steps = Math.floor((r.score || 0) / 250);
+      const u = expectedByUser[r.user_id] = expectedByUser[r.user_id] || { coins: 0, xp: 0 };
+      u.coins += 10 + steps; u.xp += 50 + steps * 3;
+    }
+    for (const r of (allGlobequizForXpRes.data || []) as any[]) {
+      const mult = Math.pow(1.15, Math.min(Math.floor((r.streak || 0) / 10), 10));
+      const u = expectedByUser[r.user_id] = expectedByUser[r.user_id] || { coins: 0, xp: 0 };
+      u.coins += Math.round(10 * mult); u.xp += Math.round(20 * mult);
+    }
+    const actualLedgerByUser: Record<string, { coins: number; xp: number }> = {};
+    for (const r of (allCurrencyLedgerRes.data || []) as any[]) {
+      if (!r.user_id) continue;
+      const u = actualLedgerByUser[r.user_id] = actualLedgerByUser[r.user_id] || { coins: 0, xp: 0 };
+      u.coins += r.coins || 0; u.xp += r.xp || 0;
+    }
+    const xpRetroactive = Object.entries(expectedByUser)
+      .map(([uid, exp]) => {
+        const level = levelFromXp(exp.xp);
+        const levelBonus = levelUpBonusCoins(level);
+        const actual = actualLedgerByUser[uid] || { coins: 0, xp: 0 };
+        // El sistema todavía no paga premios de nivel en vivo (no hay UI de
+        // niveles), así que lo único que currency_ledger debería tener
+        // acumulado es la parte "gameplay" — cualquier cosa por encima de
+        // eso (con un margen chico por redondeos) es sospechosa.
+        const suspiciousCoins = Math.max(0, actual.coins - exp.coins);
+        return {
+          username: usernameById[uid] || uid,
+          totalXp: exp.xp, level,
+          gameplayCoins: exp.coins, levelBonusCoins: levelBonus, totalCoins: exp.coins + levelBonus,
+          ledgerActualCoins: actual.coins, ledgerActualXp: actual.xp,
+          suspicious: suspiciousCoins > 5, // margen chico por redondeo entre eventos
+          suspiciousCoins,
+        };
+      })
+      .sort((a, b) => b.totalXp - a.totalXp);
+
     const economy = {
       totalCoins: currencyTotalCoins,
       totalXp: currencyTotalXp,
@@ -545,14 +616,11 @@ Deno.serve(async (req) => {
       config: (xpConfigRes.data || []).map((r: any) => ({
         key: r.rule_key, value: r.rule_value, description: r.description, status: r.status,
       })),
-      // Foto fija: qué tendría CADA cuenta hoy (XP/nivel/monedas) si el
-      // sistema hubiera estado activo desde siempre, calculado sobre el
-      // historial real de partidas (ver xp_retroactive_snapshot). No es
-      // saldo real todavía.
-      retroactive: (xpSnapshotRes.data || []).map((r: any) => ({
-        username: r.username, totalXp: r.total_xp, level: r.level,
-        gameplayCoins: r.gameplay_coins, levelBonusCoins: r.level_bonus_coins, totalCoins: r.total_coins,
-      })),
+      // Cálculo EN VIVO (se recalcula en cada carga, no una foto guardada):
+      // qué tendría cada cuenta según su historial real de partidas +
+      // comparación contra lo que currency_ledger tiene realmente acumulado,
+      // para detectar manipulación (inserts que no matchean la fórmula).
+      retroactive: xpRetroactive,
     };
 
     // ── Insights narrativos (todos all-time, sirven para el resumen ejecutivo) ─
