@@ -438,8 +438,8 @@ window.sbUploadAvatar = async function(userId, blob) {
 window.sbLoadSocialData = async function(userId) {
   const { data, error } = await sb.from('friendships')
     .select(`id, status, initiated_by, user_a, user_b,
-      pa:user_a(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing,is_practicing,vs_wins,vs_losses,is_supporter,avg_sum_flags,avg_sum_shapes,avg_sum_cities,avg_sum_monuments,play_count_flags,play_count_shapes,play_count_cities,play_count_monuments,country_code,is_founder,cell_code,frame_code,card_code,panel_code),
-      pb:user_b(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing,is_practicing,vs_wins,vs_losses,is_supporter,avg_sum_flags,avg_sum_shapes,avg_sum_cities,avg_sum_monuments,play_count_flags,play_count_shapes,play_count_cities,play_count_monuments,country_code,is_founder,cell_code,frame_code,card_code,panel_code)`)
+      pa:user_a(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing,is_practicing,vs_wins,vs_losses,is_supporter,avg_sum_flags,avg_sum_shapes,avg_sum_cities,avg_sum_monuments,play_count_flags,play_count_shapes,play_count_cities,play_count_monuments,country_code,is_founder,cell_code,frame_code,card_code,panel_code,gq_streak_count,gq_streak_last_date,gq_today_time_ms),
+      pb:user_b(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing,is_practicing,vs_wins,vs_losses,is_supporter,avg_sum_flags,avg_sum_shapes,avg_sum_cities,avg_sum_monuments,play_count_flags,play_count_shapes,play_count_cities,play_count_monuments,country_code,is_founder,cell_code,frame_code,card_code,panel_code,gq_streak_count,gq_streak_last_date,gq_today_time_ms)`)
     .or(`user_a.eq.${userId},user_b.eq.${userId}`);
   if (error) throw error;
   function toEntry(row) {
@@ -466,6 +466,9 @@ window.sbLoadSocialData = async function(userId) {
       frameCode: p.frame_code || '0001',
       cardCode: p.card_code || '0001',
       panelCode: p.panel_code || '0001',
+      gqStreakCount: p.gq_streak_count || 0,
+      gqStreakLastDate: p.gq_streak_last_date || null,
+      gqTodayTimeMs: (typeof p.gq_today_time_ms === 'number') ? p.gq_today_time_ms : null,
     };
   }
   const rows = data || [];
@@ -632,9 +635,12 @@ sb.auth.onAuthStateChange((event, session) => {
   // Notificar a monuments.js que la sesión está lista (sync de datos locales, etc.)
   window._sessionReady = true;
   document.dispatchEvent(new CustomEvent('sbSessionReady', { detail: { userId: session.user.id } }));
-  // Heartbeat periódico
+  // Heartbeat periódico — solo si la pestaña está visible, si no un usuario
+  // que deja la pestaña abierta en 2do plano por horas queda marcado como
+  // "conectado" indefinidamente en /stats (setInterval sigue corriendo aunque
+  // esté en background).
   setInterval(() => {
-    if (window._sbUserId) window.sbUpdateLastActive(window._sbUserId).catch(() => {});
+    if (window._sbUserId && document.visibilityState === 'visible') window.sbUpdateLastActive(window._sbUserId).catch(() => {});
   }, 25 * 1000);
 
   // Heartbeat en actividad: volver de background o interacción en el menú

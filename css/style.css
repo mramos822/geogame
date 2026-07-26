@@ -1028,6 +1028,59 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   -webkit-user-drag: none;
 }
 
+/* Vignette "espacio": pantalla completa (no recortada al círculo del globo)
+   centrada en el mismo punto que .gq-globe-wrap (45.5%/46%, ver esa regla)
+   para que el borde del visor y el sky.png de fondo se oscurezcan como un
+   único fondo continuo, sin costura entre el círculo y lo que lo rodea.
+   --gq-vig-core (radio transparente) y --gq-vig-t (opacidad) las anima JS
+   (updateSpaceVignette en globequiz.js) en #globequiz-screen. A zoom por
+   defecto/cerca quedan en 0, invisibles. */
+.gq-space-vignette {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+  background: radial-gradient(circle at 45.5% 46%,
+    transparent 0,
+    transparent var(--gq-vig-core, 36cqmin),
+    rgba(2, 2, 10, 1) calc(var(--gq-vig-core, 36cqmin) + 5cqmin),
+    rgba(2, 2, 10, 1) 100%);
+  opacity: var(--gq-vig-t, 0);
+  transition: opacity 0.15s linear;
+}
+
+/* Estrellas: canvas de Three.js PROPIO (escena/cámara/renderer aparte del
+   globo, ver initStarfield en globequiz.js), pantalla completa — a
+   diferencia del canvas del globo (recortado al círculo de 72cqmin,
+   .gq-globe-wrap), este cubre TODA la pantalla, así que las estrellas
+   también se ven fuera del visor. Rotan de verdad en 3D (se copia
+   sphere.rotation.x/y al objeto Points en cada render()), no es un truco de
+   CSS. El mismo mask que la vignette de arriba (mismas --gq-vig-core/
+   --gq-vig-t) hace que solo se vean sobre la zona ya oscurecida, nunca
+   flotando sobre el sky3.png celeste. */
+.gq-starfield-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+  opacity: var(--gq-vig-t, 0);
+  transition: opacity 0.15s linear;
+  -webkit-mask-image: radial-gradient(circle at 45.5% 46%,
+    transparent 0,
+    transparent var(--gq-vig-core, 36cqmin),
+    black calc(var(--gq-vig-core, 36cqmin) + 5cqmin),
+    black 100%);
+  mask-image: radial-gradient(circle at 45.5% 46%,
+    transparent 0,
+    transparent var(--gq-vig-core, 36cqmin),
+    black calc(var(--gq-vig-core, 36cqmin) + 5cqmin),
+    black 100%);
+}
+
 /* Igual que #right-edge-bar (juego real): barra celeste pegada al borde
    derecho del área visible, detrás del panel de amigos. */
 .gq-edge-bar {
@@ -1101,22 +1154,36 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 }
 .gq-power-wrap img { display: block; width: 100%; height: auto; pointer-events: none; user-select: none; -webkit-user-drag: none; }
 
+/* Antes flexbox + reordenar el DOM a mano — se ve/anima distinto del
+   leaderboard real (positionLeaderboard en monuments.js), que posiciona
+   cada fila con top absoluto y anima ESE top con la transition ya
+   incorporada en la regla base .lb-entry (top 0.7s cubic-bezier). Acá se
+   deja que .lb-entry use esa misma base tal cual (position:absolute,
+   width:100%, aspect-ratio 4/6, la transition ya viene puesta) en vez de
+   pisarla — así el intercambio de posición (ver positionGqLeaderboard en
+   globequiz.js) es LA MISMA animación que en Gira Mundial, no una parecida.
+   Filas de 18.9cqmin de alto (12.6cqmin de ancho × 6/4 del aspect-ratio)
+   + 0.7cqmin de separación = GQ_LB_ROW_H_CQMIN. */
 .gq-friends-bar {
   position: absolute;
   right: 16.5%;
   bottom: 3cqmin;
   width: 12.6cqmin;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.7cqmin;
+  /* GQ_LB_WINDOW filas visibles a la vez (ver globequiz.js) — ventana fija
+     tipo leaderboard de campaña: si hay más amigos que eso, la fila del
+     jugador se sigue viendo (nunca sale de la ventana), el resto se clipea. */
+  height: 77.7cqmin;
+  overflow: visible;
+  /* clip-path en vez de overflow:hidden a secas — corta solo en vertical
+     (top/bottom) y deja pasar cualquier emote bubble que se dispare sobre
+     una fila hacia los costados (o su sombra), mismo criterio que
+     #leaderboard. Con overflow:hidden ADEMÁS del clip-path, el hidden
+     ganaba y recortaba en las 4 direcciones — anulaba el propósito del
+     clip-path (el "se cortan hasta las sombras" reportado). */
+  clip-path: inset(0 -300px);
   z-index: 210;
 }
-.gq-friends-bar .lb-entry {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 4 / 6;
-}
+#gq-lb-player { top: 0; }
 
 /* Mismo centro/tamaño que .gq-globe-wrap pero SIN recorte circular — las
    partículas del confeti (ver globequiz.js, showWin) tienen que poder salir
@@ -1339,6 +1406,32 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 }
 .gq-endgame-row-name { flex: 1; text-align: left; }
 .gq-endgame-row-dist { opacity: 0.85; }
+.gq-endgame-msgs {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4cqmin;
+  text-align: center;
+}
+.gq-endgame-msg-title {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 1.9cqmin;
+  color: #2fae4a;
+}
+.gq-endgame-msg-sub {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 1.5cqmin;
+  color: #5a4400;
+}
+.gq-endgame-countdown {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 1.4cqmin;
+  color: #8b6a00;
+}
+.gq-endgame-countdown-val {
+  font-family: 'Arial Black', Impact, sans-serif;
+  color: #5a4400;
+}
 .gq-endgame-footer {
   display: flex;
   align-items: center;
@@ -4486,6 +4579,23 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   color: #2a2a2a;
   text-align: center;
   pointer-events: none;
+}
+.loading-globequiz-countdown {
+  position: absolute;
+  top: 63%;
+  left: 62%;
+  transform: translate(-50%, -50%);
+  width: 55cqmin;
+  z-index: 203;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 1.9cqmin;
+  color: #5a4400;
+  text-align: center;
+  pointer-events: none;
+}
+.loading-globequiz-countdown-val {
+  font-family: 'Arial Black', Impact, sans-serif;
+  color: #2a2a2a;
 }
 .loading-globequiz-play-wrap {
   position: absolute;

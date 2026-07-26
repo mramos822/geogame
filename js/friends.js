@@ -38,6 +38,9 @@ async function loadFriends() {
       cardCode: f.cardCode || '0001',
       cellCode: f.cellCode || '0001',
       panelCode: f.panelCode || '0001',
+      gqStreakCount: f.gqStreakCount || 0,
+      gqStreakLastDate: f.gqStreakLastDate || null,
+      gqTodayTimeMs: (typeof f.gqTodayTimeMs === 'number') ? f.gqTodayTimeMs : null,
     }));
   } catch (e) {
     console.warn('[friends] error cargando:', e.message);

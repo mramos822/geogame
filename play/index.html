@@ -13,7 +13,7 @@
   <link rel="icon" type="image/png" href="images/planet3.png">
   <title>myGeoChallenge</title>
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6238929099865050" crossorigin="anonymous"></script>
-  <link rel="stylesheet" href="css/style.css?v=3.5.19">
+  <link rel="stylesheet" href="css/style.css?v=3.5.20">
   <link rel="preload" href="images/characters/men3.png" as="image">
   <link rel="preload" href="images/characters/men4.png" as="image">
   <link rel="preload" href="images/characters/girl3.png" as="image">
@@ -58,6 +58,9 @@
     <span class="loading-globequiz-title" id="loading-globequiz-title" data-i18n="panel2.globequizTitle" style="display:none">GloboReto</span>
     <img class="loading-globequiz-globe" id="loading-globequiz-globe" src="images/globe.png" alt="" draggable="false" oncontextmenu="return false" style="display:none">
     <div class="loading-globequiz-desc" id="loading-globequiz-desc" data-i18n="panel2.globequizDesc" style="display:none">Adivina el país misterioso del día. Cada intento fallido marca el globo: mientras más caliente el color, más cerca estás.</div>
+    <div class="loading-globequiz-countdown" id="loading-globequiz-countdown" style="display:none">
+      <span data-i18n="panel2.globequizNextDayLabel">Nuevo día en</span>: <span class="loading-globequiz-countdown-val" id="loading-globequiz-countdown-val">00:00:00</span>
+    </div>
     <div class="loading-globequiz-play-wrap" id="loading-globequiz-play-wrap" style="display:none">
       <img src="images/buttons/es-globeplay.png" alt="" draggable="false" oncontextmenu="return false">
     </div>
@@ -1226,7 +1229,7 @@
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
     </div>
-    <div id="loading-version">Ver. 3.5.19</div>
+    <div id="loading-version">Ver. 3.5.20</div>
   </div>
 
   <!-- Pantalla de resultado versus (W/L) — fuera del loading-screen para verse tras la partida -->
@@ -1425,6 +1428,8 @@
 
   <div id="globequiz-screen" style="display:none">
     <img class="gq-bg" src="images/bg/sky3.png" alt="" draggable="false" oncontextmenu="return false">
+    <div class="gq-space-vignette" id="gq-space-vignette"></div>
+    <canvas class="gq-starfield-canvas" id="gq-starfield-canvas"></canvas>
     <div class="gq-edge-bar"></div>
     <div class="gq-power-wrap" id="gq-power-btn">
       <img src="images/power.png" alt="" draggable="false" oncontextmenu="return false">
@@ -1433,6 +1438,9 @@
       <img src="images/globecountdown.png" alt="" draggable="false" oncontextmenu="return false">
       <span id="gq-timer-number">0:00</span>
     </div>
+    <!-- Filas de amigos (los que ya jugaron HOY y aseguraron su racha) se
+         generan por JS (ver buildGqFriendRows en globequiz.js) — si nadie
+         jugó hoy, queda solo la carta del jugador. -->
     <div class="gq-friends-bar" id="gq-friends-bar">
       <div class="lb-entry lb-player" id="gq-lb-player">
         <span class="lb-rank rank-other"></span>
@@ -1485,6 +1493,13 @@
           </div>
         </div>
         <div class="gq-endgame-table" id="gq-endgame-table"></div>
+        <div class="gq-endgame-msgs" id="gq-endgame-msgs">
+          <span class="gq-endgame-msg-title" id="gq-endgame-msg-title"></span>
+          <span class="gq-endgame-msg-sub" id="gq-endgame-msg-sub"></span>
+          <span class="gq-endgame-countdown" id="gq-endgame-countdown" style="display:none">
+            <span data-i18n="globequiz.nextStreakIn">Próxima racha en</span>: <span class="gq-endgame-countdown-val" id="gq-endgame-countdown-val">00:00:00</span>
+          </span>
+        </div>
         <div class="gq-endgame-footer">
           <div class="gq-endgame-streak" id="gq-endgame-streak">
             <img class="gq-endgame-streak-img" src="images/streak.png" alt="" draggable="false" oncontextmenu="return false">
@@ -1966,30 +1981,30 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-  <script src="js/sb.js?v=3.5.19"></script>
-  <script src="js/analytics.js?v=3.5.19"></script>
-  <script src="js/letterbox.js?v=3.5.19"></script>
-  <script src="js/i18n.js?v=3.5.19"></script>
-  <script src="js/i18n-data.js?v=3.5.19"></script>
-  <script src="js/manifest.js?v=3.5.19"></script>
-  <script src="js/practice-data.js?v=3.5.19"></script>
-  <script src="js/cities.js?v=3.5.19"></script>
-  <script src="js/countries.js?v=3.5.19"></script>
-  <script src="js/places.js?v=3.5.19"></script>
-  <script src="js/friends.js?v=3.5.19"></script>
-  <script src="js/vs.js?v=3.5.19"></script>
-  <script src="js/spectate.js?v=3.5.19"></script>
-  <script src="js/lobby.js?v=3.5.19"></script>
-  <script src="js/monuments.js?v=3.5.19"></script>
-  <script src="js/globequiz-names-es.js?v=3.5.19"></script>
-  <script src="js/globequiz-countries-data.js?v=3.5.19"></script>
-  <script src="js/globequiz.js?v=3.5.19"></script>
-  <script src="js/flags.js?v=3.5.19"></script>
-  <script src="js/shapes.js?v=3.5.19"></script>
-  <script src="js/ranks.js?v=3.5.19"></script>
-  <script src="js/results.js?v=3.5.19"></script>
-  <script src="js/final.js?v=3.5.19"></script>
-  <script src="js/memdebug.js?v=3.5.19"></script>
+  <script src="js/sb.js?v=3.5.20"></script>
+  <script src="js/analytics.js?v=3.5.20"></script>
+  <script src="js/letterbox.js?v=3.5.20"></script>
+  <script src="js/i18n.js?v=3.5.20"></script>
+  <script src="js/i18n-data.js?v=3.5.20"></script>
+  <script src="js/manifest.js?v=3.5.20"></script>
+  <script src="js/practice-data.js?v=3.5.20"></script>
+  <script src="js/cities.js?v=3.5.20"></script>
+  <script src="js/countries.js?v=3.5.20"></script>
+  <script src="js/places.js?v=3.5.20"></script>
+  <script src="js/friends.js?v=3.5.20"></script>
+  <script src="js/vs.js?v=3.5.20"></script>
+  <script src="js/spectate.js?v=3.5.20"></script>
+  <script src="js/lobby.js?v=3.5.20"></script>
+  <script src="js/monuments.js?v=3.5.20"></script>
+  <script src="js/globequiz-names-es.js?v=3.5.20"></script>
+  <script src="js/globequiz-countries-data.js?v=3.5.20"></script>
+  <script src="js/globequiz.js?v=3.5.20"></script>
+  <script src="js/flags.js?v=3.5.20"></script>
+  <script src="js/shapes.js?v=3.5.20"></script>
+  <script src="js/ranks.js?v=3.5.20"></script>
+  <script src="js/results.js?v=3.5.20"></script>
+  <script src="js/final.js?v=3.5.20"></script>
+  <script src="js/memdebug.js?v=3.5.20"></script>
 
   <button id="recording-toggle" style="display:none" onclick="document.body.classList.toggle('recording-mode');this.classList.toggle('active')">⏺</button>
 

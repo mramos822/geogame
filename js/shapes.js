@@ -13,17 +13,6 @@ function ensureShapeTagStyle() {
   const st = document.createElement('style');
   st.id = 'shape-tag-style';
   st.textContent = `
-    #shapes-timer-number {
-      position: absolute;
-      top: 45%; left: 69%;
-      transform: translate(-50%, -50%);
-      font-size: 7.4cqmin; font-weight: 900;
-      font-family: 'Arial Black', Impact, sans-serif;
-      color: white;
-      -webkit-text-stroke: 0.27cqmin black;
-      text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
-      pointer-events: none; min-width: 4.8cqmin; text-align: center; transition: color 0.3s;
-    }
     #shapes-progress-dots {
       position: absolute; bottom: 1.1cqmin; left: 1cqmin; width: 100%;
       display: flex; justify-content: center; gap: 0.44cqmin; padding: 0 0.66cqmin;

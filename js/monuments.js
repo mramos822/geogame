@@ -1049,13 +1049,48 @@ document.getElementById('globequiz-btn')?.addEventListener('click', () => {
   if (back) back.style.display = 'block';
   const t2 = document.getElementById('loading-globequiz-text2');
   if (t2) t2.style.display = 'block';
+  const gqDesc = document.getElementById('loading-globequiz-desc');
+  const gqCountdown = document.getElementById('loading-globequiz-countdown');
+  // Si ya jugó hoy, la burbuja de saludo Y la descripción avisan que vuelva
+  // mañana en vez de invitarlo a buscar el país (igual puede jugar de nuevo,
+  // solo no suma racha) — y ahí recién aparece el countdown a "nuevo día".
+  // Si NO jugó hoy, ambas quedan con su texto normal de invitación y el
+  // countdown ni se muestra (no tiene sentido mostrarlo si todavía puede
+  // sumar la racha de hoy jugando).
+  if (gqCountdown) gqCountdown.style.display = 'none';
+  if (typeof window.gqHasPlayedToday === 'function') {
+    const played = window.gqHasPlayedToday();
+    const g1 = t2 ? t2.querySelector('[data-i18n="panel2.globequizGreet1"]') : null;
+    const g2 = t2 ? t2.querySelector('[data-i18n="panel2.globequizGreet2"]') : null;
+    if (g1 && g2) {
+      if (played) {
+        g1.setAttribute('data-i18n', 'panel2.globequizGreetPlayed1');
+        g1.textContent = t('panel2.globequizGreetPlayed1');
+        g2.setAttribute('data-i18n', 'panel2.globequizGreetPlayed2');
+        g2.textContent = t('panel2.globequizGreetPlayed2');
+      } else {
+        g1.setAttribute('data-i18n', 'panel2.globequizGreet1');
+        g1.textContent = t('panel2.globequizGreet1');
+        g2.setAttribute('data-i18n', 'panel2.globequizGreet2');
+        g2.textContent = t('panel2.globequizGreet2');
+      }
+    }
+    if (gqDesc) {
+      const descKey = played ? 'panel2.globequizDescPlayed' : 'panel2.globequizDesc';
+      gqDesc.setAttribute('data-i18n', descKey);
+      gqDesc.textContent = t(descKey);
+    }
+    if (played && gqCountdown) {
+      gqCountdown.style.display = 'block';
+      if (typeof window.startGlobeQuizMenuCountdown === 'function') window.startGlobeQuizMenuCountdown();
+    }
+  }
   const gqTable = document.getElementById('loading-globequiz-table');
   if (gqTable) gqTable.style.display = 'block';
   const gqTitle = document.getElementById('loading-globequiz-title');
   if (gqTitle) gqTitle.style.display = 'block';
   const gqGlobe = document.getElementById('loading-globequiz-globe');
   if (gqGlobe) gqGlobe.style.display = 'block';
-  const gqDesc = document.getElementById('loading-globequiz-desc');
   if (gqDesc) gqDesc.style.display = 'block';
   const gqPlay = document.getElementById('loading-globequiz-play-wrap');
   if (gqPlay) gqPlay.style.display = 'block';
@@ -1069,6 +1104,7 @@ document.getElementById('globequiz-locked-ok')?.addEventListener('click', () => 
 
 document.getElementById('loading-globequiz-play-wrap')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+  if (typeof window.stopGlobeQuizMenuCountdown === 'function') window.stopGlobeQuizMenuCountdown();
   document.getElementById('loading-screen').style.display = 'none';
   const gqScreen = document.getElementById('globequiz-screen');
   if (gqScreen) gqScreen.style.display = 'block';
@@ -1100,6 +1136,7 @@ document.getElementById('gq-quit-confirm')?.addEventListener('click', () => {
   if (typeof window.stopGlobeQuizInertia === 'function') window.stopGlobeQuizInertia();
   if (typeof window.stopGlobeQuizCountdown === 'function') window.stopGlobeQuizCountdown();
   if (typeof window.stopGlobeQuizEndgameTimer === 'function') window.stopGlobeQuizEndgameTimer();
+  if (typeof window.stopGlobeQuizEndgameCountdown === 'function') window.stopGlobeQuizEndgameCountdown();
   const gqEndgameModalEl = document.getElementById('gq-endgame-modal');
   if (gqEndgameModalEl) gqEndgameModalEl.style.display = 'none';
   // playMusic(null) corta también el AudioBufferSourceNode de iOS (Web Audio),
@@ -1120,8 +1157,9 @@ document.getElementById('gq-quit-confirm')?.addEventListener('click', () => {
   // conocen estos elementos (son específicos de este panel, ver el handler
   // de loading-panel2-back más abajo, que hace lo mismo para ese caso).
   ['loading-globequiz-text2', 'loading-globequiz-table', 'loading-globequiz-title',
-   'loading-globequiz-globe', 'loading-globequiz-desc', 'loading-globequiz-play-wrap']
+   'loading-globequiz-globe', 'loading-globequiz-desc', 'loading-globequiz-countdown', 'loading-globequiz-play-wrap']
     .forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+  if (typeof window.stopGlobeQuizMenuCountdown === 'function') window.stopGlobeQuizMenuCountdown();
   // Volver al MENÚ PRINCIPAL (panel1) con la MISMA animación de entrada que
   // usa quitToMenu() en el resto de los modos, no un salto abrupto.
   if (typeof window.resetEntranceElements === 'function') window.resetEntranceElements();
@@ -1153,6 +1191,9 @@ document.getElementById('loading-panel2-back')?.addEventListener('click', () => 
   if (gqGlobeB) gqGlobeB.style.display = 'none';
   const gqDescB = document.getElementById('loading-globequiz-desc');
   if (gqDescB) gqDescB.style.display = 'none';
+  const gqCountdownB = document.getElementById('loading-globequiz-countdown');
+  if (gqCountdownB) gqCountdownB.style.display = 'none';
+  if (typeof window.stopGlobeQuizMenuCountdown === 'function') window.stopGlobeQuizMenuCountdown();
   const gqPlayB = document.getElementById('loading-globequiz-play-wrap');
   if (gqPlayB) gqPlayB.style.display = 'none';
   const lgBack = document.querySelector('.loading-logo');
@@ -2204,10 +2245,21 @@ function _subscribeFriendStatuses(friendIds) {
       f.last_active   = updated.last_active;
       f.is_playing    = updated.is_playing;
       f.is_practicing = updated.is_practicing;
-      // Sincronizar caché de friends.js (usada por el panel de invitar del lobby)
+      // gq_streak_last_date/gq_today_time_ms: así, si un amigo termina su
+      // GlobeQuiz de hoy MIENTRAS ya tenés el panel social abierto (o el
+      // realtime ya suscrito), su carta puede aparecer en tu próxima partida
+      // sin esperar a un loadSocialData completo.
+      f.gqStreakCount    = updated.gq_streak_count || 0;
+      f.gqStreakLastDate = updated.gq_streak_last_date || null;
+      f.gqTodayTimeMs    = (typeof updated.gq_today_time_ms === 'number') ? updated.gq_today_time_ms : null;
+      // Sincronizar caché de friends.js (usada por el panel de invitar del lobby
+      // y por la barra de amigos in-game de GlobeQuiz, ver buildGqFriendRows)
       if (typeof getFriends === 'function') {
         const fc = getFriends().find(x => x.id === updated.id);
-        if (fc) { fc.last_active = updated.last_active; fc.is_playing = updated.is_playing; fc.is_practicing = updated.is_practicing; }
+        if (fc) {
+          fc.last_active = updated.last_active; fc.is_playing = updated.is_playing; fc.is_practicing = updated.is_practicing;
+          fc.gqStreakCount = f.gqStreakCount; fc.gqStreakLastDate = f.gqStreakLastDate; fc.gqTodayTimeMs = f.gqTodayTimeMs;
+        }
       }
       // Refrescar en vivo el panel de amigos de la sala si está abierto
       window._refreshLobbyInviteList?.();
@@ -3172,9 +3224,21 @@ async function loadSocialData(showLoader = true) {
     if (typeof window.Friends !== 'undefined') {
       // Conservar id/last_active/is_playing: los paneles de invitar usan getFriends()
       // y necesitan el estado en vivo (conectado/jugando), igual que el panel social.
+      // OJO: hay que llevar TAMBIÉN frameCode/cardCode/cellCode/panelCode y los
+      // campos gq_* — si no, este _setCache (que corre en cada loadSocialData,
+      // bastante seguido por el poll) pisa el caché más completo que arma
+      // loadFriends() en friends.js y los deja undefined. Sin esto, la barra
+      // de amigos in-game de GlobeQuiz (buildGqFriendRows) nunca encontraba a
+      // ningún amigo con racha de hoy aunque sí la tuviera en el server.
       window.Friends._setCache(socialData.friends.map(f => ({
         id: f.id, name: f.name, score: f.score, avatar: f.avatar || '',
         last_active: f.last_active || null, is_playing: f.is_playing || false,
+        is_practicing: f.is_practicing || false,
+        frameCode: f.frameCode || '0001', cardCode: f.cardCode || '0001',
+        cellCode: f.cellCode || '0001', panelCode: f.panelCode || '0001',
+        gqStreakCount: f.gqStreakCount || 0,
+        gqStreakLastDate: f.gqStreakLastDate || null,
+        gqTodayTimeMs: (typeof f.gqTodayTimeMs === 'number') ? f.gqTodayTimeMs : null,
       })));
     }
   } catch (e) {

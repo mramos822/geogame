@@ -403,7 +403,15 @@
 
   function clickOnGlobe(clientX, clientY) {
     const country = countryAtScreenPoint(clientX, clientY);
-    if (country) focusOnCountry(country);
+    if (!country) return;
+    // Solo centra la cámara en países YA adivinados (o el correcto, si ya se
+    // ganó) — mismo criterio que updateHoverLabel. Sin este chequeo, tocar
+    // CUALQUIER país del globo (aunque todavía no se haya escrito/confirmado
+    // como guess) ya centraba la cámara ahí, dando la sensación de que el
+    // juego "tipeaba" la respuesta solo.
+    const isGuessed = (solved && country.name === dailyCountry.name) ||
+      guesses.some(g => g.name === country.name);
+    if (isGuessed) focusOnCountry(country);
   }
 
   // Reposiciona el label a las coordenadas del CURSOR (no a un punto fijo):
@@ -512,6 +520,7 @@
       sphere.rotation.y = startY + dY * ease;
       zoomZ = startZ + dZ * ease;
       camera.position.z = zoomZ;
+      updateSpaceVignette();
       render();
       focusAnimId = t < 1 ? requestAnimationFrame(step) : null;
     }
@@ -630,6 +639,14 @@
   function render() {
     if (!renderer || !scene || !camera) return;
     renderer.render(scene, camera);
+    // opacity>0 solo pasado BASE_Z de zoom (ver updateSpaceVignette) — en
+    // zoom normal/cerca (la mayor parte de una partida) esto se saltea el
+    // render pass entero de la segunda escena, no solo lo esconde con CSS.
+    if (starRenderer && starGroup && sphere && starMaterial && starMaterial.opacity > 0) {
+      starGroup.rotation.x = sphere.rotation.x;
+      starGroup.rotation.y = sphere.rotation.y;
+      starRenderer.render(starScene, starCamera);
+    }
   }
 
   // Rotación automática lenta mientras el jugador todavía no hizo ningún
@@ -749,8 +766,270 @@
     gqEndgameTimeout = null;
   };
 
+  // Cuenta regresiva hasta la próxima medianoche LOCAL (mismo corte de día
+  // que dateKey/gq_streak_last_date) — se muestra en el modal de fin de
+  // partida cuando el jugador ya sumó (o re-jugó) la racha de hoy.
+  let gqCountdownIntervalId = null;
+  function msUntilNextLocalMidnight() {
+    const now = new Date();
+    const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+    return next.getTime() - now.getTime();
+  }
+  function formatCountdown(ms) {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    const h = String(Math.floor(total / 3600)).padStart(2, '0');
+    const m = String(Math.floor((total % 3600) / 60)).padStart(2, '0');
+    const s = String(total % 60).padStart(2, '0');
+    return h + ':' + m + ':' + s;
+  }
+  function stopGqEndgameCountdown() {
+    if (gqCountdownIntervalId) clearInterval(gqCountdownIntervalId);
+    gqCountdownIntervalId = null;
+  }
+  window.stopGlobeQuizEndgameCountdown = stopGqEndgameCountdown;
+  function startGqEndgameCountdown() {
+    stopGqEndgameCountdown();
+    const el = document.getElementById('gq-endgame-countdown-val');
+    if (!el) return;
+    const tick = () => { el.textContent = formatCountdown(msUntilNextLocalMidnight()); };
+    tick();
+    gqCountdownIntervalId = setInterval(tick, 1000);
+  }
+
+  // Misma cuenta regresiva pero para el panel del MENÚ (loading-globequiz-*,
+  // antes de entrar a jugar) — intervalo separado del de fin de partida
+  // porque uno puede quedar visible sin el otro según la pantalla.
+  let gqMenuCountdownIntervalId = null;
+  window.startGlobeQuizMenuCountdown = function () {
+    if (gqMenuCountdownIntervalId) clearInterval(gqMenuCountdownIntervalId);
+    const el = document.getElementById('loading-globequiz-countdown-val');
+    if (!el) return;
+    const tick = () => { el.textContent = formatCountdown(msUntilNextLocalMidnight()); };
+    tick();
+    gqMenuCountdownIntervalId = setInterval(tick, 1000);
+  };
+  window.stopGlobeQuizMenuCountdown = function () {
+    if (gqMenuCountdownIntervalId) clearInterval(gqMenuCountdownIntervalId);
+    gqMenuCountdownIntervalId = null;
+  };
+
   function clampZoom(z) {
     return Math.max(MIN_Z, Math.min(MAX_Z, z));
+  }
+
+  // Vignette "espacio" (ver .gq-space-vignette en style.css, fondo completo
+  // detrás del globo Y de sky3.png): arranca a aparecer recién pasado el
+  // zoom por defecto (BASE_Z) — con zoom normal o acercado queda en 0,
+  // invisible — y llega a máxima oscuridad en MAX_Z. El radio transparente
+  // (--gq-vig-core) sigue el radio REAL en pantalla de la esfera (proyección
+  // en perspectiva, cámara a 45° de FOV) — con un radio aproximado a mano
+  // (interpolación lineal) quedaba un anillo fino de sky3.png asomando entre
+  // el borde del globo y el arranque del negro durante buena parte del zoom,
+  // que es justo el "celeste bordeando el globo" que se veía.
+  const CAMERA_HALF_FOV_RAD = (45 / 2) * Math.PI / 180; // mismo FOV que new THREE.PerspectiveCamera(45, ...)
+  const VISOR_RADIUS_CQMIN = 36; // .gq-globe-wrap: 72cqmin de diámetro
+  function sphereScreenRadiusCqmin(z) {
+    // Ángulo entre el eje de la cámara y el punto donde la esfera (radio 1)
+    // se ve de perfil, visto desde una cámara a distancia z: asin(r/d).
+    const theta = Math.asin(Math.min(1, 1 / z));
+    const frac = Math.tan(theta) / Math.tan(CAMERA_HALF_FOV_RAD);
+    return frac * VISOR_RADIUS_CQMIN;
+  }
+  // --gq-vig-t/--gq-vig-core se setean en #globequiz-screen — de ahí los
+  // hereda .gq-space-vignette (relleno negro, DOM/CSS) por custom property,
+  // y también se usan acá para subir starMaterial.opacity (las estrellas,
+  // ver initStarfield). t=0 en zoom por defecto/cerca, invisibles.
+  function updateSpaceVignette() {
+    const screenEl = document.getElementById('globequiz-screen');
+    if (!screenEl) return;
+    const t = Math.max(0, Math.min(1, (zoomZ - BASE_Z) / (MAX_Z - BASE_Z)));
+    // -1cqmin de margen para que el negro arranque pegado al silueta real
+    // del globo en vez de dejarle un pixel de aire.
+    const core = Math.max(0, sphereScreenRadiusCqmin(zoomZ) - 1);
+    screenEl.style.setProperty('--gq-vig-t', t.toFixed(3));
+    screenEl.style.setProperty('--gq-vig-core', core.toFixed(2) + 'cqmin');
+    if (starMaterial) starMaterial.opacity = t;
+    // Las nebulosas se quedan bastante más tenues que las estrellas (0.35
+    // tope, no 1) — son detalle de fondo, no el protagonista.
+    nebulaMaterials.forEach(mat => { mat.opacity = t * 0.35; });
+  }
+
+  // Estrellas: escena de Three.js APARTE (canvas propio, #gq-starfield-
+  // canvas, pantalla completa) — no cuelgan de `sphere` como en un intento
+  // anterior, porque esa geometría vive DENTRO del canvas del globo, que
+  // está recortado al círculo de 72cqmin (.gq-globe-wrap); nunca iba a poder
+  // dibujar nada fuera de ese círculo. Acá la cámara queda fija en el CENTRO
+  // del cascarón de puntos (radio STARFIELD_RADIUS) — a esa distancia todos
+  // los puntos quedan siempre a la misma distancia de la cámara, y lo único
+  // que hace falta para que giren en sync con el globo es copiar
+  // sphere.rotation.x/y al objeto Points en cada frame (ver render()) — con
+  // geometría 3D real, no un rotate()/rotateX/rotateY de CSS fingiendo
+  // profundidad, y ahora sin el límite del círculo del visor.
+  // Radio variable (no fijo) por estrella: como la cámara de esta escena
+  // está fija en el centro exacto del cascarón, la distancia de cada punto
+  // A LA CÁMARA es directamente su propio radio — con sizeAttenuation eso ya
+  // alcanza para que las más "cercanas" (radio chico) se vean más grandes
+  // que las "lejanas" (radio grande), sin necesitar un shader custom con
+  // tamaño por vértice.
+  const STARFIELD_RADIUS_MIN = 5;
+  const STARFIELD_RADIUS_MAX = 9;
+  const STARFIELD_COUNT = 300;
+  let starScene = null, starCamera = null, starRenderer = null, starPoints = null, starGroup = null;
+  let starMaterial = null;
+  const nebulaMaterials = [];
+
+  // Sprite circular horneado en un canvas chico (radial gradient blanco ->
+  // transparente) — sin esto, THREE.PointsMaterial dibuja cada punto como un
+  // cuadrado sólido (el quad de la sprite por defecto, sin textura).
+  function buildStarSpriteTexture() {
+    const SIZE = 32;
+    const c = document.createElement('canvas');
+    c.width = SIZE; c.height = SIZE;
+    const ctx = c.getContext('2d');
+    const grd = ctx.createRadialGradient(SIZE / 2, SIZE / 2, 0, SIZE / 2, SIZE / 2, SIZE / 2);
+    grd.addColorStop(0, 'rgba(255,255,255,1)');
+    grd.addColorStop(0.6, 'rgba(255,255,255,0.95)');
+    grd.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, SIZE, SIZE);
+    return new THREE.CanvasTexture(c);
+  }
+
+  // Nebulosa: SIN mucho detalle a propósito (nada de formas/nubes
+  // complejas) — un puñado de manchas de color suaves y grandes,
+  // superpuestas, cada una un radial-gradient que se apaga a transparente.
+  // Con blending aditivo (ver nebulaMaterial) se ve como un resplandor de
+  // gas, no como una textura "pintada". `colors` parametrizable para poder
+  // instanciar varias nebulosas con paletas distintas (ver initStarfield).
+  function buildNebulaTexture(colors) {
+    const SIZE = 256;
+    const c = document.createElement('canvas');
+    c.width = SIZE; c.height = SIZE;
+    const ctx = c.getContext('2d');
+    function blob(cx, cy, r, color) {
+      const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      grd.addColorStop(0, color);
+      grd.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grd;
+      ctx.fillRect(0, 0, SIZE, SIZE);
+    }
+    colors.forEach(([cx, cy, r, color]) => blob(SIZE * cx, SIZE * cy, SIZE * r, color));
+    return new THREE.CanvasTexture(c);
+  }
+
+  function initStarfield() {
+    const canvas = document.getElementById('gq-starfield-canvas');
+    if (!canvas) return;
+    starScene = new THREE.Scene();
+    starCamera = new THREE.PerspectiveCamera(60, 1, 0.1, STARFIELD_RADIUS_MAX * 2);
+    starCamera.position.set(0, 0, 0);
+    // antialias:false — el sprite ya viene suavizado (gradient del canvas de
+    // buildStarSpriteTexture), no hace falta MSAA para 300 puntos chicos, y
+    // en un canvas de pantalla completa era el gasto más grande de esta capa.
+    starRenderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: true, powerPreference: 'low-power' });
+    // Capada a 1 (no devicePixelRatio) por la misma razón: son puntos
+    // borrosos de fondo, no necesitan nitidez retina, y renderizar a 2x en
+    // pantalla completa es 4x los píxeles por frame.
+    starRenderer.setPixelRatio(1);
+
+    // Puntos uniformes sobre la esfera (Marsaglia, normalizando un vector
+    // random dentro de la esfera unitaria) — con lat/lon random los puntos
+    // se apelmazan en los polos, se nota como dos "manchas" de estrellas.
+    // Radio (= distancia a la cámara, ver arriba) y brillo por punto son
+    // random e INDEPENDIENTES entre sí: unas quedan grandes Y opacas, otras
+    // chicas Y tenues, pero también combinaciones cruzadas — da más variedad
+    // que si tamaño y brillo fueran siempre de la mano.
+    const positions = new Float32Array(STARFIELD_COUNT * 3);
+    const colors = new Float32Array(STARFIELD_COUNT * 3);
+    for (let i = 0; i < STARFIELD_COUNT; i++) {
+      let x, y, z, d2;
+      do {
+        x = Math.random() * 2 - 1;
+        y = Math.random() * 2 - 1;
+        z = Math.random() * 2 - 1;
+        d2 = x * x + y * y + z * z;
+      } while (d2 === 0 || d2 > 1);
+      const dist = STARFIELD_RADIUS_MIN + Math.random() * (STARFIELD_RADIUS_MAX - STARFIELD_RADIUS_MIN);
+      const inv = dist / Math.sqrt(d2);
+      positions[i * 3] = x * inv;
+      positions[i * 3 + 1] = y * inv;
+      positions[i * 3 + 2] = z * inv;
+      // Piso alto (0.6) para que la mayoría se vea bien blanca, con algo de
+      // variación (hasta 1.0) para que no todas tengan el mismo brillo/glow.
+      const brightness = 0.6 + Math.random() * 0.4;
+      colors[i * 3] = brightness;
+      colors[i * 3 + 1] = brightness;
+      colors[i * 3 + 2] = brightness;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    starMaterial = new THREE.PointsMaterial({
+      size: 0.05, // antes 0.11, quedaban grandes
+      sizeAttenuation: true, // junto con el radio variable de arriba, esto es lo que las hace ver "más cerca/lejos"
+      map: buildStarSpriteTexture(),
+      transparent: true,
+      vertexColors: true, // brillo por punto (ver colors arriba), da profundidad
+      depthWrite: false,
+      opacity: 0, // arranca invisible, updateSpaceVignette lo sube con el zoom
+    });
+    starPoints = new THREE.Points(geo, starMaterial);
+
+    // Sprites de nebulosa: billboard (siempre de frente a la cámara,
+    // comportamiento nativo de THREE.Sprite), repartidos por el cascarón
+    // para que no tapen al globo cuando está centrado. Blending aditivo (se
+    // suma a lo que ya está dibujado, no lo tapa) para que se vean como un
+    // resplandor de gas y no como un parche opaco. Dos nebulosas con
+    // paletas distintas — no una sola — para que se sienta más como el
+    // espacio de verdad y no un único adorno repetido.
+    const NEBULAE = [
+      { lon: -40, lat: 25, scale: 13, colors: [
+        [0.4, 0.45, 0.5, 'rgba(150,90,220,0.55)'],  // violeta
+        [0.62, 0.55, 0.42, 'rgba(60,170,200,0.4)'], // teal
+        [0.5, 0.3, 0.3, 'rgba(230,110,180,0.3)'],   // magenta, da más riqueza
+      ] },
+      { lon: 100, lat: -18, scale: 10, colors: [
+        [0.45, 0.5, 0.46, 'rgba(80,120,230,0.45)'],  // azul
+        [0.6, 0.4, 0.36, 'rgba(230,140,70,0.3)'],    // ámbar, contraste con la primera
+      ] },
+    ];
+    const nebulaSprites = NEBULAE.map(n => {
+      const mat = new THREE.SpriteMaterial({
+        map: buildNebulaTexture(n.colors),
+        transparent: true,
+        opacity: 0, // arranca invisible, updateSpaceVignette lo sube con el zoom
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      nebulaMaterials.push(mat);
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(n.scale, n.scale, 1);
+      const pos = lonLatTo3D(n.lon, n.lat, 7); // fija en el cascarón, gira junto con las estrellas/el globo
+      sprite.position.set(pos.x, pos.y, pos.z);
+      return sprite;
+    });
+
+    // Grupo: rota como una sola unidad (ver render()), estrellas/nebulosas
+    // siempre en sync entre sí y con la rotación real del globo.
+    starGroup = new THREE.Group();
+    starGroup.add(starPoints);
+    nebulaSprites.forEach(s => starGroup.add(s));
+    starScene.add(starGroup);
+
+    fitStarfieldCanvas();
+    if (window.ResizeObserver) {
+      new ResizeObserver(() => fitStarfieldCanvas()).observe(document.getElementById('globequiz-screen'));
+    }
+  }
+  function fitStarfieldCanvas() {
+    const screenEl = document.getElementById('globequiz-screen');
+    if (!screenEl || !starRenderer || !starCamera) return;
+    const rect = screenEl.getBoundingClientRect();
+    // pixelRatio fijo en 1, seteado una vez en initStarfield — no hace falta
+    // volver a pisarlo acá en cada resize.
+    starRenderer.setSize(rect.width, rect.height, false);
+    starCamera.aspect = rect.width / Math.max(1, rect.height);
+    starCamera.updateProjectionMatrix();
   }
 
   function pinchDistance() {
@@ -777,6 +1056,7 @@
   }
 
   function initThreeScene() {
+    initStarfield();
     const canvas = document.getElementById('gq-canvas');
     texCanvas = document.createElement('canvas');
     texCanvas.width = TEX_W; texCanvas.height = TEX_H;
@@ -834,6 +1114,7 @@
         if (pinchStartDist > 0) {
           zoomZ = clampZoom(pinchStartZ * (pinchStartDist / dist));
           camera.position.z = zoomZ;
+          updateSpaceVignette();
         }
         render();
         return;
@@ -906,6 +1187,7 @@
       e.preventDefault();
       zoomZ = clampZoom(zoomZ + e.deltaY * 0.0025);
       camera.position.z = zoomZ;
+      updateSpaceVignette();
       render();
       const hoverEl = document.getElementById('gq-hover-name');
       if (hoverEl) hoverEl.style.display = 'none';
@@ -1076,7 +1358,14 @@
     const day = String(d.getDate()).padStart(2, '0');
     return d.getFullYear() + '-' + m + '-' + day;
   }
-  async function updateStreak() {
+  // Devuelve { streak, isNewDay } — isNewDay=false cuando hoy ya se había
+  // contado (ganar dos veces el mismo día no reotorga XP/monedas, ver
+  // showEndgameModal: el ledger de currency solo se llama con isNewDay=true).
+  // elapsedMs: tiempo de ESTA partida (solo se persiste como "tiempo del día"
+  // cuando es la que efectivamente asegura la racha, ver isNewDay) — lo
+  // muestra la barra de amigos de GlobeQuiz (buildGqFriendRows) para comparar
+  // contra el tiempo de hoy de cada amigo.
+  async function updateStreak(elapsedMs) {
     const userId = window._sbUserId;
     const profile = window._sbProfile;
     const today = new Date();
@@ -1088,29 +1377,31 @@
     if (userId && profile) {
       const lastStr = profile.gq_streak_last_date || null;
       let streak = profile.gq_streak_count || 0;
-      if (lastStr === todayStr) return streak; // ya contaba hoy
+      if (lastStr === todayStr) return { streak, isNewDay: false }; // ya contaba hoy
       streak = (lastStr === yesterdayStr) ? streak + 1 : 1;
       profile.gq_streak_count = streak;
       profile.gq_streak_last_date = todayStr;
+      profile.gq_today_time_ms = elapsedMs;
       try {
-        await window.sbUpdateProfile(userId, { gq_streak_count: streak, gq_streak_last_date: todayStr });
+        await window.sbUpdateProfile(userId, { gq_streak_count: streak, gq_streak_last_date: todayStr, gq_today_time_ms: elapsedMs });
       } catch (e) {}
       if (typeof window.gqRefreshMenuStreakBadge === 'function') window.gqRefreshMenuStreakBadge();
       if (typeof window.gqRefreshProfileStreakBadge === 'function') window.gqRefreshProfileStreakBadge();
-      return streak;
+      return { streak, isNewDay: true };
     }
 
     const lastStr = localStorage.getItem('gq_streak_last_date');
     let streak = parseInt(localStorage.getItem('gq_streak_count') || '0', 10) || 0;
-    if (lastStr === todayStr) return streak; // ya contaba hoy
+    if (lastStr === todayStr) return { streak, isNewDay: false }; // ya contaba hoy
     streak = (lastStr === yesterdayStr) ? streak + 1 : 1;
     try {
       localStorage.setItem('gq_streak_count', String(streak));
       localStorage.setItem('gq_streak_last_date', todayStr);
+      localStorage.setItem('gq_today_time_ms', String(elapsedMs));
     } catch (e) {}
     if (typeof window.gqRefreshMenuStreakBadge === 'function') window.gqRefreshMenuStreakBadge();
     if (typeof window.gqRefreshProfileStreakBadge === 'function') window.gqRefreshProfileStreakBadge();
-    return streak;
+    return { streak, isNewDay: true };
   }
 
   function gqStreakAlive(count, lastStr) {
@@ -1149,6 +1440,26 @@
     const lastStr = localStorage.getItem('gq_streak_last_date');
     return gqStreakAlive(count, lastStr);
   }
+
+  // A diferencia de gqReadCurrentStreak (racha "viva" si jugaste hoy O ayer),
+  // esto es estrictamente "¿ya jugaste HOY?" — usado para la burbuja de
+  // saludo/descripción de la azafata en el menú (panel2.globequizGreet*/
+  // globequizDesc*), que debe avisar que ya se sumó la racha de hoy en vez
+  // de invitar a buscar el país.
+  // SÍNCRONA a propósito (antes pedía el dato fresco al server con await) —
+  // ese viaje de red hacía que el panel se abriera un instante con el texto
+  // default y recién ~200ms después "saltara" al texto correcto. Acá alcanza
+  // con window._sbProfile (que updateStreak() ya mantiene al día en cada
+  // victoria) para que el texto salga bien de entrada, sin parpadeo.
+  window.gqHasPlayedToday = function () {
+    const todayStr = dateKey(new Date());
+    const userId = window._sbUserId;
+    if (userId) {
+      const p = window._sbProfile;
+      return !!(p && p.gq_streak_last_date === todayStr);
+    }
+    return localStorage.getItem('gq_streak_last_date') === todayStr;
+  };
 
   // Insignia de racha arriba del botón de GloboReto en el menú principal —
   // acá SÍ se oculta del todo en 0 (no hay "racha rota" que mostrar en el menú).
@@ -1190,7 +1501,7 @@
   async function showEndgameModal() {
     const modal = document.getElementById('gq-endgame-modal');
     if (!modal) return;
-    const currentStreak = await updateStreak();
+    const { streak: currentStreak, isNewDay } = await updateStreak(gqFinalElapsedMs);
     const streakEl = document.getElementById('gq-endgame-streak-num');
     if (streakEl) streakEl.textContent = String(currentStreak);
     // Cuenta como partida propia en los totales del dashboard de stats
@@ -1200,7 +1511,10 @@
     if (window.Analytics && typeof window.Analytics.logGlobequiz === 'function') {
       window.Analytics.logGlobequiz(guesses.length + 1, gqFinalElapsedMs, currentStreak);
     }
-    if (window.Analytics && typeof window.Analytics.logGlobequizCurrency === 'function') {
+    // XP/monedas: SOLO la primera vez que se gana en el día (isNewDay, ver
+    // updateStreak) — ganar de nuevo el mismo día no vuelve a otorgar nada,
+    // recién al día siguiente (cuando la racha avance de nuevo).
+    if (isNewDay && window.Analytics && typeof window.Analytics.logGlobequizCurrency === 'function') {
       window.Analytics.logGlobequizCurrency(currentStreak);
     }
     const label = document.getElementById('gq-endgame-country-label');
@@ -1246,6 +1560,13 @@
         table.appendChild(row);
       });
     }
+    const msgTitle = document.getElementById('gq-endgame-msg-title');
+    const msgSub = document.getElementById('gq-endgame-msg-sub');
+    if (msgTitle) msgTitle.textContent = t(isNewDay ? 'globequiz.streakGainedTitle' : 'globequiz.streakAlreadyTitle');
+    if (msgSub) msgSub.textContent = t(isNewDay ? 'globequiz.streakGainedSub' : 'globequiz.streakAlreadySub');
+    const countdownWrap = document.getElementById('gq-endgame-countdown');
+    if (countdownWrap) countdownWrap.style.display = 'inline';
+    startGqEndgameCountdown();
     modal.style.display = 'flex';
   }
 
@@ -1444,10 +1765,149 @@
     const wholeSec = Math.floor(elapsedMs / 1000);
     const centis = Math.floor((elapsedMs % 1000) / 10);
     cardEl.textContent = wholeSec + ':' + String(centis).padStart(2, '0');
+    positionGqLeaderboard(elapsedMs, true);
   }
+
+  // Barra de amigos in-game: solo entran los amigos que YA jugaron GlobeQuiz
+  // HOY y aseguraron su racha (gq_streak_last_date === hoy), con el tiempo
+  // que hicieron ESE día (gq_today_time_ms, ver updateStreak) — no su mejor
+  // tiempo histórico. Si nadie jugó hoy, la barra queda con solo tu carta.
+  //
+  // Mismo mecanismo que positionLeaderboard en monuments.js: las cartas
+  // quedan fijas en el DOM, se les pisa el `top` (GQ_LB_ROW_H_CQMIN acá
+  // abajo, ver también .gq-friends-bar en style.css), y la transición es la
+  // que YA trae .lb-entry de fábrica (`top 0.7s cubic-bezier(...)`) — misma
+  // animación real que la Vuelta Mundial, no una parecida. Como el tiempo
+  // del jugador solo puede subir (nunca "mejora" a mitad de partida), acá
+  // simplifica: el único que puede "caer" de posición sos vos, nunca un
+  // amigo (sus tiempos ya están fijos desde que jugaron hoy).
+  const GQ_LB_ROW_H_CQMIN = 19.6; // 18.9 (alto de la carta) + 0.7 (gap) — ver comentario en style.css
+  const GQ_LB_WINDOW = 4;  // filas visibles a la vez (ver altura fija en .gq-friends-bar)
+  const GQ_LB_PIN_ROW = 1; // cuántas filas por encima tuyo se intentan mantener visibles
+  let gqFriendPlayers = [];
+  let gqLbElements = {};
+  let lastGqPlayerRank = -1;
+  // setTimeout pendiente del emote (ver más abajo) — stopTimer() lo cancela
+  // igual que hace con gqTimerInterval/gqCardInterval. Sin esto, salir del
+  // juego justo dentro de la ventana de 200ms (o con el intervalo de 30ms
+  // todavía corriendo un instante después de salir) dejaba el timeout vivo:
+  // disparaba spawnEmoteBubble sobre #gq-lb-player YA de vuelta en el menú,
+  // o recién al entrar de nuevo — el emote "fantasma" que se reportó.
+  let gqEmoteTimeout = null;
+
+  function formatGqCardTime(ms) {
+    const wholeSec = Math.floor(ms / 1000);
+    const centis = Math.floor((ms % 1000) / 10);
+    return wholeSec + ':' + String(centis).padStart(2, '0');
+  }
+
+  // Reconstruye las filas de amigos desde cero (llamado al arrancar cada
+  // partida) — lee el snapshot actual de getFriends() (js/friends.js), así
+  // que si loadFriends() todavía no resolvió para cuando arrancás la
+  // primera partida, simplemente no hay filas de amigos esa vez (igual que
+  // buildFriendPlayers en monuments.js, mismo criterio de "mejor esfuerzo").
+  function buildGqFriendRows() {
+    const bar = document.getElementById('gq-friends-bar');
+    const playerEl = document.getElementById('gq-lb-player');
+    if (!bar || !playerEl) return;
+    bar.querySelectorAll('.lb-entry[data-gq-friend]').forEach(el => el.remove());
+    const todayStr = dateKey(new Date());
+    const friends = (typeof getFriends === 'function' ? getFriends() : [])
+      .filter(f => f.gqStreakLastDate === todayStr && typeof f.gqTodayTimeMs === 'number');
+    gqFriendPlayers = friends.map((f, i) => ({
+      id: 'gqf' + i, timeMs: f.gqTodayTimeMs, name: f.name,
+      avatar: f.avatar, cardCode: f.cardCode,
+    }));
+    gqLbElements = { player: playerEl };
+    gqFriendPlayers.forEach(f => {
+      const el = document.createElement('div');
+      el.className = 'lb-entry';
+      el.dataset.gqFriend = '1';
+      el.id = 'gq-lb-' + f.id;
+      const rank = document.createElement('span');
+      rank.className = 'lb-rank rank-other';
+      const avatarWrap = document.createElement('div');
+      avatarWrap.className = 'lb-avatar';
+      const avatarImg = document.createElement('img');
+      avatarImg.className = 'lb-avatar-img';
+      avatarImg.src = f.avatar || 'images/profilepic/ppdefault.png';
+      avatarImg.alt = '';
+      avatarWrap.appendChild(avatarImg);
+      const name = document.createElement('span');
+      name.className = 'lb-name';
+      name.textContent = f.name || '?';
+      const score = document.createElement('span');
+      score.className = 'lb-score';
+      score.textContent = formatGqCardTime(f.timeMs);
+      el.appendChild(rank); el.appendChild(avatarWrap); el.appendChild(name); el.appendChild(score);
+      bar.appendChild(el);
+      if (window.CustomizeAssets) window.CustomizeAssets.applyCard(el, f.cardCode || '0001');
+      gqLbElements[f.id] = el;
+    });
+  }
+
+  // Ordena por tiempo ascendente (menor tiempo = mejor puesto) y ubica cada
+  // carta con `top` dentro de una ventana fija de GQ_LB_WINDOW filas (igual
+  // que positionLeaderboard) — así si hay más amigos que la ventana, tu
+  // carta nunca se pierde de vista aunque el resto se recorte.
+  function positionGqLeaderboard(elapsedMs, animate) {
+    const playerEl = gqLbElements.player;
+    if (!playerEl) return;
+    const all = gqFriendPlayers.map(f => ({ id: f.id, time: f.timeMs }));
+    all.push({ id: 'player', time: elapsedMs });
+    all.sort((a, b) => a.time - b.time);
+    const playerRank = all.findIndex(p => p.id === 'player');
+
+    // Como tu tiempo solo puede subir, el único que "cae" de puesto siempre
+    // sos vos (nunca un amigo) — el emote va sobre tu carta, no la de ellos.
+    if (animate && lastGqPlayerRank !== -1 && playerRank > lastGqPlayerRank) {
+      if (gqEmoteTimeout) clearTimeout(gqEmoteTimeout);
+      if (typeof spawnEmoteBubble === 'function') {
+        gqEmoteTimeout = setTimeout(() => { gqEmoteTimeout = null; spawnEmoteBubble(playerEl); }, 200);
+      }
+    }
+    lastGqPlayerRank = playerRank;
+
+    let windowStart = Math.max(0, playerRank - GQ_LB_PIN_ROW);
+    let windowEnd = Math.min(all.length, windowStart + GQ_LB_WINDOW);
+    windowStart = Math.max(0, windowEnd - GQ_LB_WINDOW);
+
+    // Anclado ABAJO (igual que positionLeaderboard): con menos filas que la
+    // ventana, se pegan al fondo de la barra en vez de flotar arriba — con
+    // nadie más que vos, tu carta va sola en la posición de más abajo, no
+    // suelta arriba de un contenedor vacío.
+    const visibleRows = windowEnd - windowStart;
+    const bottomOffset = Math.max(0, GQ_LB_WINDOW - visibleRows) * GQ_LB_ROW_H_CQMIN;
+
+    if (!animate) {
+      Object.values(gqLbElements).forEach(el => { el.style.transition = 'none'; });
+    }
+    all.forEach((p, rank) => {
+      const el = gqLbElements[p.id];
+      if (el) el.style.top = ((rank - windowStart) * GQ_LB_ROW_H_CQMIN + bottomOffset) + 'cqmin';
+    });
+    if (!animate) {
+      requestAnimationFrame(() => {
+        Object.values(gqLbElements).forEach(el => { el.style.transition = ''; });
+      });
+    }
+  }
+  // Vuelve todo a como arranca (jugador arriba, amigos de hoy recién
+  // leídos) al empezar una partida nueva, SIN animación (todavía no hay
+  // nada que "ver" en ese momento) — mismo patrón de "plantar sin
+  // transición, reactivarla en el frame siguiente" que usa buildLeaderboard
+  // en monuments.js.
+  function resetLeaderboardOrder() {
+    if (gqEmoteTimeout) { clearTimeout(gqEmoteTimeout); gqEmoteTimeout = null; }
+    buildGqFriendRows();
+    lastGqPlayerRank = -1;
+    positionGqLeaderboard(0, false);
+  }
+
   function startTimer() {
     stopTimer();
     gqTimerStart = Date.now();
+    resetLeaderboardOrder();
     updateTimerDisplay();
     updateCardTime();
     gqTimerInterval = setInterval(updateTimerDisplay, 1000);
@@ -1456,8 +1916,10 @@
   function stopTimer() {
     if (gqTimerInterval) clearInterval(gqTimerInterval);
     if (gqCardInterval) clearInterval(gqCardInterval);
+    if (gqEmoteTimeout) clearTimeout(gqEmoteTimeout);
     gqTimerInterval = null;
     gqCardInterval = null;
+    gqEmoteTimeout = null;
   }
   window.stopGlobeQuizTimer = stopTimer;
   window.stopGlobeQuizAutoRotate = stopAutoRotate;
@@ -1500,6 +1962,7 @@
       if (sphere) { sphere.rotation.x = BASE_ROT_X; sphere.rotation.y = BASE_ROT_Y; }
       zoomZ = BASE_Z;
       if (camera) camera.position.z = zoomZ;
+      updateSpaceVignette();
       startAutoRotate();
       loadState();
       pickDailyCountry();
@@ -1507,6 +1970,7 @@
       // no apenas entrás a la pantalla — acá solo se resetea la muestra a 0.
       stopTimer();
       gqTimerStart = Date.now();
+      resetLeaderboardOrder();
       updateTimerDisplay();
       updateCardTime();
       const input = document.getElementById('gq-guess-input');
@@ -1551,6 +2015,7 @@
         document.getElementById('gq-endgame-confirm')?.addEventListener('click', () => {
           const modal = document.getElementById('gq-endgame-modal');
           if (modal) modal.style.display = 'none';
+          stopGqEndgameCountdown();
           document.getElementById('gq-quit-confirm')?.click();
         });
       }

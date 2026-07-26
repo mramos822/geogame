@@ -222,8 +222,9 @@
   function logCampaignCurrency(score) {
     logCurrencyEvent(coinsFromScore(score), xpFromScore(score), 'campaign_complete', score);
   }
-  // Se llama en cada victoria de GlobeQuiz (no solo cuando la racha avanza),
-  // con la racha YA resuelta del día — ver showEndgameModal en globequiz.js.
+  // Se llama SOLO la primera vez que se gana en el día (cuando la racha
+  // recién avanzó, isNewDay en updateStreak) — ver showEndgameModal en
+  // globequiz.js. Ganar de nuevo el mismo día no vuelve a otorgar nada.
   function logGlobequizCurrency(streakDays) {
     const mult = gqMultiplier(streakDays);
     logCurrencyEvent(GQ_BASE_COINS * mult, GQ_BASE_XP * mult, 'globequiz_win', streakDays);
