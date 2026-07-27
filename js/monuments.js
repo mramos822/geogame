@@ -1650,6 +1650,19 @@ window.startCampaign = function () {
     window.Analytics?.resetVisitorId?.();
     if (typeof window.gqRefreshMenuStreakBadge === 'function') window.gqRefreshMenuStreakBadge();
     clearLocalScores(true);
+    // clearLocalScores solo borra localStorage — las variables `highscore`/
+    // `monumentsHighscore` (ver ~línea 5054) se leen de ahí UNA sola vez al
+    // cargar la página y después viven solo en memoria. Sin este reset, si
+    // se juega de invitado justo después de cerrar sesión (sin recargar),
+    // el splash de Cities/Monumentos seguía mostrando el récord de la
+    // cuenta anterior y la comparación de "nuevo récord" al final de la
+    // partida se hacía contra ese valor viejo en vez de contra 0.
+    if (typeof highscore !== 'undefined') {
+      highscore = 0;
+      if (typeof highscoreEl !== 'undefined' && highscoreEl) highscoreEl.textContent = '0';
+      if (typeof updateSplashHighscore === 'function') updateSplashHighscore();
+    }
+    if (typeof monumentsHighscore !== 'undefined') monumentsHighscore = 0;
     if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
     _updateProfileBtnLabel();
   }
