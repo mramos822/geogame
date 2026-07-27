@@ -1577,7 +1577,14 @@ window.startCampaign = function () {
         document.getElementById('reg-email').value.trim(),
         document.getElementById('reg-pass').value
       );
-      (typeof window.withConnTimeout === 'function' ? window.withConnTimeout(_regPromise, 6000) : _regPromise)
+      // 18s en vez de los 6s del resto de las llamadas: signUp() no es una
+      // consulta simple, dispara el trigger que crea el profile Y el envío
+      // del email de verificación — con SMTP lento eso solía tardar más de
+      // 6s y el timeout mostraba "no pudimos conectar" aunque la cuenta se
+      // terminara creando bien del lado del servidor (quedaba huérfana:
+      // creada en Supabase pero el jugador nunca veía la pantalla de
+      // verificar email).
+      (typeof window.withConnTimeout === 'function' ? window.withConnTimeout(_regPromise, 18000) : _regPromise)
        .then(result => { if (result) showView(viewVerify); else showView(viewRegister); }) // undefined = timeout, viñeta ya mostrada
        .catch(err => {
          showView(viewRegister);
