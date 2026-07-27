@@ -1550,6 +1550,8 @@ window.startCampaign = function () {
       setErr(username, errU, t('account.errUserChars'));
     else if (!/^[a-zA-Z0-9]+$/.test(uVal))
       setErr(username, errU, t('account.errUserInvalid'));
+    else if (typeof window.containsBadWord === 'function' && window.containsBadWord(uVal))
+      setErr(username, errU, t('account.errUserBadWord'));
     else setErr(username, errU, '');
 
     const eVal = email.value.trim();
@@ -1813,10 +1815,25 @@ document.getElementById('loading-name-edit')?.addEventListener('click', () => {
   input.select();
 });
 
+// Feedback visual cuando containsBadWord() rechaza un nombre: borde rojo +
+// sacudida breve (reusa el keyframe lb-shake), sin bloquear la edición —
+// el input queda como estaba, listo para que lo corrijan.
+function _flashBadWordInput(input) {
+  if (!input) return;
+  input.classList.remove('badword-flash');
+  void input.offsetWidth;
+  input.classList.add('badword-flash');
+  setTimeout(() => input.classList.remove('badword-flash'), 500);
+}
+
 function confirmNameChange() {
   const wrap  = document.getElementById('loading-name-wrap');
   const input = document.getElementById('loading-name-input');
   const limpio = input.value.trim().slice(0, 12);
+  if (limpio && typeof window.containsBadWord === 'function' && window.containsBadWord(limpio)) {
+    _flashBadWordInput(input);
+    return;
+  }
   if (limpio) {
     localStorage.setItem('playerName', limpio);
     const el = document.getElementById('loading-player-name');
@@ -2034,6 +2051,10 @@ _updateProfileBtnLabel();
     function submit() {
       const limpio = input.value.trim().slice(0, 12);
       if (!limpio) return;
+      if (typeof window.containsBadWord === 'function' && window.containsBadWord(limpio)) {
+        if (typeof _flashBadWordInput === 'function') _flashBadWordInput(input);
+        return;
+      }
       localStorage.setItem('playerName', limpio);
       const el = document.getElementById('loading-player-name');
       if (el) el.textContent = limpio;

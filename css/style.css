@@ -6984,6 +6984,14 @@ body.is-mobile #screen-warning-icon {
   animation: lb-shake 0.45s ease-in-out;
 }
 
+/* Feedback de containsBadWord() (ver profanity-filter.js) al cambiar de
+   nombre / elegir usuario en inputs que no tienen su propio span de error
+   (loading-name-input, name-prompt-input) — reusa lb-shake. */
+.badword-flash {
+  border-color: #c0392b !important;
+  animation: lb-shake 0.4s ease-in-out;
+}
+
 /* Glow exterior + tinte rojo interior (inset) en la tarjeta que falla en versus/lobby */
 @keyframes lb-wrong-flash {
   0%   { box-shadow: 0 0 0 0 rgba(220,0,0,0); }

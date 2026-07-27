@@ -74,6 +74,15 @@
     });
   }
 
+  // Micro-territorios del Caribe demasiado oscuros/imposibles de adivinar a
+  // ciegas (nadie ubica San Bartolomé de memoria) — se sacan del pool acá en
+  // vez de tocar el geojson embebido, así el filtro queda en un solo lugar
+  // legible. Los nombres son los del dataset EN (ver globequiz-countries-data.js).
+  const EXCLUDED_COUNTRIES = new Set([
+    'St-Barthélemy', 'St-Martin', 'Sint Maarten', 'Curaçao', 'Aruba',
+    'Cayman Is.', 'Turks and Caicos Is.', 'British Virgin Is.', 'U.S. Virgin Is.',
+  ]);
+
   function loadCountries() {
     if (countries) return Promise.resolve(countries);
     // Embebido como window.GQ_COUNTRIES_DATA (ver js/globequiz-countries-data.js)
@@ -82,18 +91,20 @@
     // un servidor. Un <script> normal sí carga bajo file://.
     const geo = window.GQ_COUNTRIES_DATA;
     return Promise.resolve().then(() => {
-      countries = geo.features.map(f => {
-        const mainPts = mainRing(f.geometry);
-        return {
-          name: f.properties.name,
-          iso2: f.properties.iso2 || null,
-          geometry: f.geometry,
-          centroid: computeCentroid(f.geometry),
-          border: borderPoints(f.geometry),
-          mainRingPts: mainPts, // territorio principal, sin exclaves — ver focusOnCountry
-          area: Math.abs(ringArea(mainPts)), // ver countryAtLonLat: desambigua superposiciones (Marruecos/Sahara Occ.)
-        };
-      });
+      countries = geo.features
+        .filter(f => !EXCLUDED_COUNTRIES.has(f.properties.name))
+        .map(f => {
+          const mainPts = mainRing(f.geometry);
+          return {
+            name: f.properties.name,
+            iso2: f.properties.iso2 || null,
+            geometry: f.geometry,
+            centroid: computeCentroid(f.geometry),
+            border: borderPoints(f.geometry),
+            mainRingPts: mainPts, // territorio principal, sin exclaves — ver focusOnCountry
+            area: Math.abs(ringArea(mainPts)), // ver countryAtLonLat: desambigua superposiciones (Marruecos/Sahara Occ.)
+          };
+        });
       countries.forEach(c => {
         countryByName.set(normalize(c.name), c);
         const es = window.GQ_NAMES_ES && window.GQ_NAMES_ES[c.name];
