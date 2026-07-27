@@ -1251,6 +1251,13 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
      marco siempre se ve esférico. */
   border-radius: 50%;
   overflow: hidden;
+  /* border-radius+overflow a secas no alcanza en Firefox/Gecko (Zen Browser
+     incluido): un <canvas> WebGL que pasa a su propia capa compuesta por
+     GPU (más probable justo con mucho zoom, que es cuando más se nota este
+     bug) puede ignorar el overflow:hidden del ancestro y "salirse" del
+     marco redondo, mostrando el cuadrado de siempre. clip-path sí se aplica
+     en la etapa de composición y recorta el canvas de forma confiable. */
+  clip-path: circle(50%);
 }
 .gq-globe-wrap canvas {
   width: 100%;
