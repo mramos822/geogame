@@ -604,6 +604,13 @@
   }
 
   function drawTexture() {
+    // texCtx recién existe si initThreeScene() corrió (ver Promise.all en
+    // initGlobeQuiz) — si el globo 3D no pudo cargar, submitGuess() igual
+    // se ejecuta (input/confirm ahora andan siempre) y esto se llama sin
+    // globo; sin este guard tiraba un TypeError acá y cortaba la función
+    // antes de llegar a renderGuessList()/updateHint(), o sea el jugador
+    // seguía sin ver ningún feedback al confirmar.
+    if (!texCtx) return;
     texCtx.fillStyle = OCEAN;
     texCtx.fillRect(0, 0, TEX_W, TEX_H);
 
@@ -1952,6 +1959,31 @@
     if (typeof loadGameSFX === 'function') loadGameSFX();
     const spinner = document.getElementById('gq-loading-spinner');
     if (spinner) spinner.style.display = 'block';
+    // El wiring de input/confirm se hace ACÁ, fuera de la promesa del globo
+    // 3D — antes vivía dentro del .then() de abajo, así que si loadThree()
+    // o initThreeScene() fallaban (WebGL bloqueado/deshabilitado, típico en
+    // Firefox con protección de fingerprinting o extensiones de privacidad),
+    // el juego quedaba con el input visible pero sin ningún listener: el
+    // jugador podía escribir y tocar "confirmar" y no pasaba absolutamente
+    // nada, sin ningún error visible. Ahora el input/confirm funcionan
+    // siempre, aunque el globo no haya podido cargar.
+    if (wireOnce) {
+      const btn2 = document.getElementById('gq-guess-btn');
+      const input2 = document.getElementById('gq-guess-input');
+      const playCheckSfx = () => { if (typeof sfxCheck !== 'undefined' && typeof sfxPlay === 'function') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); } };
+      if (btn2) btn2.addEventListener('click', () => { playCheckSfx(); submitGuess(); });
+      if (input2) input2.addEventListener('keydown', (e) => { if (e.key === 'Enter') { playCheckSfx(); submitGuess(); } });
+      // Confirm del panel de fin de juego: mismo camino de salida que el
+      // power (cortar todo + animación de entrada típica del menú), solo
+      // que sin pasar por el popup de "¿seguro que querés salir?" (ya
+      // terminaste la partida, no hace falta confirmar de nuevo).
+      document.getElementById('gq-endgame-confirm')?.addEventListener('click', () => {
+        const modal = document.getElementById('gq-endgame-modal');
+        if (modal) modal.style.display = 'none';
+        stopGqEndgameCountdown();
+        document.getElementById('gq-quit-confirm')?.click();
+      });
+    }
     Promise.all([loadThree(), loadCountries()]).then(() => {
       if (!initialized) {
         initThreeScene();
@@ -2002,26 +2034,18 @@
         if (typeof playMusic === 'function' && typeof sfxGameMusic !== 'undefined') playMusic(sfxGameMusic);
         startTimer();
       });
-      if (wireOnce) {
-        const btn2 = document.getElementById('gq-guess-btn');
-        const input2 = document.getElementById('gq-guess-input');
-        const playCheckSfx = () => { if (typeof sfxCheck !== 'undefined' && typeof sfxPlay === 'function') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); } };
-        if (btn2) btn2.addEventListener('click', () => { playCheckSfx(); submitGuess(); });
-        if (input2) input2.addEventListener('keydown', (e) => { if (e.key === 'Enter') { playCheckSfx(); submitGuess(); } });
-        // Confirm del panel de fin de juego: mismo camino de salida que el
-        // power (cortar todo + animación de entrada típica del menú), solo
-        // que sin pasar por el popup de "¿seguro que querés salir?" (ya
-        // terminaste la partida, no hace falta confirmar de nuevo).
-        document.getElementById('gq-endgame-confirm')?.addEventListener('click', () => {
-          const modal = document.getElementById('gq-endgame-modal');
-          if (modal) modal.style.display = 'none';
-          stopGqEndgameCountdown();
-          document.getElementById('gq-quit-confirm')?.click();
-        });
-      }
     }).catch(err => {
       console.error('GlobeQuiz init failed', err);
       if (spinner) spinner.style.display = 'none';
+      // Antes esto fallaba en silencio (solo consola) y el input/confirm
+      // ni siquiera tenían listeners todavía, así que el jugador escribía
+      // y tocaba confirmar sin que pasara nada, sin ninguna pista de qué
+      // estaba mal. El wiring de input/confirm ahora vive fuera de esta
+      // promesa (ver más arriba), así que al menos eso sigue andando; acá
+      // solo avisamos que el globo 3D no pudo cargar (típicamente WebGL
+      // bloqueado o deshabilitado en el navegador).
+      const hintEl = document.getElementById('gq-hint');
+      if (hintEl) hintEl.textContent = t('globequiz.loadError');
     });
   };
 })();
