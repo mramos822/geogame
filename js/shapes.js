@@ -492,7 +492,14 @@ window.shapesSpectatorShowRound = function (payload) {
 
   const clip = document.createElement('div');
   clip.className = 'shapes-stage-el';
-  clip.style.cssText = 'position:absolute;top:52%;left:36.3%;transform:translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01);width:59.4cqmin;height:59.4cqmin;clip-path:url(#' + clipId + ');z-index:102;opacity:0;transition:opacity 2s ease;display:none;';
+  // overflow:hidden de respaldo: img2 adentro mide 118.8cqmin (el doble de
+  // este contenedor) a propósito, para que el clip-path (silueta SVG) la
+  // recorte a la forma final. En Firefox/Gecko (Zen Browser incluido) un
+  // clip-path referenciado por url() a veces no se aplica sobre un <div>
+  // con hijos transformados — sin el overflow acá, img2 se ve completa sin
+  // recortar (gigante, no "fitea" en el marco). Con el overflow, en el peor
+  // caso queda un recorte cuadrado en vez de la silueta, pero nunca gigante.
+  clip.style.cssText = 'position:absolute;top:52%;left:36.3%;transform:translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01);width:59.4cqmin;height:59.4cqmin;clip-path:url(#' + clipId + ');overflow:hidden;z-index:102;opacity:0;transition:opacity 2s ease;display:none;';
   (window.appStage || document.body).appendChild(clip);
   _shapesSpecClip = clip;
 
@@ -1249,7 +1256,14 @@ function showCountryShape(country, ext1, ext2, startDelay) {
 
   const clip = document.createElement('div');
   clip.className = 'shapes-stage-el';
-  clip.style.cssText = 'position:absolute;top:52%;left:36.3%;transform:translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01);width:59.4cqmin;height:59.4cqmin;clip-path:url(#' + clipId + ');z-index:102;opacity:0;transition:opacity 2s ease;display:none;';
+  // overflow:hidden de respaldo: img2 adentro mide 118.8cqmin (el doble de
+  // este contenedor) a propósito, para que el clip-path (silueta SVG) la
+  // recorte a la forma final. En Firefox/Gecko (Zen Browser incluido) un
+  // clip-path referenciado por url() a veces no se aplica sobre un <div>
+  // con hijos transformados — sin el overflow acá, img2 se ve completa sin
+  // recortar (gigante, no "fitea" en el marco). Con el overflow, en el peor
+  // caso queda un recorte cuadrado en vez de la silueta, pero nunca gigante.
+  clip.style.cssText = 'position:absolute;top:52%;left:36.3%;transform:translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01);width:59.4cqmin;height:59.4cqmin;clip-path:url(#' + clipId + ');overflow:hidden;z-index:102;opacity:0;transition:opacity 2s ease;display:none;';
   (window.appStage || document.body).appendChild(clip);
 
   const img2 = document.createElement('img');
