@@ -681,14 +681,12 @@ window.shapesSpectatorResolvePick = function (payload) {
   const overlay = document.getElementById(overlayId);
   if (overlay) {
     overlay.style.zIndex = '999';
-    overlay.style.left = '39%';
-    overlay.style.top = '44%';
-    overlay.style.zoom = '0.85';
+    overlay.classList.add('shapes-pos');
     overlay.style.display = '';
     overlay.classList.remove('animate');
     void overlay.offsetWidth;
     overlay.classList.add('animate');
-    setTimeout(() => { overlay.classList.remove('animate'); overlay.style.display = 'none'; overlay.style.zIndex = ''; overlay.style.left = ''; overlay.style.top = ''; overlay.style.zoom = ''; }, 820);
+    setTimeout(() => { overlay.classList.remove('animate', 'shapes-pos'); overlay.style.display = 'none'; overlay.style.zIndex = ''; }, 820);
   }
 
   // Ojo: a diferencia de banderas (que suena check+acertar juntos), siluetas
@@ -1420,14 +1418,12 @@ function showCountryShape(country, ext1, ext2, startDelay) {
       const overlay = document.getElementById(overlayId);
       if (overlay) {
         overlay.style.zIndex = '999';
-        overlay.style.left = '39%';
-        overlay.style.top = '44%';
-        overlay.style.zoom = '0.85';
+        overlay.classList.add('shapes-pos');
         overlay.style.display = '';
         overlay.classList.remove('animate');
         void overlay.offsetWidth;
         overlay.classList.add('animate');
-        setTimeout(() => { overlay.classList.remove('animate'); overlay.style.display = 'none'; overlay.style.zIndex = ''; overlay.style.left = ''; overlay.style.top = ''; overlay.style.zoom = ''; }, 820);
+        setTimeout(() => { overlay.classList.remove('animate', 'shapes-pos'); overlay.style.display = 'none'; overlay.style.zIndex = ''; }, 820);
       }
 
       if (typeof loadGameSFX  !== 'undefined') loadGameSFX();

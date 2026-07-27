@@ -6942,6 +6942,28 @@ body.is-mobile #screen-warning-icon {
   100% { transform: translate(-50%, -50%) scale(0); }
 }
 
+/* Siluetas reposiciona y encoge este mismo overlay (ver shapes.js) — antes
+   se encogía con la propiedad CSS "zoom" (no estándar, soporte tardío/
+   inconsistente en Firefox y derivados como Zen Browser: se combinaba mal
+   con las unidades cqmin de arriba y el overlay salía gigante y sin recortar
+   en vez de achicarse). Ahora el 0.85 va horneado en un keyframe de
+   transform aparte, que es estándar y se comporta igual en todos lados. */
+#flags-check-overlay.shapes-pos,
+#flags-wrong-overlay.shapes-pos {
+  top: 44%;
+  left: 39%;
+}
+#flags-check-overlay.shapes-pos.animate,
+#flags-wrong-overlay.shapes-pos.animate {
+  animation-name: flags-check-pop-shapes;
+}
+@keyframes flags-check-pop-shapes {
+  0%   { transform: translate(-50%, -50%) scale(0.2125); }
+  24%  { transform: translate(-50%, -50%) scale(0.85); }
+  73%  { transform: translate(-50%, -50%) scale(0.85); }
+  100% { transform: translate(-50%, -50%) scale(0); }
+}
+
 /* Vibración lateral de la tarjeta que falla */
 @keyframes lb-shake {
   0%,100% { transform: translateX(0); }

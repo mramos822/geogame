@@ -4628,6 +4628,11 @@ window.quitToMenu = quitToMenu;
       sfxSelect.currentTime = 0; sfxPlay(sfxSelect);
       quitPopup.style.display = 'none';
       document.body.classList.remove('quit-open');
+    } else if (_panelVisible('loading-customize-group')) {
+      // Personalización se abre COMO SUB-panel del modal de perfil (ver
+      // loading-customize-btn) — sin este check, _closeOpenModal() de abajo
+      // cerraba directo el modal de perfil entero y se saltaba este paso.
+      _clickBack('customize-back-wrap');
     } else if (_closeOpenModal()) {
       // modal de cuenta cerrado
     } else if (_panelVisible('loading-friend-group'))    { _clickBack('loading-friend-back-wrap'); }
