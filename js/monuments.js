@@ -1325,6 +1325,17 @@ window.startCampaign = function () {
 
   document.getElementById('reg-verify-ok')?.addEventListener('click', () => {
     sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    if (_pendingLoginFill) {
+      const userEl = document.getElementById('login-user');
+      const passEl = document.getElementById('login-pass');
+      if (userEl) userEl.value = _pendingLoginFill.username;
+      if (passEl) passEl.value = _pendingLoginFill.password;
+      const errU = document.getElementById('login-err-user');
+      const errP = document.getElementById('login-err-pass');
+      if (errU) errU.textContent = '';
+      if (errP) errP.textContent = '';
+      _pendingLoginFill = null;
+    }
     showView(viewLogin);
   });
 
@@ -1528,6 +1539,11 @@ window.startCampaign = function () {
     document.getElementById('reg-pass')?.dispatchEvent(new Event('input'));
   });
 
+  // Credenciales recién registradas, para precargar el login apenas se
+  // confirma el email (ver reg-submit más abajo y reg-verify-ok más arriba)
+  // — solo en memoria, nunca en localStorage.
+  let _pendingLoginFill = null;
+
   document.getElementById('reg-submit')?.addEventListener('click', () => {
     const username = document.getElementById('reg-username');
     const email    = document.getElementById('reg-email');
@@ -1574,11 +1590,14 @@ window.startCampaign = function () {
     if (ok) {
       sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
       showView(viewLoading);
-      const _regPromise = window.sbRegister(
-        document.getElementById('reg-username').value.trim(),
-        document.getElementById('reg-email').value.trim(),
-        document.getElementById('reg-pass').value
-      );
+      const _regUsername = document.getElementById('reg-username').value.trim();
+      const _regPassword = document.getElementById('reg-pass').value;
+      // Se guardan para precargar el login apenas confirme el email (ver
+      // reg-verify-ok más abajo) — así no tiene que volver a tipear lo mismo
+      // que acaba de escribir dos segundos antes. Solo vive en memoria,
+      // nunca en localStorage, y se borra apenas se usa una vez.
+      _pendingLoginFill = { username: _regUsername, password: _regPassword };
+      const _regPromise = window.sbRegister(_regUsername, document.getElementById('reg-email').value.trim(), _regPassword);
       // 18s en vez de los 6s del resto de las llamadas: signUp() no es una
       // consulta simple, dispara el trigger que crea el profile Y el envío
       // del email de verificación — con SMTP lento eso solía tardar más de
