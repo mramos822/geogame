@@ -36,11 +36,24 @@
   }
 
   // País vía IP (cacheado en localStorage; solo se pide una vez por dispositivo).
+  // Resuelto server-side por la Edge Function get-country — antes pegaba
+  // directo a ipinfo.io desde el navegador, y un bloqueador de trackers
+  // (uBlock Origin, protección de Firefox/Zen) cortaba el fetch en
+  // silencio dejando el país sin detectar para siempre (ver misma nota en
+  // _getCountryCodeForSignup, js/sb.js).
   async function getCountryCode() {
     const cached = localStorage.getItem('_an_country');
     if (cached) return cached || null;
     try {
-      const r = await fetch('https://ipinfo.io/json');
+      const r = await fetch('https://xituwurshmaqsnnnrdhx.supabase.co/functions/v1/get-country', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhpdHV3dXJzaG1hcXNubm5yZGh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyMjU0OTUsImV4cCI6MjA5NjgwMTQ5NX0.jlT6O8dkuYXc8F3fOK_QXgH4Sqw6dAbhi2EIkvcS7Mk',
+          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhpdHV3dXJzaG1hcXNubm5yZGh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyMjU0OTUsImV4cCI6MjA5NjgwMTQ5NX0.jlT6O8dkuYXc8F3fOK_QXgH4Sqw6dAbhi2EIkvcS7Mk',
+        },
+        body: '{}',
+      });
       const d = await r.json();
       if (d && d.country) {
         localStorage.setItem('_an_country', d.country);

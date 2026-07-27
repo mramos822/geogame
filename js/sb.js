@@ -152,11 +152,21 @@ window.CustomizeAssets._initDefaultCellVar();
 // País por IP para guardarlo en la cuenta desde su creación (ver handle_new_user
 // en la DB, que lo lee de raw_user_meta_data). Usa el valor ya cacheado por
 // analytics.js si está disponible; si no, lo pide en el momento.
+//
+// Se resuelve vía la Edge Function get-country (servidor, no el navegador) —
+// antes esto pegaba directo a ipinfo.io desde acá mismo, y cualquier
+// bloqueador de trackers (uBlock Origin, protección de Firefox/Zen) cortaba
+// el fetch en silencio dejando country_code en null para siempre (sin
+// reintento posterior). Al servidor nadie lo bloquea.
 async function _getCountryCodeForSignup() {
   const cached = localStorage.getItem('_an_country');
   if (cached) return cached || null;
   try {
-    const r = await fetch('https://ipinfo.io/json');
+    const r = await fetch(_SB_URL + '/functions/v1/get-country', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': _SB_ANON, 'Authorization': 'Bearer ' + _SB_ANON },
+      body: '{}',
+    });
     const d = await r.json();
     if (d && d.country) { localStorage.setItem('_an_country', d.country); return d.country; }
   } catch (e) {}
