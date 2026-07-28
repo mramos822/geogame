@@ -29,6 +29,17 @@ function _onFinalResize() {
 }
 
 function showFinalScreen() {
+  // Conversión de Google Ads "Juega partida diaria": completar una Gira
+  // Mundial entera es la señal de compromiso real que decidimos usar en vez
+  // de solo entrar a jugar. typeof-check por si un bloqueador de anuncios
+  // impide que cargue gtag.js — no debe romper el resto de la pantalla final.
+  if (typeof gtag === 'function') {
+    gtag('event', 'conversion', {
+      'send_to': 'AW-18355179202/cZ38COS379ccEMKdt7BE',
+      'value': 0.0,
+      'currency': 'USD',
+    });
+  }
   finalScreen.style.display = 'block';
   if (typeof window._setPlaying === 'function') window._setPlaying(false);
   // Espejo local SIEMPRE (con cuenta o sin ella): si falla el guardado en el
