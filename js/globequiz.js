@@ -2061,8 +2061,16 @@
       // promesa (ver más arriba), así que al menos eso sigue andando; acá
       // solo avisamos que el globo 3D no pudo cargar (típicamente WebGL
       // bloqueado o deshabilitado en el navegador).
+      // THREE.WebGLRenderer tira "Error creating WebGL context" cuando el
+      // navegador se niega a crear el contexto — típico de forks con
+      // hardening de privacidad (LibreWolf, Tor Browser) que desactivan
+      // WebGL por defecto. El motivo puntual ("WebGL is currently disabled")
+      // solo aparece como warning de consola del navegador, no llega acá en
+      // err.message, así que distinguimos por este mensaje genérico de
+      // three.js en vez de por la causa exacta.
+      const isWebglDisabled = /error creating webgl context/i.test(String(err && err.message || err));
       const hintEl = document.getElementById('gq-hint');
-      if (hintEl) hintEl.textContent = t('globequiz.loadError');
+      if (hintEl) hintEl.textContent = t(isWebglDisabled ? 'globequiz.loadErrorWebgl' : 'globequiz.loadError');
     });
   };
 })();

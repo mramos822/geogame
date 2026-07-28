@@ -309,7 +309,6 @@ window.shapesSpectatorExit = function (switchingMode) {
 // Cuenta 3-2-1: reusa runShapesPregame (100% la misma animación/sonido que el
 // jugador real) — igual patrón que flags.js con runFlagsPregame.
 window.shapesSpectatorShowPregame = function (payload) {
-  console.log('[spec] shapesSpectatorShowPregame called', { specMode: _shapesSpecMode, payload });
   if (!_shapesSpecMode) return;
   // Sincrónico, apenas llega el broadcast — lo usa el timer de "fallback" de
   // shapesSpectatorShowRound para decidir si de verdad hay un 3-2-1 en curso
@@ -352,9 +351,7 @@ window.shapesSpectatorShowPregame = function (payload) {
   const _pregameTotalMs = (typeof SHAPES_PREGAME_STEPS !== 'undefined')
     ? SHAPES_PREGAME_STEPS.reduce((s, x) => s + x.hold, 0) : 3350;
   if (elapsedMs > _pregameTotalMs - 400) elapsedMs = Math.max(0, _pregameTotalMs - 400);
-  console.log('[spec] shapesSpectatorShowPregame: calling runShapesPregame, elapsedMs=', elapsedMs);
   runShapesPregame(() => {
-    console.log('[spec] shapesSpectatorShowPregame: runShapesPregame onDone fired');
     const _cwPost = document.getElementById('shapes-countdown-widget');
     if (_cwPost) _cwPost.style.visibility = '';
     const tImg = document.getElementById('shapes-timer-img');
@@ -1951,7 +1948,6 @@ function runShapesPregame(onDone, elapsedMs) {
   shapesAborted = false;
   const el  = document.getElementById('pregame-countdown');
   const img = document.getElementById('pregame-countdown-img');
-  console.log('[spec] runShapesPregame start', { elFound: !!el, imgFound: !!img, elapsedMs });
   if (!el || !img) { console.warn('[spec] runShapesPregame: missing el/img, skipping straight to onDone'); onDone(); return; }
   el.style.display = 'flex';
   // Desbloquear el compositor de Opera al arrancar la cuenta regresiva (ver
@@ -1973,7 +1969,6 @@ function runShapesPregame(onDone, elapsedMs) {
       step = i + 1;
     }
     if (step >= SHAPES_PREGAME_STEPS.length) {
-      console.log('[spec] runShapesPregame: elapsedMs already past all steps, skipping straight to onDone (no 3-2-1 shown)');
       el.style.display = 'none'; onDone(); return;
     }
   }
