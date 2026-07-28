@@ -1093,6 +1093,12 @@ window.flagsSpectatorShowRound = function (payload) {
   if (_flagsSpecIsFirstRound) {
     _flagsSpecIsFirstRound = false;
     setTimeout(() => {
+      // Guard contra el "sigue sonando la música de juego" reportado en VS:
+      // si para cuando dispara este timer ya se salió del modo espectador
+      // (ej. el jugador que esperaba de prestado ya vio el resultado final,
+      // ver _exitWaitAsSpectator en vs.js), no hay que pisar el postgameloop
+      // que _showVsResult() ya puso sonando.
+      if (!_flagsSpecMode) return;
       if (!_flagsSpecPregameSeen && typeof playMusic === 'function' && typeof sfxGameMusic !== 'undefined') {
         playMusic(sfxGameMusic);
       }

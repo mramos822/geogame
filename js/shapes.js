@@ -634,6 +634,9 @@ window.shapesSpectatorShowRound = function (payload) {
     // reportado).
     _shapesSpecPendingReveal = revealTags;
     setTimeout(() => {
+      // Guard contra el "sigue sonando la música de juego" reportado en VS —
+      // ver mismo comentario en citiesSpectatorShowRound/flagsSpectatorShowRound.
+      if (!_shapesSpecMode) return;
       if (!_shapesSpecPregameSeen) {
         // Confirmado: no viene ningún pregame (unión a mitad de ronda ya en
         // curso) — recién ACÁ, mostrando ya la ronda real, arranca la

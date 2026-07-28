@@ -5783,6 +5783,12 @@ window.citiesSpectatorShowRound = function (payload) {
   if (_citiesSpecIsFirstRound) {
     _citiesSpecIsFirstRound = false;
     setTimeout(() => {
+      // Guard contra el "sigue sonando la música de juego" reportado en VS:
+      // si para cuando dispara este timer ya se salió del modo espectador
+      // (ej. el jugador que esperaba de prestado ya vio el resultado final,
+      // ver _exitWaitAsSpectator en vs.js), no hay que pisar el postgameloop
+      // que _showVsResult() ya puso sonando.
+      if (!_citiesSpecMode) return;
       if (!_citiesSpecPregameSeen && typeof playMusic === 'function' && typeof sfxGameMusic !== 'undefined') {
         playMusic(sfxGameMusic);
       }
@@ -6356,6 +6362,8 @@ window.monumentsSpectatorShowRound = function (payload) {
   if (_monumentsSpecIsFirstRound) {
     _monumentsSpecIsFirstRound = false;
     setTimeout(() => {
+      // Mismo guard que citiesSpectatorShowRound — ver comentario ahí.
+      if (!_monumentsSpecMode) return;
       if (!_monumentsSpecPregameSeen && typeof playMusic === 'function' && typeof sfxGameMusic !== 'undefined') {
         playMusic(sfxGameMusic);
       }
