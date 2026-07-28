@@ -222,6 +222,19 @@ window.sbChangeEmail = async function(newEmail) {
   if (!res.ok) throw new Error(json.error || 'Error al enviar el correo.');
 };
 
+// Límite de 1 cambio cada 30 días: NO se controla solo acá — hay un trigger
+// (protect_username_change) que revierte cualquier UPDATE directo de
+// username/username_changed_at que no pase por este RPC, y el RPC mismo
+// rechaza el cambio si todavía no pasaron los 30 días (ver migración
+// add_change_username_rpc). Errores posibles vía error.message:
+// __cooldown_active__:ISODATE, __username_taken__, __same_username__,
+// __invalid_username__, __not_authenticated__.
+window.sbChangeUsername = async function(newUsername) {
+  const { data, error } = await sb.rpc('change_username', { p_new_username: newUsername });
+  if (error) throw error;
+  return data; // timestamptz de este cambio (nuevo username_changed_at)
+};
+
 window.sbLogout = async function() {
   await sb.auth.signOut();
   window._accountLoggedIn = false;

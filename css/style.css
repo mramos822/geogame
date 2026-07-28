@@ -4903,6 +4903,15 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   background: #f4a800;
   border-color: #8b6a00;
 }
+.account-modal-opt.disabled {
+  opacity: 0.45;
+  pointer-events: none;
+  filter: grayscale(0.4);
+}
+.account-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
 
 .account-modal-close {
   position: absolute;

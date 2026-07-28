@@ -1275,10 +1275,13 @@ window.startCampaign = function () {
   const viewLogoutConfirm    = document.getElementById('account-view-logout-confirm');
   const viewForgot           = document.getElementById('account-view-forgot');
   const viewForgotCode       = document.getElementById('account-view-forgot-code');
+  const viewChangeUsername        = document.getElementById('account-view-change-username');
+  const viewChangeUsernameConfirm = document.getElementById('account-view-change-username-confirm');
+  const viewChangeUsernameOk      = document.getElementById('account-view-change-username-ok');
 
   const allViews = [viewMain, viewLogin, viewRegister, viewLoading, viewVerify, viewWelcome,
                     viewLoggedIn, viewChangePass, viewChangePassOk, viewChangeEmail, viewChangeEmailSent, viewLogoutConfirm,
-                    viewForgot, viewForgotCode];
+                    viewForgot, viewForgotCode, viewChangeUsername, viewChangeUsernameConfirm, viewChangeUsernameOk];
 
   const box = modal.querySelector('.account-modal-box');
   let currentView = null;
@@ -1294,6 +1297,9 @@ window.startCampaign = function () {
     [viewChangePassOk,    viewLoggedIn],
     [viewChangeEmail,     viewLoggedIn],
     [viewLogoutConfirm,   viewLoggedIn],
+    [viewChangeUsername,        viewLoggedIn],
+    [viewChangeUsernameConfirm, viewChangeUsername],
+    [viewChangeUsernameOk,      viewLoggedIn],
     [viewForgot,          viewLogin],
     [viewForgotCode,      viewForgot],
   ]);
@@ -1716,6 +1722,112 @@ window.startCampaign = function () {
     window._isPasswordReset = false;
     ['chpass-err-current','chpass-err-new','chpass-err-confirm'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = ''; });
     showView(viewChangePass);
+  });
+
+  // ── Cambiar nombre de usuario (1 vez cada 30 días, ver RPC change_username) ─
+  let _pendingNewUsername = null;
+
+  function _usernameCooldownRemainingMs() {
+    const changedAt = window._sbProfile?.username_changed_at;
+    if (!changedAt) return 0;
+    const nextEligible = new Date(changedAt).getTime() + 30 * 24 * 60 * 60 * 1000;
+    return Math.max(0, nextEligible - Date.now());
+  }
+
+  document.getElementById('account-go-change-username')?.addEventListener('click', () => {
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    const inp = document.getElementById('chusername-new');
+    const err = document.getElementById('chusername-err');
+    if (inp) { inp.value = ''; inp.classList.remove('input-error'); }
+    const remainingMs = _usernameCooldownRemainingMs();
+    if (remainingMs > 0) {
+      const days = Math.ceil(remainingMs / (24 * 60 * 60 * 1000));
+      if (err) err.textContent = tn('account.errUsernameCooldown', days);
+      if (inp) inp.disabled = true;
+      const submitBtn = document.getElementById('chusername-submit');
+      if (submitBtn) submitBtn.classList.add('disabled');
+    } else {
+      if (err) err.textContent = '';
+      if (inp) inp.disabled = false;
+      const submitBtn = document.getElementById('chusername-submit');
+      if (submitBtn) submitBtn.classList.remove('disabled');
+    }
+    showView(viewChangeUsername);
+  });
+
+  document.getElementById('chusername-submit')?.addEventListener('click', () => {
+    if (_usernameCooldownRemainingMs() > 0) return;
+    const inp = document.getElementById('chusername-new');
+    const err = document.getElementById('chusername-err');
+    const uVal = inp?.value.trim() || '';
+    const setErr = (msg) => { if (err) err.textContent = msg; inp?.classList.toggle('input-error', !!msg); };
+    if (uVal.length < 4 || uVal.length > 12) { setErr(t('account.errUserChars')); return; }
+    if (!/^[a-zA-Z0-9]+$/.test(uVal)) { setErr(t('account.errUserInvalid')); return; }
+    if (typeof window.containsBadWord === 'function' && window.containsBadWord(uVal)) { setErr(t('account.errUserBadWord')); return; }
+    if (uVal === (window._sbProfile?.username || '')) { setErr(t('account.errSameUsername')); return; }
+    setErr('');
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    _pendingNewUsername = uVal;
+    const descEl = document.getElementById('account-change-username-confirm-desc');
+    if (descEl) descEl.textContent = t('account.changeUsernameConfirmDesc', { name: uVal });
+    showView(viewChangeUsernameConfirm);
+  });
+
+  document.getElementById('chusername-confirm-no')?.addEventListener('click', () => {
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    showView(viewChangeUsername);
+  });
+
+  document.getElementById('chusername-confirm-yes')?.addEventListener('click', () => {
+    if (!_pendingNewUsername) return;
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    showView(viewLoading);
+    const newName = _pendingNewUsername;
+    window.sbChangeUsername(newName)
+      .then((changedAt) => {
+        _pendingNewUsername = null;
+        if (window._sbProfile) {
+          window._sbProfile.username = newName;
+          window._sbProfile.username_changed_at = changedAt || new Date().toISOString();
+        }
+        localStorage.setItem('playerName', newName);
+        const nameEl = document.getElementById('loading-player-name');
+        if (nameEl) nameEl.textContent = newName;
+        const linkedNameEl = document.getElementById('account-linked-name');
+        if (linkedNameEl) linkedNameEl.textContent = newName;
+        if (typeof window._updateProfileBtnLabel === 'function') window._updateProfileBtnLabel();
+        if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
+        const okDescEl = document.getElementById('account-change-username-ok-desc');
+        if (okDescEl) okDescEl.textContent = t('account.changeUsernameOkDesc', { name: newName });
+        showView(viewChangeUsernameOk);
+      })
+      .catch(err => {
+        showView(viewChangeUsername);
+        const errEl = document.getElementById('chusername-err');
+        const msg = err.message || '';
+        let friendly = t('account.errGeneric') || 'Ocurrió un error. Intenta de nuevo.';
+        if (msg.startsWith('__cooldown_active__')) {
+          const iso = msg.split(':').slice(1).join(':');
+          const days = Math.max(1, Math.ceil((new Date(iso).getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
+          friendly = tn('account.errUsernameCooldown', days);
+          if (window._sbProfile) window._sbProfile.username_changed_at = new Date(new Date(iso).getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+          const inp = document.getElementById('chusername-new');
+          if (inp) inp.disabled = true;
+          document.getElementById('chusername-submit')?.classList.add('disabled');
+        } else if (msg === '__username_taken__') {
+          friendly = t('account.errUserTaken') || 'Ese nombre de usuario ya está en uso.';
+        } else if (msg === '__same_username__') {
+          friendly = t('account.errSameUsername');
+        } else if (msg === '__invalid_username__') {
+          friendly = t('account.errUserInvalid');
+        }
+        if (errEl) errEl.textContent = friendly;
+      });
+  });
+
+  document.getElementById('chusername-ok-close')?.addEventListener('click', () => {
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    showView(viewLoggedIn);
   });
 
   document.getElementById('account-go-change-email')?.addEventListener('click', () => {
