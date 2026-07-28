@@ -94,7 +94,6 @@ window.SoloSpectate = (() => {
   function reportRound(payload) {
     _lastPhase = 'round';
     _lastRoundPayload = payload;
-    console.log('[spec] SoloSpectate.reportRound()', { channel: !!_channel, active: _active, mode: payload && payload.mode });
     if (_channel) { try { _channel.send({ type: 'broadcast', event: 'round', payload }); } catch (e) { console.warn('[spec] reportRound send failed', e); } }
   }
   function reportScoreSync(score, dots) {
@@ -121,7 +120,6 @@ window.SoloSpectate = (() => {
   // No se cachea para resend: es un aviso transitorio, no un estado.
   function reportAdvancing() {
     _lastPhase = null; // ya no hay "fase vigente" que reenviarle a alguien que se une justo ahora
-    console.log('[spec] SoloSpectate.reportAdvancing()', { channel: !!_channel, active: _active });
     if (_channel) { try { _channel.send({ type: 'broadcast', event: 'advancing', payload: {} }); } catch (e) { console.warn('[spec] reportAdvancing send failed', e); } }
   }
   // Se dispara apenas el jugador real entra a la pantalla de instrucciones
@@ -135,13 +133,11 @@ window.SoloSpectate = (() => {
   function reportSplash(payload) {
     _lastPhase = 'splash';
     _lastSplashPayload = payload || {};
-    console.log('[spec] SoloSpectate.reportSplash()', { channel: !!_channel, active: _active, payload });
     if (_channel) { try { _channel.send({ type: 'broadcast', event: 'splash', payload: payload || {} }); } catch (e) { console.warn('[spec] reportSplash send failed', e); } }
   }
   function reportPregame(payload) {
     _lastPhase = 'pregame';
     _lastPregamePayload = payload || {};
-    console.log('[spec] SoloSpectate.reportPregame()', { channel: !!_channel, active: _active, payload });
     if (_channel) { try { _channel.send({ type: 'broadcast', event: 'pregame', payload: payload || {} }); } catch (e) { console.warn('[spec] reportPregame send failed', e); } }
   }
   function reportPostgame(payload) {
@@ -200,11 +196,6 @@ window._specReportRound = function (payload) {
   }
   if (!window._vsActive && !window._lobbyActive && window.SoloSpectate && window.SoloSpectate.isActive()) {
     window.SoloSpectate.reportRound(payload);
-  } else {
-    console.log('[spec] _specReportRound: DROPPED (no branch matched)', {
-      vsActive: window._vsActive, lobbyActive: window._lobbyActive,
-      soloSpectateExists: !!window.SoloSpectate, soloActive: window.SoloSpectate && window.SoloSpectate.isActive(),
-    });
   }
 };
 window._specReportAnswer = function (correct, score, detail) {
@@ -270,11 +261,6 @@ window._specReportSplash = function (payload) {
   }
   if (!window._vsActive && !window._lobbyActive && window.SoloSpectate && window.SoloSpectate.isActive()) {
     window.SoloSpectate.reportSplash(payload);
-  } else {
-    console.log('[spec] _specReportSplash: DROPPED (no branch matched)', {
-      vsActive: window._vsActive, lobbyActive: window._lobbyActive,
-      soloSpectateExists: !!window.SoloSpectate, soloActive: window.SoloSpectate && window.SoloSpectate.isActive(),
-    });
   }
 };
 window._specReportPregame = function (payload) {
@@ -288,11 +274,6 @@ window._specReportPregame = function (payload) {
   }
   if (!window._vsActive && !window._lobbyActive && window.SoloSpectate && window.SoloSpectate.isActive()) {
     window.SoloSpectate.reportPregame(payload);
-  } else {
-    console.log('[spec] _specReportPregame: DROPPED (no branch matched)', {
-      vsActive: window._vsActive, lobbyActive: window._lobbyActive,
-      soloSpectateExists: !!window.SoloSpectate, soloActive: window.SoloSpectate && window.SoloSpectate.isActive(),
-    });
   }
 };
 window._specReportPostgame = function (payload) {
@@ -318,11 +299,6 @@ window._specReportAdvancing = function () {
   }
   if (!window._vsActive && !window._lobbyActive && window.SoloSpectate && window.SoloSpectate.isActive()) {
     window.SoloSpectate.reportAdvancing();
-  } else {
-    console.log('[spec] _specReportAdvancing: DROPPED (no branch matched)', {
-      vsActive: window._vsActive, lobbyActive: window._lobbyActive,
-      soloSpectateExists: !!window.SoloSpectate, soloActive: window.SoloSpectate && window.SoloSpectate.isActive(),
-    });
   }
 };
 
@@ -486,7 +462,7 @@ window.Spectate = (() => {
           if (_onSpectatorCount) _onSpectatorCount(n);
         } catch (e) {}
       })
-      .on('broadcast', { event: 'round' }, ({ payload }) => { console.log('[spec] watchSolo RAW broadcast: round', payload); if (payload && _onRound) { _match.mode = payload.mode || _match.mode; _onRound(payload); } })
+      .on('broadcast', { event: 'round' }, ({ payload }) => { if (payload && _onRound) { _match.mode = payload.mode || _match.mode; _onRound(payload); } })
       .on('broadcast', { event: 'answer' }, ({ payload }) => {
         if (!payload) return;
         if (typeof payload.score === 'number') _match.score = payload.score;
@@ -495,10 +471,10 @@ window.Spectate = (() => {
       })
       .on('broadcast', { event: 'tick' }, ({ payload }) => { if (payload && _onTick) _onTick(payload.timeLeft, payload.role); })
       .on('broadcast', { event: 'timesup' }, ({ payload }) => { if (_onTimesUp) _onTimesUp(payload && payload.role); })
-      .on('broadcast', { event: 'splash' }, ({ payload }) => { console.log('[spec] watchSolo RAW broadcast: splash', payload); if (_onSplash) _onSplash(payload || {}); })
-      .on('broadcast', { event: 'pregame' }, ({ payload }) => { console.log('[spec] watchSolo RAW broadcast: pregame', payload); if (_onPregame) _onPregame(payload); })
+      .on('broadcast', { event: 'splash' }, ({ payload }) => { if (_onSplash) _onSplash(payload || {}); })
+      .on('broadcast', { event: 'pregame' }, ({ payload }) => { if (_onPregame) _onPregame(payload); })
       .on('broadcast', { event: 'postgame' }, ({ payload }) => { if (payload && _onPostgame) _onPostgame(payload); })
-      .on('broadcast', { event: 'advancing' }, () => { console.log('[spec] watchSolo RAW broadcast: advancing'); if (_onAdvancing) _onAdvancing(); })
+      .on('broadcast', { event: 'advancing' }, () => { if (_onAdvancing) _onAdvancing(); })
       .on('broadcast', { event: 'scoresync' }, ({ payload }) => { if (payload && _onScoreSync) _onScoreSync(payload.score, payload.dots); })
       .on('presence', { event: 'leave' }, ({ key }) => {
         // Único "jugador" posible en este canal es el dueño (userId, sin prefijo
@@ -506,7 +482,6 @@ window.Spectate = (() => {
         if (key && key.indexOf('spectator-') !== 0) { if (_onEnd) _onEnd('finished'); stop(); }
       })
       .subscribe(async (status) => {
-        console.log('[spec] watchSolo channel status:', status, 'channel:', 'solo-' + userId);
         if (status === 'SUBSCRIBED') {
           try { await _channel.track({ t: Date.now() }); } catch (e) {}
           if (_onSnapshot) _onSnapshot(_match);
