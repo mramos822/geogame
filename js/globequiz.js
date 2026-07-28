@@ -1636,6 +1636,12 @@
       // mostrado.
       gqFinalElapsedMs = Math.max(0, Date.now() - gqTimerStart);
       stopTimer();
+      // Repinta la tarjeta con el mismo valor congelado que usará el panel de
+      // game over — si no, la última pintura del intervalo de 30ms (gqCardInterval,
+      // ya detenido en stopTimer) puede quedar hasta 30ms más vieja que
+      // gqFinalElapsedMs y mostrar un dígito distinto entre carta y panel.
+      const gqCardEl = document.getElementById('gq-lb-player-time');
+      if (gqCardEl) gqCardEl.textContent = formatGqCardTime(gqFinalElapsedMs);
       // playMusic(null) en vez de sfxGameMusic.pause() directo — en iOS el
       // audio real de gamemusic corre por un AudioBufferSourceNode aparte
       // (Web Audio, ver playMusicIOS en monuments.js), no por el <audio>

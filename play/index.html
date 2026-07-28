@@ -807,17 +807,24 @@
             <label class="account-label" data-i18n="account.username">Nombre de usuario</label>
             <input class="account-input" id="forgot-user" type="text" placeholder="johndoe321" maxlength="12" autocomplete="off" spellcheck="false">
             <span class="account-error" id="forgot-err-user"></span>
-            <button class="account-modal-opt account-modal-login" id="forgot-submit" type="button" data-i18n="account.forgotBtn">Enviar enlace</button>
+            <button class="account-modal-opt account-modal-login" id="forgot-submit" type="button" data-i18n="account.forgotBtn">Enviar código</button>
             <button class="account-modal-back" id="forgot-back" type="button" data-i18n="account.back">Volver</button>
           </div>
         </div>
 
-        <!-- Vista enlace enviado -->
-        <div class="account-view" id="account-view-forgot-sent" style="display:none">
-          <span class="account-modal-title" data-i18n="account.forgotSentTitle">Revisa tu correo</span>
+        <!-- Vista código de verificación -->
+        <div class="account-view" id="account-view-forgot-code" style="display:none">
+          <span class="account-modal-title" data-i18n="account.forgotCodeTitle">Revisa tu correo</span>
           <div class="account-verify-icon">✉️</div>
-          <p class="account-modal-desc" data-i18n="account.forgotSentDesc">Te enviamos un enlace para restablecer tu contraseña.</p>
-          <button class="account-modal-opt account-modal-login" id="forgot-sent-ok" type="button" data-i18n="account.understood">Entendido</button>
+          <p class="account-modal-desc" data-i18n="account.forgotCodeDesc">Te enviamos un código de 6 dígitos a tu correo.</p>
+          <div class="account-form">
+            <label class="account-label" data-i18n="account.code">Código</label>
+            <input class="account-input" id="forgot-code" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="000000" maxlength="6" autocomplete="off" spellcheck="false" style="text-align:center;letter-spacing:0.4em;font-size:20px;">
+            <span class="account-error" id="forgot-err-code"></span>
+            <button class="account-modal-opt account-modal-login" id="forgot-code-submit" type="button" data-i18n="account.forgotCodeBtn">Verificar</button>
+            <button class="account-modal-back" id="forgot-code-resend" type="button" data-i18n="account.resendCode">Reenviar código</button>
+            <button class="account-modal-back" id="forgot-code-back" type="button" data-i18n="account.back">Volver</button>
+          </div>
         </div>
 
         <!-- Vista cuenta vinculada (logueado) -->
@@ -1229,7 +1236,7 @@
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
     </div>
-    <div id="loading-version">Ver. 3.5.31</div>
+    <div id="loading-version">Ver. 3.5.32</div>
   </div>
 
   <!-- Pantalla de resultado versus (W/L) — fuera del loading-screen para verse tras la partida -->
@@ -1682,6 +1689,11 @@
     <div class="results-back-wrap" id="results-back-wrap">
       <img class="results-back1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
       <img class="results-back2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
+    </div>
+    <div class="results-skip-wrap" id="results-skip-wrap">
+      <img class="results-skip1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
+      <img class="results-skip2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
+      <span class="results-skip-label" data-i18n="results.skip">Adelantar »</span>
     </div>
     <div class="results-confirm-wrap">
       <img class="results-confirm1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">

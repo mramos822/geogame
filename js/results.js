@@ -145,6 +145,44 @@ function triggerRankUp(rank, isFinal = false) {
   }
 }
 
+// Timeouts pendientes de la animación de conteo/rank-up (aparte de countRaf/
+// rankInterval) — el botón de adelantar necesita poder cancelarlos todos de
+// una, si no el "reveal" final se dispara doble (una vez por el skip, otra
+// por el timeout original que seguía corriendo de fondo).
+let _resultsAnimTimeouts = [];
+function _clearResultsAnimTimers() {
+  clearInterval(rankInterval);
+  cancelAnimationFrame(countRaf);
+  _resultsAnimTimeouts.forEach(id => clearTimeout(id));
+  _resultsAnimTimeouts = [];
+}
+
+function _revealResultsBack() {
+  if (resultsBackWrap.classList.contains('visible')) return;
+  resultsBackWrap.classList.add('visible');
+  resultsTable.classList.add('shifted');
+  resultsScreen.querySelector('.results-content')?.classList.add('shifted');
+  applyShift();
+  hideResultsSkipButton();
+}
+
+function showResultsSkipButton() { document.getElementById('results-skip-wrap')?.classList.add('visible'); }
+function hideResultsSkipButton() { document.getElementById('results-skip-wrap')?.classList.remove('visible'); }
+
+// Salta directo al puntaje final y al rank final, como si la animación de
+// conteo ya hubiera terminado — mismo resultado visual, sin esperar.
+function skipResultsAnimation() {
+  if (resultsScreen._skipTarget === undefined) return;
+  const target = resultsScreen._skipTarget;
+  const finalRank = resultsScreen._skipFinalRank;
+  _clearResultsAnimTimers();
+  const totalEl = document.getElementById('results-total-score');
+  if (totalEl) renderDigits(totalEl, target);
+  if (finalRank) triggerRankUp(finalRank, true);
+  _revealResultsBack();
+}
+window.skipResultsAnimation = skipResultsAnimation;
+
 function animateTotal(target) {
   const totalEl = document.getElementById('results-total-score');
   if (!totalEl || target === 0) { if (totalEl) renderDigits(totalEl, 0); return; }
@@ -154,6 +192,10 @@ function animateTotal(target) {
   // rank cycling: always starts at rank 0, goes up one per second
   clearInterval(rankInterval);
   const finalRankIdx = (typeof rankIndex === 'function') ? rankIndex(target) : RANKS.indexOf(getRank(target));
+  const finalRank = (typeof rankAt === 'function') ? rankAt(finalRankIdx) : getRank(target);
+  resultsScreen._skipTarget = target;
+  resultsScreen._skipFinalRank = finalRank;
+  showResultsSkipButton();
   let currentRankIdx = 0;
   if (finalRankIdx > 0) {
     const intervalMs = (duration - 300) / finalRankIdx;
@@ -163,26 +205,16 @@ function animateTotal(target) {
       triggerRankUp((typeof rankAt === 'function') ? rankAt(currentRankIdx) : RANKS[currentRankIdx], isFinal);
       if (isFinal) {
         clearInterval(rankInterval);
-        setTimeout(() => {
-          resultsBackWrap.classList.add('visible');
-          resultsTable.classList.add('shifted');
-          resultsScreen.querySelector('.results-content')?.classList.add('shifted');
-          applyShift();
-        }, 300 + 1000);
+        _resultsAnimTimeouts.push(setTimeout(_revealResultsBack, 300 + 1000));
       }
     }, intervalMs);
   } else {
-    setTimeout(() => {
+    _resultsAnimTimeouts.push(setTimeout(() => {
       resultsRank.classList.remove('rank-up', 'rank-final');
       void resultsRank.offsetWidth;
       resultsRank.classList.add('rank-final');
-    }, Math.max(0, duration - 300));
-    setTimeout(() => {
-      resultsBackWrap.classList.add('visible');
-      resultsTable.classList.add('shifted');
-      resultsScreen.querySelector('.results-content')?.classList.add('shifted');
-      applyShift();
-    }, duration + 1000);
+    }, Math.max(0, duration - 300)));
+    _resultsAnimTimeouts.push(setTimeout(_revealResultsBack, duration + 1000));
   }
 
   function tick(now) {
@@ -244,6 +276,17 @@ resultsConfirm?.addEventListener('click', () => {
 resultsConfirm?.addEventListener('mouseenter', playSelect);
 resultsConfirm?.addEventListener('mouseleave', playSelect);
 
+const resultsSkipWrap = document.getElementById('results-skip-wrap');
+resultsSkipWrap?.addEventListener('click', () => {
+  if (!resultsSkipWrap.classList.contains('visible')) return;
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+  resultsSkipWrap.classList.add('confirm-pressed');
+  setTimeout(() => resultsSkipWrap.classList.remove('confirm-pressed'), 50);
+  skipResultsAnimation();
+});
+resultsSkipWrap?.addEventListener('mouseenter', playSelect);
+resultsSkipWrap?.addEventListener('mouseleave', playSelect);
+
 resultsBackWrap?.addEventListener('click', () => {
   if (confirmCooldown) return;
   confirmCooldownLock();
@@ -289,12 +332,14 @@ function showResultsScreen() {
   resultsScreen.style.display = 'block';
   const content = resultsScreen.querySelector('.results-content');
   if (content) content.style.visibility = '';
-  clearInterval(rankInterval);
-  cancelAnimationFrame(countRaf);
+  _clearResultsAnimTimers();
   resultsRank.style.display = 'none';
   resultsRank.classList.remove('visible', 'rank-up', 'rank-final');
   resultsRankLabel.classList.remove('visible', 'instant', 'final');
   resultsBackWrap.classList.remove('visible');
+  hideResultsSkipButton();
+  resultsScreen._skipTarget = undefined;
+  resultsScreen._skipFinalRank = undefined;
   resultsBackStep = 0;
   resetShift();
   resultsPointsWrap.classList.remove('visible');

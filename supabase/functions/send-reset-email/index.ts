@@ -10,26 +10,29 @@ const CORS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const EMAIL_HTML = (resetUrl: string) => `
-<div style="background:#0a1628;padding:40px 20px;font-family:'Segoe UI',Arial,sans-serif;text-align:center;">
-  <div style="max-width:480px;margin:0 auto;background:#111d35;border-radius:16px;padding:36px 32px;border:1px solid #1e3a5f;">
-    <img src="https://mygeochallenge.com/images/logo.png" alt="GeoChallenge" style="width:140px;margin-bottom:16px;">
-    <h1 style="color:#ffe066;font-size:24px;margin:0 0 8px;">myGeoChallenge</h1>
-    <p style="color:#8aabcf;font-size:13px;margin:0 0 28px;letter-spacing:0.05em;text-transform:uppercase;">Password Reset</p>
-    <p style="color:#cce0ff;font-size:15px;line-height:1.6;margin:0 0 28px;">
-      A password reset was requested for your account.<br>
-      Click the button below to choose a new one.
-    </p>
-    <a href="${resetUrl}"
-       style="display:inline-block;background:#ffe066;color:#0a1628;font-weight:700;font-size:15px;padding:13px 36px;border-radius:8px;text-decoration:none;letter-spacing:0.04em;">
-      Reset Password
-    </a>
-    <p style="color:#4a6a8a;font-size:12px;margin:28px 0 0;line-height:1.6;">
-      If you didn't request this, you can safely ignore this email.<br>
-      This link expires in 24 hours.
-    </p>
-  </div>
-</div>`;
+const EMAIL_HTML = (code: string) => `
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0a1628;padding:40px 20px;font-family:'Segoe UI',Arial,sans-serif;">
+  <tr><td align="center">
+    <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;background:#111d35;border-radius:16px;border:1px solid #1e3a5f;">
+      <tr><td style="padding:36px 32px;text-align:center;">
+        <img src="https://mygeochallenge.com/images/logo.png" alt="GeoChallenge" width="140" style="width:140px;margin-bottom:16px;">
+        <h1 style="color:#ffe066;font-size:24px;margin:0 0 8px;">myGeoChallenge</h1>
+        <p style="color:#8aabcf;font-size:13px;margin:0 0 24px;letter-spacing:0.05em;text-transform:uppercase;">Password Reset</p>
+        <p style="color:#cce0ff;font-size:15px;line-height:1.6;margin:0 0 20px;">
+          A password reset was requested for your account. Enter this code in the app to choose a new password:
+        </p>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 24px;">
+          <tr><td style="background:#0a1628;border:1px solid #ffe066;border-radius:8px;padding:16px 28px;">
+            <span style="color:#ffe066;font-weight:700;font-size:32px;letter-spacing:0.3em;">${code}</span>
+          </td></tr>
+        </table>
+        <p style="color:#cce0ff;font-size:13px;line-height:1.6;margin:0;">
+          This code expires in 10 minutes. If you didn't request this, you can safely ignore this email.
+        </p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>`;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -48,8 +51,8 @@ Deno.serve(async (req) => {
       email,
       options: { redirectTo: REDIRECT_URL }
     });
-    if (error || !data?.properties?.action_link) {
-      return new Response(JSON.stringify({ error: error?.message || 'link generation failed' }), { status: 500, headers: CORS });
+    if (error || !data?.properties?.email_otp) {
+      return new Response(JSON.stringify({ error: error?.message || 'code generation failed' }), { status: 500, headers: CORS });
     }
 
     const res = await fetch('https://api.resend.com/emails', {
@@ -58,8 +61,8 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         from: 'myGeoChallenge <noreply@mygeochallenge.com>',
         to: [email],
-        subject: 'myGeoChallenge — Reset your password',
-        html: EMAIL_HTML(data.properties.action_link),
+        subject: 'myGeoChallenge — Your password reset code',
+        html: EMAIL_HTML(data.properties.email_otp),
       }),
     });
 

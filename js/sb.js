@@ -495,19 +495,16 @@ window.sbLoadSocialData = async function(userId) {
 // Mostrar modal de nueva contraseña (recovery link)
 function _showRecoveryModal() {
   history.replaceState(null, '', window.location.pathname);
-  window._isPasswordReset = true;
   function show() {
+    if (typeof window._openRecoveryChangePassView === 'function') {
+      window._openRecoveryChangePassView();
+      return;
+    }
+    // Fallback si monuments.js todavía no cargó (no debería pasar, __loadingReady lo garantiza)
+    window._isPasswordReset = true;
     const modal = document.getElementById('account-modal');
     const viewChangePass = document.getElementById('account-view-change-pass');
     if (!modal || !viewChangePass) return;
-    ['chpass-current','chpass-new','chpass-confirm'].forEach(id => {
-      const el = document.getElementById(id); if (el) { el.value = ''; el.classList.remove('input-error'); }
-    });
-    document.querySelectorAll('[id^="chpass-err"]').forEach(el => { el.textContent = ''; });
-    const strengthWrap = document.getElementById('chpass-strength-wrap');
-    if (strengthWrap) strengthWrap.style.display = 'none';
-    const currentWrap = document.getElementById('chpass-current-wrap');
-    if (currentWrap) currentWrap.style.display = 'none';
     document.querySelectorAll('#account-modal .account-view').forEach(el => { el.style.display = 'none'; });
     viewChangePass.style.display = 'flex';
     modal.classList.add('open');
@@ -607,6 +604,13 @@ sb.auth.onAuthStateChange((event, session) => {
     }
   }
   if (!session) return;
+  // Recuperación de contraseña abandonada (recarga/cierre sin terminar): la sesión
+  // de recovery quedaría autenticada indefinidamente si la tratáramos como login normal.
+  if (localStorage.getItem('_pendingPasswordReset')) {
+    localStorage.removeItem('_pendingPasswordReset');
+    await sb.auth.signOut();
+    return;
+  }
   window._accountLoggedIn = true;
   window._sbUserId = session.user.id;
   document.body.classList.add('account-logged');

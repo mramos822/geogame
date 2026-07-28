@@ -175,18 +175,15 @@
         if (accountModal) obs.observe(accountModal, { attributes: true, attributeFilter: ['class'] });
       }
       const fmt = v => v > 0 ? '🏆 ' + v.toLocaleString() : '';
-      const playHs      = parseInt(localStorage.getItem('geochallenge_highscore') || '0', 10);
-      const flagsHs     = parseInt(localStorage.getItem('flagsHighscore')         || '0', 10);
-      const shapesHs    = parseInt(localStorage.getItem('shapesHighscore')        || '0', 10);
-      const monumentsHs = parseInt(localStorage.getItem('monumentsHighscore')     || '0', 10);
+      const _hs = _loadingHsValues();
       const elPlay      = document.getElementById('loading-play-hs');
       const elFlags     = document.getElementById('loading-flags-hs');
       const elShapes    = document.getElementById('loading-shapes-hs');
       const elMode4     = document.getElementById('loading-mode4-hs');
-      if (elPlay)   elPlay.textContent   = fmt(playHs);
-      if (elFlags)  elFlags.textContent  = fmt(flagsHs);
-      if (elShapes) elShapes.textContent = fmt(shapesHs);
-      if (elMode4)  elMode4.textContent  = fmt(monumentsHs);
+      if (elPlay)   elPlay.textContent   = fmt(_hs.play);
+      if (elFlags)  elFlags.textContent  = fmt(_hs.flags);
+      if (elShapes) elShapes.textContent = fmt(_hs.shapes);
+      if (elMode4)  elMode4.textContent  = fmt(_hs.mode4);
       if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
     }
   }
@@ -274,6 +271,26 @@ function syncHsFromProfile(profile) {
 }
 
 window.syncHsFromProfile = syncHsFromProfile;
+
+// Fuente de verdad para los trofeos 🏆 de cada modo en la pantalla principal:
+// con cuenta logueada usa el perfil de Supabase (server truth), igual que
+// refreshProfileStats — si no, cae a localStorage. Antes estos badges leían
+// localStorage siempre, sin importar la sesión: un reset de stats en la base
+// (o jugar highscore nuevo en otro dispositivo) no se reflejaba acá hasta
+// que se jugaba localmente de nuevo.
+function _loadingHsValues() {
+  const p = window._sbProfile;
+  if (p && window._accountLoggedIn) {
+    return { play: p.hs_cities || 0, flags: p.hs_flags || 0, shapes: p.hs_shapes || 0, mode4: p.hs_monuments || 0 };
+  }
+  return {
+    play:   parseInt(localStorage.getItem('geochallenge_highscore') || '0', 10),
+    flags:  parseInt(localStorage.getItem('flagsHighscore')         || '0', 10),
+    shapes: parseInt(localStorage.getItem('shapesHighscore')        || '0', 10),
+    mode4:  parseInt(localStorage.getItem('monumentsHighscore')     || '0', 10),
+  };
+}
+window._loadingHsValues = _loadingHsValues;
 
 // Ruta de la bandera del país (código ISO2) para el circulito de perfil.
 function flagUrlForCountryCode(cc) {
@@ -1257,16 +1274,16 @@ window.startCampaign = function () {
   const viewChangeEmailSent  = document.getElementById('account-view-change-email-sent');
   const viewLogoutConfirm    = document.getElementById('account-view-logout-confirm');
   const viewForgot           = document.getElementById('account-view-forgot');
-  const viewForgotSent       = document.getElementById('account-view-forgot-sent');
+  const viewForgotCode       = document.getElementById('account-view-forgot-code');
 
   const allViews = [viewMain, viewLogin, viewRegister, viewLoading, viewVerify, viewWelcome,
                     viewLoggedIn, viewChangePass, viewChangePassOk, viewChangeEmail, viewChangeEmailSent, viewLogoutConfirm,
-                    viewForgot, viewForgotSent];
+                    viewForgot, viewForgotCode];
 
   const box = modal.querySelector('.account-modal-box');
   let currentView = null;
 
-  const noCloseViews = new Set([viewLoading, viewWelcome, viewChangeEmailSent, viewForgotSent]);
+  const noCloseViews = new Set([viewLoading, viewWelcome, viewChangeEmailSent]);
   // backMap: X button goes to parent view; null = close modal
   const backMap = new Map([
     [viewMain,            null],
@@ -1278,6 +1295,7 @@ window.startCampaign = function () {
     [viewChangeEmail,     viewLoggedIn],
     [viewLogoutConfirm,   viewLoggedIn],
     [viewForgot,          viewLogin],
+    [viewForgotCode,      viewForgot],
   ]);
 
   function showView(v) {
@@ -1285,7 +1303,8 @@ window.startCampaign = function () {
     if (v) v.style.display = 'flex';
     currentView = v;
     if (box) {
-      box.classList.toggle('hide-close', noCloseViews.has(v));
+      const forceHideClose = v === viewChangePass && !!window._isPasswordReset;
+      box.classList.toggle('hide-close', noCloseViews.has(v) || forceHideClose);
       box.style.animation = 'none'; box.offsetWidth; box.style.animation = '';
     }
   }
@@ -1309,6 +1328,22 @@ window.startCampaign = function () {
     if (startView === 'login')    { showView(viewLogin);    modal.classList.add('open'); return; }
     if (startView === 'register') { showView(viewRegister); modal.classList.add('open'); return; }
     openModal();
+  };
+
+  // Expuesto para que sb.js abra la vista de "nueva contraseña" tras una recuperación
+  // (evento PASSWORD_RECOVERY), reusando el pipeline real de showView (animación, X oculta, etc.)
+  window._openRecoveryChangePassView = function () {
+    ['chpass-current','chpass-new','chpass-confirm'].forEach(id => {
+      const el = document.getElementById(id); if (el) { el.value = ''; el.classList.remove('input-error'); }
+    });
+    document.querySelectorAll('[id^="chpass-err"]').forEach(el => { el.textContent = ''; });
+    const strengthWrap = document.getElementById('chpass-strength-wrap');
+    if (strengthWrap) strengthWrap.style.display = 'none';
+    const currentWrap = document.getElementById('chpass-current-wrap');
+    if (currentWrap) currentWrap.style.display = 'none';
+    window._isPasswordReset = true;
+    showView(viewChangePass);
+    modal.classList.add('open');
   };
 
   if (!btn) return;
@@ -1353,6 +1388,9 @@ window.startCampaign = function () {
     showView(viewLogin);
   });
 
+  let _forgotEmail = null;
+  let _forgotResendCooldown = false;
+
   document.getElementById('forgot-submit')?.addEventListener('click', async () => {
     const userEl = document.getElementById('forgot-user');
     const errEl  = document.getElementById('forgot-err-user');
@@ -1368,16 +1406,68 @@ window.startCampaign = function () {
         return;
       }
       await window.sbResetPassword(profile.email);
-      showView(viewForgotSent);
+      _forgotEmail = profile.email;
+      const codeEl = document.getElementById('forgot-code');
+      const codeErrEl = document.getElementById('forgot-err-code');
+      if (codeEl) codeEl.value = '';
+      if (codeErrEl) codeErrEl.textContent = '';
+      showView(viewForgotCode);
     } catch(e) {
       showView(viewForgot);
       if (errEl) errEl.textContent = (e.message && e.message !== '{}') ? e.message : 'Error al enviar el correo.';
     }
   });
 
-  document.getElementById('forgot-sent-ok')?.addEventListener('click', () => {
+  document.getElementById('forgot-code')?.addEventListener('input', (e) => {
+    e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+  });
+
+  document.getElementById('forgot-code-back')?.addEventListener('click', () => {
     sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
-    showView(viewLogin);
+    showView(viewForgot);
+  });
+
+  document.getElementById('forgot-code-submit')?.addEventListener('click', async () => {
+    const codeEl = document.getElementById('forgot-code');
+    const errEl  = document.getElementById('forgot-err-code');
+    const code = codeEl?.value.trim() || '';
+    if (!_forgotEmail) { showView(viewForgot); return; }
+    if (!/^\d{6}$/.test(code)) {
+      if (errEl) errEl.textContent = t('account.errCodeInvalid') || 'Ingresa el código de 6 dígitos.';
+      return;
+    }
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    if (errEl) errEl.textContent = '';
+    showView(viewLoading);
+    try {
+      const { error } = await window.sb.auth.verifyOtp({ email: _forgotEmail, token: code, type: 'recovery' });
+      if (error) throw error;
+      localStorage.setItem('_pendingPasswordReset', '1');
+      _forgotEmail = null;
+      // El listener de PASSWORD_RECOVERY en sb.js abre la vista de nueva contraseña.
+    } catch(e) {
+      showView(viewForgotCode);
+      if (errEl) errEl.textContent = t('account.errCodeInvalid') || 'Código inválido o expirado.';
+    }
+  });
+
+  document.getElementById('forgot-code-resend')?.addEventListener('click', async () => {
+    const resendBtn = document.getElementById('forgot-code-resend');
+    if (_forgotResendCooldown || !_forgotEmail) return;
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    _forgotResendCooldown = true;
+    try {
+      await window.sbResetPassword(_forgotEmail);
+      const errEl = document.getElementById('forgot-err-code');
+      if (errEl) { errEl.classList.add('account-error-ok'); errEl.textContent = t('account.codeResent') || 'Código reenviado.'; }
+    } catch(e) { /* silencioso: no bloquea el flujo */ }
+    if (resendBtn) resendBtn.classList.add('disabled');
+    setTimeout(() => {
+      _forgotResendCooldown = false;
+      if (resendBtn) resendBtn.classList.remove('disabled');
+      const errEl = document.getElementById('forgot-err-code');
+      if (errEl) { errEl.classList.remove('account-error-ok'); errEl.textContent = ''; }
+    }, 20000);
   });
 
   document.getElementById('login-welcome-ok')?.addEventListener('click', () => {
@@ -1662,6 +1752,15 @@ window.startCampaign = function () {
     document.body.classList.remove('account-logged');
     localStorage.removeItem('profilePhoto');
     applyStoredProfilePic();
+    // Personalización (marco/tarjeta/panel/celda): _applyFounderFrame cae a
+    // este caché local cuando no hay perfil logueado — sin borrarlo acá, un
+    // invitado que juega después de cerrar sesión seguía viendo el marco,
+    // la carta del leaderboard y el panel de la cuenta anterior.
+    localStorage.removeItem('cust_frame_code');
+    localStorage.removeItem('cust_card_code');
+    localStorage.removeItem('cust_panel_code');
+    localStorage.removeItem('cust_cell_code');
+    if (typeof window._applyFounderFrame === 'function') window._applyFounderFrame();
     // Racha de invitado de GlobeQuiz + visitor_id: si no se resetean acá,
     // el próximo que juegue de invitado en este mismo dispositivo (sin
     // loguearse) hereda la racha y el visitor_id de la cuenta que se
@@ -1752,7 +1851,7 @@ window.startCampaign = function () {
       sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
       showView(viewLoading);
       const doChange = () => window.sbChangePassword(newInp.value)
-        .then(() => { window._isPasswordReset = false; showView(viewChangePassOk); })
+        .then(() => { window._isPasswordReset = false; localStorage.removeItem('_pendingPasswordReset'); showView(viewChangePassOk); })
         .catch(err => {
           showView(viewChangePass);
           if (errNew) errNew.textContent = err.message || t('account.errPassShort');
@@ -8775,14 +8874,15 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
   document.getElementById('loading-sent-group')?.classList.add('table-gone');
 
   const fmt = v => v > 0 ? '🏆 ' + v.toLocaleString() : '';
+  const _hs2 = _loadingHsValues();
   const elPlay   = document.getElementById('loading-play-hs');
   const elFlags  = document.getElementById('loading-flags-hs');
   const elShapes = document.getElementById('loading-shapes-hs');
   const elMode4  = document.getElementById('loading-mode4-hs');
-  if (elPlay)   elPlay.textContent   = fmt(parseInt(localStorage.getItem('geochallenge_highscore') || '0', 10));
-  if (elFlags)  elFlags.textContent  = fmt(parseInt(localStorage.getItem('flagsHighscore')         || '0', 10));
-  if (elShapes) elShapes.textContent = fmt(parseInt(localStorage.getItem('shapesHighscore')        || '0', 10));
-  if (elMode4)  elMode4.textContent  = fmt(parseInt(localStorage.getItem('monumentsHighscore')     || '0', 10));
+  if (elPlay)   elPlay.textContent   = fmt(_hs2.play);
+  if (elFlags)  elFlags.textContent  = fmt(_hs2.flags);
+  if (elShapes) elShapes.textContent = fmt(_hs2.shapes);
+  if (elMode4)  elMode4.textContent  = fmt(_hs2.mode4);
   if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
 
   confirmStep = 0;

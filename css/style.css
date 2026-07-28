@@ -5122,6 +5122,8 @@ body.account-logged .loading-name-edit {
   text-align: left;
   margin-top: -0.6cqmin;
 }
+.account-error.account-error-ok { color: #1c8a32; }
+.account-modal-back.disabled { opacity: 0.4; pointer-events: none; }
 
 /* ── ACCOUNT LOGGED-IN VIEWS ────────────────────────── */
 .account-modal-pic-wrap {
@@ -7470,6 +7472,55 @@ body.is-mobile #splash-screen.mode-monuments .game-bg-city-monuments2 {
 }
 .results-back-wrap:hover .results-back2 { opacity: 1; }
 .results-back-wrap.confirm-pressed .results-back2 { opacity: 0; }
+
+.results-skip-wrap {
+  position: absolute;
+  z-index: 23;
+  width: 8.6cqmin;
+  top: 4%;
+  right: 4%;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.results-skip-wrap.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+.results-skip1 {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+}
+.results-skip2 {
+  position: absolute;
+  top: 46%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 10.2cqmin;
+  height: auto;
+  pointer-events: none;
+  opacity: 0;
+}
+.results-skip-wrap:hover .results-skip2 { opacity: 1; }
+.results-skip-wrap.confirm-pressed .results-skip2 { opacity: 0; }
+.results-skip-label {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 0.3cqmin;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-weight: bold;
+  font-size: 1.6cqmin;
+  color: #FFFF00;
+  -webkit-text-stroke: 0.35cqmin #000080;
+  paint-order: stroke fill;
+  white-space: nowrap;
+  pointer-events: none;
+}
 
 .results-rank-label {
   position: absolute;
