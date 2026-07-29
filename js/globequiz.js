@@ -2033,7 +2033,7 @@
       // El input/check y el hint recién aparecen cuando termina el
       // 3-2-1-GO, no antes.
       if (guessRow) guessRow.style.display = 'none';
-      if (hintEl2) hintEl2.style.display = 'none';
+      if (hintEl2) { hintEl2.style.display = 'none'; hintEl2.classList.remove('gq-hint-wrap'); }
       // El globo tampoco es interactivo (click/drag/zoom) hasta que termina
       // el 3-2-1-GO.
       const canvasEl = document.getElementById('gq-canvas');
@@ -2070,7 +2070,13 @@
       // three.js en vez de por la causa exacta.
       const isWebglDisabled = /error creating webgl context/i.test(String(err && err.message || err));
       const hintEl = document.getElementById('gq-hint');
-      if (hintEl) hintEl.textContent = t(isWebglDisabled ? 'globequiz.loadErrorWebgl' : 'globequiz.loadError');
+      if (hintEl) {
+        // Ambos mensajes de error son mucho más largos que un hint normal
+        // (ver .gq-hint-wrap en style.css) — sin esto se desbordan en un
+        // solo renglón e ilegible.
+        hintEl.classList.add('gq-hint-wrap');
+        hintEl.textContent = t(isWebglDisabled ? 'globequiz.loadErrorWebgl' : 'globequiz.loadError');
+      }
     });
   };
 })();

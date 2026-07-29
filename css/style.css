@@ -1593,6 +1593,15 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   line-height: 1.3;
   pointer-events: none;
 }
+/* Mensaje de error de carga del globo 3D (WebGL bloqueado, etc.) — mucho más
+   largo que un hint normal, necesita romper línea en vez de desbordar en un
+   solo renglón (ver .gq-hint arriba, pensado para hints cortos). */
+.gq-hint-wrap {
+  white-space: normal;
+  width: 70cqmin;
+  max-width: 70cqmin;
+}
+
 .gq-hint-correct-name {
   color: #2fae4a;
 }
