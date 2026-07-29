@@ -915,7 +915,16 @@ window.LB = (() => {
     sendInvite, listenForInvites, setName, getName, setModes, getModes, sendModes,
     isHost, getMembers, getLobby, getCode, getId, getSeed,
     refreshMembers: () => _fetchMembers(),
-    resubscribeChannel: () => { if (_lobbyId) _subscribe(); },
+    // _subscribe() por sí sola solo vuelve a ESCUCHAR cambios futuros — no trae
+    // los que pasaron MIENTRAS el canal estaba suelto (ver releaseChannel,
+    // usado por _enterGroupWaitAsSpectator). Sin este _fetchMembers() acá, el
+    // que volvía de "espectar de prestado" seguía viendo el score de sus
+    // rivales congelado en lo que era ANTES de soltar el canal (ej. a mitad
+    // de la ronda que estaba mirando) — quedaba pegado así hasta el próximo
+    // cambio real en lobby_members, que podía no llegar antes de arrancar el
+    // siguiente modo (el "puntaje y cards en 0 al entrar al modo siguiente"
+    // reportado).
+    resubscribeChannel: () => { if (_lobbyId) { _subscribe(); _fetchMembers(); } },
     refreshSpectatorCount: () => { try { _applySpectatorBadge(); } catch (e) {} },
     getPendingKicksCount: () => _pendingKicks.size,
     clearPendingKicks: () => { _pendingKicks.clear(); },
