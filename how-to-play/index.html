@@ -13,7 +13,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>How to Play myGeoChallenge — Complete Game Guide</title>
-  <meta name="description" content="Complete guide to playing myGeoChallenge. Rules for all 4 modes, scoring system, speed bonus, World Tour campaign, Versus mode, Practice Tour, and 35 rank titles explained.">
+  <meta name="description" content="Complete guide to playing myGeoChallenge. Rules for all 4 modes, scoring system, speed bonus, World Tour campaign, Versus mode, Practice Tour, the daily GlobeQuiz challenge, and 35 rank titles explained.">
   <link rel="canonical" href="https://mygeochallenge.com/how-to-play/">
   <link rel="icon" type="image/png" href="images/planet3.png">
   <script type="application/ld+json">
@@ -132,6 +132,7 @@
     .emote-img:hover{transform:scale(1.3) rotate(-5deg)}
 
     .practice-section{background:linear-gradient(135deg,#162a40 0%,#0d1d30 100%)}
+    .globequiz-section{background:linear-gradient(135deg,#0d1d30 0%,#162a40 100%)}
     .practice-grid{display:grid;grid-template-columns:280px 1fr;gap:48px;align-items:center}
     @media(max-width:780px){.practice-grid{grid-template-columns:1fr}.practice-visual{display:none}}
     .practice-visual{text-align:center}
@@ -226,6 +227,7 @@
     <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.v">Real-Time Versus</span></span>
     <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.t">World Tour Campaign</span></span>
     <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.p">Practice Tour</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.gq">Daily GlobeQuiz</span></span>
     <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.l">Global Leaderboards</span></span>
     <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.m">4 Game Modes</span></span>
     <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.c">195 Countries</span></span>
@@ -234,6 +236,7 @@
     <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.v">Real-Time Versus</span></span>
     <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.t">World Tour Campaign</span></span>
     <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.p">Practice Tour</span></span>
+    <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.gq">Daily GlobeQuiz</span></span>
     <span class="ticker-item"><span class="dot">★</span> <span data-i18n="tick.l">Global Leaderboards</span></span>
   </div>
 </div>
@@ -246,6 +249,7 @@
 <a class="toc-link" href="#campaign"><img src="images/planet3.png" alt=""><span data-i18n="toc.t">World Tour</span></a>
       <a class="toc-link" href="#versus"><img src="images/sword.png" alt=""><span data-i18n="toc.v">Versus</span></a>
       <a class="toc-link" href="#practice"><img src="images/practice.png" alt=""><span data-i18n="toc.p">Practice Tour</span></a>
+      <a class="toc-link" href="#globequiz"><img src="images/globe.png" alt=""><span data-i18n="toc.gq">GlobeQuiz</span></a>
       <a class="toc-link" href="#tips"><img src="images/crown.png" alt=""><span data-i18n="toc.tp">Pro Tips</span></a>
     </div>
   </div>
@@ -415,6 +419,31 @@
   </div>
 </section>
 
+<!-- GLOBEQUIZ -->
+<section class="content-section globequiz-section" id="globequiz">
+  <div class="section-inner">
+    <div class="section-head reveal">
+      <div class="eyebrow" data-i18n="gq.eyebrow">Daily Challenge</div>
+      <h2 class="section-title" data-i18n="gq.title">GlobeQuiz — <span>Guess the Country, No Clock</span></h2>
+    </div>
+    <div class="versus-grid">
+      <div>
+        <p class="body-text reveal" data-i18n="gq.p1">A random country is picked every time you play — find it on a 3D globe you can drag, spin, and zoom, by typing country names as your guesses. No multiple choice here: you actually have to know your geography.</p>
+        <p class="body-text reveal" data-i18n="gq.p2">Every guess shows the distance in kilometers to the real answer, plus a "getting warmer/colder" hint compared to your last try. Unlimited attempts, no game-over timer — just a stopwatch tracking how fast you nail it.</p>
+        <ul class="body-list reveal">
+          <li data-i18n="gq.li1"><strong>Daily streak:</strong> win at least once a day to keep it going — resets at midnight New York time for everyone, no matter your timezone</li>
+          <li data-i18n="gq.li2"><strong>Friends can spectate live</strong> — they see the same globe and your guesses landing in real time</li>
+          <li data-i18n="gq.li3">A new random country every single game — replay as many times as you want, never the same twice</li>
+          <li data-i18n="gq.li4">Runs separate from World Tour scoring — its own streak, not part of the combined campaign rank</li>
+        </ul>
+      </div>
+      <div class="versus-visual reveal">
+        <img class="sword-img" src="images/globe.png" alt="GlobeQuiz">
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- RANKS -->
 <section class="content-section ranks-section" id="ranks">
   <div class="section-inner">
@@ -480,8 +509,8 @@ const T={
     'hero.title':'You could jump in blind.<br>Or read this <span>first</span>.',
     'hero.desc':'The players who understand how the speed bonus works, when wrong options fade out, and what Practice Tour is actually for score noticeably higher. Everything in one place.',
     'hero.btn':"Start Playing — It's Free",
-    'tick.m':'4 Game Modes','tick.c':'195 Countries','tick.r':'35 Rank Titles','tick.s':'Speed Bonus System','tick.v':'Real-Time Versus','tick.t':'World Tour Campaign','tick.p':'Practice Tour','tick.l':'Global Leaderboards',
-    'toc.head':'Jump To','toc.m':'The 4 Modes','toc.s':'Scoring','toc.t':'World Tour','toc.v':'Versus','toc.p':'Practice Tour','toc.tp':'Pro Tips',
+    'tick.m':'4 Game Modes','tick.c':'195 Countries','tick.r':'35 Rank Titles','tick.s':'Speed Bonus System','tick.v':'Real-Time Versus','tick.t':'World Tour Campaign','tick.p':'Practice Tour','tick.l':'Global Leaderboards','tick.gq':'Daily GlobeQuiz',
+    'toc.head':'Jump To','toc.m':'The 4 Modes','toc.s':'Scoring','toc.t':'World Tour','toc.v':'Versus','toc.p':'Practice Tour','toc.gq':'GlobeQuiz','toc.tp':'Pro Tips',
     'modes.eyebrow':'Game Modes','modes.title':'4 Modes. <span>All Different. All Hard.</span>','modes.sub':"Each mode tests a different skill. You'll be decent at one going in and confused by the rest — that's just how it works. The modes you're bad at are the ones worth practicing first.",
     'hw':'How it works',
     'm1.num':'Mode 01','m1.name':'Suitcase Shuffle','m1.tag':'Flags &amp; Countries',
@@ -525,6 +554,13 @@ const T={
     'prac.li2':'<strong>Difficulties:</strong> Easy · Medium · Hard',
     'prac.li3':'<strong>Any of the 4 modes</strong> available in Practice',
     'prac.li4':"No time limit — answer when you're ready",
+    'gq.eyebrow':'Daily Challenge','gq.title':'GlobeQuiz — <span>Guess the Country, No Clock</span>',
+    'gq.p1':'A random country is picked every time you play — find it on a 3D globe you can drag, spin, and zoom, by typing country names as your guesses. No multiple choice here: you actually have to know your geography.',
+    'gq.p2':'Every guess shows the distance in kilometers to the real answer, plus a "getting warmer/colder" hint compared to your last try. Unlimited attempts, no game-over timer — just a stopwatch tracking how fast you nail it.',
+    'gq.li1':'<strong>Daily streak:</strong> win at least once a day to keep it going — resets at midnight New York time for everyone, no matter your timezone',
+    'gq.li2':'<strong>Friends can spectate live</strong> — they see the same globe and your guesses landing in real time',
+    'gq.li3':'A new random country every single game — replay as many times as you want, never the same twice',
+    'gq.li4':'Runs separate from World Tour scoring — its own streak, not part of the combined campaign rank',
     'ranks.eyebrow':'Progression','ranks.title':'35 Ranks. Climb <span>Them All</span>.','ranks.sub':'Your combined high score across all modes determines your rank. Every session you play pushes you further up the ladder.',
     'tips.eyebrow':'Strategy','tips.title':'Things You <span>Learn the Hard Way</span>','tips.sub':'Figured out by playing way too much of this game. These are the things that actually move your score.',
     'tips.note':'<strong style="color:var(--gold)">General strategy:</strong> For the World Tour, aim for consistent "Good" or better across all modes. A single mode where you time out constantly will drag your total score down significantly. The speed multiplier is the biggest lever — don\'t sacrifice accuracy for speed.',
@@ -537,8 +573,8 @@ const T={
     'hero.title':'Podrías entrar de golpe.<br>O leer esto <span>primero</span>.',
     'hero.desc':'Los jugadores que entienden cómo funciona el bonus de velocidad, cuándo se desvanecen las opciones y para qué sirve el Tour de Práctica sacan puntajes notablemente más altos. Todo en un lugar.',
     'hero.btn':'Empezar a Jugar — Es Gratis',
-    'tick.m':'4 Modos de Juego','tick.c':'195 Países','tick.r':'35 Títulos de Rango','tick.s':'Sistema de Bonus de Velocidad','tick.v':'Versus en Tiempo Real','tick.t':'Campaña Tour Mundial','tick.p':'Tour de Práctica','tick.l':'Rankings Globales',
-    'toc.head':'Ir a','toc.m':'Los 4 Modos','toc.s':'Puntaje','toc.t':'Tour Mundial','toc.v':'Versus','toc.p':'Tour de Práctica','toc.tp':'Consejos Pro',
+    'tick.m':'4 Modos de Juego','tick.c':'195 Países','tick.r':'35 Títulos de Rango','tick.s':'Sistema de Bonus de Velocidad','tick.v':'Versus en Tiempo Real','tick.t':'Campaña Tour Mundial','tick.p':'Tour de Práctica','tick.l':'Rankings Globales','tick.gq':'GlobeQuiz Diario',
+    'toc.head':'Ir a','toc.m':'Los 4 Modos','toc.s':'Puntaje','toc.t':'Tour Mundial','toc.v':'Versus','toc.p':'Tour de Práctica','toc.gq':'GlobeQuiz','toc.tp':'Consejos Pro',
     'modes.eyebrow':'Modos de Juego','modes.title':'4 Modos. <span>Todos Distintos. Todos Difíciles.</span>','modes.sub':'Cada modo prueba una habilidad diferente. Vas a ser decente en uno de entrada y no tener idea en el resto — así es como funciona. Los modos en los que fallás son los que vale practicar primero.',
     'hw':'Cómo funciona',
     'm1.num':'Modo 01','m1.name':'Suitcase Shuffle','m1.tag':'Banderas y Países',
@@ -582,6 +618,13 @@ const T={
     'prac.li2':'<strong>Dificultades:</strong> Fácil · Medio · Difícil',
     'prac.li3':'<strong>Cualquiera de los 4 modos</strong> disponible en Práctica',
     'prac.li4':'Sin límite de tiempo — responde cuando estés listo',
+    'gq.eyebrow':'Desafío Diario','gq.title':'GlobeQuiz — <span>Adivina el País, Sin Reloj</span>',
+    'gq.p1':'Cada vez que juegas te toca un país al azar — encuéntralo en un globo 3D que puedes arrastrar, girar y hacer zoom, escribiendo nombres de países como tus intentos. Nada de opción múltiple: tienes que saber geografía de verdad.',
+    'gq.p2':'Cada intento te muestra la distancia en kilómetros hasta la respuesta real, más una pista de "te acercas/alejas" comparada con tu intento anterior. Intentos ilimitados, sin temporizador de fin de juego — solo un cronómetro que mide qué tan rápido lo lograste.',
+    'gq.li1':'<strong>Racha diaria:</strong> gana al menos una vez al día para mantenerla — se reinicia a medianoche hora de Nueva York para todo el mundo, sin importar tu zona horaria',
+    'gq.li2':'<strong>Tus amigos pueden espectarte en vivo</strong> — ven el mismo globo y tus intentos cayendo en tiempo real',
+    'gq.li3':'Un país nuevo al azar en cada partida — juega las veces que quieras, nunca se repite',
+    'gq.li4':'Corre aparte del puntaje del Tour Mundial — tiene su propia racha, no forma parte del rango combinado de la campaña',
     'ranks.eyebrow':'Progresión','ranks.title':'35 Rangos. Súbelos <span>Todos</span>.','ranks.sub':'Tu puntaje máximo combinado en todos los modos determina tu rango. Cada sesión que juegas te empuja más arriba en la tabla.',
     'tips.eyebrow':'Estrategia','tips.title':'Lo Que Aprendes <span>a las Malas</span>','tips.sub':'Descubierto jugando demasiado este juego. Estas son las cosas que de verdad mueven tu puntaje.',
     'tips.note':'<strong style="color:var(--gold)">Estrategia general:</strong> En el Tour Mundial, apunta a "Bueno" o mejor de forma consistente en todos los modos. Un modo donde constantemente se te acaba el tiempo va a arrastrar tu puntaje total hacia abajo. El multiplicador de velocidad es la palanca más grande — no sacrifiques precisión por velocidad.',
@@ -603,7 +646,10 @@ const TIPS_DATA=[
    es:{h:'City Blitz',li:['<strong>Haz clic en el país, no en el punto.</strong> La región aproximada es suficiente — el bonus de velocidad recompensa los clics rápidos y confiados.','Las ciudades difíciles aparecen después de 15 respuestas correctas. Usa el Tour de Práctica para practicarlas antes de partidas de campaña.','La mayoría de las capitales se agrupan cerca de costas, deltas de ríos o zonas históricas — úsalo como ancla mental.']}},
   {img:'images/game4.png',
    en:{h:'Landmark Loco',li:['<strong>Architecture style = region clue.</strong> You don\'t need to know the name — the style narrows it down.','Focus on Europe and Asia first — highest density of landmarks in the game.','Know the Hagia Sophia is Turkey, not Greece. Historical context helps with the trickier ones.']},
-   es:{h:'Landmark Loco',li:['<strong>Estilo arquitectónico = pista de región.</strong> No necesitas saber el nombre — el estilo lo reduce.','Enfócate en Europa y Asia primero — la mayor densidad de monumentos del juego está ahí.','La Hagia Sophia es de Turquía, no de Grecia. El contexto histórico ayuda con los más difíciles.']}}
+   es:{h:'Landmark Loco',li:['<strong>Estilo arquitectónico = pista de región.</strong> No necesitas saber el nombre — el estilo lo reduce.','Enfócate en Europa y Asia primero — la mayor densidad de monumentos del juego está ahí.','La Hagia Sophia es de Turquía, no de Grecia. El contexto histórico ayuda con los más difíciles.']}},
+  {img:'images/globe.png',
+   en:{h:'GlobeQuiz',li:['<strong>Watch whether the distance goes up or down</strong> between guesses — that tells you if you\'re getting warmer or colder.','Open with a big, central country (Kazakhstan, Brazil, Congo) — the distance alone cuts the map roughly in half.','The streak only needs ONE win a day — after that, replay all you want with zero pressure.']},
+   es:{h:'GlobeQuiz',li:['<strong>Fíjate si la distancia sube o baja</strong> entre intentos — eso te dice si te acercas o te alejas.','Arranca con un país grande y central (Kazajistán, Brasil, Congo) — la distancia sola corta el mapa casi a la mitad.','La racha solo necesita UNA victoria al día — después, juega las veces que quieras sin presión.']}}
 ];
 
 /* ── LANG ── */

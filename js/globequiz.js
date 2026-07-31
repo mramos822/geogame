@@ -81,6 +81,8 @@
   const EXCLUDED_COUNTRIES = new Set([
     'St-Barthélemy', 'St-Martin', 'Sint Maarten', 'Curaçao', 'Aruba',
     'Cayman Is.', 'Turks and Caicos Is.', 'British Virgin Is.', 'U.S. Virgin Is.',
+    'Saint Helena', // territorio británico, no es un país soberano
+    'Falkland Is.', // Islas Malvinas — territorio en disputa, no es un país soberano
   ]);
 
   function loadCountries() {
@@ -196,10 +198,10 @@
     return best;
   }
 
-  // Centroide (ponderado por área, no promedio simple de vértices) del
-  // anillo principal — ver mainRing().
-  function computeCentroid(geometry) {
-    const ring = mainRing(geometry);
+  // Centroide (ponderado por área, no promedio simple de vértices) de UN
+  // anillo — usado tanto por computeCentroid (anillo principal) como por
+  // borderPoints (cada anillo de un MultiPolygon, ver más abajo).
+  function centroidOfRing(ring) {
     let cx = 0, cy = 0, a = 0;
     for (let i = 0; i < ring.length - 1; i++) {
       const [x1, y1] = ring[i], [x2, y2] = ring[i + 1];
@@ -217,6 +219,9 @@
     }
     return [cx / (6 * a), cy / (6 * a)];
   }
+  function computeCentroid(geometry) {
+    return centroidOfRing(mainRing(geometry));
+  }
 
   // Puntos de frontera para el cálculo de distancia (no para el dibujo, que
   // usa la geometría completa). Con el mapa de mayor detalle (Natural Earth
@@ -230,13 +235,37 @@
   // realmente se tocan podía caer justo entre dos muestras y la distancia
   // mínima detectada terminaba dando "8km" o "2km" en vez de 0.
   const MAX_BORDER_PTS = 300;
-  // Solo el territorio PRINCIPAL (mismo criterio que mainRing/centroide) —
-  // los exclaves/islas lejanas (ej. Alaska/Hawaii de EE.UU., territorios de
-  // ultramar) quedaban contando para la distancia mínima, y por estar tan
-  // lejos del "país real" daban falsos "muy cerca"/confundían mucho la
-  // pista de a qué país se está más cerca.
+  // Antes esto usaba SOLO el anillo principal (mainRing, el de mayor área) —
+  // pensado para descartar exclaves genuinamente lejanos (Alaska/Hawaii de
+  // EE.UU. respecto al resto de EE.UU. continental, Guyana Francesa respecto
+  // a Francia europea), que daban falsos "muy cerca" y confundían la pista.
+  // Pero ese mismo criterio rompía países archipiélago donde NINGUNA isla
+  // es un "exclave": Indonesia (Kalimantan, la isla más grande, quedaba como
+  // única frontera) medía su distancia a Timor Oriental usando SOLO
+  // Kalimantan en vez de también la mitad indonesia de la isla de Timor —
+  // ~1500km en vez de los ~0km reales de una frontera terrestre compartida
+  // (el "Timor Oriental limita con Indonesia y dice 1155km" reportado).
+  // CORE_CLUSTER_KM agrupa como "territorio núcleo" cualquier anillo cuyo
+  // centroide esté a esta distancia o menos del anillo principal — cubre de
+  // sobra un archipiélago real (Kalimantan-Timor ~1500km, Kalimantan-Papúa
+  // ~2700km) sin llegar a los exclaves de verdad (Hawaii-EEUU continental
+  // ~6000km centroide a centroide, Guyana Francesa-Francia bastante más).
+  const CORE_CLUSTER_KM = 3000;
   function borderPoints(geometry) {
-    const all = mainRing(geometry);
+    const polyList = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates;
+    const rings = polyList.map(p => p[0]);
+    if (rings.length === 1) return _downsampleBorder(rings[0]);
+    const main = mainRing(geometry);
+    const mainCentroid = centroidOfRing(main);
+    let all = [];
+    rings.forEach(ring => {
+      if (ring === main || haversine(mainCentroid, centroidOfRing(ring)) <= CORE_CLUSTER_KM) {
+        all = all.concat(ring);
+      }
+    });
+    return _downsampleBorder(all);
+  }
+  function _downsampleBorder(all) {
     if (all.length <= MAX_BORDER_PTS) return all;
     const step = all.length / MAX_BORDER_PTS;
     const out = [];
@@ -739,14 +768,35 @@
   ];
   let gqCountdownTimeout = null, gqCountdownAborted = false;
   let gqEndgameTimeout = null;
-  function runGqPregameCountdown(onDone) {
+  // elapsedMs (opcional): cuánto del 3-2-1 ya pasó de otro lado — lo usa el
+  // espectador (ver globequizSpectatorShowPregame) para arrancar en el número
+  // que corresponde en vez de siempre desde "3", si se conecta a mitad de la
+  // cuenta. Mismo patrón que runPregameCountdown en monuments.js/cities.
+  // _specReportPregame vive en el CALL SITE (initGlobeQuiz), no acá adentro —
+  // solo el jugador real debe transmitir el arranque del 3-2-1; el espectador
+  // llama a esta misma función para MOSTRARLO, nunca para reportarlo de nuevo.
+  function runGqPregameCountdown(onDone, elapsedMs) {
     const wrap = document.getElementById('gq-pregame-countdown');
     const img = document.getElementById('gq-pregame-countdown-img');
     if (!wrap || !img) { onDone(); return; }
     gqCountdownAborted = false;
     wrap.style.display = 'flex';
-    if (typeof sfxCountdown !== 'undefined') { sfxCountdown.currentTime = 0; sfxCountdown.play().catch(() => {}); }
     let step = 0;
+    let firstStepRemaining = null;
+    if (elapsedMs > 0) {
+      let acc = 0;
+      for (let i = 0; i < GQ_COUNTDOWN_STEPS.length; i++) {
+        const stepEnd = acc + GQ_COUNTDOWN_STEPS[i].hold;
+        if (elapsedMs < stepEnd) { step = i; firstStepRemaining = stepEnd - elapsedMs; break; }
+        acc = stepEnd;
+        step = i + 1;
+      }
+      if (step >= GQ_COUNTDOWN_STEPS.length) { wrap.style.display = 'none'; onDone(); return; }
+    }
+    if (typeof sfxCountdown !== 'undefined') {
+      sfxCountdown.currentTime = elapsedMs > 0 ? elapsedMs / 1000 : 0;
+      sfxCountdown.play().catch(() => {});
+    }
     function showStep() {
       if (gqCountdownAborted) return; // se salió con power a mitad del 3-2-1
       if (step >= GQ_COUNTDOWN_STEPS.length) {
@@ -754,15 +804,16 @@
         onDone();
         return;
       }
-      const s = GQ_COUNTDOWN_STEPS[step];
+      const s = GQ_COUNTDOWN_STEPS[step++];
+      const thisHold = firstStepRemaining != null ? firstStepRemaining : s.hold;
+      firstStepRemaining = null;
       img.style.width = s.size + 'cqmin';
       img.style.height = s.size + 'cqmin';
       img.src = s.src;
       img.classList.remove('gq-pop');
       void img.offsetWidth; // reinicia la animación en cada paso
       img.classList.add('gq-pop');
-      step++;
-      gqCountdownTimeout = setTimeout(showStep, s.hold);
+      gqCountdownTimeout = setTimeout(showStep, thisHold);
     }
     showStep();
   }
@@ -1227,6 +1278,18 @@
 
   function saveState() { /* sin persistencia por ahora */ }
 
+  // Elige el país objetivo de ESTA partida al azar — antes salía de un hash
+  // determinístico de la fecha (mismo país para todos, todo el día), pero eso
+  // significaba que volver a jugar de nuevo el mismo día te tocaba SIEMPRE el
+  // mismo país (el "no se mantiene igual" reportado): cada partida nueva
+  // tiene que sortear el suyo, independiente por jugador. La racha
+  // (updateStreak/dateKey) no depende de esto — solo mira si ya jugaste HOY,
+  // sin importar qué país te tocó — así que sigue funcionando igual. El
+  // espectador tampoco necesita saber el país por adelantado: cada guess ya
+  // le llega con la distancia/dirección YA calculada por el jugador real (ver
+  // submitGuess), y el país en sí recién se transmite al ganar/terminar
+  // (_specReportAnswer win / _specReportPostgame) — nada de esto dependía de
+  // que el país fuera predecible por fecha.
   function pickDailyCountry() {
     const idx = Math.floor(Math.random() * countries.length);
     dailyCountry = countries[idx];
@@ -1371,10 +1434,22 @@
   // Formato ISO con ceros (YYYY-MM-DD) — tiene que calzar exacto con el
   // formato que devuelve la columna `date` de Postgres (gq_streak_last_date),
   // si no la comparación nunca matchea después de recargar la página.
+  //
+  // OJO: antes esto leía d.getFullYear()/getMonth()/getDate() — los campos
+  // LOCALES del navegador de cada jugador. Con eso, "el día" (y por lo tanto
+  // el país del día, ver pickDailyCountry) cambiaba en momentos distintos según
+  // la zona horaria de cada uno (alguien en Argentina veía el país nuevo horas
+  // antes que alguien en España, por ejemplo) — el reportado: el reseteo tiene
+  // que ser el MISMO instante para todo el mundo, a medianoche hora de Nueva
+  // York (America/New_York, DST-aware — EDT en verano/EST en invierno, como
+  // corresponde a "medianoche en NYC" durante todo el año). d sigue siendo un
+  // instante absoluto (epoch ms) — el "-1 día" de gqStreakAlive/updateStreak
+  // (yesterday.setDate(...)) sigue funcionando igual, solo cambia en qué
+  // huso horario se lee el resultado.
   function dateKey(d) {
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return d.getFullYear() + '-' + m + '-' + day;
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(d);
   }
   // Devuelve { streak, isNewDay } — isNewDay=false cuando hoy ya se había
   // contado (ganar dos veces el mismo día no reotorga XP/monedas, ver
@@ -1658,16 +1733,48 @@
       showWin();
       updateHint();
       focusOnCountry(country);
+      if (typeof window._specReportAnswer === 'function') {
+        window._specReportAnswer(true, guesses.length + 1, {
+          win: true, countryName: dailyCountry.name, iso2: dailyCountry.iso2, elapsedMs: gqFinalElapsedMs,
+        });
+      }
       gqEndgameTimeout = setTimeout(() => {
         gqEndgameTimeout = null;
         showEndgameModal();
+        if (typeof window._specReportPostgame === 'function') {
+          window._specReportPostgame({
+            countryName: dailyCountry.name, iso2: dailyCountry.iso2, elapsedMs: gqFinalElapsedMs, guessCount: guesses.length,
+          });
+        }
         if (typeof playMusic === 'function' && typeof sfxPostgame !== 'undefined') playMusic(sfxPostgame);
+        // Antes is_playing seguía en true (y con eso el "ojo" de espectar
+        // seguía ofreciéndose en la lista de amigos) hasta que el jugador
+        // tocaba "confirmar" en este mismo modal para volver al menú — podía
+        // quedarse mirando el resultado un buen rato sin apurarse, todo ese
+        // tiempo "especteable" de mentira (el reportado: "todavía deja ser
+        // espectado" con el panel de fin de juego ya puesto). Acá, apenas
+        // aparece el modal, ya no hay nada más que ver — se corta acá, no hay
+        // que esperar al click de "confirmar". _setPlaying(false) además para
+        // el canal de SoloSpectate, así que a quien YA estaba espectando esto
+        // lo desconecta por el mismo camino genérico que usa cualquier otro
+        // modo cuando el jugador real se va ("dejó de jugar").
+        if (typeof window._setPlaying === 'function') window._setPlaying(false);
       }, 2000);
       return;
     }
     const km = minBorderDistance(country, dailyCountry);
     const dir = bearingArrow(bearing(country.centroid, dailyCountry.centroid));
-    guesses.push({ name: country.name, km, dir, color: distColor(km) });
+    const g = { name: country.name, km, dir, color: distColor(km) };
+    guesses.push(g);
+    if (typeof window._specReportAnswer === 'function') {
+      window._specReportAnswer(false, guesses.length, { name: g.name, km: g.km, dir: g.dir, color: g.color });
+    }
+    // Lista completa (no solo este guess) para que alguien que se une a
+    // mitad de partida la reciba entera al conectarse — ver reportGqGuesses/
+    // globequizSpectatorSyncGuesses. _specReportAnswer de arriba es la ruta
+    // EN VIVO (con sonido/animación) para quien ya está mirando; esta es solo
+    // el snapshot que se cachea para el resend.
+    if (typeof window._specReportGqGuesses === 'function') window._specReportGqGuesses(guesses.slice());
     saveState();
     drawTexture();
     renderGuessList();
@@ -1772,10 +1879,21 @@
   }
   // Countdown grande: solo segundos enteros, un tick por segundo.
   function updateTimerDisplay() {
-    const wholeSec = Math.floor((Date.now() - gqTimerStart) / 1000);
+    const elapsedMs = Date.now() - gqTimerStart;
+    const wholeSec = Math.floor(elapsedMs / 1000);
     const el = document.getElementById('gq-timer-number');
     if (el) el.textContent = String(wholeSec);
     pulseCountdown();
+    // GlobeQuiz no tiene 'tick' de cuenta regresiva real (el cronómetro cuenta
+    // ARRIBA sin límite), pero el watchdog de inactividad del espectador
+    // (_resetIdleWatchdog en spectate.js) necesita ALGO 1x/seg que confirme
+    // que el jugador sigue en la ronda incluso si tarda mucho en tipear un
+    // guess — sin esto, a los 3.5s sin ningún guess el espectador mostraba
+    // "está en otra parte del juego" con el jugador todavía pensando en la
+    // MISMA ronda (el reportado). onTick del lado espectador no usa este
+    // valor para nada más (GlobeQuiz no tiene fns.updateTimer), solo lo usa
+    // como heartbeat.
+    if (typeof window._specReportTick === 'function') window._specReportTick(elapsedMs);
   }
   // Card del leaderboard: formato "S:CC" (segundos:centésimas — a 1 segundo
   // exacto muestra "1:00"). Va en un intervalo aparte y mucho más frecuente
@@ -1952,18 +2070,15 @@
   window.initGlobeQuiz = function () {
     const wireOnce = !initialized;
     fillPlayerCard();
-    // Marca is_playing para que amigos/grupos vean "Jugando" igual que en
-    // el resto de los modos — pero con is_practicing=true así el ojo de
-    // espectar queda oculto (mismo mecanismo que el modo práctica; ver
-    // shouldShowEye en monuments.js). GlobeQuiz no tiene UI de espectador
-    // real, no se puede espectar acá.
-    window._isPlaying = true;
-    if (window._sbUserId && typeof window.sbSetPlaying === 'function') {
-      window.sbSetPlaying(window._sbUserId, true, true).catch(() => {});
-    }
-    if (window._sbUserId && typeof window.sbSetPlayingMode === 'function') {
-      window.sbSetPlayingMode(window._sbUserId, 'GlobeQuiz').catch(() => {});
-    }
+    // Marca is_playing para que amigos/grupos vean "Jugando" (window._setPlaying
+    // es el helper genérico de monuments.js: además prende el canal
+    // SoloSpectate para que un amigo pueda mirar, igual que el resto de los
+    // modos — ver panel espectador en spectate.js/REAL_UI_MODES.globequiz).
+    window.pendingGameMode = 'globequiz';
+    window._setPlaying(true);
+    Promise.resolve().then(() => {
+      if (typeof window._specReportSplash === 'function') window._specReportSplash({ mode: 'globequiz' });
+    });
     // Se corta la música del menú apenas se entra (no hay que esperar a que
     // termine el 3-2-1-GO para esto, solo gamemusic espera al onDone).
     // playMusic(null) en vez de pausar el <audio> a mano — en iOS el sonido
@@ -2042,6 +2157,13 @@
       restoreUIState();
       fitCanvas();
       if (spinner) spinner.style.display = 'none';
+      // Reporta el arranque del 3-2-1 para que el espectador lo mire en vivo
+      // (ver globequizSpectatorShowPregame) — antes vivía DENTRO de
+      // runGqPregameCountdown, que ahora también la llama el espectador para
+      // MOSTRAR la cuenta, no para volver a transmitirla.
+      if (typeof window._specReportPregame === 'function') {
+        window._specReportPregame({ mode: 'globequiz', startedAt: Date.now() });
+      }
       // Música recién arranca cuando termina el 3-2-1-GO, igual que en el
       // resto de los modos (ver runPregameCountdown en monuments.js).
       runGqPregameCountdown(() => {
@@ -2050,6 +2172,12 @@
         if (canvasEl) canvasEl.style.pointerEvents = '';
         if (typeof playMusic === 'function' && typeof sfxGameMusic !== 'undefined') playMusic(sfxGameMusic);
         startTimer();
+        // Un solo "round" por sesión (no hay rondas repetidas) — nunca se
+        // manda el país objetivo, solo cuándo arrancó el cronómetro, para
+        // que el espectador no vea la respuesta antes que el jugador.
+        if (typeof window._specReportRound === 'function') {
+          window._specReportRound({ mode: 'globequiz', startedAt: gqTimerStart });
+        }
       });
     }).catch(err => {
       console.error('GlobeQuiz init failed', err);
@@ -2078,5 +2206,368 @@
         hintEl.textContent = t(isWebglDisabled ? 'globequiz.loadErrorWebgl' : 'globequiz.loadError');
       }
     });
+  };
+
+  // ── ESPECTADOR ─────────────────────────────────────────────────────────────
+  // Reusa el MISMO #globequiz-screen/gq-panel/gq-guess-list/gq-win-msg/globo
+  // 3D que ve el jugador real (mismo patrón que flags/shapes/monuments — ver
+  // REAL_UI_MODES.globequiz en spectate.js). A diferencia del resto de este
+  // archivo, acá NO hay un estado de juego propio separado: el espectador
+  // escribe directamente en las mismas variables de módulo que usa el
+  // jugador real (guesses/solved/dailyCountry) y llama a las MISMAS funciones
+  // de dibujo (drawTexture/focusOnCountry/renderGuessList/updateHint/showWin)
+  // — nunca hay una partida real Y una sesión de espectador activas a la vez
+  // en la misma pestaña, así que no hay conflicto posible por compartir el
+  // estado. Esto es justo lo que permite mostrar el globo (con los mismos
+  // países pintados/contorneados y el mismo drag/zoom/click-para-enfocar que
+  // ya trae initThreeScene(), gratis) en vez de reimplementar un renderer
+  // aparte. countryByName/normalize/formatGqCardTime también son las mismas
+  // funciones/mapas de arriba en este archivo, no una copia.
+  let _gqSpecTimerInterval = null;
+  let _gqSpecCardInterval = null;
+  let _gqSpecStartedAt = 0;
+
+  function _gqSpecResetPanel() {
+    if (_gqSpecCardInterval) { clearInterval(_gqSpecCardInterval); _gqSpecCardInterval = null; }
+    const win = document.getElementById('gq-win-msg');
+    if (win) { win.style.display = 'none'; win.innerHTML = ''; }
+    const banner = document.getElementById('gq-spec-postgame-banner');
+    if (banner) banner.style.display = 'none';
+    // Segundos enteros, igual que el cronómetro grande del jugador real
+    // (updateTimerDisplay/String(wholeSec)) — nunca "M:SS"/"S:CC" (ese formato
+    // es solo de la carta chica, formatGqCardTime).
+    const timerEl = document.getElementById('gq-timer-number');
+    if (timerEl) timerEl.textContent = '0';
+    const cardTimeEl = document.getElementById('gq-lb-player-time');
+    if (cardTimeEl) cardTimeEl.textContent = '0:00';
+    // Mismo reset que loadState() del jugador real (guesses/solved) más
+    // dailyCountry en null — el espectador nunca lo sabe hasta que gane (ver
+    // globequizSpectatorResolvePick), así que drawTexture()/updateOutlines()
+    // tienen que arrancar SIN él (su guard `if (solved)` ya contempla esto).
+    guesses = [];
+    solved = false;
+    animatedGuessNames = new Set();
+    dailyCountry = null;
+    if (sphere) {
+      sphere.rotation.x = BASE_ROT_X; sphere.rotation.y = BASE_ROT_Y;
+      zoomZ = BASE_Z;
+      if (camera) camera.position.z = zoomZ;
+      updateSpaceVignette();
+    }
+    // No-ops seguros si el globo todavía no terminó de cargar (ver guards
+    // propios de cada función) — se recuperan solos apenas initThreeScene()
+    // resuelva, en globequizSpectatorEnter. updateHint() (el texto de "más
+    // caliente/frío") queda afuera a propósito — el espectador no lo muestra
+    // (.gq-hint sigue oculto, ver globequizSpectatorEnter).
+    drawTexture();
+    renderGuessList();
+    startAutoRotate();
+  }
+
+  // Carta única del amigo espectado, reusando el mismo #gq-lb-player que en
+  // partida real muestra al propio jugador (fillPlayerCard) — mismo patrón
+  // que citiesSpectatorSetPlayerCard/monumentsSpectatorSetPlayerCard. GlobeQuiz
+  // no tiene puntaje tradicional ni rival (siempre solo), así que score/
+  // oppName/oppAvatar/oppScore llegan pero se ignoran a propósito — se
+  // mantienen en la firma solo porque _updateMiniScores (spectate.js) llama a
+  // TODOS los fns.setPlayerCard con los mismos 8 argumentos posicionales.
+  window.globequizSpectatorSetPlayerCard = function (name, avatar, score, oppName, oppAvatar, oppScore, cardCode) {
+    const playerEl = document.getElementById('gq-lb-player');
+    if (!playerEl) return;
+    const nameEl = document.getElementById('gq-lb-player-name');
+    if (nameEl) nameEl.textContent = name || 'Jugador';
+    const avatarEl = document.getElementById('gq-lb-player-avatar');
+    if (avatarEl) avatarEl.src = avatar || 'images/profilepic/ppdefault.png';
+    if (window.CustomizeAssets) window.CustomizeAssets.applyCard(playerEl, cardCode || '0001');
+    // #gq-lb-player trae `top: 0` de CSS (ver style.css) pensado como punto de
+    // partida para que positionGqLeaderboard() lo reubique en cada tick de
+    // partida real — acá esa función nunca corre (no hay "amigos de hoy" que
+    // espectear, es SIEMPRE una sola carta), así que sin esto la carta se
+    // quedaba pegada arriba de la ventana de 4 filas en vez de anclada abajo
+    // como le corresponde a un jugador solo (mismo criterio de anclaje-abajo
+    // que positionGqLeaderboard, el "no sale alineada" reportado).
+    playerEl.style.top = ((GQ_LB_WINDOW - 1) * GQ_LB_ROW_H_CQMIN) + 'cqmin';
+  };
+
+  window.globequizSpectatorEnter = function () {
+    window._isSpectating = true;
+    window.pendingGameMode = 'globequiz';
+    if (typeof loadCountries === 'function') loadCountries().catch(() => {});
+    // sfxBonus (y el resto de sfxPin/sfxError/etc.) se instancian recién acá
+    // (ver loadGameSFX) — initGlobeQuiz() del jugador real ya lo llama, pero
+    // el espectador nunca pasa por ahí. Si esta pestaña nunca jugó una
+    // partida real antes de espectar, sfxBonus quedaba `undefined` toda la
+    // sesión y el guard `typeof sfxBonus !== 'undefined'` de
+    // globequizSpectatorResolvePick lo saltaba en silencio (el "no le suena
+    // bonus.mp3" reportado).
+    if (typeof loadGameSFX === 'function') loadGameSFX();
+    const ls = document.getElementById('loading-screen');
+    if (ls) ls.style.display = 'none';
+    const screenEl = document.getElementById('globequiz-screen');
+    if (screenEl) screenEl.style.display = '';
+    // Ocultar todo lo que requiere ESCRIBIR/actuar como jugador: input de
+    // guess, power/quit real (el cierre del espectador usa #ingame-power —
+    // ver refreshIngamePower en monuments.js, ahora incluye #globequiz-screen
+    // en modo espectador — no este popup, aunque este power SÍ dispara la
+    // salida real de GlobeQuiz vía _setPlaying(false) para el jugador de
+    // verdad), y el hint de "más caliente/frío" (.gq-hint, información de la
+    // que el espectador no participa). El globo 3D (.gq-globe-wrap) SÍ se
+    // ve — ver el bloque de abajo que lo carga.
+    const powerBtn2 = document.getElementById('gq-power-btn');
+    if (powerBtn2) powerBtn2.style.display = 'none';
+    // .gq-friends-bar (con #gq-lb-player adentro) NO se oculta acá a
+    // propósito, a diferencia del resto — es lo que globequizSpectatorSetPlayerCard
+    // reusa para mostrar la carta (foto/nombre/marco) del amigo espectado, ver
+    // esa función más abajo. Sí se limpian las filas de OTROS amigos que
+    // buildGqFriendRows pudiera haber dejado de una partida real previa en
+    // esta misma pestaña (antes de pasar a espectar) — acá solo corresponde
+    // la única carta del amigo espectado.
+    const friendsBar2 = document.getElementById('gq-friends-bar');
+    if (friendsBar2) friendsBar2.querySelectorAll('.lb-entry[data-gq-friend]').forEach(el => el.remove());
+    const guessRow2 = document.querySelector('.gq-guess-row');
+    if (guessRow2) guessRow2.style.display = 'none';
+    const hintEl4 = document.querySelector('.gq-hint');
+    if (hintEl4) hintEl4.style.display = 'none';
+    if (typeof window.refreshIngamePower === 'function') window.refreshIngamePower();
+    _gqSpecResetPanel();
+    // Antes el espectador nunca llamaba loadThree()/initThreeScene() a
+    // propósito ("v1 sin globo"). Ahora reusa EXACTAMENTE el mismo globo que
+    // ve el jugador real — mismo canvas/renderer/sphere (initialized evita
+    // reinicializar si esta pestaña ya jugó una partida real antes), así que
+    // drag/zoom/click-para-enfocar (ya cableados en initThreeScene, sin tocar
+    // estado de juego) funcionan gratis para quien mira.
+    Promise.all([loadThree(), loadCountries()]).then(() => {
+      if (!initialized) {
+        initThreeScene();
+        initialized = true;
+        // Recién ahora existe `sphere` — _gqSpecResetPanel() de arriba corrió
+        // antes de que este Promise resolviera y su reset de rotación/zoom
+        // quedó no-opeado (guard `if (sphere)`). guesses/solved/dailyCountry
+        // en cambio pueden haber cambiado YA (llegó un guess real mientras
+        // cargaba three.js desde el CDN) — NO se puede volver a llamar
+        // _gqSpecResetPanel() acá, pisaría esos datos con un reset a cero.
+        sphere.rotation.x = BASE_ROT_X; sphere.rotation.y = BASE_ROT_Y;
+        zoomZ = BASE_Z;
+        camera.position.z = zoomZ;
+        updateSpaceVignette();
+      }
+      // Repinta con lo que YA haya en guesses/solved/dailyCountry (mismo
+      // patrón que restoreUIState(), pero sin el guard de `initialized` que
+      // tiene esa función, y sin updateHint() — el espectador no muestra el
+      // hint) — cubre tanto el primer guess que haya llegado durante la
+      // carga como el caso normal de entrar sin nada todavía.
+      drawTexture();
+      renderGuessList();
+      if (solved) showWin();
+      fitCanvas();
+      // Sin esto el spinner (visible por CSS hasta que JS lo apaga, ver
+      // initGlobeQuiz) se quedaba girando para siempre encima del globo ya
+      // cargado — nada más lo ocultaba en el camino del espectador.
+      const spinner = document.getElementById('gq-loading-spinner');
+      if (spinner) spinner.style.display = 'none';
+      // startAutoRotate() de _gqSpecResetPanel() (más arriba, síncrono, antes
+      // de que este Promise resolviera) arranca su propio rAF loop pero ese
+      // loop se corta solo en el primer frame si `sphere` todavía no existe
+      // (ver el guard `if (!sphere) return` adentro, que no se auto-programa
+      // de nuevo) — sin este segundo llamado acá, el globo se quedaba
+      // congelado para siempre si three.js tardaba en cargar. Si ya llegó
+      // algún guess mientras tanto, NO hay que reactivarlo (submitGuess del
+      // jugador real tampoco lo hace pasado el primer guess).
+      if (guesses.length === 0 && !solved) startAutoRotate();
+    }).catch(() => {
+      // three.js no pudo cargar (WebGL bloqueado/deshabilitado, mismo caso
+      // que ve el jugador real) — el espectador se queda con la lista/carta
+      // igual, pero sin esto el spinner seguía girando encima de un globo
+      // que nunca iba a llegar.
+      const spinner = document.getElementById('gq-loading-spinner');
+      if (spinner) spinner.style.display = 'none';
+    });
+  };
+
+  window.globequizSpectatorExit = function (switchingMode) {
+    if (!switchingMode) window._isSpectating = false;
+    if (_gqSpecTimerInterval) { clearInterval(_gqSpecTimerInterval); _gqSpecTimerInterval = null; }
+    if (_gqSpecCardInterval) { clearInterval(_gqSpecCardInterval); _gqSpecCardInterval = null; }
+    // El globo ahora corre de verdad para el espectador (rotación automática
+    // + inercia al soltar, ver initThreeScene) — sin cortarlas acá quedaban
+    // vivas de fondo (rAF loop) con la pantalla ya oculta, exactamente el
+    // patrón de "GPU siempre activa aunque no se vea nada" que ya causó
+    // crashes de memoria en iOS en otras partes de este proyecto.
+    stopAutoRotate();
+    stopInertia();
+    // Corta el 3-2-1-GO mirror en seco (timeout pendiente + sfxCountdown) si
+    // el espectador cierra la sesión a mitad de camino — mismo motivo que
+    // abortGqPregameCountdown ya cubre para el jugador real saliendo con power.
+    abortGqPregameCountdown();
+    const screenEl = document.getElementById('globequiz-screen');
+    if (screenEl) screenEl.style.display = 'none';
+    // Restaurar lo que se ocultó en Enter — si esta misma pestaña después
+    // arranca una partida REAL de GlobeQuiz, initGlobeQuiz() espera estos
+    // elementos en su estado normal.
+    const powerBtn = document.getElementById('gq-power-btn');
+    if (powerBtn) powerBtn.style.display = '';
+    const friendsBar = document.querySelector('.gq-friends-bar');
+    if (friendsBar) friendsBar.style.display = '';
+    const guessRow = document.querySelector('.gq-guess-row');
+    if (guessRow) guessRow.style.display = '';
+    const hintEl = document.querySelector('.gq-hint');
+    if (hintEl) hintEl.style.display = '';
+    if (typeof window.refreshIngamePower === 'function') window.refreshIngamePower();
+    if (!switchingMode) {
+      const ls = document.getElementById('loading-screen');
+      if (ls) ls.style.display = 'flex';
+    }
+  };
+
+  window.globequizSpectatorShowPregame = function (payload) {
+    if (_gqSpecTimerInterval) { clearInterval(_gqSpecTimerInterval); _gqSpecTimerInterval = null; }
+    _gqSpecResetPanel();
+    // El jugador real corta la música del menú apenas entra y se queda en
+    // silencio durante todo el 3-2-1 (ver initGlobeQuiz, playMusic(null) antes
+    // de runGqPregameCountdown) — acá antes no se tocaba nada de audio en
+    // ningún punto del espectador GlobeQuiz (el "no se transfiere la
+    // música/sfx" reportado).
+    if (typeof playMusic === 'function') playMusic(null);
+    // Mismo 3-2-1-GO visual (imágenes/pop) + sfxCountdown que ve/oye el
+    // jugador real (runGqPregameCountdown, ahora reusable con elapsedMs) — el
+    // "falta el 3 2 1 GO con el sfx coordinado" reportado. payload.startedAt
+    // es el mismo instante en que el jugador real arrancó SU cuenta (ver
+    // _specReportPregame en initGlobeQuiz) — si el espectador se conecta a
+    // mitad de camino, arranca en el número que corresponde en vez de
+    // siempre desde "3" (mismo criterio que citiesSpectatorShowPregame).
+    let elapsedMs = (payload && typeof payload.startedAt === 'number') ? Date.now() - payload.startedAt : 0;
+    if (elapsedMs < 0) elapsedMs = 0;
+    runGqPregameCountdown(() => {}, elapsedMs);
+  };
+
+  // Un solo "round" por sesión — arranca el cronómetro local desde
+  // payload.startedAt (mismo instante en que el jugador real vio terminar
+  // su 3-2-1-GO), sin necesitar ticks por segundo del broadcaster.
+  window.globequizSpectatorShowRound = function (payload) {
+    // La ronda es la señal de que el 3-2-1-GO ya terminó del lado real — por
+    // las dudas de que llegue mientras el mirror local (globequizSpectatorShowPregame)
+    // todavía sigue animando (latencia de red), se corta acá para no dejarlo
+    // pegado en pantalla tapando el globo.
+    abortGqPregameCountdown();
+    _gqSpecResetPanel();
+    _gqSpecStartedAt = (payload && typeof payload.startedAt === 'number') ? payload.startedAt : Date.now();
+    if (_gqSpecTimerInterval) clearInterval(_gqSpecTimerInterval);
+    // #gq-timer-number es el cronómetro GRANDE — el jugador real lo pinta con
+    // updateTimerDisplay() como segundos enteros (String(wholeSec)), nunca
+    // "S:CC" (eso es solo el formato de la carta chica del leaderboard,
+    // formatGqCardTime). Usar formatGqCardTime acá mostraba algo como
+    // "142:15" en vez de "142" (el reportado).
+    const tick = () => {
+      const elapsedMs = Math.max(0, Date.now() - _gqSpecStartedAt);
+      const el = document.getElementById('gq-timer-number');
+      if (el) el.textContent = String(Math.floor(elapsedMs / 1000));
+    };
+    tick();
+    _gqSpecTimerInterval = setInterval(tick, 1000);
+    // Carta chica (#gq-lb-player-time, formato "S:CC"): el jugador real la
+    // corre en SU PROPIO intervalo de 30ms (gqCardInterval), separado del
+    // cronómetro grande de 1s — así se ve correr de verdad en centésimas en
+    // vez de saltar de a un segundo entero. Va en su propio interval acá
+    // también (no adentro de `tick`, que solo corre 1x/seg) para que se
+    // comporte IGUAL que en el jugador normal.
+    if (_gqSpecCardInterval) clearInterval(_gqSpecCardInterval);
+    const cardTick = () => {
+      const cardTimeEl = document.getElementById('gq-lb-player-time');
+      if (cardTimeEl && typeof formatGqCardTime === 'function') {
+        cardTimeEl.textContent = formatGqCardTime(Math.max(0, Date.now() - _gqSpecStartedAt));
+      }
+    };
+    cardTick();
+    _gqSpecCardInterval = setInterval(cardTick, 30);
+    // El gameloop real arranca recién al terminar el 3-2-1-GO (onDone de
+    // runGqPregameCountdown, línea ~2087) — este 'round' es justo esa señal
+    // (un solo round por sesión, siempre después del pregame), así que acá es
+    // el momento correcto para prenderlo. playMusic no reinicia el loop si el
+    // mismo track ya está sonando (ver playMusicHTML), así que no rompe nada
+    // si esto se repite (resend de 'round' al reconectar).
+    if (typeof playMusic === 'function' && typeof sfxGameMusic !== 'undefined') playMusic(sfxGameMusic);
+  };
+
+  // payload.win=true en el guess ganador (nunca se manda el país objetivo
+  // ANTES de este momento — ver _specReportRound sin countryName). El resto
+  // de los guesses sí traen el país que el amigo tipeó (no es spoiler del
+  // objetivo, es lo que hace interesante mirar la lista en vivo).
+  window.globequizSpectatorResolvePick = function (payload) {
+    if (!payload) return;
+    // El jugador real toca sfxCheck en CADA submit (click en confirmar/Enter,
+    // ver playCheckSfx en initGlobeQuiz) — no solo en el acierto final.
+    if (typeof sfxCheck !== 'undefined' && typeof sfxPlay === 'function') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+    // Mismo momento que submitGuess() del jugador real: cualquier guess (gane
+    // o no) corta la rotación automática del globo.
+    stopAutoRotate();
+    if (payload.win) {
+      if (_gqSpecTimerInterval) { clearInterval(_gqSpecTimerInterval); _gqSpecTimerInterval = null; }
+      if (_gqSpecCardInterval) { clearInterval(_gqSpecCardInterval); _gqSpecCardInterval = null; }
+      // Mismo momento que submitGuess() del jugador real: corta el gameloop
+      // (silencio) y suena sfxBonus — sfxPostgame recién entra 2s después,
+      // con el banner de globequizSpectatorShowPostgame.
+      if (typeof playMusic === 'function') playMusic(null);
+      if (typeof sfxBonus !== 'undefined' && typeof sfxPlay === 'function') { sfxBonus.currentTime = 0; sfxPlay(sfxBonus); }
+      const timerEl = document.getElementById('gq-timer-number');
+      if (timerEl) timerEl.textContent = String(Math.floor((payload.elapsedMs || 0) / 1000));
+      // Congela la carta chica en el mismo valor final que el jugador real
+      // (ver gqCardEl.textContent = formatGqCardTime(gqFinalElapsedMs) en
+      // submitGuess) en vez de dejarla en lo último que pintó cardTick.
+      const cardTimeEl = document.getElementById('gq-lb-player-time');
+      if (cardTimeEl && typeof formatGqCardTime === 'function') cardTimeEl.textContent = formatGqCardTime(payload.elapsedMs || 0);
+      // solved/dailyCountry son las MISMAS variables de módulo que usa el
+      // jugador real — con esto seteado, drawTexture()/updateOutlines() ya
+      // pintan el país correcto de verde con su contorno, y showWin() arma
+      // exactamente el mismo mensaje/confeti que ve el propio jugador (antes
+      // esto se rearmaba a mano acá, duplicando ese HTML con un texto
+      // distinto — "correctBadge" en vez del nombre). Sin updateHint() — el
+      // espectador no muestra el hint de "más caliente/frío".
+      solved = true;
+      dailyCountry = countryByName.get(normalize(payload.countryName || ''));
+      if (dailyCountry) {
+        drawTexture();
+        focusOnCountry(dailyCountry);
+        showWin();
+      }
+      return;
+    }
+    const country = countryByName.get(normalize(payload.name || ''));
+    guesses.push({ name: payload.name, km: payload.km, dir: payload.dir, color: payload.color });
+    drawTexture();
+    renderGuessList();
+    if (country) focusOnCountry(country);
+  };
+
+  // Reenvío (no en vivo) de TODOS los guesses ya hechos — llega al unirse a
+  // mitad de partida (ver reportGqGuesses en spectate.js), a diferencia de
+  // globequizSpectatorResolvePick que es la ruta EN VIVO (un guess por vez,
+  // con sfxCheck/foco de cámara). Reemplaza `guesses` entero de un saque y
+  // repinta en silencio — sin esto, alguien que se conectaba a mitad de
+  // partida solo veía los países que el jugador escribiera DE AHÍ EN MÁS, no
+  // los que ya tenía puestos (el reportado).
+  window.globequizSpectatorSyncGuesses = function (list) {
+    if (!Array.isArray(list) || solved) return; // ya ganó — el postgame/win manda, no pisar con una lista vieja
+    guesses = list.slice();
+    if (guesses.length > 0) stopAutoRotate();
+    drawTexture();
+    renderGuessList();
+  };
+
+  window.globequizSpectatorShowPostgame = function (payload) {
+    if (_gqSpecTimerInterval) { clearInterval(_gqSpecTimerInterval); _gqSpecTimerInterval = null; }
+    if (_gqSpecCardInterval) { clearInterval(_gqSpecCardInterval); _gqSpecCardInterval = null; }
+    // El banner de "S:CC · N intentos" (el "36:47 13 intentos" reportado) se
+    // sacó a propósito: la ventana de fin de espectador es de solo unos
+    // segundos ahora (ver window._setPlaying(false) en submitGuess, que
+    // desconecta al espectador poco después de esto vía el mismo mecanismo
+    // genérico de "el jugador dejó de jugar"), así que ya no vale la pena
+    // mostrar un resumen que casi nadie llega a leer. gq-win-msg (armado en
+    // resolvePick) ya deja ver el país acertado, que es lo que importa.
+    if (typeof playMusic === 'function' && typeof sfxPostgame !== 'undefined') playMusic(sfxPostgame);
+  };
+
+  window.globequizSpectatorHidePostgame = function () {
+    const banner = document.getElementById('gq-spec-postgame-banner');
+    if (banner) banner.style.display = 'none';
   };
 })();

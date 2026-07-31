@@ -1692,6 +1692,23 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 }
 .gq-guess-item.correct .gq-guess-dist { color: #ffffff; -webkit-text-stroke: 0.4cqmin #1c6b32; }
 
+/* Espectador GlobeQuiz v1: resumen al terminar (ver globequizSpectatorShowPostgame). */
+#gq-spec-postgame-banner {
+  position: absolute;
+  top: 10%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 215;
+  font-family: 'Dimbo', sans-serif;
+  font-size: 3cqmin;
+  color: #ffffff;
+  -webkit-text-stroke: 0.5cqmin #000000;
+  paint-order: stroke fill;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 /* Etiqueta de versión: abajo al centro del menú de carga */
 #loading-version {
   position: absolute;

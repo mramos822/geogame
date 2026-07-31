@@ -67,6 +67,7 @@ window.SoloSpectate = (() => {
     _lastPostgamePayload = null;
     _lastScore = null;
     _lastDots = null;
+    _lastGqGuesses = null;
     if (typeof window.refreshVsSpectatorBadge === 'function') window.refreshVsSpectatorBadge(0);
   }
 
@@ -91,6 +92,30 @@ window.SoloSpectate = (() => {
   // hasta la PRÓXIMA respuesta correcta del jugador real, en vez de reflejar
   // el progreso YA acumulado desde el vamos.
   let _lastDots = null;
+  // Lista COMPLETA (no solo el último) de guesses ya hechos en GlobeQuiz — a
+  // diferencia de _lastScore/_lastDots (un número resume todo el progreso),
+  // acá cada intento es un país distinto con su propia distancia, y el
+  // espectador necesita verlos TODOS al unirse a mitad de partida, no solo
+  // los que se hagan de ahí en más (el "no le salen los países ya escritos"
+  // reportado). Sin animación/sonido al reenviarse (ver
+  // globequizSpectatorSyncGuesses, separado de globequizSpectatorResolvePick
+  // que sí es la ruta en VIVO) — replicar el sonido de cada intento viejo de
+  // golpe sería un caos. null para cualquier otro modo (nunca la llenan).
+  let _lastGqGuesses = null;
+  // SOLO actualiza el caché, sin transmitir nada — el jugador real llama a
+  // esto en CADA guess (junto con reportAnswer, que sí es el broadcast en
+  // vivo que ya recibe cualquiera que esté mirando). Antes esto también
+  // mandaba su PROPIO broadcast 'gqguesses' en cada guess, así que un
+  // espectador ya conectado recibía la MISMA jugada dos veces (el 'answer'
+  // en vivo + este sync "completo") y terminaba pintando el globo/la lista
+  // DOS veces seguidas por guess — el lag/tirón reportado. Ahora el único
+  // que dispara el broadcast de verdad es _resendStateTo() (unión a mitad de
+  // partida), acá abajo.
+  function updateGqGuessesCache(list) { _lastGqGuesses = list; }
+  function reportGqGuesses(list) {
+    _lastGqGuesses = list;
+    if (_channel) { try { _channel.send({ type: 'broadcast', event: 'gqguesses', payload: { list } }); } catch (e) {} }
+  }
   function reportRound(payload) {
     _lastPhase = 'round';
     _lastRoundPayload = payload;
@@ -173,9 +198,12 @@ window.SoloSpectate = (() => {
     // puntaje ni dots, así que sin esto el marcador y el trencito de
     // puntitos se quedaban en 0 hasta la PRÓXIMA respuesta del jugador real.
     if (_lastScore != null || _lastDots != null) reportScoreSync(_lastScore, _lastDots);
+    // Mismo motivo que arriba pero para GlobeQuiz: reenvía TODOS los guesses
+    // ya hechos, no solo el próximo que llegue en vivo.
+    if (_lastGqGuesses != null) reportGqGuesses(_lastGqGuesses);
   }
 
-  return { start, stop, reportRound, reportAnswer, reportTick, reportTimesUp, reportSplash, reportPregame, reportPostgame, reportAdvancing, isActive: () => _active };
+  return { start, stop, reportRound, reportAnswer, reportTick, reportTimesUp, reportSplash, reportPregame, reportPostgame, reportAdvancing, reportGqGuesses, updateGqGuessesCache, isActive: () => _active };
 })();
 
 // ── DISPATCHER ───────────────────────────────────────────────────────────────
@@ -209,6 +237,18 @@ window._specReportAnswer = function (correct, score, detail) {
   }
   if (!window._vsActive && !window._lobbyActive && window.SoloSpectate && window.SoloSpectate.isActive()) {
     window.SoloSpectate.reportAnswer({ ...(detail || {}), correct, score });
+  }
+};
+// GlobeQuiz-only (siempre solo, nunca VS/lobby) — actualiza el CACHÉ de la
+// lista completa de guesses (para reenviarla si alguien se une a mitad de
+// partida, ver reportGqGuesses/_resendStateTo en SoloSpectate), sin
+// transmitir nada en vivo — el 'answer' normal (_specReportAnswer, llamado
+// junto con esto en cada guess) ya es el broadcast en vivo que ve cualquier
+// espectador ya conectado; duplicar el envío acá hacía que cada guess se
+// pintara DOS veces seguidas del lado del espectador (el lag reportado).
+window._specReportGqGuesses = function (list) {
+  if (!window._vsActive && !window._lobbyActive && window.SoloSpectate && window.SoloSpectate.isActive()) {
+    window.SoloSpectate.updateGqGuessesCache(list);
   }
 };
 window._specReportTick = function (timeLeft) {
@@ -328,6 +368,7 @@ window.Spectate = (() => {
   let _onGameEnd   = null; // cb({role, score}) — SOLO versus: uno de los dos jugadores terminó su cronómetro (ver reportGameEnd en vs.js). Consumido por _enterWaitAsSpectator (vs.js) cuando el jugador que terminó primero mira al rival de prestado — ver comentario largo ahí.
   let _onScoreSync = null; // cb(score) — puntaje ya conocido reenviado a quien se une a mitad de ronda (ver SoloSpectate.reportScoreSync)
   let _onSpectatorCount = null; // cb(n) — cuántos espectadores hay mirando (a este mismo incluido), ver watchSolo
+  let _onGqGuesses = null; // cb(list) — GlobeQuiz: TODOS los guesses ya hechos, reenviados a quien se une a mitad de partida (ver reportGqGuesses)
 
   function _myId() { return window._sbUserId || null; }
 
@@ -475,6 +516,7 @@ window.Spectate = (() => {
       .on('broadcast', { event: 'pregame' }, ({ payload }) => { if (_onPregame) _onPregame(payload); })
       .on('broadcast', { event: 'postgame' }, ({ payload }) => { if (payload && _onPostgame) _onPostgame(payload); })
       .on('broadcast', { event: 'advancing' }, () => { if (_onAdvancing) _onAdvancing(); })
+      .on('broadcast', { event: 'gqguesses' }, ({ payload }) => { if (payload && _onGqGuesses) _onGqGuesses(payload.list); })
       .on('broadcast', { event: 'scoresync' }, ({ payload }) => { if (payload && _onScoreSync) _onScoreSync(payload.score, payload.dots); })
       .on('presence', { event: 'leave' }, ({ key }) => {
         // Único "jugador" posible en este canal es el dueño (userId, sin prefijo
@@ -552,6 +594,7 @@ window.Spectate = (() => {
     onGameEnd:  cb => { _onGameEnd = cb; },
     onScoreSync: cb => { _onScoreSync = cb; },
     onSpectatorCount: cb => { _onSpectatorCount = cb; },
+    onGqGuesses: cb => { _onGqGuesses = cb; },
     getMatch:   () => _match,
     getMatchId: () => _matchId,
     isSolo:     () => _isSolo,
@@ -1668,6 +1711,20 @@ window.GroupSpectate = (() => {
       timesUpEffect: 'monumentsSpectatorTimesUpEffect',
       showPostgame: 'monumentsSpectatorShowPostgame', hidePostgame: 'monumentsSpectatorHidePostgame',
     },
+    // GlobeQuiz v1: sin globo 3D — panel simple (lista de guesses + cronómetro).
+    // Omite a propósito updateTimer/updateScore/wrongEffect/timesUpEffect/
+    // showTimesUp — todos los call-sites de más abajo ya chequean
+    // `typeof window[fns.x] === 'function'` antes de invocar, así que faltar
+    // una key es un no-op seguro. No aplican acá: no hay score numérico
+    // tradicional, ni "wrong" que corte turno, ni límite de tiempo. setPlayerCard
+    // SÍ aplica (identidad del amigo espectado, sin score/rival).
+    globequiz: {
+      enter: 'globequizSpectatorEnter', exit: 'globequizSpectatorExit',
+      showRound: 'globequizSpectatorShowRound', resolvePick: 'globequizSpectatorResolvePick',
+      showPregame: 'globequizSpectatorShowPregame', showPostgame: 'globequizSpectatorShowPostgame',
+      hidePostgame: 'globequizSpectatorHidePostgame',
+      setPlayerCard: 'globequizSpectatorSetPlayerCard',
+    },
   };
 
   function _label(val) {
@@ -2143,6 +2200,26 @@ window.GroupSpectate = (() => {
       if (_usingRealUI) {
         const fns = REAL_UI_MODES[_mode];
         if (fns && typeof window[fns.resolvePick] === 'function') window[fns.resolvePick](payload);
+        // GlobeQuiz no tiene más rondas — payload.win=true es LITERALMENTE el
+        // fin de la partida del amigo (a diferencia de un acierto cualquiera
+        // en flags/shapes/cities/monuments, que solo avanza a la próxima
+        // ronda), así que acá se cierra la sesión sola a los 3s en vez de
+        // esperar a que el amigo, ya de vuelta en el menú, la corte por su
+        // cuenta (el "no se desconecta solo" reportado). window._setPlaying(false)
+        // (ver submitGuess en globequiz.js, 2s después de este mismo acierto)
+        // también termina desconectando por la vía genérica de presence
+        // ("dejó de jugar") si llega primero — este timeout de acá es el que
+        // garantiza el corte a un tiempo fijo y predecible (3s) sin depender
+        // de la latencia real de esa propagación, y con el mensaje correcto
+        // ("terminó la partida", no el genérico de abandono).
+        if (_mode === 'globequiz' && payload && payload.win) {
+          setTimeout(() => {
+            if (_closing) return;
+            const who = _friendName || ((typeof t === 'function') ? t('spectator.defaultPlayer') : 'El jugador');
+            const msg = (typeof t === 'function') ? t('spectator.finished', { name: who }) : `¡${who} terminó la partida!`;
+            _showEndMessage(msg);
+          }, 3000);
+        }
         return;
       }
       highlightPick(payload);
@@ -2298,6 +2375,15 @@ window.GroupSpectate = (() => {
       if (!_usingRealUI) return;
       const fns = REAL_UI_MODES[_mode];
       if (fns && typeof window[fns.showPostgame] === 'function') window[fns.showPostgame](payload);
+    });
+    // Solo GlobeQuiz lo usa (ver reportGqGuesses en SoloSpectate) — lista
+    // COMPLETA de guesses ya hechos, reenviada al unirse a mitad de partida
+    // (el "no le salen los países ya escritos" reportado). Sin animación/
+    // sonido a propósito (globequizSpectatorSyncGuesses, separada de
+    // resolvePick que sí es la ruta en vivo).
+    window.Spectate.onGqGuesses(list => {
+      if (_closing || _mode !== 'globequiz' || !_usingRealUI) return;
+      if (typeof window.globequizSpectatorSyncGuesses === 'function') window.globequizSpectatorSyncGuesses(list);
     });
     // El jugador real confirmó salir del postgame hacia el siguiente modo de
     // la campaña — todavía no hay round/pregame nuevo (puede tardar mientras

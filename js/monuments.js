@@ -812,7 +812,7 @@ window.showGlobalToast = function(msg) {
 // en sb.js) — best-effort a partir del contexto disponible en el momento
 // del microtask (después de que quien llamó a _setPlaying ya terminó de
 // setear pendingGameMode/campaign/_vsActive en su misma función síncrona).
-const _MODE_NAME_LABELS = { flags: 'Banderas', shapes: 'Figuras', game: 'Ciudades', monuments: 'Monumentos' };
+const _MODE_NAME_LABELS = { flags: 'Banderas', shapes: 'Figuras', game: 'Ciudades', monuments: 'Monumentos', globequiz: 'GlobeQuiz' };
 function _computePlayingLabel(isPracticing) {
   const modeName = _MODE_NAME_LABELS[window.pendingGameMode] || null;
   if (window._vsActive) return 'VS' + (modeName ? ' · ' + modeName : '');
@@ -1143,9 +1143,7 @@ document.getElementById('gq-quit-cancel')?.addEventListener('click', () => {
 
 document.getElementById('gq-quit-confirm')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
-  window._isPlaying = false;
-  if (window._sbUserId) window.sbSetPlaying(window._sbUserId, false).catch(() => {});
-  if (window._sbUserId && typeof window.sbSetPlayingMode === 'function') window.sbSetPlayingMode(window._sbUserId, null).catch(() => {});
+  window._setPlaying(false);
   // Cortar TODO lo de GlobeQuiz (timer, rotación automática, música/sfx) —
   // mismo criterio que quitToMenu() para los demás modos.
   if (typeof window.stopGlobeQuizTimer === 'function') window.stopGlobeQuizTimer();
@@ -4776,8 +4774,14 @@ window.quitToMenu = quitToMenu;
     const prepost = isVisible('splash-screen') || isVisible('gameover-screen');
     // score-display / flags-score-display están visibles durante el juego de
     // cualquier modo (shapes agrega sus piezas al body, no usa game-wrapper).
+    // globequiz-screen NUNCA participa de esto para el JUGADOR REAL (tiene su
+    // propio #gq-power-btn) — solo se suma acá cuando _isSpectating, para el
+    // espectador de GlobeQuiz, que no tiene ningún otro back visible (el
+    // "no aparece el botón de back" reportado: #gq-power-btn queda oculto a
+    // propósito para el espectador, ver globequizSpectatorEnter).
+    const gqSpecIngame = window._isSpectating && isVisible('globequiz-screen');
     const ingame  = prepost || isVisible('game-wrapper') || isVisible('flags-wrapper') ||
-                    isVisible('score-display') || isVisible('flags-score-display');
+                    isVisible('score-display') || isVisible('flags-score-display') || gqSpecIngame;
     powerEl.style.display = (ingame && !blocked) ? 'block' : 'none';
     // En pre/postgame va un poco más a la derecha que durante el juego
     powerEl.style.left = prepost ? '82%' : '74%';
@@ -4850,7 +4854,7 @@ window.quitToMenu = quitToMenu;
   const obs = new MutationObserver(refreshIngamePower);
   ['loading-screen','splash-screen','game-wrapper','flags-wrapper',
    'gameover-screen','results-screen','final-screen','score-display',
-   'flags-score-display','vs-result-screen'].forEach(id => {
+   'flags-score-display','vs-result-screen','globequiz-screen'].forEach(id => {
     const el = document.getElementById(id);
     if (el) obs.observe(el, { attributes: true, attributeFilter: ['style'] });
   });
