@@ -660,14 +660,14 @@
       <div class="modal-subtitle">🎮 Partidas <span id="day-modal-games-count"></span></div>
       <div class="table-scroll">
         <table id="tbl-day-modal">
-          <thead><tr><th>Hora</th><th>Jugador</th><th>País</th><th>Modo</th><th>Contexto</th><th style="text-align:right">Score</th></tr></thead>
+          <thead><tr><th>Hora</th><th>Jugador</th><th>País</th><th>Dispositivo</th><th>Modo</th><th>Contexto</th><th style="text-align:right">Score</th></tr></thead>
           <tbody id="day-modal-body"></tbody>
         </table>
       </div>
       <div class="modal-subtitle">👁 Visitantes <span id="day-modal-visits-count"></span></div>
       <div class="table-scroll">
         <table id="tbl-day-modal-visits">
-          <thead><tr><th>Hora</th><th>Cuenta</th><th>País</th></tr></thead>
+          <thead><tr><th>Hora</th><th>Cuenta</th><th>País</th><th>Dispositivo</th></tr></thead>
           <tbody id="day-modal-visits-body"></tbody>
         </table>
       </div>
@@ -1031,8 +1031,10 @@ function eventScoreCell(e){
   }
   return e.score!=null ? e.score.toLocaleString('es') : '—';
 }
-function playerCell(username){
-  return username ? escapeHtml(username) : '<span style="color:var(--dim);font-style:italic">Cuenta no registrada</span>';
+function playerCell(username, guestNameVal){
+  if(username) return escapeHtml(username);
+  if(guestNameVal) return `<span style="font-style:italic">${escapeHtml(guestNameVal)} <span style="color:var(--dim)">(invitado)</span></span>`;
+  return '<span style="color:var(--dim);font-style:italic">Cuenta no registrada</span>';
 }
 function countryCell(cc){
   return cc ? `<span class="flag">${flag(cc)}</span>${countryName(cc)}` : '<span style="color:var(--dim)">—</span>';
@@ -1059,25 +1061,25 @@ function openDayPanel(rawKey, granularity){
 
   const tb = $('day-modal-body');
   if(!events.length){
-    tb.innerHTML = '<tr><td class="empty" colspan="6">Sin partidas registradas en este momento</td></tr>';
+    tb.innerHTML = '<tr><td class="empty" colspan="7">Sin partidas registradas en este momento</td></tr>';
   } else {
     tb.innerHTML = events.map(e=>{
       const hora = new Date(e.created_at).toLocaleTimeString('es', { hour:'2-digit', minute:'2-digit' });
       const modeLabel = e.type === 'campaign' ? '🌍 Gira Mundial' : e.type === 'globequiz' ? '🌎 GlobeQuiz' : (MODE_LABELS[e.mode] || e.mode || '—');
       const modePillClass = e.type === 'campaign' || e.type === 'globequiz' ? 'session-campaign' : (e.mode||'');
       const score = eventScoreCell(e);
-      return `<tr><td>${hora}</td><td>${playerCell(e.username)}</td><td>${countryCell(e.country_code)}</td>` +
+      return `<tr><td>${hora}</td><td>${playerCell(e.username, e.guest_name)}</td><td>${countryCell(e.country_code)}</td><td>${deviceIcon(e.device)}</td>` +
         `<td><span class="mode-pill ${modePillClass}">${modeLabel}</span></td><td>${contextBadge(e)}</td><td class="n">${score}</td></tr>`;
     }).join('');
   }
 
   const vb = $('day-modal-visits-body');
   if(!visits.length){
-    vb.innerHTML = '<tr><td class="empty" colspan="3">Sin visitas registradas en este momento</td></tr>';
+    vb.innerHTML = '<tr><td class="empty" colspan="4">Sin visitas registradas en este momento</td></tr>';
   } else {
     vb.innerHTML = visits.map(v=>{
       const hora = new Date(v.created_at).toLocaleTimeString('es', { hour:'2-digit', minute:'2-digit' });
-      return `<tr><td>${hora}</td><td>${playerCell(v.username)}</td><td>${countryCell(v.country_code)}</td></tr>`;
+      return `<tr><td>${hora}</td><td>${playerCell(v.username, v.guest_name)}</td><td>${countryCell(v.country_code)}</td><td>${deviceIcon(v.device)}</td></tr>`;
     }).join('');
   }
 

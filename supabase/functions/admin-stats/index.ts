@@ -192,13 +192,13 @@ Deno.serve(async (req) => {
       sb.from('profiles')
         .select('id, username, created_at, last_active, play_count, hs_total, vs_wins, vs_losses, is_supporter')
         .gte('created_at', windowISO).limit(50000),
-      sb.from('analytics_events').select('created_at, type, mode, score, user_id, visitor_id, country_code, session_type, guest_name')
+      sb.from('analytics_events').select('created_at, type, mode, score, user_id, visitor_id, country_code, session_type, guest_name, device')
         .in('type', ['game', 'versus']).gte('created_at', windowISO).limit(50000),
-      sb.from('analytics_events').select('created_at, visitor_id, country_code, user_id, guest_name')
+      sb.from('analytics_events').select('created_at, visitor_id, country_code, user_id, guest_name, device')
         .eq('type', 'visit').gte('created_at', windowISO).limit(50000),
-      sb.from('analytics_events').select('created_at, score, user_id, visitor_id, country_code, guest_name')
+      sb.from('analytics_events').select('created_at, score, user_id, visitor_id, country_code, guest_name, device')
         .eq('type', 'campaign').gte('created_at', windowISO).limit(50000),
-      sb.from('analytics_events').select('created_at, score, user_id, visitor_id, country_code, duration_ms, streak')
+      sb.from('analytics_events').select('created_at, score, user_id, visitor_id, country_code, duration_ms, streak, guest_name, device')
         .eq('type', 'globequiz').gte('created_at', windowISO).limit(50000),
       sb.from('profiles').select('username, hs_flags').order('hs_flags', { ascending: false }).limit(10),
       sb.from('profiles').select('username, hs_shapes').order('hs_shapes', { ascending: false }).limit(10),
@@ -406,7 +406,9 @@ Deno.serve(async (req) => {
         // no la necesitan porque ya se distinguen por type).
         session_type: r.session_type || null,
         username: r.user_id ? (usernameById[r.user_id] || null) : null,
+        guest_name: r.user_id ? null : (r.guest_name || null),
         country_code: r.country_code || null,
+        device: r.device || null,
         duration_ms: null, streak: null,
       })),
       // Giras Mundiales completas y partidas de GlobeQuiz ganadas — antes solo
@@ -416,14 +418,18 @@ Deno.serve(async (req) => {
         created_at: r.created_at, type: 'campaign', mode: null, score: r.score,
         session_type: 'campaign',
         username: r.user_id ? (usernameById[r.user_id] || null) : null,
+        guest_name: r.user_id ? null : (r.guest_name || null),
         country_code: r.country_code || null,
+        device: r.device || null,
         duration_ms: null, streak: null,
       })),
       ...(globequizRows as any[]).map((r) => ({
         created_at: r.created_at, type: 'globequiz', mode: null, score: r.score,
         session_type: 'standalone',
         username: r.user_id ? (usernameById[r.user_id] || null) : null,
+        guest_name: r.user_id ? null : (r.guest_name || null),
         country_code: r.country_code || null,
+        device: r.device || null,
         duration_ms: r.duration_ms ?? null, streak: r.streak ?? null,
       })),
     ];
@@ -432,7 +438,9 @@ Deno.serve(async (req) => {
     const visits = (visitRows as any[]).map((r) => ({
       created_at: r.created_at,
       username: r.user_id ? (usernameById[r.user_id] || null) : null,
+      guest_name: r.user_id ? null : (r.guest_name || null),
       country_code: r.country_code || null,
+      device: r.device || null,
     }));
     // Registros (cuentas creadas) de la ventana, para el mismo panel de detalle.
     const registrationsList = (regRows as any[]).map((r) => ({

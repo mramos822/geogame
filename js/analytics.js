@@ -72,11 +72,20 @@
     try { return localStorage.getItem('playerName') || null; } catch (e) { return null; }
   }
 
+  // navigator.maxTouchPoints > 1 (mismo criterio que _sbDeviceType en js/sb.js)
+  // para no depender de userAgent, que se puede spoofear/desactualizar.
+  function deviceType() {
+    return (navigator.maxTouchPoints > 1) ? 'mobile' : 'pc';
+  }
+
   async function insertEvent(row, table) {
     const sb = window.sb;
     if (!sb) return;
     try {
-      await sb.from(table || 'analytics_events').insert(row);
+      // 'device' solo tiene sentido para eventos de juego/visita (no para
+      // currency_ledger, que usa la misma insertEvent con table='currency_ledger').
+      const full = (table && table !== 'analytics_events') ? row : { ...row, device: deviceType() };
+      await sb.from(table || 'analytics_events').insert(full);
     } catch (e) { /* silencioso: nunca debe afectar al juego */ }
   }
 
@@ -186,6 +195,7 @@
       visitor_id: visitorId,
       country_code: cc,
       user_id: window._sbUserId || null,
+      guest_name: guestName(),
     });
   }
 
