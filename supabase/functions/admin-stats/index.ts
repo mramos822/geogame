@@ -287,12 +287,15 @@ Deno.serve(async (req) => {
       // ── Invitados conectados AHORA (ver guest_presence, js/analytics.js
       // guestHeartbeat) — sin esto, "Quién está conectado ahora" solo podía
       // ver profiles.last_active, que no existe para nadie sin cuenta.
+      // Append-only (no upsert, ver comentario en guestHeartbeat): puede
+      // haber varias filas por invitado dentro de esta ventana de 5min (un
+      // latido cada ~15-25s) — se reduce a la más reciente por visitor_id
+      // más abajo, por eso el límite es generoso.
       sb.from('guest_presence')
         .select('visitor_id, last_active, is_playing, playing_mode, guest_name, device')
         .gte('last_active', onlineISO)
-        .order('is_playing', { ascending: false })
         .order('last_active', { ascending: false })
-        .limit(200),
+        .limit(5000),
       // ── Historial de nombres de invitado (TODA la ventana, no solo online)
       // — el nombre que alguien escribe en el splash recién queda guardado en
       // analytics_events con el próximo evento de PARTIDA (game/campaign); el
@@ -1009,7 +1012,14 @@ Deno.serve(async (req) => {
     // cuente también, no solo profiles. `username: null` + `guest_name`
     // distingue una fila de invitado del lado del front (ver renderOnlineUsers,
     // stats/index.html).
-    const onlineGuestRows = (onlineGuestsRes.data || []) as any[];
+    // Reduce a 1 fila por visitor_id (la más reciente) — ya vienen ordenadas
+    // last_active desc, así que la primera aparición de cada visitor_id es
+    // la que gana.
+    const onlineGuestByVisitor: Record<string, any> = {};
+    for (const g of (onlineGuestsRes.data || []) as any[]) {
+      if (!onlineGuestByVisitor[g.visitor_id]) onlineGuestByVisitor[g.visitor_id] = g;
+    }
+    const onlineGuestRows = Object.values(onlineGuestByVisitor) as any[];
     const onlineGuestsCount  = onlineGuestRows.length;
     const playingGuestsCount = onlineGuestRows.filter((g) => g.is_playing).length;
     const mergedOnlineUsers = [

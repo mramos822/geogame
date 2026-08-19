@@ -272,12 +272,18 @@
   // `profiles`, que no tiene fila para invitados, así que /stats "En línea
   // ahora"/"Jugando ahora" nunca podía verlos jugar en vivo — solo quedaban
   // eventos puntuales (visit/game) sin ningún latido continuo.
+  // Append-only (mismo modelo que analytics_events, no upsert): un
+  // ON CONFLICT DO UPDATE contra RLS con rol anon sin policy de SELECT no
+  // funciona (confirmado insertando de prueba como anon — "new row violates
+  // row-level security policy"), así que cada latido es una fila nueva; el
+  // server (admin-stats) se queda con la más reciente por visitor_id. Un
+  // cron diario poda filas de más de 2 días para que no crezca sin límite.
   let _guestPlaying = false, _guestPlayingMode = null;
   async function guestHeartbeat() {
     if (window._sbUserId || !window.sb) return; // ya tiene cuenta -> profiles
     const cc = localStorage.getItem('_an_country') || null;
     try {
-      await window.sb.from('guest_presence').upsert({
+      await window.sb.from('guest_presence').insert({
         visitor_id: visitorId,
         last_active: new Date().toISOString(),
         is_playing: _guestPlaying,
@@ -285,7 +291,7 @@
         guest_name: guestName(),
         country_code: cc,
         device: deviceType(),
-      }, { onConflict: 'visitor_id' });
+      });
     } catch (e) { /* silencioso, igual que el resto de analytics.js */ }
   }
   // Llamado desde window._setPlaying (monuments.js) para invitados, mismo
