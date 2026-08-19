@@ -172,7 +172,7 @@ Deno.serve(async (req) => {
       currencyLedgerRes, xpConfigRes,
       allCampaignsForXpRes, allGlobequizForXpRes, allCurrencyLedgerRes,
       visitorUserBridgeRes,
-      onlineGuestsRes,
+      onlineGuestsRes, guestPresenceHistoryRes,
     ] = await Promise.all([
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true })),
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true }).gte('last_active', onlineISO)),
@@ -293,6 +293,15 @@ Deno.serve(async (req) => {
         .order('is_playing', { ascending: false })
         .order('last_active', { ascending: false })
         .limit(200),
+      // ── Historial de nombres de invitado (TODA la ventana, no solo online)
+      // — el nombre que alguien escribe en el splash recién queda guardado en
+      // analytics_events con el próximo evento de PARTIDA (game/campaign); el
+      // heartbeat de guest_presence (cada ~15-25s mientras navega) lo captura
+      // fresco mucho antes, así que la pestaña "Invitados" ya no se queda
+      // pegada en "Sin nombre puesto" hasta que la persona termine de jugar.
+      sb.from('guest_presence')
+        .select('visitor_id, last_active, guest_name, country_code')
+        .gte('last_active', windowISO).limit(50000),
     ]);
 
     const regRows      = profilesRes.data || [];
@@ -744,6 +753,15 @@ Deno.serve(async (req) => {
       g.campaignCoins += 10 + steps;
       g.campaignXp += 50 + steps * 3;
       g.history.push({ type: 'campaign', mode: null, score: r.score ?? null, created_at: r.created_at });
+    }
+    // Nombre en vivo (ver query de guest_presence más arriba): no suma a
+    // visits/games/campaigns (no es un evento de esos), solo actualiza
+    // nombre/país/last_seen si es más reciente que lo que ya había —
+    // touchGuest ya resuelve "cuál es más nuevo" por timestamp sin importar
+    // el orden en que se procesen estos loops.
+    for (const r of (guestPresenceHistoryRes.data || []) as any[]) {
+      if (!r.visitor_id) continue;
+      touchGuest(r.visitor_id, r.last_active, r.country_code, r.guest_name);
     }
     const flaggedGuestIds = new Set(
       integrityFlags
