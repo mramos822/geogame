@@ -473,8 +473,28 @@ window.Spectate = (() => {
   // fila en `matches`, así que nos unimos directo al canal fijo 'solo-{userId}'
   // que abre SoloSpectate del lado del jugador. Sin snapshot de DB: si el amigo
   // ya está a mitad de ronda, recién vemos la próxima ronda que se transmita.
+  //
+  // A diferencia de watch() (VS 1v1), este canal de Realtime no tiene ningún
+  // RLS de por medio (no hay fila en `matches` que consultar primero) — sin
+  // este chequeo, cualquiera logueado podía abrir la consola del navegador y
+  // llamar Spectate.watchSolo('<userId-de-cualquiera>') para mirar la partida
+  // en vivo de alguien sin ser su amigo, saltándose por completo el botón del
+  // ojito (que solo oculta la opción en la UI, no protege nada). Mismo criterio
+  // que la policy 'matches_select_friends': solo amigos aceptados, o uno mismo.
+  async function _isFriendOf(userId) {
+    const uid = _myId();
+    if (!uid) return false;
+    if (uid === userId) return true;
+    try {
+      const { data } = await window.sb.from('friendships').select('id')
+        .or(`and(user_a.eq.${uid},user_b.eq.${userId}),and(user_a.eq.${userId},user_b.eq.${uid})`)
+        .eq('status', 'accepted').maybeSingle();
+      return !!data;
+    } catch (e) { return false; }
+  }
   async function watchSolo(userId) {
     await stop();
+    if (!(await _isFriendOf(userId))) throw new Error('not_friends');
     _isSolo  = true;
     _matchId = userId;
     _match   = { mode: null, score: 0, solo: true };
