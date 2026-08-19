@@ -844,7 +844,14 @@ function _computePlayingLabel(isPracticing) {
 window._setPlaying = function(playing) {
   window._isPlaying = !!playing;
   const isPracticing = !!(window.practiceConfig && window.practiceConfig.active);
-  if (window._sbUserId) window.sbSetPlaying(window._sbUserId, playing, playing && isPracticing).catch(() => {});
+  if (window._sbUserId) {
+    window.sbSetPlaying(window._sbUserId, playing, playing && isPracticing).catch(() => {});
+  } else if (window.Analytics && typeof window.Analytics.guestSetPlaying === 'function') {
+    // Invitado (sin cuenta): mismo latido que sbSetPlaying, pero a
+    // guest_presence — es lo único que le permite a /stats "En línea
+    // ahora"/"Jugando ahora" verlos, ver js/analytics.js.
+    window.Analytics.guestSetPlaying(playing, null);
+  }
   if (playing) {
     window._scoresUploadedThisGame = false;
     window._gameSessionId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
@@ -862,6 +869,8 @@ window._setPlaying = function(playing) {
       try {
         if (window._isPlaying && window._sbUserId && typeof window.sbSetPlayingMode === 'function') {
           window.sbSetPlayingMode(window._sbUserId, _computePlayingLabel(isPracticing)).catch(() => {});
+        } else if (window._isPlaying && !window._sbUserId && window.Analytics && typeof window.Analytics.guestSetPlaying === 'function') {
+          window.Analytics.guestSetPlaying(true, _computePlayingLabel(isPracticing));
         }
       } catch (e) {}
       try {

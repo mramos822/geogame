@@ -172,6 +172,7 @@ Deno.serve(async (req) => {
       currencyLedgerRes, xpConfigRes,
       allCampaignsForXpRes, allGlobequizForXpRes, allCurrencyLedgerRes,
       visitorUserBridgeRes,
+      onlineGuestsRes,
     ] = await Promise.all([
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true })),
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true }).gte('last_active', onlineISO)),
@@ -283,6 +284,15 @@ Deno.serve(async (req) => {
         .not('visitor_id', 'is', null)
         .not('user_id', 'is', null)
         .limit(50000),
+      // ── Invitados conectados AHORA (ver guest_presence, js/analytics.js
+      // guestHeartbeat) — sin esto, "Quién está conectado ahora" solo podía
+      // ver profiles.last_active, que no existe para nadie sin cuenta.
+      sb.from('guest_presence')
+        .select('visitor_id, last_active, is_playing, playing_mode, guest_name, device')
+        .gte('last_active', onlineISO)
+        .order('is_playing', { ascending: false })
+        .order('last_active', { ascending: false })
+        .limit(200),
     ]);
 
     const regRows      = profilesRes.data || [];
@@ -976,14 +986,37 @@ Deno.serve(async (req) => {
       atRiskCount: atRisk.length,
     };
 
+    // ── Invitados conectados ahora (ver guest_presence más arriba) — se
+    // mezclan con las cuentas para que "En línea ahora"/"Jugando ahora" los
+    // cuente también, no solo profiles. `username: null` + `guest_name`
+    // distingue una fila de invitado del lado del front (ver renderOnlineUsers,
+    // stats/index.html).
+    const onlineGuestRows = (onlineGuestsRes.data || []) as any[];
+    const onlineGuestsCount  = onlineGuestRows.length;
+    const playingGuestsCount = onlineGuestRows.filter((g) => g.is_playing).length;
+    const mergedOnlineUsers = [
+      ...(onlineUsersRes.data || []).map((p: any) => ({
+        username: p.username, guest_name: null, is_playing: !!p.is_playing,
+        playing_mode: p.playing_mode || null, last_active: p.last_active, device: p.device || null,
+      })),
+      ...onlineGuestRows.map((g: any) => ({
+        username: null, guest_name: g.guest_name || null, is_playing: !!g.is_playing,
+        playing_mode: g.playing_mode || null, last_active: g.last_active, device: g.device || null,
+      })),
+    ].sort((a, b) => {
+      if (!!a.is_playing !== !!b.is_playing) return a.is_playing ? -1 : 1;
+      return new Date(b.last_active).getTime() - new Date(a.last_active).getTime();
+    });
+
     return new Response(JSON.stringify({
       ok: true,
       generated_at: now.toISOString(),
       range,
-      totals: { totalUsers, onlineNow, playingNow, totalGames: totalCampaigns + versusTotal + totalGlobequiz, totalVisits, versusTotal },
-      onlineUsers: (onlineUsersRes.data || []).map((p: any) => ({
-        username: p.username, is_playing: !!p.is_playing, playing_mode: p.playing_mode || null, last_active: p.last_active, device: p.device || null,
-      })),
+      totals: {
+        totalUsers, onlineNow: onlineNow + onlineGuestsCount, playingNow: playingNow + playingGuestsCount,
+        totalGames: totalCampaigns + versusTotal + totalGlobequiz, totalVisits, versusTotal,
+      },
+      onlineUsers: mergedOnlineUsers,
       period: {
         newUsers: registrations, games: finishedRows.length,
         visits: uniqueVisitors, versus: versusRows.length,

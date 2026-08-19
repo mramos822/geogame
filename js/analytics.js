@@ -266,16 +266,65 @@
     logCurrencyEvent(GQ_BASE_COINS * mult, GQ_BASE_XP * mult, 'globequiz_win', streakDays);
   }
 
+  // ── Presencia en vivo de invitados (sin cuenta) ───────────────────────────
+  // Espejo minimalista de sbUpdateLastActive/sbSetPlaying (js/sb.js), pero
+  // para quien todavía no tiene cuenta: esas funciones escriben en
+  // `profiles`, que no tiene fila para invitados, así que /stats "En línea
+  // ahora"/"Jugando ahora" nunca podía verlos jugar en vivo — solo quedaban
+  // eventos puntuales (visit/game) sin ningún latido continuo.
+  let _guestPlaying = false, _guestPlayingMode = null;
+  async function guestHeartbeat() {
+    if (window._sbUserId || !window.sb) return; // ya tiene cuenta -> profiles
+    const cc = localStorage.getItem('_an_country') || null;
+    try {
+      await window.sb.from('guest_presence').upsert({
+        visitor_id: visitorId,
+        last_active: new Date().toISOString(),
+        is_playing: _guestPlaying,
+        playing_mode: _guestPlayingMode,
+        guest_name: guestName(),
+        country_code: cc,
+        device: deviceType(),
+      }, { onConflict: 'visitor_id' });
+    } catch (e) { /* silencioso, igual que el resto de analytics.js */ }
+  }
+  // Llamado desde window._setPlaying (monuments.js) para invitados, mismo
+  // punto que sbSetPlaying para cuentas.
+  function guestSetPlaying(playing, mode) {
+    _guestPlaying = !!playing;
+    _guestPlayingMode = playing ? (mode || null) : null;
+    guestHeartbeat();
+  }
+
   window.Analytics = {
     logVisit, logGame, logVersus, logVersusFunnel, logCampaign, logGlobequiz,
-    logCampaignCurrency, logGlobequizCurrency, resetVisitorId,
+    logCampaignCurrency, logGlobequizCurrency, resetVisitorId, guestSetPlaying,
   };
 
   // Registrar la visita en cuanto el cliente sb esté listo.
   function tryVisit(attempt) {
-    if (window.sb) { logVisit(); return; }
+    if (window.sb) { logVisit(); guestHeartbeat(); return; }
     if (attempt > 20) return;
     setTimeout(() => tryVisit(attempt + 1), 300);
   }
   tryVisit(0);
+
+  // Heartbeat periódico + en actividad, mismo patrón que el de cuentas en
+  // js/sb.js (25s en background visible + ping en interacción, throttle
+  // 15s) — pero se auto-desactiva solo si en algún momento se logueó
+  // (guestHeartbeat() es no-op con _sbUserId puesto).
+  setInterval(() => {
+    if (!window._sbUserId && document.visibilityState === 'visible') guestHeartbeat();
+  }, 25 * 1000);
+  let _lastGuestPing = 0;
+  function _guestActivityPing() {
+    if (window._sbUserId) return;
+    const now = Date.now();
+    if (now - _lastGuestPing < 15000) return;
+    _lastGuestPing = now;
+    guestHeartbeat();
+  }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') _guestActivityPing(); });
+  document.addEventListener('click', _guestActivityPing, { passive: true });
+  document.addEventListener('touchstart', _guestActivityPing, { passive: true });
 })();

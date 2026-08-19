@@ -479,7 +479,7 @@
 
       <div class="box wide" style="margin-top:20px">
         <h2>Quién está conectado ahora
-          <span class="sub"><span class="help" title="Cuentas con actividad en los últimos 5 minutos. 🎮 = tiene is_playing=true (está dentro de una partida ahora mismo); 🟢 = está en la app pero no en medio de un modo de juego (menú, panel social, etc). Se actualiza solo cada 15s.">ⓘ</span></span>
+          <span class="sub"><span class="help" title="Cuentas E invitados sin cuenta (en cursiva, marcados '(invitado)') con actividad en los últimos 5 minutos. 🎮 = está dentro de una partida ahora mismo; 🟢 = está en la app pero no en medio de un modo de juego. Se actualiza solo cada 15s.">ⓘ</span></span>
         </h2>
         <div class="table-scroll"><table id="tbl-online"><tbody></tbody></table></div>
       </div>
@@ -1195,8 +1195,8 @@ function renderOnlineUsers(rows){
   const playing = rows.filter(r=>r.is_playing);
   const idle = rows.filter(r=>!r.is_playing);
   tb.innerHTML = '<tr><th>Usuario</th><th>Estado</th><th>Dispositivo</th><th style="text-align:right">Última actividad</th></tr>' +
-    playing.map(r=>`<tr><td>${escapeHtml(r.username||'—')}</td><td><span class="status-pill active"><span class="dotstat"></span>🎮 Jugando${r.playing_mode?' · '+escapeHtml(r.playing_mode):''}</span></td><td>${deviceIcon(r.device)}</td><td class="n">${timeAgo(r.last_active)}</td></tr>`).join('') +
-    idle.map(r=>`<tr><td>${escapeHtml(r.username||'—')}</td><td><span class="status-pill stale"><span class="dotstat"></span>🟢 Conectado</span></td><td>${deviceIcon(r.device)}</td><td class="n">${timeAgo(r.last_active)}</td></tr>`).join('');
+    playing.map(r=>`<tr><td>${playerCell(r.username, r.guest_name)}</td><td><span class="status-pill active"><span class="dotstat"></span>🎮 Jugando${r.playing_mode?' · '+escapeHtml(r.playing_mode):''}</span></td><td>${deviceIcon(r.device)}</td><td class="n">${timeAgo(r.last_active)}</td></tr>`).join('') +
+    idle.map(r=>`<tr><td>${playerCell(r.username, r.guest_name)}</td><td><span class="status-pill stale"><span class="dotstat"></span>🟢 Conectado</span></td><td>${deviceIcon(r.device)}</td><td class="n">${timeAgo(r.last_active)}</td></tr>`).join('');
 }
 
 function renderModes(m){
