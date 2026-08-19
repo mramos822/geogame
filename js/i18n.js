@@ -536,7 +536,19 @@ const I18N = {
   },
 };
 
-let currentLang = localStorage.getItem('lang') || 'en';
+// Sin idioma guardado todavía (primera visita): usar el idioma del
+// navegador/SO en vez de un default fijo -- es instantaneo (a diferencia de
+// geolocalizar por IP, que necesitaria esperar un fetch antes de poder
+// pintar la UI) y en la practica es una senal mas confiable de en que
+// idioma prefiere jugar alguien que el pais donde esta fisicamente.
+function _defaultLangByLocale() {
+  try {
+    const langs = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || ''];
+    for (const l of langs) { if (l && l.toLowerCase().indexOf('es') === 0) return 'es'; }
+  } catch (e) {}
+  return 'en';
+}
+let currentLang = localStorage.getItem('lang') || _defaultLangByLocale();
 
 function t(key, vars) {
   let s = (I18N[currentLang] && I18N[currentLang][key]);

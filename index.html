@@ -728,7 +728,17 @@
   };
 
   // ── LANG ENGINE ─────────────────────────────────────────────
-  let lang = localStorage.getItem('mgc-landing-lang') || 'en';
+  // Mismo criterio que js/i18n.js (el juego): sin idioma guardado, usar el
+  // idioma del navegador en vez de un default fijo — instantáneo, sin
+  // esperar un fetch de geolocalización por IP.
+  function _defaultLangByLocale() {
+    try {
+      const langs = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || ''];
+      for (const l of langs) { if (l && l.toLowerCase().indexOf('es') === 0) return 'es'; }
+    } catch (e) {}
+    return 'en';
+  }
+  let lang = localStorage.getItem('mgc-landing-lang') || _defaultLangByLocale();
 
   function buildTicker(l) {
     const items = T[l].ticker;
