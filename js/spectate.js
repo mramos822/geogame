@@ -27,7 +27,7 @@ window.SoloSpectate = (() => {
     if (!uid) return; // sin cuenta no hay a quién autorizar a espectar
     _active = true;
     _channel = window.sb
-      .channel('solo-' + uid, { config: { presence: { key: uid } } })
+      .channel('solo-' + uid, { config: { private: true, presence: { key: uid } } })
       // 'sync' (no join/leave): es el único evento que garantiza que
       // presenceState() ya está consistente — leerlo en el handler de 'leave'
       // a veces todavía traía al que se fue (race de timing), por eso el
@@ -392,7 +392,7 @@ window.Spectate = (() => {
 
     const uid = _myId();
     _channel = window.sb
-      .channel('match-' + matchId, { config: { presence: { key: 'spectator-' + (uid || Math.random().toString(36).slice(2)) } } })
+      .channel('match-' + matchId, { config: { private: true, presence: { key: 'spectator-' + (uid || Math.random().toString(36).slice(2)) } } })
       .on('postgres_changes', {
         event: 'UPDATE', schema: 'public', table: 'matches',
         filter: 'id=eq.' + matchId,
@@ -501,7 +501,7 @@ window.Spectate = (() => {
 
     const uid = _myId();
     _channel = window.sb
-      .channel('solo-' + userId, { config: { presence: { key: 'spectator-' + (uid || Math.random().toString(36).slice(2)) } } })
+      .channel('solo-' + userId, { config: { private: true, presence: { key: 'spectator-' + (uid || Math.random().toString(36).slice(2)) } } })
       // Mismo canal que ve el jugador real (dueño de 'solo-{userId}') — el
       // espectador también recibe estos eventos de presence, así que puede
       // mostrar cuánta gente hay mirando (a él mismo incluido) sin necesitar

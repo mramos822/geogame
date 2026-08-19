@@ -81,7 +81,7 @@ window.VS = (() => {
     if (_channel) _channel.unsubscribe();
     const uid = _myId();
     _channel = window.sb
-      .channel('match-' + matchId, { config: { presence: { key: uid || 'anon' } } })
+      .channel('match-' + matchId, { config: { private: true, presence: { key: uid || 'anon' } } })
       .on('postgres_changes', {
         event: 'UPDATE', schema: 'public', table: 'matches',
         filter: 'id=eq.' + matchId,
