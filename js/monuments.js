@@ -2312,6 +2312,14 @@ _updateProfileBtnLabel();
         return;
       }
       localStorage.setItem('playerName', limpio);
+      // Latido directo (sin freno) para invitados: confirmar con Enter no
+      // dispara 'click' (el heartbeat genérico depende de eso), y aunque
+      // confirme con el botón, un clic previo (ej. entrar al input) pudo
+      // haber consumido el freno de 15s dejando este sin efecto — ver
+      // guestPing en js/analytics.js.
+      if (!window._sbUserId && window.Analytics && typeof window.Analytics.guestPing === 'function') {
+        window.Analytics.guestPing();
+      }
       const el = document.getElementById('loading-player-name');
       if (el) el.textContent = limpio;
       maybeAutoAssignPic(limpio);

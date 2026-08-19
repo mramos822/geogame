@@ -302,9 +302,18 @@
     guestHeartbeat();
   }
 
+  // Latido inmediato sin pasar por el freno de 15s de _guestActivityPing —
+  // para momentos que SÍ importa que se vean al instante en /stats (recién
+  // puso su nombre) y que no siempre coinciden con un 'click' que burbujee
+  // a document (confirmar con Enter no dispara 'click'; y si el freno ya
+  // estaba consumido por un clic anterior —ej. entrar al input—, el clic
+  // real de "Confirmar" quedaba silenciado hasta el próximo latido de
+  // fondo, hasta 25s después).
+  function guestPing() { guestHeartbeat(); }
+
   window.Analytics = {
     logVisit, logGame, logVersus, logVersusFunnel, logCampaign, logGlobequiz,
-    logCampaignCurrency, logGlobequizCurrency, resetVisitorId, guestSetPlaying,
+    logCampaignCurrency, logGlobequizCurrency, resetVisitorId, guestSetPlaying, guestPing,
   };
 
   // Registrar la visita en cuanto el cliente sb esté listo.
