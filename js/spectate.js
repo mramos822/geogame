@@ -1619,7 +1619,11 @@ window.GroupSpectate = (() => {
       // (normal en el espectador) — igual que sfxPlay en el resto del código,
       // se intenta y se ignora el rechazo; el video igual queda ahí, pausado
       // en su primer frame, que es mejor que nada.
-      if (howtoVideo) { try { howtoVideo.play().catch(() => {}); } catch (e) {} }
+      // Chrome-iOS (ver IS_CHROME_IOS, monuments.js): nunca decodificar acá
+      // tampoco — mismo crash reportado en el flujo real, ver Ver.3.5.41.
+      if (howtoVideo && !(typeof IS_CHROME_IOS !== 'undefined' && IS_CHROME_IOS)) {
+        try { howtoVideo.play().catch(() => {}); } catch (e) {}
+      }
     } else {
       if (label) { label.textContent = (typeof t === 'function') ? t(cfg.key1) : ''; label.classList.remove('step2'); }
       if (howtoWrap) howtoWrap.classList.remove('slide-down');

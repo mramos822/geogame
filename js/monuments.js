@@ -573,6 +573,19 @@ const IS_MOBILE = IS_IOS || navigator.maxTouchPoints > 1;
 if (IS_IOS)    document.body.classList.add('is-ios');
 if (IS_MOBILE) document.body.classList.add('is-mobile');
 
+// Chrome para iOS (token 'CriOS' en el UA) corre sobre el mismo WebKit que Safari,
+// pero es un build distinto de Apple/Google — un jugador reportó (Ver.3.5.41, iPhone
+// 13 Pro Max, 6GB, NO es un device viejo/débil) que el proceso de la pestaña crashea
+// ("Can't open this page") apenas en el 1er confirm de la 1ra partida, justo en
+// howtoVideo.play() — la primera decodificación de video de la sesión, sin nada
+// acumulado de antes (toda la investigación previa del crash de iOS, ver memoria
+// project_ios_crash_investigation, se probó siempre con Safari, nunca con Chrome-iOS).
+// Sin poder reproducirlo ni tener más dispositivos para probar, la mitigación más
+// segura es no depender del decoder de video para ESTE combo puntual: se muestra un
+// frame estático (poster) del tutorial en vez de reproducirlo — ver swapHowtoVideo y
+// el confirm handler (~confirmStep 0→1) más abajo en este archivo.
+const IS_CHROME_IOS = IS_IOS && /CriOS/i.test(navigator.userAgent);
+
 // Muestra/oculta el confirm del gameover (se revela tras cargar assets del siguiente modo).
 window.showGameoverConfirm = function () {
   const w = document.querySelector('.gameover-confirm-wrap');
@@ -597,7 +610,9 @@ window.hideSplashConfirm = function () {
 window.waitForHowtoVideo = function () {
   window.hideSplashConfirm();
   const v = document.querySelector('.splash-howtoplay-video');
-  if (!v || v.readyState >= 3) { window.showSplashConfirm(); return; }
+  // Chrome-iOS nunca reproduce el video (poster estático, ver IS_CHROME_IOS)
+  // así que no tiene sentido esperar eventos de carga que no van a llegar.
+  if (!v || v.readyState >= 3 || IS_CHROME_IOS) { window.showSplashConfirm(); return; }
   let done = false;
   const reveal = () => { if (!done) { done = true; window.showSplashConfirm(); } };
   v.addEventListener('canplaythrough', reveal, { once: true });
@@ -632,6 +647,10 @@ window.swapHowtoVideo = function (newSrc) {
     fresh.muted = true;
     fresh.setAttribute('playsinline', '');
     fresh.setAttribute('preload', 'none');
+    // Chrome-iOS (ver IS_CHROME_IOS más arriba): nunca se llama .play() sobre
+    // este elemento (ver confirm handler), así que sin poster quedaría en
+    // blanco — un frame estático del tutorial en vez del video animado.
+    if (IS_CHROME_IOS) fresh.poster = newSrc.replace(/howtoplay(\d)\.mp4$/, 'howtoplay$1-poster.jpg');
     old.replaceWith(fresh);
     fresh.src = newSrc;
     // NO fresh.load() acá — el crash-log mostró que sigue crasheando en el
@@ -8850,8 +8869,12 @@ document.querySelector('.splash-confirm-wrap')?.addEventListener('click', () => 
     }
     const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
     if (howtoWrap) howtoWrap.classList.add('slide-down');
-    const howtoVideo = document.querySelector('.splash-howtoplay-video');
-    if (howtoVideo) howtoVideo.play();
+    // Chrome-iOS: nunca decodificar el video (ver IS_CHROME_IOS) — se queda
+    // en el poster estático que le puso swapHowtoVideo.
+    if (!IS_CHROME_IOS) {
+      const howtoVideo = document.querySelector('.splash-howtoplay-video');
+      if (howtoVideo) howtoVideo.play();
+    }
     confirmStep = 1;
     window.waitForHowtoVideo();
     // Avisar a un posible espectador que este primer confirm ya se apretó —
@@ -9481,7 +9504,12 @@ document.querySelectorAll('.practice-mode-item').forEach(btn => {
     document.getElementById('practice-config-title').textContent = PRACTICE_MODE_LABELS[mode] || mode;
     // Video howtoplay
     const vid = document.getElementById('practice-config-video');
-    if (vid) { vid.src = PRACTICE_MODE_VIDEOS[mode]; vid.load(); vid.play().catch(() => {}); }
+    if (vid) {
+      // Chrome-iOS: mismo crash de decode que en el splash real (ver
+      // IS_CHROME_IOS más arriba) — poster estático, sin load()/play().
+      if (IS_CHROME_IOS) { vid.poster = PRACTICE_MODE_VIDEOS[mode].replace(/howtoplay(\d)\.mp4$/, 'howtoplay$1-poster.jpg'); }
+      else { vid.src = PRACTICE_MODE_VIDEOS[mode]; vid.load(); vid.play().catch(() => {}); }
+    }
     // Mostrar continentes o dificultad según el modo
     const showCont = mode !== 'monuments';
     document.getElementById('practice-continents').style.display  = showCont ? '' : 'none';
