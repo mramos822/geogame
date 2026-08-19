@@ -1108,9 +1108,9 @@ function timeAgo(iso){
   return `hace ${hrs}h`;
 }
 function deviceIcon(device){
-  if(device === 'mobile') return '<span class="help" title="Celular">📱</span>';
-  if(device === 'pc') return '<span class="help" title="PC">💻</span>';
-  return '';
+  if(device === 'mobile') return '📱 Celular';
+  if(device === 'pc') return '💻 PC';
+  return '—';
 }
 function renderOnlineUsers(rows){
   const tb = $('tbl-online');
