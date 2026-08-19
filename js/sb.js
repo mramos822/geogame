@@ -427,13 +427,19 @@ window.sbDeleteFriendship = async function(friendshipId, userA, userB) {
   }
 };
 
+// navigator.maxTouchPoints > 1 (mismo criterio que isMobile en monuments.js)
+// para no depender de userAgent, que se puede spoofear/desactualizar.
+function _sbDeviceType() {
+  return (navigator.maxTouchPoints > 1) ? 'mobile' : 'pc';
+}
+
 window.sbUpdateLastActive = async function(userId) {
-  await sb.from('profiles').update({ last_active: new Date().toISOString() }).eq('id', userId);
+  await sb.from('profiles').update({ last_active: new Date().toISOString(), device: _sbDeviceType() }).eq('id', userId);
 };
 
 window.sbSetPlaying = async function(userId, playing, practicing) {
   await sb.from('profiles')
-    .update({ is_playing: playing, is_practicing: !!practicing, last_active: new Date().toISOString() })
+    .update({ is_playing: playing, is_practicing: !!practicing, last_active: new Date().toISOString(), device: _sbDeviceType() })
     .eq('id', userId);
 };
 
