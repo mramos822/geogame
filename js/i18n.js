@@ -536,7 +536,7 @@ const I18N = {
   },
 };
 
-let currentLang = localStorage.getItem('lang') || 'es';
+let currentLang = localStorage.getItem('lang') || 'en';
 
 function t(key, vars) {
   let s = (I18N[currentLang] && I18N[currentLang][key]);
