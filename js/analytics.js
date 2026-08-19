@@ -78,6 +78,18 @@
     return (navigator.maxTouchPoints > 1) ? 'mobile' : 'pc';
   }
 
+  // Atribución de campaña (ej. play/?src=yt en el anuncio de YouTube).
+  // First-touch: una vez guardado en localStorage no se pisa con visitas
+  // posteriores sin el parámetro, para no perder de dónde vino este
+  // dispositivo la primera vez.
+  function getSource() {
+    try {
+      const fromUrl = new URLSearchParams(location.search).get('src');
+      if (fromUrl) { localStorage.setItem('_an_source', fromUrl); return fromUrl; }
+      return localStorage.getItem('_an_source') || null;
+    } catch (e) { return null; }
+  }
+
   async function insertEvent(row, table) {
     const sb = window.sb;
     if (!sb) return;
@@ -100,6 +112,7 @@
       country_code: cc,
       user_id: window._sbUserId || null,
       guest_name: guestName(),
+      source: getSource(),
     });
   }
 

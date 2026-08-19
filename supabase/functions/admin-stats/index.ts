@@ -194,7 +194,7 @@ Deno.serve(async (req) => {
         .gte('created_at', windowISO).limit(50000),
       sb.from('analytics_events').select('created_at, type, mode, score, user_id, visitor_id, country_code, session_type, guest_name, device')
         .in('type', ['game', 'versus']).gte('created_at', windowISO).limit(50000),
-      sb.from('analytics_events').select('created_at, visitor_id, country_code, user_id, guest_name, device')
+      sb.from('analytics_events').select('created_at, visitor_id, country_code, user_id, guest_name, device, source')
         .eq('type', 'visit').gte('created_at', windowISO).limit(50000),
       sb.from('analytics_events').select('created_at, score, user_id, visitor_id, country_code, guest_name, device')
         .eq('type', 'campaign').gte('created_at', windowISO).limit(50000),
@@ -338,6 +338,27 @@ Deno.serve(async (req) => {
       .map(([code, set]) => ({ code, count: set.size }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 12);
+
+    // ── Conversión por fuente de tráfico (ej. ?src=yt en el anuncio de
+    // YouTube, ver getSource() en js/analytics.js) — visitantes únicos por
+    // fuente vs. cuántos de esos visitor_id aparecen después en algún evento
+    // de partida jugada, dentro de la misma ventana.
+    const playedVisitorIds = new Set<string>([
+      ...gameRows.map((r: any) => r.visitor_id),
+      ...campaignRows.map((r: any) => r.visitor_id),
+      ...globequizRows.map((r: any) => r.visitor_id),
+    ].filter(Boolean));
+    const sourceVisitors: Record<string, Set<string>> = {};
+    for (const r of visitRows as any[]) {
+      const src = r.source || '(sin fuente)';
+      (sourceVisitors[src] = sourceVisitors[src] || new Set()).add(r.visitor_id || '?');
+    }
+    const topSources = Object.entries(sourceVisitors)
+      .map(([source, set]) => {
+        const played = [...set].filter((vid) => playedVisitorIds.has(vid)).length;
+        return { source, visitors: set.size, played, rate: set.size > 0 ? Math.round((played / set.size) * 100) : 0 };
+      })
+      .sort((a, b) => b.visitors - a.visitors);
 
     // ── Funnel: visitantes únicos -> registros -> jugaron al menos 1 partida ──
     const uniqueVisitors = new Set(visitRows.map((r: any) => r.visitor_id || '?')).size;
@@ -986,6 +1007,7 @@ Deno.serve(async (req) => {
       integrityFlags,
       guests,
       topCountries,
+      topSources,
       cohortRetention,
       playBuckets,
       atRisk,

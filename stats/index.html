@@ -289,81 +289,149 @@
   @media (max-width:640px){
     html,body{overflow-x:hidden;}
     main, .topbar-inner, .controlbar-inner{max-width:100vw;}
+    /* Sin esto Safari/Chrome mobile dejan "rebote" de fondo blanco al hacer
+       overscroll — el body ya pinta --bg pero el viewport detrás no. */
+    html{background:var(--bg);}
+
+    /* Feedback táctil: :hover no dispara bien con dedo, así que cualquier
+       elemento clickeable necesita su propio :active para sentirse "vivo". */
+    .btn, .tab-btn, .range-btn, .chip, .subtab, .acc-row, .guest-card-toggle,
+    .guest-link-btn, th.sortable, .card, .modal-close{
+      -webkit-tap-highlight-color:transparent; touch-action:manipulation;
+    }
+    .btn:active, .tab-btn:active, .range-btn:active, .chip:active, .subtab:active,
+    .guest-card-toggle:active, .guest-link-btn:active, .modal-close:active{
+      transform:scale(.95); opacity:.8;
+    }
+    .acc-row:active td{background:var(--panel3);}
 
     /* ── Header compacto: una sola línea, sin wrap, para que el controlbar
        sticky (top calculado abajo) no quede tapado ni deje hueco ── */
     .topbar h1{display:none;}
-    .topbar-inner{padding:8px 10px;gap:8px;flex-wrap:nowrap;}
-    .topbar img{width:26px;flex-shrink:0;}
+    .topbar-inner{padding:9px 10px;gap:8px;flex-wrap:nowrap;}
+    .topbar img{width:28px;flex-shrink:0;}
     .topbar .upd{font-size:0;}
-    .topbar .upd .dot{margin-right:0;}
-    .btn{padding:7px 9px;font-size:11.5px;flex-shrink:0;}
-    .controlbar{top:43px;}
-    .controlbar-inner{flex-direction:column;align-items:stretch;gap:8px;padding:8px 10px;}
+    .topbar .upd .dot{margin-right:0;width:8px;height:8px;}
+    .btn{padding:9px 12px;font-size:12px;flex-shrink:0;min-height:38px;}
+    .controlbar{top:46px;}
+    .controlbar-inner{flex-direction:column;align-items:stretch;gap:8px;padding:8px 10px 10px;}
 
     /* controlbar-inner es flex-column: sin min-width:0 los hijos flex no
        se achican y tabs-nav empuja todo el ancho de página hacia la derecha
        en vez de scrollear internamente */
-    .tabs-nav{gap:2px;padding-bottom:2px;width:100%;min-width:0;flex-shrink:1;}
-    .tab-btn{padding:9px 12px;font-size:12.5px;flex-shrink:0;}
-    .rangebar{justify-content:center;width:100%;min-width:0;}
-    .range-btn{padding:6px 11px;}
+    .tabs-nav{gap:4px;padding:2px 2px 4px;width:100%;min-width:0;flex-shrink:1;
+      scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;}
+    .tab-btn{padding:10px 14px;font-size:13px;flex-shrink:0;min-height:40px;
+      scroll-snap-align:start;}
+    .rangebar{justify-content:center;width:100%;min-width:0;flex-wrap:nowrap;
+      overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px;}
+    .range-btn{padding:8px 14px;min-height:36px;flex-shrink:0;}
 
-    main{padding:12px 8px 40px;}
+    main{padding:14px 10px 48px;}
     .insights{grid-template-columns:1fr;gap:8px;margin-bottom:16px;}
-    .insight-card{padding:11px 12px;}
-    .cards{grid-template-columns:repeat(2,1fr);gap:8px;}
-    .card{padding:10px 12px;}
-    .card .v{font-size:19px;}
-    .card .l{font-size:10px;}
-    .box{padding:12px 12px 10px;border-radius:10px;}
-    .box h2{flex-wrap:wrap;font-size:12px;gap:4px 8px;}
-    .grid{gap:10px;grid-template-columns:1fr;}
-    .chart-wrap{height:220px;}
-    .chart-wrap.short{height:190px;}
-    .activity-grid{grid-template-columns:1fr;gap:10px;}
-    .activity-cell .chart-wrap{height:130px;}
+    .insight-card{padding:12px 13px;font-size:13px;line-height:1.55;}
+    .cards{grid-template-columns:repeat(2,1fr);gap:10px;}
+    .card{padding:12px 13px;border-radius:12px;}
+    .card .v{font-size:21px;}
+    .card .l{font-size:10.5px;}
+    .box{padding:14px 13px 12px;border-radius:12px;}
+    .box h2{flex-wrap:wrap;font-size:13px;gap:4px 8px;line-height:1.4;}
+    .grid{gap:12px;grid-template-columns:1fr;}
+    .chart-wrap{height:230px;}
+    .chart-wrap.short{height:200px;}
+    .activity-grid{grid-template-columns:1fr;gap:12px;}
+    .activity-cell{padding:13px 14px 10px;}
+    .activity-cell .chart-wrap{height:140px;}
     .funnel{flex-wrap:wrap;}
-    .funnel-step{flex:1 1 40%;padding:10px 4px;}
-    .funnel-step .v{font-size:20px;}
+    .funnel-step{flex:1 1 40%;padding:12px 6px;}
+    .funnel-step .v{font-size:21px;}
     .funnel-arrow{display:none;}
 
-    table{font-size:11.5px;}
-    table th, table td{padding:6px 6px;}
-    .box > .table-scroll{margin:0 -12px;padding:0 12px;width:calc(100% + 24px);}
+    /* ── Tablas: se pierde poco achicando la letra vs. forzar scroll
+       horizontal en algo tan chico como un dedo. Fila más alta = blanco
+       de toque más grande al tocar filas expandibles (cuentas). Primera
+       columna fija (sticky) para no perder de vista "quién es" mientras
+       se desliza para ver el resto — la sombra marca que hay más contenido. ── */
+    table{font-size:12px;}
+    table th, table td{padding:9px 8px;}
+    .table-scroll{-webkit-overflow-scrolling:touch;scroll-padding-left:2px;}
+    .box > .table-scroll{margin:0 -13px;padding:0 13px;width:calc(100% + 26px);}
+    .table-scroll table td:first-child, .table-scroll table th:first-child{
+      position:sticky;left:0;background:var(--panel);
+      box-shadow:6px 0 8px -6px rgba(0,0,0,.5);
+    }
+    .guest-history .table-scroll table td:first-child,
+    .guest-history .table-scroll table th:first-child{background:var(--panel2);}
+    .modal-box .table-scroll table td:first-child,
+    .modal-box .table-scroll table th:first-child{background:var(--panel);}
+    /* #tbl-accounts: la 1ra columna es solo el ▶ de expandir (sin info útil
+       para fijar) — se fija la 2da (usuario) en su lugar. */
+    #tbl-accounts td:first-child, #tbl-accounts th:first-child{
+      position:static;box-shadow:none;background:transparent;width:26px;
+    }
+    #tbl-accounts td:nth-child(2), #tbl-accounts th:nth-child(2){
+      position:sticky;left:0;background:var(--panel);
+      box-shadow:6px 0 8px -6px rgba(0,0,0,.5);
+    }
+    .acc-row:active td:nth-child(2){background:var(--panel3);}
 
-    .subtabs{gap:4px;}
-    .subtab{padding:7px 10px;font-size:12px;}
+    .subtabs{gap:6px;-webkit-overflow-scrolling:touch;}
+    .subtab{padding:9px 13px;font-size:12.5px;min-height:38px;}
 
-    .accounts-toolbar{flex-direction:column;align-items:stretch;gap:8px;}
-    #accounts-search, #guests-search{max-width:none;font-size:16px;}
+    .accounts-toolbar{flex-direction:column;align-items:stretch;gap:9px;}
+    #accounts-search, #guests-search{max-width:none;font-size:16px;padding:11px 13px;}
     .accounts-count, .guests-count{text-align:center;}
-    .filter-chips, .rangebar{justify-content:center;}
-    .chip{padding:6px 11px;font-size:11.5px;}
+    .filter-chips{justify-content:center;flex-wrap:nowrap;overflow-x:auto;
+      -webkit-overflow-scrolling:touch;padding-bottom:2px;}
+    .rangebar{justify-content:center;}
+    .chip{padding:8px 14px;font-size:12px;min-height:36px;flex-shrink:0;}
 
-    .guests-grid{grid-template-columns:1fr;gap:10px;}
-    .guest-card{padding:12px 13px;}
+    .guests-grid{grid-template-columns:1fr;gap:12px;}
+    .guest-card{padding:14px 15px;border-radius:14px;}
+    .guest-card-toggle, .guest-link-btn{min-height:36px;padding:8px 12px;}
 
-    #login input, #login button{font-size:16px;}
+    #login input, #login button{font-size:16px;padding:13px 15px;min-height:46px;}
 
-    /* ── Modal en celular: casi pantalla completa, sin wrap raro ── */
+    /* ── Modal en celular: casi pantalla completa, con "handle" visual de
+       hoja inferior y botón de cerrar con blanco de toque real ── */
     .modal-overlay{padding:0;align-items:flex-end;}
-    .modal-box{max-width:100vw;width:100vw;max-height:92vh;border-radius:14px 14px 0 0;}
-    .modal-head{padding:12px 14px;}
-    .modal-head h3{font-size:13px;}
-    .modal-body{padding:4px 12px 14px;}
-    .modal-subtitle{margin:14px 0 6px;}
-    #tbl-day-modal, #tbl-day-modal-visits, #tbl-day-modal-regs{font-size:11.5px;}
+    .modal-box{max-width:100vw;width:100vw;max-height:94vh;border-radius:16px 16px 0 0;}
+    .modal-box::before{
+      content:'';display:block;width:36px;height:4px;border-radius:3px;
+      background:var(--border);margin:9px auto 0;
+    }
+    .modal-head{padding:10px 14px 12px;}
+    .modal-head h3{font-size:13.5px;}
+    .modal-close{font-size:22px;padding:8px 10px;min-width:40px;min-height:40px;}
+    .modal-body{padding:4px 13px 20px;-webkit-overflow-scrolling:touch;}
+    .modal-subtitle{margin:16px 0 8px;font-size:11.5px;}
+    #tbl-day-modal, #tbl-day-modal-visits, #tbl-day-modal-regs{font-size:12px;}
     /* País ocupa mucho y es lo menos crítico en pantallas chicas */
     #tbl-day-modal th:nth-child(3), #tbl-day-modal td:nth-child(3),
     #tbl-day-modal-visits th:nth-child(3), #tbl-day-modal-visits td:nth-child(3){display:none;}
   }
 
   @media (max-width:400px){
-    .cards{grid-template-columns:1fr 1fr;}
-    .card .v{font-size:17px;}
-    .btn{padding:6px 8px;font-size:11px;}
-    .topbar img{width:22px;}
+    .cards{grid-template-columns:1fr 1fr;gap:8px;}
+    .card{padding:10px 12px;}
+    .card .v{font-size:18px;}
+    .btn{padding:8px 10px;font-size:11.5px;}
+    .topbar img{width:24px;}
+    .tab-btn{padding:9px 12px;font-size:12.5px;}
+  }
+
+  /* Sin hover real en touch: los tooltips ⓘ con solo title="" quedan
+     inalcanzables con el dedo. Un tap alterna un tooltip propio en vez de
+     depender del title nativo del navegador (ver JS más abajo). */
+  @media (hover:none){
+    .help{position:relative;}
+    .help.tt-open::after{
+      content:attr(data-tt); position:absolute; z-index:30; left:50%; bottom:calc(100% + 8px);
+      transform:translateX(-50%); width:max-content; max-width:min(78vw,320px);
+      background:#0e1830; border:1px solid var(--border); border-radius:8px;
+      padding:9px 11px; font-size:11.5px; line-height:1.5; color:var(--text);
+      box-shadow:0 12px 30px rgba(0,0,0,.5); white-space:normal; text-align:left;
+    }
   }
 </style>
 </head>
@@ -452,6 +520,12 @@
         <div class="box">
           <h2>Países conectados</h2>
           <div class="table-scroll"><table id="tbl-countries"><tbody></tbody></table></div>
+        </div>
+        <div class="box">
+          <h2>Fuentes de tráfico
+            <span class="sub"><span class="help" title="Se identifica agregando ?src=nombre al link (ej. play/?src=yt en el anuncio de YouTube). 'sin fuente' es tráfico orgánico/directo sin ese parámetro. % jugó = de los visitantes de esa fuente, cuántos llegaron a jugar algo en el mismo período.">ⓘ</span></span>
+          </h2>
+          <div class="table-scroll"><table id="tbl-sources"><tbody></tbody></table></div>
         </div>
       </div>
     </section>
@@ -863,6 +937,7 @@ function render(data){
   renderModes(data.gamesByMode||{});
   renderHourly(data.hourly||[]);
   renderCountries(data.topCountries||[]);
+  renderSources(data.topSources||[]);
   renderRetention(data.retention||{});
   renderFunnel(data.funnel||{});
   renderActiveUsers(data.series||{});
@@ -1464,6 +1539,13 @@ function renderCountries(rows){
     rows.map(r=>`<tr><td><span class="flag">${flag(r.code)}</span>${countryName(r.code)}</td><td class="n">${r.count.toLocaleString('es')}</td></tr>`).join('');
 }
 
+function renderSources(rows){
+  const tb = $('tbl-sources').querySelector('tbody');
+  if(!rows.length){ tb.innerHTML = '<tr><td class="empty">Sin datos en este período</td></tr>'; return; }
+  tb.innerHTML = '<tr><th>Fuente</th><th style="text-align:right">Visitantes</th><th style="text-align:right">Jugaron</th><th style="text-align:right">% jugó</th></tr>' +
+    rows.map(r=>`<tr><td>${escapeHtml(r.source)}</td><td class="n">${r.visitors.toLocaleString('es')}</td><td class="n">${r.played.toLocaleString('es')}</td><td class="n">${r.rate}%</td></tr>`).join('');
+}
+
 function renderRetention(r){
   const cards = [
     ['dau','🟢','Activos hoy (DAU)','Cuentas con actividad en las últimas 24 horas.'],
@@ -1722,6 +1804,18 @@ function renderAccountGames(games){
   return `<div class="table-scroll"><table><tr><th>Fecha</th><th>Modo</th><th style="text-align:right">Score</th></tr>${rows}</table></div>`;
 }
 $('accounts-search').addEventListener('input', applyAccountsView);
+
+// ── Tooltips ⓘ táctiles: en touch no hay :hover para leer el title nativo,
+// así que un tap alterna un globo propio (ver CSS @media (hover:none) .help).
+// Los .help se re-crean en cada render() (innerHTML), por eso va delegado.
+document.addEventListener('click', (e)=>{
+  const help = e.target.closest && e.target.closest('.help');
+  document.querySelectorAll('.help.tt-open').forEach(h=>{ if(h!==help) h.classList.remove('tt-open'); });
+  if(!help || !window.matchMedia('(hover:none)').matches) return;
+  if(!help.dataset.tt) help.dataset.tt = help.getAttribute('title') || '';
+  help.classList.toggle('tt-open');
+  e.stopPropagation();
+});
 
 // ── Sesión recordada ──────────────────────────────────────────────────────────
 (async function(){
