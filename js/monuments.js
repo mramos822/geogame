@@ -9278,8 +9278,15 @@ document.getElementById('vol-btn')?.addEventListener('click', () => {
     const msg  = document.getElementById('screen-warning-msg');
     const sub  = document.getElementById('screen-warning-sub');
     if (icon) icon.textContent = '📱';
-    if (msg)  msg.textContent  = 'Rotá el teléfono a horizontal para jugar.';
-    if (sub)  sub.textContent  = 'Rotate your phone to landscape to play.';
+    // Antes mostraba español e inglés a la vez, fijo. Ahora un solo idioma,
+    // el actual del juego — y se re-aplica solo si el jugador cambia de
+    // idioma en caliente (ver onLangChange, js/i18n.js) sin recargar.
+    const applyRotateMsg = () => {
+      if (msg) msg.textContent = (typeof t === 'function') ? t('screen.rotate') : 'Rotá el teléfono a horizontal para jugar.';
+      if (sub) sub.textContent = '';
+    };
+    applyRotateMsg();
+    if (typeof onLangChange === 'function') onLangChange(applyRotateMsg);
   }
 
   function check() {

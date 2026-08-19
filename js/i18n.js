@@ -277,6 +277,7 @@ const I18N = {
     'screen.resize': 'Redimensiona la ventana para una experiencia óptima.',
     'screen.tooWide': 'La pantalla es demasiado ancha. Redimensiona la ventana verticalmente.',
     'screen.tooTall': 'La pantalla es demasiado alta. Redimensiona la ventana horizontalmente.',
+    'screen.rotate': 'Rotá el teléfono a horizontal para jugar.',
   },
   en: {
     'mode.shapes': 'Countries', 'mode.cities': 'Cities', 'mode.flags': 'Flags', 'mode.monuments': 'Monuments',
@@ -533,14 +534,15 @@ const I18N = {
     'screen.resize': 'Resize the window for the best experience.',
     'screen.tooWide': 'The screen is too wide. Resize the window vertically.',
     'screen.tooTall': 'The screen is too tall. Resize the window horizontally.',
+    'screen.rotate': 'Rotate your phone to landscape to play.',
   },
 };
 
 // Sin idioma guardado todavía (primera visita): usar el idioma del
-// navegador/SO en vez de un default fijo -- es instantaneo (a diferencia de
-// geolocalizar por IP, que necesitaria esperar un fetch antes de poder
-// pintar la UI) y en la practica es una senal mas confiable de en que
-// idioma prefiere jugar alguien que el pais donde esta fisicamente.
+// navegador/SO en vez de un default fijo — es instantáneo (a diferencia de
+// geolocalizar por IP, que necesitaría esperar un fetch antes de poder
+// pintar la UI) y en la práctica es una señal más confiable de en qué
+// idioma prefiere jugar alguien que el país donde está físicamente.
 function _defaultLangByLocale() {
   try {
     const langs = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || ''];
