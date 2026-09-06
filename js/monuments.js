@@ -3032,6 +3032,17 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
   let _rankingsRTChannel = null; // realtime channel
   let _allGlobalRows = null;     // full sorted list for rank computation
 
+  // 4ta pestaña "Invitados" (partidas de gente sin cuenta, ver
+  // analytics_events) — visible SOLO para esta cuenta (BlueLite/admin). La
+  // seguridad real vive en el RPC get_guest_rankings (SECURITY DEFINER con
+  // el mismo chequeo de uid adentro) — analytics_events no tiene policy de
+  // SELECT para nadie, así que ocultar el botón acá es solo para que no
+  // aparezca a la vista, no lo único que protege el dato.
+  const ADMIN_GUEST_RANKINGS_UID = '530cb816-8562-4e7e-a538-15c6713fcc8d';
+  function _escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
   const SEL = 'id, username, avatar_url, hs_flags, hs_shapes, hs_cities, hs_monuments, hs_total, play_count, vs_wins, vs_losses, is_supporter, avg_sum_flags, avg_sum_shapes, avg_sum_cities, avg_sum_monuments, play_count_flags, play_count_shapes, play_count_cities, play_count_monuments, country_code, is_founder, cell_code, frame_code, panel_code';
 
   function _totalScore(p) {
@@ -3125,6 +3136,28 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
     return rows;
   }
 
+  // Invitados sin cuenta, mejor puntaje de campaña por visitor_id — ver
+  // get_guest_rankings (RPC, Supabase). No hay id de perfil real (isGuest
+  // marca esto para que renderRankings los pinte distinto: sin marco/celda
+  // personalizada, sin click a un perfil que no existe).
+  async function fetchTopGuests() {
+    if (_rankingsCache.guests) return _rankingsCache.guests;
+    if (!window.sb || window._sbUserId !== ADMIN_GUEST_RANKINGS_UID) return [];
+    const { data, error } = await window.sb.rpc('get_guest_rankings', { p_limit: 100 });
+    if (error) { console.warn('[rankings] guests:', error.message); return []; }
+    const rows = (data || []).map((g, i) => ({
+      isGuest: true,
+      id: null,
+      name: g.guest_name || '?',
+      score: g.best_score || 0,
+      country_code: g.country_code || null,
+      play_count: g.play_count || 0,
+      rank: i + 1,
+    }));
+    _rankingsCache.guests = rows;
+    return rows;
+  }
+
   // Puesto global de un id cualquiera (para el badge de copa en los paneles
   // de perfil). Reusa el listado completo ya ordenado por fetchTopGlobal.
   async function getGlobalRankForId(id) {
@@ -3171,19 +3204,41 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
     if (!list) return;
     if (rows === null) { list.innerHTML = '<div class="rankings-msg">' + t('rankings.notLoggedIn') + '</div>'; return; }
     if (!rows.length) {
-      list.innerHTML = '<div class="rankings-msg">' + t(tab === 'friends' ? 'rankings.noFriends' : 'rankings.noData') + '</div>';
+      list.innerHTML = '<div class="rankings-msg">' + (tab === 'guests' ? 'Sin partidas de invitados todavía.' : t(tab === 'friends' ? 'rankings.noFriends' : 'rankings.noData')) + '</div>';
       return;
     }
     const myId = window._sbProfile?.id;
     list.innerHTML = '';
     rows.forEach(r => {
-      const isMe = myId && r.id === myId;
       const rk   = (typeof getRank === 'function') ? getRank(r.score) : { name: '', img: 'images/ranks/1.png' };
       const medalCls = r.rank === 1 ? ' rk-gold' : r.rank === 2 ? ' rk-silver' : r.rank === 3 ? ' rk-bronze' : '';
       const el = document.createElement('div');
+      const flagUrl = window.flagUrlForCountryCode?.(r.country_code);
+      // Invitados (tab "guests", solo admin): sin cuenta real de por medio
+      // — nada de marco/celda personalizada (no existen para ellos) ni
+      // click a un perfil que no existe. guest_name es texto libre sin el
+      // pipeline de validación que sí pasa un username real, por eso se
+      // escapa acá (en el resto de las filas no hace falta, r.name viene
+      // de profiles.username ya validado en el registro).
+      if (r.isGuest) {
+        el.className = 'loading-social-row';
+        el.innerHTML =
+          `<span class="rankings-pos${medalCls}">#${r.rank}</span>` +
+          _socialAvatarHtml('images/profilepic/ppdefault.png', '0001') +
+          `<div class="loading-social-info"><span class="loading-social-name">${_escapeHtml(r.name)}</span></div>` +
+          `<div class="loading-social-score">` +
+            (flagUrl ? `<img class="loading-social-flag" src="${flagUrl}" alt="" draggable="false" oncontextmenu="return false">` : '') +
+            `<img class="loading-social-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">` +
+            `<span class="loading-social-score-val">${r.score.toLocaleString()}</span>` +
+          `</div>` +
+          `<span class="loading-social-rankname">${rk.name}</span>` +
+          `<img class="loading-social-emote" src="${rk.img}" alt="" draggable="false" oncontextmenu="return false">`;
+        list.appendChild(el);
+        return;
+      }
+      const isMe = myId && r.id === myId;
       el.className = 'loading-social-row' + (isMe ? ' is-me-row' : '') + (window.CUSTOMIZE_CELL_LIGHT_TEXT?.has(r.cellCode) ? ' cell-light-text' : '');
       el.style.setProperty('--cust-cell', `url('${window.CustomizeAssets.cellUrl(r.cellCode)}')`);
-      const flagUrl = window.flagUrlForCountryCode?.(r.country_code);
       el.innerHTML =
         `<span class="rankings-pos${medalCls}">#${r.rank}</span>` +
         _socialAvatarHtml(r.avatar, r.frameCode) +
@@ -3265,11 +3320,13 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
     let rows;
     if (tab === 'top100')       rows = await fetchTop100();
     else if (tab === 'global')  rows = await fetchTopGlobal();
+    else if (tab === 'guests')  rows = await fetchTopGuests();
     else                        rows = await fetchTopFriends();
     if (_activeRTab !== tab) return;
     renderRankings(rows, tab);
-    // Subscribe realtime to IDs now visible
-    if (rows && rows.length) _subscribeRealtime(rows.map(r => r.id));
+    // Subscribe realtime to IDs now visible — los invitados no tienen fila
+    // en profiles, no hay nada a lo que suscribirse.
+    if (tab !== 'guests' && rows && rows.length) _subscribeRealtime(rows.map(r => r.id));
   }
 
   // ── open / close ──────────────────────────────────────────────────────────────
@@ -3277,6 +3334,8 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
     sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
     document.getElementById('loading-rankings-group')?.classList.remove('table-gone');
     document.getElementById('loading-screen').classList.add('table-shown');
+    const guestsTab = document.getElementById('loading-rankings-tab-guests');
+    if (guestsTab) guestsTab.style.display = (window._sbUserId === ADMIN_GUEST_RANKINGS_UID) ? '' : 'none';
     _rankingsCache = {};
     _rankingsRawMap = {};
     _allGlobalRows = null;
