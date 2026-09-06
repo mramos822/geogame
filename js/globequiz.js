@@ -251,16 +251,34 @@
   // ~2700km) sin llegar a los exclaves de verdad (Hawaii-EEUU continental
   // ~6000km centroide a centroide, Guyana Francesa-Francia bastante más).
   const CORE_CLUSTER_KM = 3000;
+  // `p[0]` de cada polígono es el anillo EXTERIOR — el resto (p[1], p[2]...)
+  // son AGUJEROS, y en este dataset un agujero es exactamente el borde
+  // compartido con un país enclave (Italia tiene uno para San Marino y otro
+  // para el Vaticano; Sudáfrica uno para Lesoto). Antes esta función solo
+  // miraba p[0] de cada polígono para decidir qué es "territorio núcleo" Y
+  // para juntar los puntos de frontera — de paso descartaba esos agujeros
+  // por completo, así que la frontera real con el enclave nunca entraba a la
+  // comparación de minBorderDistance: el punto más cercano terminaba siendo
+  // de la costa exterior, varios km lejos en vez de 0 (el "San Marino a
+  // 15km de Italia" reportado). Ahora se sigue usando SOLO p[0] para decidir
+  // qué polígonos son núcleo vs. exclave lejano (mismo criterio de
+  // CORE_CLUSTER_KM), pero una vez que un polígono califica como núcleo se
+  // suman TODOS sus anillos, agujeros incluidos.
   function borderPoints(geometry) {
     const polyList = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates;
-    const rings = polyList.map(p => p[0]);
-    if (rings.length === 1) return _downsampleBorder(rings[0]);
+    if (polyList.length === 1) {
+      let all = [];
+      polyList[0].forEach(ring => { all = all.concat(ring); });
+      return _downsampleBorder(all);
+    }
+    const outerRings = polyList.map(p => p[0]);
     const main = mainRing(geometry);
     const mainCentroid = centroidOfRing(main);
     let all = [];
-    rings.forEach(ring => {
-      if (ring === main || haversine(mainCentroid, centroidOfRing(ring)) <= CORE_CLUSTER_KM) {
-        all = all.concat(ring);
+    polyList.forEach((rings, i) => {
+      const outer = outerRings[i];
+      if (outer === main || haversine(mainCentroid, centroidOfRing(outer)) <= CORE_CLUSTER_KM) {
+        rings.forEach(ring => { all = all.concat(ring); });
       }
     });
     return _downsampleBorder(all);
@@ -768,6 +786,12 @@
   ];
   let gqCountdownTimeout = null, gqCountdownAborted = false;
   let gqEndgameTimeout = null;
+  // VS 1v1: cuánto dura la animación de cada lado (festejo del ganador acá,
+  // gameover.png del perdedor en vs.js) antes de que aparezca el cartel de
+  // ganaste/perdiste — mismo valor en ambos archivos para que terminen
+  // más o menos a la vez.
+  const GQ_VS_ANIM_MS = 2000;
+  window._GQ_VS_ANIM_MS = GQ_VS_ANIM_MS;
   // elapsedMs (opcional): cuánto del 3-2-1 ya pasó de otro lado — lo usa el
   // espectador (ver globequizSpectatorShowPregame) para arrancar en el número
   // que corresponde en vez de siempre desde "3", si se conecta a mitad de la
@@ -1291,9 +1315,21 @@
   // (_specReportAnswer win / _specReportPostgame) — nada de esto dependía de
   // que el país fuera predecible por fecha.
   function pickDailyCountry() {
-    const idx = Math.floor(Math.random() * countries.length);
+    const idx = Math.floor(gqRand() * countries.length);
     dailyCountry = countries[idx];
   }
+
+  // VS 1v1: host y guest arrancan con el mismo seed (ver vs.js
+  // _startSeededRandom) así que pickDailyCountry() de arriba les da el MISMO
+  // país sin transmitirlo nunca — mismo patrón que citiesSetSeed/
+  // monumentsSetSeed (xorshift determinístico).
+  let _gqSeededRand = null;
+  function gqRand() { return _gqSeededRand ? _gqSeededRand() : Math.random(); }
+  window.globequizSetSeed = function(seed) {
+    let s = seed >>> 0; if (!s) s = 1;
+    _gqSeededRand = () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return (s >>> 0) / 0x100000000; };
+  };
+  window.globequizClearSeed = function() { _gqSeededRand = null; };
 
   // Estilo "bar chart race": el guess más cercano (arriba) se ve más grande,
   // achicándose a medida que baja de posición. Al reordenar (nuevo guess más
@@ -1715,8 +1751,17 @@
       // game over — si no, la última pintura del intervalo de 30ms (gqCardInterval,
       // ya detenido en stopTimer) puede quedar hasta 30ms más vieja que
       // gqFinalElapsedMs y mostrar un dígito distinto entre carta y panel.
-      const gqCardEl = document.getElementById('gq-lb-player-time');
-      if (gqCardEl) gqCardEl.textContent = formatGqCardTime(gqFinalElapsedMs);
+      // En VS, #gq-lb-player-time no es texto plano: globequizVsPrepareOpponentRow
+      // le puso adentro dos spans (tiempo/km, ver gq-lb-vs-score) — pisar
+      // textContent acá los borraría y dejaría la cartita en una sola línea
+      // durante el festejo (showWin() no oculta .gq-friends-bar).
+      if (window._vsActive) {
+        const gqCardValEl = document.getElementById('gq-lb-player-time-val');
+        if (gqCardValEl) gqCardValEl.textContent = formatGqCardTime(gqFinalElapsedMs);
+      } else {
+        const gqCardEl = document.getElementById('gq-lb-player-time');
+        if (gqCardEl) gqCardEl.textContent = formatGqCardTime(gqFinalElapsedMs);
+      }
       // playMusic(null) en vez de sfxGameMusic.pause() directo — en iOS el
       // audio real de gamemusic corre por un AudioBufferSourceNode aparte
       // (Web Audio, ver playMusicIOS en monuments.js), no por el <audio>
@@ -1733,6 +1778,27 @@
       showWin();
       updateHint();
       focusOnCountry(country);
+      // VS 1v1: el broadcast de victoria sale YA MISMO (para que el rival
+      // arranque su animación de gameover.png lo antes posible, ver
+      // _handleGqOpponentWin en vs.js), pero MI PROPIO cartel de "GANASTE"
+      // espera los mismos GQ_VS_ANIM_MS que showWin() necesita para verse
+      // (confeti + celda verde, igual que el 1 player) — así ambos lados
+      // terminan su animación (festejo acá, gameover.png allá) y recién ahí
+      // aparece el ganaste/perdiste, más o menos a la vez en las dos
+      // pantallas (el reportado: "durante esa animación... al perdedor le
+      // sale el gameover.png").
+      if (window._vsActive) {
+        gqVsWon = true;
+        if (typeof window._vsReportGqWin === 'function') {
+          window._vsReportGqWin(gqFinalElapsedMs, dailyCountry.name, dailyCountry.iso2);
+        }
+        gqEndgameTimeout = setTimeout(() => {
+          gqEndgameTimeout = null;
+          if (typeof window._vsShowGqWinResult === 'function') window._vsShowGqWinResult(gqFinalElapsedMs);
+          if (typeof window._setPlaying === 'function') window._setPlaying(false);
+        }, GQ_VS_ANIM_MS);
+        return;
+      }
       if (typeof window._specReportAnswer === 'function') {
         window._specReportAnswer(true, guesses.length + 1, {
           win: true, countryName: dailyCountry.name, iso2: dailyCountry.iso2, elapsedMs: gqFinalElapsedMs,
@@ -1767,7 +1833,23 @@
     const g = { name: country.name, km, dir, color: distColor(km) };
     guesses.push(g);
     if (typeof window._specReportAnswer === 'function') {
-      window._specReportAnswer(false, guesses.length, { name: g.name, km: g.km, dir: g.dir, color: g.color });
+      // VS 1v1: solo km/dir, NUNCA el nombre del país tipeado (spoilearía la
+      // zona que está probando el rival) — el modo solo/espectador sí recibe
+      // el detail completo (reconstruye la fila con bandera y todo).
+      const detail = window._vsActive
+        ? { km: g.km, dir: g.dir }
+        : { name: g.name, km: g.km, dir: g.dir, color: g.color };
+      // En VS, `score` viaja hasta VS.reportScore y se persiste tal cual en
+      // host_score/guest_score de la fila de match (ver _vsReportAnswer) —
+      // GlobeQuiz no tiene puntaje numérico, así que mandar guesses.length
+      // ahí contaminaba ese campo con el conteo de intentos (visible si el
+      // rival abandona: _showVsResultForAbandon lo lee de la fila y lo graba
+      // en el historial vía reportPostgame). El modo solo/espectador sí
+      // necesita guesses.length acá (lo usa SoloSpectate.reportAnswer).
+      window._specReportAnswer(false, window._vsActive ? 0 : guesses.length, detail);
+    }
+    if (window._vsActive && typeof window.globequizVsUpdateOwnGuess === 'function') {
+      window.globequizVsUpdateOwnGuess(km);
     }
     // Lista completa (no solo este guess) para que alguien que se une a
     // mitad de partida la reciba entera al conectarse — ver reportGqGuesses/
@@ -1781,6 +1863,34 @@
     updateHint();
     focusOnCountry(country);
   }
+
+  // VS 1v1: el rival acertó primero — llamado desde vs.js (_handleGqOpponentWin)
+  // apenas llega el broadcast de victoria. dailyCountry ya lo tenía este
+  // cliente de entrada (mismo seed, ver globequizSetSeed), así que no hace
+  // falta esperar nada del payload para revelarlo — solo frena input/timer y
+  // muestra dónde estaba, sin el festejo de showWin() (esto no es un acierto
+  // propio).
+  window.globequizVsShowLoss = function () {
+    if (solved) return;
+    solved = true;
+    stopTimer();
+    stopAutoRotate();
+    const input = document.getElementById('gq-guess-input');
+    const btn = document.getElementById('gq-guess-btn');
+    if (input) input.disabled = true;
+    if (btn) btn.classList.add('gq-disabled');
+    drawTexture();
+    renderGuessList();
+    updateHint();
+    if (dailyCountry) focusOnCountry(dailyCountry);
+    // Game over instantáneo para quien pierde — mismo sfx que usan
+    // cities/monuments cuando se les acaba el tiempo (sfx/timesup.mp3),
+    // acá dispara apenas se entera de que el rival ya acertó.
+    if (typeof playMusic === 'function') playMusic(null);
+    if (typeof sfxTimesUp !== 'undefined' && typeof sfxPlay === 'function') {
+      sfxTimesUp.currentTime = 0; sfxPlay(sfxTimesUp);
+    }
+  };
 
   // Texto de ayuda debajo del input: instrucciones antes del primer guess,
   // "más caliente/frío" (comparado con el guess anterior) o "limita con tu
@@ -1904,6 +2014,12 @@
     const cardEl = document.getElementById('gq-lb-player-time');
     if (!cardEl) return;
     const elapsedMs = Date.now() - gqTimerStart;
+    // VS 1v1: las dos cartas (mía y la del rival) corren el MISMO cronómetro
+    // compartido (arriba, ver globequizVsSetTime) — el km de abajo lo pisan
+    // aparte globequizVsUpdateOwnGuess/globequizSetVsOpponentGuess por cada
+    // guess. No hay reorden por tiempo acá (eso es solo para la barra de
+    // amigos diaria, ver positionGqLeaderboard más abajo).
+    if (window._vsActive) { globequizVsSetTime(elapsedMs); return; }
     const wholeSec = Math.floor(elapsedMs / 1000);
     const centis = Math.floor((elapsedMs % 1000) / 10);
     cardEl.textContent = wholeSec + ':' + String(centis).padStart(2, '0');
@@ -1942,6 +2058,10 @@
     const centis = Math.floor((ms % 1000) / 10);
     return wholeSec + ':' + String(centis).padStart(2, '0');
   }
+  // Expuesta para que vs.js pueda formatear el tiempo del ganador en la
+  // pantalla de resultado del duelo (#vs-result-me-score/opp-score), sin
+  // duplicar el formato acá y allá.
+  window.formatGqCardTime = formatGqCardTime;
 
   // Reconstruye las filas de amigos desde cero (llamado al arrancar cada
   // partida) — lee el snapshot actual de getFriends() (js/friends.js), así
@@ -1949,6 +2069,9 @@
   // primera partida, simplemente no hay filas de amigos esa vez (igual que
   // buildFriendPlayers en monuments.js, mismo criterio de "mejor esfuerzo").
   function buildGqFriendRows() {
+    // En VS 1v1 esta barra no muestra amigos del día — muestra al rival del
+    // duelo (ver globequizVsPrepareOpponentRow), basado en km, no en tiempo.
+    if (window._vsActive) return;
     const bar = document.getElementById('gq-friends-bar');
     const playerEl = document.getElementById('gq-lb-player');
     if (!bar || !playerEl) return;
@@ -1987,6 +2110,133 @@
       gqLbElements[f.id] = el;
     });
   }
+
+  // ── VS 1v1: fila del rival en .gq-friends-bar ──────────────────────────────
+  // Mismo estilo lb-vsopp que usan cities/monuments para el rival (ver
+  // citiesSpectatorSetPlayerCard en monuments.js) — acá en vez de comparar
+  // puntaje o tiempo se compara km (más cerca = mejor puesto). gqVsOppBestKm/
+  // gqVsMyBestKm son Infinity hasta el primer guess de cada lado.
+  let gqVsOppBestKm = Infinity;
+  let gqVsMyBestKm = Infinity;
+  // true solo cuando ESTE cliente fue el que acertó (ver rama de victoria en
+  // submitGuess) — distingue el conteo de intentos del ganador (sus guesses
+  // fallidos + el acierto final) del perdedor (solo sus fallidos, nunca
+  // acertó), ver globequizGetVsSummary.
+  let gqVsWon = false;
+
+  function formatGqKm(km) {
+    return (km == null || !isFinite(km)) ? '—' : Math.round(km) + ' km';
+  }
+  // Tiempo arriba, km del último guess abajo — mismo `.lb-score` de siempre,
+  // pero con dos líneas propias (gq-lb-vs-score, ver style.css) en vez del
+  // único valor que usa el modo solo/campaña. Sin flecha de acercarse/
+  // alejarse (se sacó a pedido: el km crudo ya alcanza).
+  function gqVsScoreInnerHtml(timeId, kmId) {
+    return '<span class="gq-lb-vs-time" id="' + timeId + '">0:00</span>'
+      + '<span class="gq-lb-vs-km" id="' + kmId + '">—</span>';
+  }
+
+  window.globequizVsPrepareOpponentRow = function () {
+    const bar = document.getElementById('gq-friends-bar');
+    const playerEl = document.getElementById('gq-lb-player');
+    if (!bar || !playerEl) return;
+    bar.querySelectorAll('.lb-entry[data-gq-friend]').forEach(el => el.remove());
+    gqVsOppBestKm = Infinity;
+    gqVsMyBestKm = Infinity;
+    gqVsWon = false;
+    const opp = window._vsOpponent || {};
+    let el = document.getElementById('gq-lb-vsopp');
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'lb-entry lb-vsopp';
+      el.id = 'gq-lb-vsopp';
+      el.innerHTML = '<div class="lb-avatar"><img class="lb-avatar-img" id="gq-lb-vsopp-avatar" src="images/profilepic/ppdefault.png"></div>'
+        + '<span class="lb-name" id="gq-lb-vsopp-name"></span>'
+        + '<span class="lb-score gq-lb-vs-score" id="gq-lb-vsopp-score"></span>';
+      bar.appendChild(el);
+    }
+    document.getElementById('gq-lb-vsopp-name').textContent = opp.name || 'Rival';
+    document.getElementById('gq-lb-vsopp-avatar').src = opp.avatar || 'images/profilepic/ppdefault.png';
+    document.getElementById('gq-lb-vsopp-score').innerHTML = gqVsScoreInnerHtml('gq-lb-vsopp-time', 'gq-lb-vsopp-km');
+    window.CustomizeAssets?.applyCard(el, opp.cardCode || '0001');
+    const myScoreEl = document.getElementById('gq-lb-player-time');
+    if (myScoreEl) {
+      myScoreEl.classList.add('gq-lb-vs-score');
+      myScoreEl.innerHTML = gqVsScoreInnerHtml('gq-lb-player-time-val', 'gq-lb-player-km');
+    }
+    gqLbElements = { player: playerEl, vsopp: el };
+    lastGqPlayerRank = -1;
+    positionGqVsLeaderboard(false);
+  };
+
+  // Reordena las dos filas (jugador/rival) según quién tiene el mejor
+  // (mínimo) km logrado hasta ahora — mismo mecanismo de `top` animado que
+  // positionGqLeaderboard, pero con criterio de distancia en vez de tiempo.
+  // Ancladas ABAJO de la ventana de GQ_LB_WINDOW filas (mismo criterio que
+  // positionGqLeaderboard/bottomOffset) — sin esto las dos cartas quedaban
+  // arriba de la barra en vez de abajo (el "se pusieron en el medio"
+  // reportado, ya que .gq-friends-bar centra su contenido).
+  function positionGqVsLeaderboard(animate) {
+    const playerEl = gqLbElements.player, oppEl = gqLbElements.vsopp;
+    if (!playerEl || !oppEl) return;
+    const all = [{ id: 'player', km: gqVsMyBestKm }, { id: 'vsopp', km: gqVsOppBestKm }];
+    all.sort((a, b) => a.km - b.km);
+    const bottomOffset = (GQ_LB_WINDOW - all.length) * GQ_LB_ROW_H_CQMIN;
+    if (!animate) { [playerEl, oppEl].forEach(el => { el.style.transition = 'none'; }); }
+    all.forEach((p, rank) => { gqLbElements[p.id].style.top = (rank * GQ_LB_ROW_H_CQMIN + bottomOffset) + 'cqmin'; });
+    if (!animate) {
+      requestAnimationFrame(() => { [playerEl, oppEl].forEach(el => { el.style.transition = ''; }); });
+    }
+  }
+
+  // Tick compartido (ver updateCardTime): las dos cartas corren el MISMO
+  // cronómetro (arrancan sincronizadas por el mismo 3-2-1, ver
+  // _scheduleVersusStart en vs.js) — no hace falta transmitir el tiempo del
+  // rival por separado, alcanza con mostrarle a los dos mi propio elapsedMs.
+  function globequizVsSetTime(elapsedMs) {
+    const t = formatGqCardTime(elapsedMs);
+    const mine = document.getElementById('gq-lb-player-time-val');
+    if (mine) mine.textContent = t;
+    const opp = document.getElementById('gq-lb-vsopp-time');
+    if (opp) opp.textContent = t;
+  }
+
+  // Llamado desde submitGuess() con MI propio guess (VS) — refleja el mismo
+  // tratamiento visual que la fila del rival, para que ambas cartas se lean
+  // igual (km del último intento).
+  window.globequizVsUpdateOwnGuess = function (km) {
+    gqVsMyBestKm = Math.min(gqVsMyBestKm, km);
+    const el = document.getElementById('gq-lb-player-km');
+    // Muestra el MEJOR km hasta ahora, no el del guess recién tipeado — si
+    // no, un guess peor que uno anterior "reemplazaba" visualmente el más
+    // cercano ya logrado (el reportado: "se tiene que mantener con el más
+    // cercano, no con el próximo que escoge").
+    if (el) el.textContent = formatGqKm(gqVsMyBestKm);
+    positionGqVsLeaderboard(true);
+  };
+
+  // Llamado desde vs.js (VS.onAnswer) con el guess incorrecto del rival —
+  // nunca trae el nombre del país que probó, solo km (ver submitGuess).
+  window.globequizSetVsOpponentGuess = function (km) {
+    gqVsOppBestKm = Math.min(gqVsOppBestKm, km);
+    const el = document.getElementById('gq-lb-vsopp-km');
+    if (el) el.textContent = formatGqKm(gqVsOppBestKm);
+    positionGqVsLeaderboard(true);
+  };
+
+  // Resumen de MI progreso al terminar un duelo (gané o perdí) — usado por
+  // vs.js para completar la pantalla de resultado (ver _showVsResult /
+  // _handleGqOpponentWin en vs.js). guessCount suma +1 solo si gané (el
+  // acierto final nunca se empuja a `guesses`, ver rama de victoria en
+  // submitGuess) — quien perdió nunca acertó, así que su cuenta es solo la
+  // de sus intentos fallidos.
+  window.globequizGetVsSummary = function () {
+    return {
+      bestKm: isFinite(gqVsMyBestKm) ? gqVsMyBestKm : null,
+      countryName: dailyCountry ? displayName(dailyCountry) : null,
+      guessCount: guesses.length + (gqVsWon ? 1 : 0),
+    };
+  };
 
   // Ordena por tiempo ascendente (menor tiempo = mejor puesto) y ubica cada
   // carta con `top` dentro de una ventana fija de GQ_LB_WINDOW filas (igual
@@ -2041,6 +2291,10 @@
   // en monuments.js.
   function resetLeaderboardOrder() {
     if (gqEmoteTimeout) { clearTimeout(gqEmoteTimeout); gqEmoteTimeout = null; }
+    // VS 1v1 arma/posiciona su propia fila aparte (globequizVsPrepareOpponentRow,
+    // ya llamada por vs.js antes de initGlobeQuiz) — no tocar acá, evita pisar
+    // la fila del rival con la lógica de amigos-por-tiempo de más abajo.
+    if (window._vsActive) return;
     buildGqFriendRows();
     lastGqPlayerRank = -1;
     positionGqLeaderboard(0, false);
@@ -2066,6 +2320,41 @@
   window.stopGlobeQuizTimer = stopTimer;
   window.stopGlobeQuizAutoRotate = stopAutoRotate;
   window.stopGlobeQuizInertia = stopInertia;
+
+  // Corte total del modo (VS: rival abandonó, o quitToMenu genérico
+  // encontrándose con un duelo en curso) — mismo criterio de limpieza que ya
+  // hace gq-quit-confirm a mano (monuments.js), reunido acá para poder
+  // reusarlo desde vs.js (_onOpponentAbandoned) y desde window.gameStoppers.
+  function globequizHardReset() {
+    stopTimer();
+    stopAutoRotate();
+    stopInertia();
+    abortGqPregameCountdown();
+    if (typeof window.stopGlobeQuizEndgameTimer === 'function') window.stopGlobeQuizEndgameTimer();
+    stopGqEndgameCountdown();
+    if (gqEndgameTimeout) { clearTimeout(gqEndgameTimeout); gqEndgameTimeout = null; }
+    const modal = document.getElementById('gq-endgame-modal');
+    if (modal) modal.style.display = 'none';
+    if (typeof playMusic === 'function') playMusic(null);
+    const screenEl = document.getElementById('globequiz-screen');
+    if (screenEl) screenEl.style.display = 'none';
+    guesses = [];
+    solved = false;
+    animatedGuessNames = new Set();
+    dailyCountry = null;
+    gqVsOppBestKm = Infinity;
+    gqVsMyBestKm = Infinity;
+    // Deshacer el layout de dos líneas (tiempo/km) de la cartita propia y
+    // sacar la fila del rival — si no, la próxima partida SOLO (que reusa
+    // el mismo #gq-lb-player-time) arrancaría con el HTML/clase de VS
+    // pegados.
+    const myScoreEl = document.getElementById('gq-lb-player-time');
+    if (myScoreEl) { myScoreEl.classList.remove('gq-lb-vs-score'); myScoreEl.textContent = '0:00'; }
+    document.getElementById('gq-lb-vsopp')?.remove();
+  }
+  window.globequizHardReset = globequizHardReset;
+  window.gameStoppers = window.gameStoppers || [];
+  window.gameStoppers.push(globequizHardReset);
 
   window.initGlobeQuiz = function () {
     const wireOnce = !initialized;
@@ -2156,29 +2445,43 @@
       drawTexture();
       restoreUIState();
       fitCanvas();
-      if (spinner) spinner.style.display = 'none';
-      // Reporta el arranque del 3-2-1 para que el espectador lo mire en vivo
-      // (ver globequizSpectatorShowPregame) — antes vivía DENTRO de
-      // runGqPregameCountdown, que ahora también la llama el espectador para
-      // MOSTRAR la cuenta, no para volver a transmitirla.
-      if (typeof window._specReportPregame === 'function') {
-        window._specReportPregame({ mode: 'globequiz', startedAt: Date.now() });
-      }
-      // Música recién arranca cuando termina el 3-2-1-GO, igual que en el
-      // resto de los modos (ver runPregameCountdown en monuments.js).
-      runGqPregameCountdown(() => {
-        if (guessRow) guessRow.style.display = '';
-        if (hintEl2) hintEl2.style.display = '';
-        if (canvasEl) canvasEl.style.pointerEvents = '';
-        if (typeof playMusic === 'function' && typeof sfxGameMusic !== 'undefined') playMusic(sfxGameMusic);
-        startTimer();
-        // Un solo "round" por sesión (no hay rondas repetidas) — nunca se
-        // manda el país objetivo, solo cuándo arrancó el cronómetro, para
-        // que el espectador no vea la respuesta antes que el jugador.
-        if (typeof window._specReportRound === 'function') {
-          window._specReportRound({ mode: 'globequiz', startedAt: gqTimerStart });
+      const startGqCountdown = () => {
+        if (spinner) spinner.style.display = 'none';
+        // Reporta el arranque del 3-2-1 para que el espectador lo mire en vivo
+        // (ver globequizSpectatorShowPregame) — antes vivía DENTRO de
+        // runGqPregameCountdown, que ahora también la llama el espectador para
+        // MOSTRAR la cuenta, no para volver a transmitirla.
+        if (typeof window._specReportPregame === 'function') {
+          window._specReportPregame({ mode: 'globequiz', startedAt: Date.now() });
         }
-      });
+        // Música recién arranca cuando termina el 3-2-1-GO, igual que en el
+        // resto de los modos (ver runPregameCountdown en monuments.js).
+        runGqPregameCountdown(() => {
+          if (guessRow) guessRow.style.display = '';
+          if (hintEl2) hintEl2.style.display = '';
+          if (canvasEl) canvasEl.style.pointerEvents = '';
+          if (typeof playMusic === 'function' && typeof sfxGameMusic !== 'undefined') playMusic(sfxGameMusic);
+          startTimer();
+          // Un solo "round" por sesión (no hay rondas repetidas) — nunca se
+          // manda el país objetivo, solo cuándo arrancó el cronómetro, para
+          // que el espectador no vea la respuesta antes que el jugador.
+          if (typeof window._specReportRound === 'function') {
+            window._specReportRound({ mode: 'globequiz', startedAt: gqTimerStart });
+          }
+        });
+      };
+      // VS 1v1: no arrancar el 3-2-1 hasta que el RIVAL también termine de
+      // cargar su globo 3D (three.js + GeoJSON pesan y tardan distinto según
+      // dispositivo/red) — sin esto, quien cargaba más rápido arrancaba su
+      // cronómetro antes, ventaja real en un modo que se gana por ser el
+      // primero en acertar. El spinner de carga se queda puesto mientras se
+      // espera (ver _vsGqAwaitBothReady en vs.js, incluye timeout de
+      // seguridad por si el rival nunca llega a avisar).
+      if (window._vsActive && typeof window._vsGqAwaitBothReady === 'function') {
+        window._vsGqAwaitBothReady(startGqCountdown);
+      } else {
+        startGqCountdown();
+      }
     }).catch(err => {
       console.error('GlobeQuiz init failed', err);
       if (spinner) spinner.style.display = 'none';

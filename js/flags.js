@@ -1921,8 +1921,37 @@ function showFlagsBadge(badgeImg, bonus, streak, cxOverride, scaleOverride) {
   rafId = requestAnimationFrame(frame);
 }
 
-function startFlagsRoundRecording() {
-  const REC_SLOTS = ['Reino Unido', 'Brasil', 'Italia'];
+// Secuencia guionada para grabar el reel promocional: 5 rondas fijas con
+// dificultad creciente (la 4ta es "trampa" a propósito: banderas parecidas).
+// Cada ronda espera un delay guionado y luego simula el click en el slot
+// correcto — así se puede grabar en OBS sin jugar en vivo, tantas tomas
+// como haga falta, siempre con el mismo resultado.
+const FLAGS_REC_SEQUENCE = [
+  { flags: ['España', 'Francia', 'Alemania'],        correct: 0, delayMs: 2200 },
+  { flags: ['Japón', 'Corea del Sur', 'China'],       correct: 0, delayMs: 2000 },
+  { flags: ['Argentina', 'Brasil', 'Portugal'],       correct: 1, delayMs: 2400 },
+  { flags: ['Chad', 'Rumanía', 'Andorra'],            correct: 1, delayMs: 4500 }, // trampa: Chad/Rumanía casi idénticas
+  { flags: ['Mónaco', 'Indonesia', 'Polonia'],        correct: 1, delayMs: 3800 }, // trampa: Mónaco/Indonesia casi idénticas
+];
+
+let flagsRecScore = 0;
+
+function startFlagsRoundRecording(recIndex) {
+  recIndex = recIndex || 0;
+  const round = FLAGS_REC_SEQUENCE[recIndex];
+
+  if (!round) {
+    // Fin de la secuencia: pantalla de resultado final para el cierre del reel.
+    flagsFlagidLabel.textContent = `Score: ${flagsRecScore}`;
+    flagsFlagidLabel.style.fontSize = '4.2cqmin';
+    flagsTopGroupIds.forEach(id => {
+      const g = document.getElementById(id);
+      if (g) { g.style.pointerEvents = 'none'; g.style.display = 'none'; }
+    });
+    return;
+  }
+
+  if (recIndex === 0) flagsRecScore = 0;
 
   flagsFindLuggage.style.transition = '';
   flagsFindLuggage.style.animation  = 'none';
@@ -1932,7 +1961,7 @@ function startFlagsRoundRecording() {
   flagsFindLuggage.style.animation  = '';
   flagsFindLuggage.classList.add('scrolling');
 
-  flagsFlagidLabel.textContent         = 'Italy';
+  flagsFlagidLabel.textContent         = `Flag ${recIndex + 1}/${FLAGS_REC_SEQUENCE.length}`;
   flagsFlagidLabel.style.fontSize      = '4.2cqmin';
   flagsFlagidLabel.style.letterSpacing = '';
 
@@ -1941,59 +1970,62 @@ function startFlagsRoundRecording() {
     if (!group) return;
     group.style.display       = '';
     group.style.opacity       = '';
-    group.style.pointerEvents = 'auto';
-    group.style.cursor        = 'pointer';
+    group.style.pointerEvents = 'none'; // guionado: sin clicks manuales
+    group.style.cursor        = 'default';
+    group.style.animation     = '';
+    group.style.transition    = '';
+    group.style.transform     = '';
+    group.style.willChange    = '';
     group.classList.remove('luggage-enter-active');
     void group.offsetWidth;
     group.classList.add('luggage-enter-active');
 
     const imgId = flagsSlotImgIds[id];
     const img   = document.getElementById(imgId);
-    if (img) { img.src = COUNTRY_FLAGS[REC_SLOTS[i]] || ''; img.style.display = 'block'; }
+    if (img) { img.src = COUNTRY_FLAGS[round.flags[i]] || ''; img.style.display = 'block'; }
   });
 
-  let picked = false;
-  flagsTopGroupIds.forEach(id => {
-    const group = document.getElementById(id);
+  setTimeout(() => {
+    if (!document.body.classList.contains('recording-mode')) return;
+    const group = document.getElementById(flagsTopGroupIds[round.correct]);
     if (!group) return;
-    group.onclick = () => {
-      if (!flagsRunning || picked) return;
-      picked = true;
-      // Disable further clicks
-      flagsTopGroupIds.forEach(gid => {
-        const g = document.getElementById(gid);
-        if (g) { g.style.pointerEvents = 'none'; g.style.cursor = 'default'; }
-      });
-      // Igual que el juego real: freeze inmediato + translate hacia findluggage
-      group.classList.remove('luggage-enter-active');
-      group.style.animation = 'none';
-      group.style.transition = 'none';
-      group.style.transform  = 'none';
-      group.style.transformOrigin = '0 0';
-      void group.offsetWidth;
-      // Ver handler real: centrar el maletín sobre findluggage e igualar su tamaño.
-      const lugImg    = group.querySelector('#flags-luggage, .flags-luggage-side');
-      const lugRect   = (lugImg || group).getBoundingClientRect();
-      const grpRect   = group.getBoundingClientRect();
-      const findRect  = flagsFindLuggage.getBoundingClientRect();
-      const lugScale  = flagsLuggageWrap.getBoundingClientRect().width / 220;
-      const fit = lugRect.width ? (findRect.width / lugRect.width) : 1;
-      const lugCx  = (lugRect.left + lugRect.width  / 2 - grpRect.left) / lugScale;
-      const lugCy  = (lugRect.top  + lugRect.height / 2 - grpRect.top)  / lugScale;
-      const findCx = (findRect.left + findRect.width  / 2 - grpRect.left) / lugScale;
-      const findCy = (findRect.top  + findRect.height / 2 - grpRect.top)  / lugScale;
-      const dx = findCx - fit * lugCx;
-      const dy = findCy - fit * lugCy;
-      group.style.willChange = 'transform';                 // capa GPU (suaviza iOS)
-      group.style.transformOrigin = '0 0';
-      group.style.transition = 'transform 0.1s linear';
-      group.style.transform  = `translate3d(${dx}px, ${dy}px, 0) scale(${fit})`;
-      flagsMachine2.style.animationPlayState     = 'paused';
-      flagsMachine3.style.animationPlayState     = 'paused';
-      flagsMachine3b.style.animationPlayState    = 'paused';
-      flagsFindLuggage.style.animationPlayState  = 'paused';
-    };
-  });
+    flagsRecScore += 100;
+    // Igual que el juego real: freeze inmediato + translate hacia findluggage
+    group.classList.remove('luggage-enter-active');
+    group.style.animation = 'none';
+    group.style.transition = 'none';
+    group.style.transform  = 'none';
+    group.style.transformOrigin = '0 0';
+    void group.offsetWidth;
+    const lugImg    = group.querySelector('#flags-luggage, .flags-luggage-side');
+    const lugRect   = (lugImg || group).getBoundingClientRect();
+    const grpRect   = group.getBoundingClientRect();
+    const findRect  = flagsFindLuggage.getBoundingClientRect();
+    const lugScale  = flagsLuggageWrap.getBoundingClientRect().width / 220;
+    const fit = lugRect.width ? (findRect.width / lugRect.width) : 1;
+    const lugCx  = (lugRect.left + lugRect.width  / 2 - grpRect.left) / lugScale;
+    const lugCy  = (lugRect.top  + lugRect.height / 2 - grpRect.top)  / lugScale;
+    const findCx = (findRect.left + findRect.width  / 2 - grpRect.left) / lugScale;
+    const findCy = (findRect.top  + findRect.height / 2 - grpRect.top)  / lugScale;
+    const dx = findCx - fit * lugCx;
+    const dy = findCy - fit * lugCy;
+    group.style.willChange = 'transform';
+    group.style.transformOrigin = '0 0';
+    group.style.transition = 'transform 0.1s linear';
+    group.style.transform  = `translate3d(${dx}px, ${dy}px, 0) scale(${fit})`;
+    flagsMachine2.style.animationPlayState     = 'paused';
+    flagsMachine3.style.animationPlayState     = 'paused';
+    flagsMachine3b.style.animationPlayState    = 'paused';
+    flagsFindLuggage.style.animationPlayState  = 'paused';
+
+    setTimeout(() => {
+      if (!document.body.classList.contains('recording-mode')) return;
+      flagsMachine2.style.animationPlayState     = 'running';
+      flagsMachine3.style.animationPlayState     = 'running';
+      flagsMachine3b.style.animationPlayState    = 'running';
+      startFlagsRoundRecording(recIndex + 1);
+    }, 900);
+  }, round.delayMs);
 }
 
 function startFlagsRound() {

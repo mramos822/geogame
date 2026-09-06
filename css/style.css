@@ -6125,6 +6125,20 @@ body.is-mobile #screen-warning-icon {
   color: #f0e060;
 }
 
+/* GlobeQuiz VS 1v1: la cartita muestra dos líneas (tiempo arriba, km del
+   último guess abajo) en vez del score de una sola línea — ver
+   globequizVsPrepareOpponentRow/globequizVsSetTime en globequiz.js. */
+.gq-lb-vs-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.1;
+}
+.gq-lb-vs-score .gq-lb-vs-km {
+  font-size: 1.4cqmin;
+  opacity: 0.85;
+}
+
 /* "Modo oscuro" de card (images/customize/cards/<code>.png, ver
    CUSTOMIZE_CARD_LIGHT_TEXT en js/sb.js) — mismo criterio que
    .cell-light-text: fondo de carta oscuro, texto pasa a blanco con contorno
@@ -9673,6 +9687,28 @@ body.is-mobile #splash-screen.mode-monuments .game-bg-city-monuments2 {
   font-size: 4cqmin;
   color: #fffbe6;
   opacity: 0.7;
+}
+
+/* GlobeQuiz: país revelado + intentos propios, debajo de los avatares del
+   panel W/L (ver _patchGqResultExtra en vs.js) — oculto por defecto para el
+   resto de los modos versus (flags/shapes/cities/monuments). */
+.vs-result-gq-extra {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4cqmin;
+}
+.vs-result-gq-country {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2.6cqmin;
+  color: #fffbe6;
+  text-align: center;
+}
+.vs-result-gq-attempts {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2.3cqmin;
+  color: #fffbe6;
+  opacity: 0.75;
 }
 
 /* ═══════════════════════════════════════════════════════════════

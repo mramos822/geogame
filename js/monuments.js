@@ -1171,6 +1171,17 @@ document.getElementById('gq-quit-cancel')?.addEventListener('click', () => {
 
 document.getElementById('gq-quit-confirm')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+  // VS 1v1: a diferencia de flags/cities/monuments (que salen por
+  // quitToMenu(), ver línea ~4642 más abajo, y ESA sí llama _vsAbandon()),
+  // este botón tiene su propia secuencia de salida manual que nunca pasaba
+  // por ahí — quien abandonaba un duelo de GlobeQuiz volvía al menú sin
+  // avisarle nada al rival, que se quedaba esperando para siempre (el
+  // reportado: "no reconoce cuando alguien se va de la partida"). Mismo
+  // criterio que el resto de los modos: avisar el abandono ANTES de
+  // desmontar la UI.
+  if (window._vsActive && typeof window._vsAbandon === 'function') {
+    try { window._vsAbandon(); } catch (e) {}
+  }
   window._setPlaying(false);
   // Cortar TODO lo de GlobeQuiz (timer, rotación automática, música/sfx) —
   // mismo criterio que quitToMenu() para los demás modos.

@@ -9,6 +9,8 @@ function _startSeededRandom(seed, mode) {
     window.citiesSetSeed?.(seed);
   } else if (_vsCurrentMode === 'monuments') {
     window.monumentsSetSeed?.(seed);
+  } else if (_vsCurrentMode === 'globequiz') {
+    window.globequizSetSeed?.(seed);
   } else {
     if (typeof window.flagsSetSeed === 'function') window.flagsSetSeed(seed);
   }
@@ -20,6 +22,8 @@ function _restoreRandom() {
     window.citiesClearSeed?.();
   } else if (_vsCurrentMode === 'monuments') {
     window.monumentsClearSeed?.();
+  } else if (_vsCurrentMode === 'globequiz') {
+    window.globequizClearSeed?.();
   } else {
     if (typeof window.flagsClearSeed === 'function') window.flagsClearSeed();
   }
@@ -38,6 +42,20 @@ window.VS = (() => {
   let _onOppLeft = null; // cb() — el rival se desconectó/abandonó
   let _onWrong   = null; // cb() — el rival falló una pregunta
   let _onGameEnd = null; // cb({role, score}) — el rival terminó SU cronómetro (ver reportGameEnd)
+  let _onAnswer  = null; // cb(detail) — broadcast 'answer' propio (no el de espectador, ver window._onVsAnswer). Solo usado por GlobeQuiz hoy.
+  let _onReady   = null; // cb({role}) — el rival terminó de cargar sus assets pesados (ver reportReady). Solo usado por GlobeQuiz hoy.
+  // cb(status) — el canal de Realtime NUNCA llegó a autorizarse (típicamente
+  // una policy de RLS rota en el server, ver la de sep-2026: un cast inválido
+  // hacía que CUALQUIER intento de unirse a 'match-{id}'/'solo-{id}' tirara
+  // CHANNEL_ERROR). Antes esto no se manejaba en absoluto: el .subscribe()
+  // de más abajo solo reaccionaba a 'SUBSCRIBED', así que un fallo dejaba
+  // _vsLaunching/_vsActive trabados en true para siempre (nada volvía a
+  // false) — el jugador quedaba con el juego colgado sin ningún cartel de
+  // error, sin poder arrancar OTRO duelo hasta recargar la página a mano, y
+  // la fila de matches se quedaba en 'active' para siempre en la base (el
+  // reportado: "ya lo hice [refrescar] y aun nada"). Registrado UNA vez al
+  // iniciar sesión (ver "VERSUS UI" más abajo), no por partida.
+  let _onSubscribeError = null;
   let _pollId    = null;
   let _started   = false; // evita que _onStart se dispare más de una vez
   let _oppGoneTimer = null; // gracia antes de declarar abandono por presencia
@@ -132,6 +150,16 @@ window.VS = (() => {
       // modo espectador para recrear el click en tiempo real; no afecta al juego.
       .on('broadcast', { event: 'answer' }, ({ payload }) => {
         if (window._onVsAnswer && payload) window._onVsAnswer(payload);
+        if (_onAnswer && payload) _onAnswer(payload);
+      })
+      // El rival terminó de cargar sus assets pesados (hoy solo GlobeQuiz:
+      // three.js + GeoJSON, ver reportReady/_vsGqAwaitBothReady) — mientras
+      // NO se persiste en la fila de matches (es efímero, como 'score'), no
+      // hace falta: este listener se registra ANTES de arrancar la propia
+      // carga (ver _launchVersus), así que llega a tiempo sin importar quién
+      // termine de cargar primero.
+      .on('broadcast', { event: 'ready' }, ({ payload }) => {
+        if (_onReady && payload) _onReady(payload);
       })
       // Presencia: detecta cierre de pestaña / pérdida de conexión del rival.
       .on('presence', { event: 'leave' }, ({ key }) => {
@@ -187,6 +215,8 @@ window.VS = (() => {
               if (m && m.status === 'active') { _match = m; _started = true; _onStart(m); }
             } catch (e) {}
           }
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          if (_onSubscribeError) _onSubscribeError(status);
         }
       });
   }
@@ -341,6 +371,12 @@ window.VS = (() => {
 
   function sendWrong() {
     if (_channel) { try { _channel.send({ type: 'broadcast', event: 'wrong', payload: { role: _role } }); } catch (e) {} }
+  }
+
+  // Avisa que ESTE cliente terminó de cargar sus assets pesados y ya puede
+  // arrancar (ver _vsGqAwaitBothReady, "GlobeQuiz: victoria instantánea").
+  function reportReady() {
+    if (_channel) { try { _channel.send({ type: 'broadcast', event: 'ready', payload: { role: _role } }); } catch (e) {} }
   }
 
   // Libera el canal de Realtime de ESTE jugador (sin tocar _matchId/_role —
@@ -548,7 +584,7 @@ window.VS = (() => {
     clearTimeout(_oppGoneTimer);
     _oppFinishedGameEnd = false;
     _matchId = _role = _match = null;
-    _onStart = _onScore = _onEnd = _onOppLeft = _onWrong = _onGameEnd = null;
+    _onStart = _onScore = _onEnd = _onOppLeft = _onWrong = _onGameEnd = _onAnswer = _onReady = null;
     _started = false;
     _lastPhase = null;
     _lastRoundPayload = null;
@@ -569,6 +605,7 @@ window.VS = (() => {
     cancelInvite,
     reportScore,
     sendWrong,
+    reportReady,
     reportGameEnd,
     releaseChannel,
     reportRound,
@@ -598,6 +635,9 @@ window.VS = (() => {
     onOppLeft: cb => { _onOppLeft = cb; },
     onWrong:   cb => { _onWrong = cb; },
     onGameEnd: cb => { _onGameEnd = cb; },
+    onAnswer:  cb => { _onAnswer = cb; },
+    onReady:   cb => { _onReady = cb; },
+    onSubscribeError: cb => { _onSubscribeError = cb; },
     getMatch: () => _match,
     getRole:  () => _role,
     getMatchId: () => _matchId,
@@ -883,6 +923,9 @@ window.refreshVsSpectatorBadge = function (n) {
     } else if (e.target.closest('#vs-mode-btn-monuments')) {
       msel.style.display = 'none';
       _sendInvite(guestId, guestName, guestAvatar, 'monuments');
+    } else if (e.target.closest('#vs-mode-btn-globequiz')) {
+      msel.style.display = 'none';
+      _sendInvite(guestId, guestName, guestAvatar, 'globequiz');
     } else if (e.target.closest('#vs-mode-cancel')) {
       msel.style.display = 'none';
     }
@@ -1143,6 +1186,7 @@ window.refreshVsSpectatorBadge = function (n) {
         sub: match.mode === 'shapes'    ? T('vs.challengedShapes',    'te retó a Map Mayhem 1v1')
            : match.mode === 'cities'    ? T('vs.challengedCities',    'te retó a City Blitz 1v1')
            : match.mode === 'monuments' ? T('vs.challengedMonuments', 'te retó a Landmark Loco 1v1')
+           : match.mode === 'globequiz' ? T('vs.challengedGlobequiz', 'te retó a GloboReto 1v1')
            : T('vs.challengedYou', 'te retó a Suitcase Shuffle 1v1'),
         onAccept: async () => {
           if (typeof window.removeVersusNotif === 'function') window.removeVersusNotif(match.id);
@@ -1308,6 +1352,8 @@ window.refreshVsSpectatorBadge = function (n) {
     _vsLaunching = false;
     window._vsSpectatorCount = 0;
     if (typeof window.refreshVsSpectatorBadge === 'function') window.refreshVsSpectatorBadge(0);
+    _clearGqLoseAnim();
+    _gqReadyReset();
   }
 
   // Llamado desde flags.js/shapes.js cuando el jugador responde correcto/incorrecto.
@@ -1551,6 +1597,8 @@ window.refreshVsSpectatorBadge = function (n) {
       if (typeof window.shapesHardReset === 'function') { try { window.shapesHardReset(); } catch(e) {} }
     } else if (_vsCurrentMode === 'cities' || _vsCurrentMode === 'monuments') {
       (_vsCurrentMode === 'monuments' ? window.monumentsHardReset : window.citiesHardReset)?.();
+    } else if (_vsCurrentMode === 'globequiz') {
+      window.globequizHardReset?.();
     } else {
       if (typeof window.flagsHardReset === 'function') { try { window.flagsHardReset(); } catch(e) {} }
     }
@@ -1568,6 +1616,192 @@ window.refreshVsSpectatorBadge = function (n) {
     const myScore  = Math.max(liveScore, myScoreFromMatch);
     const oppScore = isHost ? (m.guest_score || 0) : (m.host_score || 0);
     _showVsResult('win', myScore, oppScore, 'abandon');
+    // GlobeQuiz no tiene puntaje numérico comparable — pisar los spans con mi
+    // mejor km logrado (o "—" si no llegué a adivinar ninguno) y "—" para el
+    // rival, que abandonó.
+    if (_vsCurrentMode === 'globequiz') {
+      const summary = window.globequizGetVsSummary?.() || {};
+      _patchGqResultScores(
+        summary.bestKm != null ? Math.round(summary.bestKm) + ' km' : '—',
+        '—'
+      );
+    }
+  }
+
+  // Pisa los dos spans numéricos de #vs-result-screen con texto propio de
+  // GlobeQuiz (tiempo/km en vez de un score con toLocaleString()) — llamada
+  // siempre DESPUÉS de _showVsResult(), que ya hizo todo el resto (ocultar
+  // HUD, registrar win/lose, reportPostgame/finish).
+  function _patchGqResultScores(meText, oppText) {
+    const meEl  = document.getElementById('vs-result-me-score');
+    const oppEl = document.getElementById('vs-result-opp-score');
+    if (meEl)  meEl.textContent  = meText;
+    if (oppEl) oppEl.textContent = oppText;
+  }
+
+  // País revelado + intentos propios, debajo de los avatares — mismo texto
+  // que usa el modal de fin de juego 1 player (globequiz.hintCorrect/
+  // attempts, ver gq-endgame-country-label/gq-endgame-attempts en
+  // globequiz.js), acá pegado en el panel W/L en vez de un modal aparte.
+  function _patchGqResultExtra(countryName, guessCount) {
+    const wrap        = document.getElementById('vs-result-gq-extra');
+    const countryEl   = document.getElementById('vs-result-gq-country');
+    const attemptsEl  = document.getElementById('vs-result-gq-attempts');
+    if (!wrap) return;
+    const T = (k, d, vars) => (typeof t === 'function' ? t(k, vars) : d);
+    if (countryEl) {
+      countryEl.textContent = countryName
+        ? T('globequiz.hintCorrect', 'El país correcto es ' + countryName + '.', { name: countryName })
+        : '';
+    }
+    if (attemptsEl) {
+      attemptsEl.textContent = T('globequiz.attempts', 'Intentos', {}) + ': ' + (guessCount != null ? guessCount : '—');
+    }
+    wrap.style.display = 'flex';
+  }
+
+  // ── GlobeQuiz VS: esperar a que AMBOS carguen el globo 3D ──────────────────
+  // Cada cliente arranca su propio Promise.all([loadThree(), loadCountries()])
+  // por su cuenta (ver initGlobeQuiz en globequiz.js) — sin este handshake, el
+  // 3-2-1 arrancaba apenas terminaba de cargar CADA UNO por separado, así que
+  // quien cargaba más rápido (mejor red/CPU) arrancaba su cronómetro antes
+  // que el rival, una ventaja real en un modo que se gana por ser el primero
+  // en acertar (el reportado: "el versus no debe empezar hasta que a ambos
+  // les cargue el globo 3D").
+  const GQ_READY_TIMEOUT_MS = 10000;
+  let _gqReadyMe = false, _gqReadyOpp = false, _gqReadyDone = false, _gqReadyTimer = null, _gqReadyResolveCb = null;
+
+  // Registrada en _launchVersus ANTES de llamar initGlobeQuiz() — así el
+  // listener ya está enganchado al canal (que a esa altura ya está
+  // suscripto) pase lo que pase con el orden de carga de cada lado; no hace
+  // falta persistir nada en la fila de matches para cubrir la carrera de
+  // "el aviso del rival llega antes de que yo escuche".
+  function _gqReadySetup() {
+    _gqReadyMe = false; _gqReadyOpp = false; _gqReadyDone = false;
+    clearTimeout(_gqReadyTimer); _gqReadyTimer = null; _gqReadyResolveCb = null;
+    window.VS.onReady(payload => {
+      if (!payload) return;
+      const myRole = window.VS.isHost() ? 'host' : 'guest';
+      if (payload.role === myRole) return; // eco propio, mismo filtro que 'answer'
+      _gqReadyOpp = true;
+      _gqTryResolveReady();
+    });
+  }
+  function _gqTryResolveReady() {
+    if (_gqReadyDone || !_gqReadyResolveCb) return;
+    if (_gqReadyMe && _gqReadyOpp) {
+      _gqReadyDone = true;
+      clearTimeout(_gqReadyTimer);
+      const cb = _gqReadyResolveCb; _gqReadyResolveCb = null;
+      cb();
+    }
+  }
+  // Corte del handshake (abandono/quitToMenu mientras se esperaba) — sin
+  // esto, un timeout viejo podía disparar el 3-2-1 sobre una pantalla que ya
+  // volvió al menú.
+  function _gqReadyReset() {
+    clearTimeout(_gqReadyTimer); _gqReadyTimer = null;
+    _gqReadyMe = _gqReadyOpp = _gqReadyDone = false;
+    _gqReadyResolveCb = null;
+  }
+
+  // Llamada desde globequiz.js apenas ESTE cliente termina de cargar three.js
+  // + el GeoJSON — avisa al rival y llama a onBothReady() recién cuando LOS
+  // DOS avisaron, o a los GQ_READY_TIMEOUT_MS si el rival nunca llega a
+  // avisar (falló su carga, se le cortó la conexión, etc.) — un timeout
+  // generoso para no colgar la partida entera por eso, pero sin dejar a
+  // quien sí cargó esperando para siempre.
+  window._vsGqAwaitBothReady = function (onBothReady) {
+    if (!window._vsActive || !window.VS.getMatchId()) { onBothReady(); return; }
+    _gqReadyResolveCb = onBothReady;
+    _gqReadyMe = true;
+    window.VS.reportReady();
+    _gqReadyTimer = setTimeout(() => {
+      if (_gqReadyDone) return;
+      _gqReadyDone = true;
+      const cb = _gqReadyResolveCb; _gqReadyResolveCb = null;
+      if (cb) cb();
+    }, GQ_READY_TIMEOUT_MS);
+    _gqTryResolveReady();
+  };
+
+  // ── GlobeQuiz: victoria instantánea ─────────────────────────────────────────
+  // A diferencia de flags/shapes/cities/monuments (score que sube con cada
+  // acierto, comparado recién al cortar un timer), acá solo hay UN ganador
+  // posible: el primero en acertar. No hay que esperar nada del rival — ni
+  // _vsHandleGameEnd ni el "revealAt" compartido aplican, se corta ya mismo
+  // en ambos lados (yo lo sé de una porque acerté; el rival se entera por el
+  // broadcast de abajo, ver _handleGqOpponentWin).
+
+  // Llamada desde globequiz.js (submitGuess) apenas ESTE cliente acierta —
+  // manda el broadcast YA MISMO (sin esperar el festejo local) para que el
+  // rival vea el game over lo antes posible. NO toca la UI de este cliente
+  // todavía (ver _vsShowGqWinResult, llamada 2s después con el festejo ya
+  // visto).
+  window._vsReportGqWin = function(elapsedMs, countryName, iso2) {
+    if (_resultShown) return;
+    if (!window.VS.getMatchId()) return;
+    // Reusa el broadcast 'answer' existente (VS.reportScore con detail) — el
+    // rival ya lo escucha vía VS.onAnswer (ver _launchVersus, rama globequiz).
+    window.VS.reportScore(1, { win: true, elapsedMs, countryName, iso2, correct: true });
+  };
+
+  // Llamada desde globequiz.js JUNTO con _vsReportGqWin (mismo instante) —
+  // el ganador ve su "GANASTE" al mismo tiempo que el rival recibe el
+  // broadcast y ve su "PERDISTE" (ver _handleGqOpponentWin más abajo), sin
+  // delay de festejo de por medio.
+  window._vsShowGqWinResult = function(elapsedMs) {
+    if (_resultShown) return;
+    _showVsResult('win', 0, 0);
+    _patchGqResultScores(window.formatGqCardTime ? window.formatGqCardTime(elapsedMs) : String(elapsedMs), '—');
+    const summary = window.globequizGetVsSummary?.() || {};
+    _patchGqResultExtra(summary.countryName, summary.guessCount);
+  };
+
+  // Llamada desde VS.onAnswer (ver _launchVersus) cuando el rival avisó que
+  // ganó — nunca desde acá se decide nada, solo se refleja. Mismo criterio
+  // que el 1 player: mientras el ganador ve su festejo (showWin, ver
+  // submitGuess en globequiz.js), acá se ve la animación de gameover.png
+  // (mismo overlay/timing que usa #powerquit-overlay para "quitaste en
+  // práctica" — timeup-in/timeup-out) durante GQ_VS_ANIM_MS, y recién
+  // terminada esa animación aparece el cartel de "PERDISTE".
+  let _gqLoseAnimT1 = null, _gqLoseAnimT2 = null, _gqLoseResultT = null;
+  function _handleGqOpponentWin(payload) {
+    if (_resultShown) return;
+    window.globequizVsShowLoss?.();
+    const animMs = window._GQ_VS_ANIM_MS || 2000;
+    const goOverlay = document.getElementById('powerquit-overlay');
+    if (goOverlay) {
+      goOverlay.style.display = 'flex';
+      goOverlay.classList.remove('timeup-out');
+      goOverlay.classList.add('timeup-in');
+      _gqLoseAnimT1 = setTimeout(() => {
+        goOverlay.classList.remove('timeup-in');
+        goOverlay.classList.add('timeup-out');
+        _gqLoseAnimT2 = setTimeout(() => {
+          goOverlay.style.display = 'none';
+          goOverlay.classList.remove('timeup-out');
+        }, 400);
+      }, Math.max(0, animMs - 400));
+    }
+    _gqLoseResultT = setTimeout(() => {
+      _showVsResult('lose', 0, 0);
+      const oppText = window.formatGqCardTime ? window.formatGqCardTime(payload.elapsedMs || 0) : String(payload.elapsedMs || 0);
+      const summary = window.globequizGetVsSummary?.() || {};
+      const meText = summary.bestKm != null ? Math.round(summary.bestKm) + ' km' : '—';
+      _patchGqResultScores(meText, oppText);
+      _patchGqResultExtra(summary.countryName, summary.guessCount);
+    }, animMs);
+  }
+  // Corte de la animación de arriba (abandono del rival, quitToMenu genérico)
+  // — sin esto, el overlay de gameover.png o el timeout podían dispararse
+  // sobre una pantalla que ya volvió al menú.
+  function _clearGqLoseAnim() {
+    if (_gqLoseAnimT1) { clearTimeout(_gqLoseAnimT1); _gqLoseAnimT1 = null; }
+    if (_gqLoseAnimT2) { clearTimeout(_gqLoseAnimT2); _gqLoseAnimT2 = null; }
+    if (_gqLoseResultT) { clearTimeout(_gqLoseResultT); _gqLoseResultT = null; }
+    const goOverlay = document.getElementById('powerquit-overlay');
+    if (goOverlay) { goOverlay.style.display = 'none'; goOverlay.classList.remove('timeup-in', 'timeup-out'); }
   }
 
   // Lee el puntaje EN VIVO del modo actualmente en curso, directo de la
@@ -1579,6 +1813,7 @@ window.refreshVsSpectatorBadge = function (n) {
     if (_vsCurrentMode === 'cities' || _vsCurrentMode === 'monuments') {
       return Math.round((typeof state !== 'undefined' && state && typeof state.score === 'number') ? state.score : 0);
     }
+    if (_vsCurrentMode === 'globequiz') return 0; // sin score numérico — ver _patchGqResultScores
     return Math.round(typeof flagsScore !== 'undefined' ? flagsScore : 0);
   }
 
@@ -1649,7 +1884,11 @@ window.refreshVsSpectatorBadge = function (n) {
     ['score-display','countdown-widget','flags-score-display','flags-countdown-widget',
      'shapes-countdown-widget','pregame-countdown','flags-pregame-countdown',
      'right-panel','flags-right-panel','timeup-overlay','flags-timeup-overlay',
-     'speed-bonus-text','flags-speed-bonus-text','game-wrapper'].forEach(id => {
+     'speed-bonus-text','flags-speed-bonus-text','game-wrapper',
+     // País/intentos de GlobeQuiz: oculto por defecto, lo reactiva
+     // _patchGqResultExtra() solo cuando el modo es globequiz — así otros
+     // modos nunca arrastran texto viejo de un duelo anterior.
+     'vs-result-gq-extra'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.style.display = 'none';
     });
@@ -1908,6 +2147,9 @@ window.refreshVsSpectatorBadge = function (n) {
         window.citiesSetVsOpponentScore?.(oppScore);
       } else if (mode === 'monuments') {
         window.monumentsSetVsOpponentScore?.(oppScore);
+      } else if (mode === 'globequiz') {
+        // No-op — GlobeQuiz no tiene score numérico, el progreso del rival
+        // viaja por el broadcast 'answer' (ver VS.onAnswer más abajo).
       } else {
         if (typeof window.flagsSetVsOpponentScore === 'function') window.flagsSetVsOpponentScore(oppScore);
       }
@@ -1921,10 +2163,31 @@ window.refreshVsSpectatorBadge = function (n) {
         window.citiesTriggerOpponentWrong?.();
       } else if (mode === 'monuments') {
         window.monumentsTriggerOpponentWrong?.();
+      } else if (mode === 'globequiz') {
+        // No-op — GlobeQuiz no tiene concepto de "wrong" con flash, solo
+        // guesses más cerca/lejos (ver VS.onAnswer).
       } else {
         if (typeof window.flagsTriggerOpponentWrong === 'function') window.flagsTriggerOpponentWrong();
       }
     });
+
+    // GlobeQuiz: progreso del rival (km/dir) y victoria instantánea — ver
+    // "GlobeQuiz: victoria instantánea" más arriba en este archivo.
+    if (mode === 'globequiz') {
+      window.VS.onAnswer(payload => {
+        if (!payload) return;
+        // El broadcast 'answer' vuelve también a quien lo mandó (eco del
+        // propio canal de Supabase Realtime) — sin este filtro, el que
+        // acababa de ganar recibía su PROPIO aviso de victoria como si fuera
+        // el rival, y terminaba viendo la pantalla de "perdiste"/timesup
+        // encima de su propio festejo (el reportado: "al ganador le sale lo
+        // de juego terminado como si fuera 1v1... y no el panel de ganaste").
+        const myRole = window.VS.isHost() ? 'host' : 'guest';
+        if (payload.role === myRole) return;
+        if (payload.win) _handleGqOpponentWin(payload);
+        else if (typeof payload.km === 'number') window.globequizSetVsOpponentGuess?.(payload.km);
+      });
+    }
 
     window.VS.onEnd(() => {
       _restoreRandom();
@@ -1940,12 +2203,45 @@ window.refreshVsSpectatorBadge = function (n) {
       if (typeof startGame === 'function') startGame();
     } else if (mode === 'monuments') {
       if (typeof startGame === 'function') startGame();
+    } else if (mode === 'globequiz') {
+      document.getElementById('globequiz-screen').style.display = 'block';
+      if (typeof window.letterboxRefresh === 'function') window.letterboxRefresh();
+      window.globequizVsPrepareOpponentRow?.();
+      // Registrado ANTES de initGlobeQuiz() (que dispara la carga async de
+      // three.js/GeoJSON) — ver _gqReadySetup, así el listener de 'ready' ya
+      // está enganchado sin importar quién termine de cargar primero.
+      _gqReadySetup();
+      if (typeof window.initGlobeQuiz === 'function') window.initGlobeQuiz();
     } else {
       if (typeof showFlagsMode === 'function') showFlagsMode();
     }
   }
 
   // ── Escuchar invitaciones al loguear ─────────────────────────────────────
+
+  // Recuperación de un canal de duelo que nunca llegó a autorizarse (ver
+  // _onSubscribeError en la definición de window.VS más arriba) — registrado
+  // UNA sola vez por sesión, no por partida, porque el fallo puede darse en
+  // cualquier momento del flujo (esperando que el rival acepte, cargando el
+  // 3-2-1, ya jugando). quitToMenu() ya sabe hacer TODO lo necesario cuando
+  // window._vsActive es true (llama a _vsAbandon(), corre gameStoppers,
+  // vuelve al loading screen) — antes de esto, un CHANNEL_ERROR dejaba
+  // _vsLaunching/_vsActive trabados en true para siempre, sin cartel de
+  // error, bloqueando cualquier duelo nuevo hasta recargar la página a mano.
+  window.VS.onSubscribeError(() => {
+    if (typeof window.showVersusToast === 'function') {
+      window.showVersusToast(T('vs.connectionFailed', 'No se pudo conectar al duelo, volviendo al menú'));
+    }
+    _hideOutgoingPopup();
+    _hideIncomingPopup();
+    _hideDuelAcceptedPopup();
+    if (window._vsActive) {
+      if (typeof window.quitToMenu === 'function') window.quitToMenu();
+    } else {
+      if (typeof window.VS.cleanup === 'function') window.VS.cleanup();
+      _vsLaunching = false;
+    }
+  });
 
   window._vsStartListening = function() {
     window.VS.listenForInvites(

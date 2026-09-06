@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Reel vertical — Flags</title>
+<style>
+  @font-face {
+    font-family: 'VAGRoundBold';
+    src: url('../fonts/OPTIVagRound-Bold.otf') format('opentype');
+    font-weight: bold;
+    font-style: normal;
+  }
+  @font-face {
+    font-family: 'Dimbo';
+    src: url('../fonts/Dimbo Regular.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    background: #14181f;
+    overflow: hidden;
+  }
+
+  /* Igual que el juego real (#app-stage-outer): lienzo de TAMAÑO FIJO
+     (1080x1920 = un reel) que se escala en bloque con transform:scale()
+     para entrar completo en cualquier ventana, sin recortarse ni deformarse. */
+  #stage-outer {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    width: 1080px;
+    height: 1920px;
+    transform: translate(-50%, -50%) scale(var(--fit, 1));
+    transform-origin: 50% 50%;
+  }
+
+  #stage {
+    position: relative;
+    width: 1080px;
+    height: 1920px;
+    background: #5b9fd4 url('../images/background.png') center center / cover no-repeat;
+    overflow: hidden;
+    font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+    color: #fff;
+  }
+
+  .txt-outline {
+    text-shadow: 3px 3px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 3px -3px 0 #000, -3px 3px 0 #000;
+  }
+
+  /* Banner del país a buscar (mismo asset flagid.png del juego), pegado
+     arriba del todo para que parezca que cuelga del techo del lienzo —
+     las cables del propio PNG arrancan en su borde superior. */
+  #flagid-wrap {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 620px;
+    z-index: 2;
+  }
+
+  /* ── Encabezado / hook ─────────────────────────── */
+  #hook {
+    position: absolute;
+    top: 250px;
+    left: 60px;
+    right: 60px;
+    text-align: center;
+    font-size: 52px;
+    line-height: 1.15;
+    z-index: 2;
+  }
+
+  #round-label {
+    position: absolute;
+    top: 400px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 32px;
+    letter-spacing: 2px;
+    color: #ffe98a;
+    z-index: 2;
+  }
+  #flagid-wrap img { width: 100%; display: block; }
+  #prompt {
+    position: absolute;
+    top: 54%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 56px;
+    white-space: nowrap;
+  }
+
+  /* ── Timer bar ─────────────────────────────────── */
+  #timer-track {
+    position: absolute;
+    top: 500px;
+    left: 140px;
+    right: 140px;
+    height: 22px;
+    border-radius: 11px;
+    background: rgba(0,0,0,0.35);
+    border: 3px solid #1c3a5e;
+    overflow: hidden;
+    z-index: 2;
+  }
+  #timer-fill {
+    height: 100%;
+    width: 100%;
+    background: #ffe98a;
+    transform-origin: left center;
+  }
+
+  /* ── Valijas apiladas (mismo asset y efecto de bandera que el juego) ── */
+  #cards {
+    position: absolute;
+    top: 570px;
+    left: 0;
+    right: 0;
+    bottom: 300px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+    align-items: center;
+    z-index: 2;
+  }
+
+  /* .card-outer reserva el espacio de LAYOUT ya al tamaño final (396x315 =
+     220x175 * 1.8), así el flex no superpone las tarjetas. .card adentro
+     mantiene el tamaño real 220x175 al que el juego renderiza la valija
+     (el clip-path/matrix3d de la bandera está calculado en px exactos para
+     ESE tamaño) y se agranda con scale() desde la esquina sup-izq para
+     llenar exactamente el outer. */
+  .card-outer {
+    position: relative;
+    width: 396px;
+    height: 315px;
+    transition: filter 0.25s ease, opacity 0.25s ease;
+  }
+  .card {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 220px;
+    height: 175px;
+    transform: scale(1.8);
+    transform-origin: top left;
+  }
+  .card .luggage-img { width: 100%; height: 100%; display: block; position: relative; z-index: 2; }
+
+  /* Contenedor/transform de la bandera CLAVADOS del juego real (flags CSS)
+     para que la "bandera pegada en la valija" se vea idéntica. */
+  .flag-slot {
+    position: absolute;
+    top: 41px;
+    left: 43px;
+    width: 172px;
+    height: 122px;
+    overflow: visible;
+    z-index: 1;
+    clip-path: path('M 9 2 Q 11 -12 26 -11 L 144 -1 Q 158 0 159 14 L 159 101 Q 171 108 146 116 L 8 116 Q -6 116 -4 104 Q -10 55 9 2 Z');
+    transform: rotate(-6deg) perspective(400px) rotateX(4deg);
+  }
+  .flag-slot img {
+    width: 157px;
+    height: 95px;
+    object-fit: fill;
+    transform-origin: 0 0;
+    transform: matrix3d(1.0827, 0.0764, 0, 0.000659, -0.1750, 1.2702, 0, -0.000665, 0, 0, 1, 0, 11, -12, 0, 1);
+  }
+
+  /* Las marcas quedan FUERA de .card (que está escalado 1.8x) para no
+     heredar ese agrandado — se posicionan directo contra .card-outer. */
+  .card-outer .mark {
+    position: absolute;
+    width: 96px;
+    height: auto;
+    right: -22px;
+    top: -22px;
+    display: none;
+    z-index: 1;
+    filter: drop-shadow(0 4px 4px rgba(0,0,0,0.4));
+  }
+  .card-outer.correct .mark.check { display: block; }
+  .card-outer.wrong .mark.cross   { display: block; }
+  .card-outer.wrong .card { opacity: 0.4; filter: grayscale(0.6); }
+  .card-outer.correct .card { filter: drop-shadow(0 0 22px rgba(46,204,113,0.85)); }
+
+  /* ── Score (mismo asset points.png del juego, relación de aspecto real
+     670x151 ≈ 4.44:1 — se mantiene con height:auto para no deformarlo) ── */
+  #score-bar {
+    position: absolute;
+    bottom: 170px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 420px;
+    z-index: 5;
+  }
+  #score-bar img { width: 100%; height: auto; display: block; }
+  #score-value {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 48px;
+    letter-spacing: 2px;
+  }
+
+  /* ── Cinta transportadora del juego real (machine1/2/3), reemplaza el
+     texto "jugá gratis" por el mismo decorado animado que usa Flags:
+     machine1 = base estática, machine3 x2 = cinta que desliza en loop
+     (misma animación machine3-scroll de style.css), machine2 = frente
+     estático que queda por delante de todo. ── */
+  #machine-footer {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 520px;
+    overflow: hidden;
+    z-index: 1;
+    pointer-events: none;
+  }
+  #machine-footer img {
+    position: absolute;
+    bottom: 0;
+    width: 1700px;
+    pointer-events: none;
+  }
+  .machine-base  { left: 65%; transform: translateX(-50%); z-index: 1; }
+  .machine-belt  { left: 65%; transform: translateX(-50%); z-index: 2; animation: machine-belt-scroll 10s linear infinite; }
+  .machine-belt.b2 { left: calc(65% + 1700px); }
+  .machine-front { left: 65%; transform: translateX(-50%); z-index: 3; }
+
+  @keyframes machine-belt-scroll {
+    from { transform: translateX(-50%); }
+    to   { transform: translateX(calc(-50% - 1700px)); }
+  }
+
+  /* ── Findluggage: el "hueco" que se desliza por la cinta (igual que
+     #flags-findluggage del juego real) — cuando se elige la valija
+     correcta, esta vuela hasta donde esté ESTE marcador en ese instante. */
+  /* bottom:75px calibrado mirando el asset machine1.png: la franja de la
+     cinta (la parte rayada) cae cerca del borde inferior de la imagen, no
+     en el medio — el findluggage tiene que quedar centrado sobre ESA franja. */
+  #findluggage {
+    position: absolute;
+    bottom: 115px;
+    left: 940px;
+    width: 300px;
+    height: auto;
+    z-index: 9;
+    pointer-events: none;
+  }
+
+  /* ── Pantalla final ────────────────────────────── */
+  #final {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 40px;
+    z-index: 3;
+    background: #5b9fd4 url('../images/background.png') center center / cover no-repeat;
+    text-align: center;
+    padding: 0 80px;
+  }
+  #final.show { display: flex; }
+  #final img.logo { width: 340px; height: auto; filter: drop-shadow(0 8px 10px rgba(0,0,0,0.35)); }
+  #final .big { font-size: 78px; }
+  #final .score-final { position: relative; width: 440px; }
+  #final .score-final img { width: 100%; height: auto; display: block; }
+  #final .score-final .val {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    font-size: 54px;
+  }
+  #final .cta2 { font-family: 'Dimbo', sans-serif; font-size: 40px; color: #ffe98a; text-shadow: 2px 2px 0 #000; }
+</style>
+</head>
+<body>
+
+<div id="stage-outer">
+  <div id="stage">
+    <div id="hook" class="txt-outline">¿Podés adivinar<br>estas 5 banderas?</div>
+    <div id="round-label" class="txt-outline">BANDERA 1/5</div>
+
+    <div id="flagid-wrap">
+      <img src="../images/flagid.png" alt="">
+      <div id="prompt" class="txt-outline">España</div>
+    </div>
+
+    <div id="timer-track"><div id="timer-fill"></div></div>
+
+    <div id="cards"></div>
+
+    <div id="score-bar">
+      <img src="../images/points.png" alt="">
+      <div id="score-value" class="txt-outline">0</div>
+    </div>
+    <div id="machine-footer">
+      <img class="machine-base" src="../images/machine1.png" alt="">
+      <img class="machine-belt" src="../images/machine3.png" alt="">
+      <img class="machine-belt b2" src="../images/machine3.png" alt="">
+      <img class="machine-front" src="../images/machine2.png" alt="">
+    </div>
+    <img id="findluggage" src="../images/findluggage.png" alt="">
+
+    <div id="final">
+      <img class="logo" src="../images/logo.png" alt="">
+      <div class="big txt-outline" id="final-label">¡5/5!</div>
+      <div class="score-final">
+        <img src="../images/points.png" alt="">
+        <div class="val txt-outline" id="final-score">500</div>
+      </div>
+      <div class="cta2">Jugá gratis → mygeochallenge.com</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Escala el lienzo fijo 1080x1920 para que entre completo en la ventana,
+  // igual que el #app-stage del juego real.
+  function fitStage() {
+    const fit = Math.min(window.innerWidth / 1080, window.innerHeight / 1920);
+    document.documentElement.style.setProperty('--fit', fit);
+  }
+  window.addEventListener('resize', fitStage);
+  fitStage();
+
+  // Secuencia guionada e independiente del juego real — solo usa las
+  // imágenes ya existentes en images/ (banderas, valija, puntos, logo).
+  const SEQUENCE = [
+    { prompt: 'España',    options: ['spain','france','germany'],       correct: 0, thinkMs: 2200 },
+    { prompt: 'Japón',     options: ['japan','southkorea','china'],     correct: 0, thinkMs: 2000 },
+    { prompt: 'Brasil',    options: ['argentina','brazil','portugal'],  correct: 1, thinkMs: 2400 },
+    { prompt: 'Rumanía',   options: ['chad','romania','andorra'],       correct: 1, thinkMs: 4500 },
+    { prompt: 'Indonesia', options: ['monaco','indonesia','poland'],    correct: 1, thinkMs: 3800 },
+  ];
+
+  const stageEl      = document.getElementById('stage');
+  const cardsEl      = document.getElementById('cards');
+  const roundEl      = document.getElementById('round-label');
+  const promptEl     = document.getElementById('prompt');
+  const scoreValueEl = document.getElementById('score-value');
+  const timerFill    = document.getElementById('timer-fill');
+  const findEl       = document.getElementById('findluggage');
+  const beltEls       = document.querySelectorAll('.machine-belt');
+  const finalEl      = document.getElementById('final');
+  const finalScoreEl = document.getElementById('final-score');
+  const finalLabelEl = document.getElementById('final-label');
+
+  const FIND_START = 940;
+  const FIND_END   = -260;
+  // Misma velocidad (px/ms) que la cinta: 1700px cada 10s (machine-belt-scroll).
+  const FIND_DURATION = ((FIND_START - FIND_END) / 1700) * 10000;
+
+  let score = 0;
+
+  function renderRound(round) {
+    cardsEl.innerHTML = '';
+    round.options.forEach(code => {
+      const outer = document.createElement('div');
+      outer.className = 'card-outer';
+      outer.innerHTML = `
+        <div class="card">
+          <img class="luggage-img" src="../images/luggage.png" alt="">
+          <div class="flag-slot"><img src="../images/flags/${code}.png" alt=""></div>
+        </div>
+        <img class="mark check" src="../images/check.png" alt="">
+        <img class="mark cross" src="../images/wrong.png" alt="">`;
+      cardsEl.appendChild(outer);
+    });
+  }
+
+  function runTimer(ms) {
+    timerFill.style.transition = 'none';
+    timerFill.style.transform = 'scaleX(1)';
+    void timerFill.offsetWidth;
+    timerFill.style.transition = `transform ${ms}ms linear`;
+    timerFill.style.transform = 'scaleX(0)';
+  }
+
+  function runFindLuggage() {
+    findEl.style.transition = 'none';
+    findEl.style.left = FIND_START + 'px';
+    void findEl.offsetWidth;
+    findEl.style.transition = `left ${FIND_DURATION}ms linear`;
+    findEl.style.left = FIND_END + 'px';
+  }
+
+  // Igual que startFlagsRoundRecording() en flags.js: congela el findluggage
+  // donde esté en ese instante y hace volar la valija elegida hasta ahí,
+  // calculando dx/dy/escala con getBoundingClientRect (no valores fijos),
+  // porque el findluggage puede estar en cualquier punto de su recorrido.
+  function flyToFindLuggage(outerEl) {
+    const liveLeft = getComputedStyle(findEl).left;
+    findEl.style.transition = 'none';
+    findEl.style.left = liveLeft;
+    beltEls.forEach(b => b.style.animationPlayState = 'paused');
+
+    const cardImg = outerEl.querySelector('.luggage-img');
+    outerEl.style.transition = 'none';
+    outerEl.style.transform = 'none';
+    outerEl.style.transformOrigin = '0 0';
+    void outerEl.offsetWidth;
+
+    const ambientScale = stageEl.getBoundingClientRect().width / 1080;
+    const grpRect  = outerEl.getBoundingClientRect();
+    const lugRect  = cardImg.getBoundingClientRect();
+    const findRect = findEl.getBoundingClientRect();
+    const fit  = findRect.width / lugRect.width;
+    const lugCx  = (lugRect.left  + lugRect.width  / 2 - grpRect.left) / ambientScale;
+    const lugCy  = (lugRect.top   + lugRect.height / 2 - grpRect.top)  / ambientScale;
+    const findCx = (findRect.left + findRect.width  / 2 - grpRect.left) / ambientScale;
+    const findCy = (findRect.top  + findRect.height / 2 - grpRect.top)  / ambientScale;
+    const dx = findCx - fit * lugCx;
+    const dy = findCy - fit * lugCy;
+
+    // Igual que el juego real: transición casi instantánea, no una animación
+    // "voladora" lenta — freeze inmediato + salto rápido a la posición final.
+    outerEl.style.zIndex = 20;
+    outerEl.style.transition = 'transform 0.1s linear';
+    outerEl.style.transform = `translate3d(${dx}px, ${dy}px, 0) scale(${fit})`;
+  }
+
+  function playRound(i) {
+    if (i >= SEQUENCE.length) return endSequence();
+    const round = SEQUENCE[i];
+    roundEl.textContent = `BANDERA ${i + 1}/${SEQUENCE.length}`;
+    promptEl.textContent = round.prompt;
+    renderRound(round);
+    runTimer(round.thinkMs + 200);
+    runFindLuggage();
+    beltEls.forEach(b => b.style.animationPlayState = 'running');
+
+    setTimeout(() => {
+      const cards = cardsEl.querySelectorAll('.card-outer');
+      const correctOuter = cards[round.correct];
+      cards.forEach((c, idx) => { if (idx !== round.correct) c.classList.add('wrong'); });
+      flyToFindLuggage(correctOuter);
+
+      setTimeout(() => {
+        correctOuter.classList.add('correct');
+        score += 100;
+        scoreValueEl.textContent = score;
+        setTimeout(() => playRound(i + 1), 700);
+      }, 150);
+    }, round.thinkMs);
+  }
+
+  function endSequence() {
+    finalLabelEl.textContent = `¡${SEQUENCE.length}/${SEQUENCE.length}!`;
+    finalScoreEl.textContent = score;
+    finalEl.classList.add('show');
+  }
+
+  playRound(0);
+</script>
+
+</body>
+</html>
