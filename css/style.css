@@ -1966,20 +1966,48 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   position: absolute;
   top: -0.5cqmin;
   right: -0.5cqmin;
-  width: 6.5cqmin;
+  /* min-width (no width fijo) + padding lateral: con "99+" (3 caracteres,
+     ver _badgeLabel en chat.js) un círculo de ancho fijo lo recortaba —
+     ahora crece a "píldora" para 2-3 caracteres y sigue siendo un círculo
+     perfecto para 1 solo, gracias al border-radius:999px de más abajo. */
+  min-width: 6.5cqmin;
   height: 6.5cqmin;
+  padding: 0 1cqmin;
+  box-sizing: border-box;
   background: #e03030;
   border: 0.6cqmin solid #fff;
-  border-radius: 50%;
+  border-radius: 999px;
+  /* flex centering: sigue haciendo falta para los usos VIEJOS de esta
+     clase que ponen el texto directo, sin el span .notif-badge-num de
+     abajo (ej. el "!" de solicitudes de amistad) — el span nuevo se centra
+     por posición absoluta y no le importa el flex del padre. */
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 4cqmin;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  line-height: 1;
+  font-size: 3.6cqmin;
   font-weight: 900;
   color: #fff;
   pointer-events: none;
   animation: notif-pop 0.35s cubic-bezier(0.34,1.56,0.64,1) both;
   z-index: 5;
+}
+/* El número centrado por POSICIÓN (no por line-height/flex del contenedor)
+   — con una fuente display como VAGRoundBold el centrado por métrica de
+   fuente queda sistemáticamente corrido (el "aún desalineado" reportado,
+   incluso ya con line-height:1). position:absolute + translate(-50%,-50%)
+   es inmune a esa clase de desajuste, sea cual sea la fuente. Usado por
+   .social-notif-badge y .loading-messages-unread-badge (ver chat.js,
+   _setBadgeCount) — los usos viejos de .social-notif-badge que siguen
+   poniendo el texto directo (sin este span, ej. el "!" de solicitudes de
+   amistad) no se tocan, la vieja centrada por flex sigue andando igual. */
+.notif-badge-num {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
 }
 @keyframes notif-pop {
   from { transform: scale(0); opacity: 0; }
@@ -3028,6 +3056,297 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   transition: transform 0.4s ease-in;
   transform: translateY(-120%);
 }
+
+/* ── Mensajes (chat directo entre amigos) ────────────────────────────────
+   A pedido: NADA de la mesa de pergamino (.loading-howtotable) — un modal
+   simple, mismo lenguaje que .account-modal (login/cuenta): caja crema
+   flotante centrada sobre un fondo oscuro, sin la mesa. Dos modales
+   separados (bandeja / conversación); abrir uno oculta el otro por JS
+   (ver chat.js), nunca los dos .open a la vez. */
+/* Selector con #id ancestro (no solo .chat-inbox-box) a propósito: esta
+   regla vive ANTES que .account-modal-box en el archivo, y con la misma
+   especificidad (0,1,0) el orden de aparición en el CSS decide — sin el
+   #id ganaba .account-modal-box (más abajo) y pisaba el ancho/align-items
+   pensados acá. El #id sube la especificidad (1,1,0) y listo. */
+#chat-inbox-modal .chat-inbox-box {
+  width: 90cqmin;
+  max-width: 90cqmin;
+  /* gap:0 propio (no el 2.2cqmin general de .account-modal-box) — con el
+     gap general, pestañas y lista quedaban con un hueco entre sí, "flotando"
+     en vez de pegadas como un solo bloque (el reportado). El margin-bottom
+     del título de acá abajo cubre el espacio que hacía falta arriba. */
+  gap: 0;
+}
+#chat-inbox-modal .account-modal-title { margin-bottom: 1.8cqmin; }
+.chat-tabs { margin-top: 0; }
+/* Pestañas Historial/Conectados/Todos — mismo widget que Rankings (3
+   pestañas también), con el mismo padding angosto que ese panel ya usa
+   para que entren bien las 3 sin desbordar. */
+.chat-tabs .loading-social-tab {
+  padding: 1.1cqmin 4.5cqmin 1.5cqmin;
+  font-size: 2.1cqmin;
+}
+.chat-tabs .loading-social-tab.active { padding-bottom: 1.9cqmin; }
+.loading-messages-list {
+  width: 100%;
+  box-sizing: border-box;
+  height: 54cqmin;
+  /* Fondo/borde ya los hereda de .loading-social-list; acá solo se pisa la
+     fila interna (ver .versus-friend-row más abajo, reusado tal cual del
+     panel de Retar 1v1 — mismo look "limpio" que ese panel, en vez del
+     .loading-social-row denso pensado para puntaje/rango que no aplica acá). */
+  gap: 1cqmin;
+}
+.loading-messages-list .versus-friend-row { cursor: pointer; padding: 1.5cqmin 1.8cqmin; }
+/* Estado offline: el panel de Retar nunca lo necesitó (solo lista amigos
+   conectados), acá sí hace falta para la pestaña "Todos". */
+.versus-friend-dot.offline { background: #b0b0b0; box-shadow: none; animation: none; }
+.versus-friend-status.offline { color: #8a7a3a; }
+/* Primera línea de la fila: nombre, bandera y estado de conexión juntos —
+   el último mensaje va ABAJO de esto (ver .loading-messages-preview), no al
+   costado. */
+.loading-messages-topline {
+  display: flex;
+  align-items: center;
+  gap: 0.8cqmin;
+  min-width: 0;
+}
+.loading-messages-topline .versus-friend-name { flex: none; max-width: 34cqmin; }
+/* Circular, igual que .loading-social-flag en Rankings (mismo criterio en
+   toda la app: bandera = círculo, nunca rectángulo). */
+.loading-messages-flag {
+  flex: none;
+  width: 2.8cqmin;
+  height: 2.8cqmin;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 0.18cqmin solid #fff;
+  box-shadow: 0 0 0 0.15cqmin rgba(0,0,0,0.15);
+}
+.loading-messages-topline .versus-friend-status { flex: none; }
+.loading-messages-preview {
+  display: block;
+  font-size: 1.9cqmin;
+  color: #8a7a3a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.loading-messages-preview-empty { font-style: italic; opacity: 0.8; }
+.loading-messages-time {
+  flex: none;
+  font-size: 1.5cqmin;
+  color: #a89b6a;
+  white-space: nowrap;
+}
+/* Fila con mensaje sin leer: se destaca de verdad, no solo negrita — franja
+   izquierda dorada (inset box-shadow: pinta POR ENCIMA del fondo aunque sea
+   la celda personalizable opaca, a diferencia de background-color que
+   quedaría tapado por ella) + burbujita roja con la cantidad, mismo
+   lenguaje que cualquier notificación sin leer. */
+.versus-friend-row.is-unread {
+  box-shadow: inset 0.5cqmin 0 0 #fde20e;
+}
+.versus-friend-row.is-unread .versus-friend-name { font-weight: 900; color: #2a2100; }
+.versus-friend-row.is-unread .loading-messages-preview { color: #5a4400; font-weight: 700; }
+/* Celda oscura (cell-light-text, texto general pasa a blanco): sin esto la
+   segunda línea (preview) y la hora quedaban en el color oscuro de
+   siempre, ilegibles sobre un fondo oscuro — mismo criterio que ya cubre
+   .versus-friend-name/.versus-friend-status más abajo en el archivo. */
+.versus-friend-row.cell-light-text .loading-messages-preview,
+.versus-friend-row.cell-light-text .loading-messages-time {
+  color: #fff;
+  -webkit-text-stroke: 0.3cqmin #4a3b00;
+  paint-order: stroke fill;
+}
+/* Más grande a pedido (2.6→3.6cqmin) — position:relative para poder centrar
+   el número adentro con .notif-badge-num (position absoluta), ver esa
+   regla más abajo junto a .social-notif-badge. */
+.loading-messages-unread-badge {
+  position: relative;
+  flex: none;
+  min-width: 3.6cqmin;
+  height: 3.6cqmin;
+  padding: 0 0.9cqmin;
+  border-radius: 999px;
+  background: #e03030;
+  border: 0.24cqmin solid #fff;
+  box-shadow: 0 0 0.6cqmin rgba(224,48,48,0.7);
+  box-sizing: border-box;
+  animation: notif-pop 0.35s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+.loading-messages-empty {
+  text-align: center;
+  color: #8a7a3a;
+  font-size: 2.3cqmin;
+  padding: 3cqmin;
+  margin: auto;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+}
+
+/* ── Conversación individual ── */
+/* Mismo motivo del #id ancestro que .chat-inbox-box más arriba (ganarle a
+   .account-modal-box en especificidad, no solo en orden). Más grande a
+   pedido (76→92cqmin). */
+#chat-conversation-modal .chat-conversation-box {
+  width: 92cqmin;
+  max-width: 92cqmin;
+  align-items: stretch;
+}
+/* Volver: el back1/back2.png de siempre (.loading-social-back-wrap ya trae
+   el hover/press que muestra back2, ver esa regla más arriba) — a pedido
+   va ADENTRO de la caja, como primer elemento del header, en vez de
+   sobresalir de la esquina (que es como se usa en el resto del juego para
+   un botón "cerrar todo", no para "volver" dentro de otro modal). */
+/* Más grande y alineada con la foto de perfil (mismo 8cqmin que
+   .loading-chat-avatar-wrap más abajo) — antes quedaba visiblemente más
+   chica que el resto del header. */
+.chat-back-wrap {
+  /* top/left explícitos: .loading-social-back-wrap (la clase base, ver más
+     arriba en el archivo) trae top:22%;left:calc(50% - 46cqmin) para su
+     uso normal en la mesa vieja — con position:relative eso NO se ignora,
+     se suma como offset desde la posición normal en el flex, así que sin
+     resetearlo acá el botón se seguía yendo fuera de la tarjeta pese al
+     position:relative (la causa real de "no queda dentro del panel"). */
+  position: relative;
+  /* Corrimiento chico a propósito (no el de antes, que se sentía como que
+     desarmaba toda la fila) — top/left en relative NO mueve a los hermanos
+     (avatar/nombre quedan clavados donde estaban), es solo este ícono el
+     que se corre un poco de su celda dentro del flex. */
+  top: 3.5cqmin;
+  left: 2.5cqmin;
+  flex: none;
+  width: 10.5cqmin;
+}
+.loading-chat-header {
+  display: flex;
+  align-items: center;
+  gap: 1.8cqmin;
+  width: 100%;
+}
+.loading-chat-flag {
+  margin-left: auto;
+  flex: none;
+  width: 6cqmin;
+  height: 6cqmin;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 0.3cqmin solid #fff;
+  box-shadow: 0 0 0 0.15cqmin rgba(0,0,0,0.15);
+}
+.loading-chat-avatar-wrap { width: 8cqmin; height: 8cqmin; flex: none; }
+.loading-chat-avatar { width: 8cqmin; height: 8cqmin; }
+.loading-chat-name-col { display: flex; flex-direction: column; gap: 0.4cqmin; align-items: flex-start; min-width: 0; }
+.loading-chat-name {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 3.4cqmin;
+  color: #5a4400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 55cqmin;
+}
+#loading-chat-status { font-size: 1.9cqmin; }
+.loading-chat-messages {
+  width: 100%;
+  box-sizing: border-box;
+  height: 52cqmin;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2cqmin;
+  padding: 1.8cqmin;
+  background: #f6f2e9;
+  border: 0.4cqmin solid #8b6a00;
+  border-radius: 1.6cqmin;
+  box-shadow: inset 0 0.3cqmin 0.8cqmin rgba(0,0,0,0.08);
+}
+.chat-bubble-row { display: flex; }
+.chat-bubble-row.mine { justify-content: flex-end; }
+.chat-bubble-row.theirs { justify-content: flex-start; }
+/* Burbujas más grandes y con sombra propia para que "resalten" del fondo
+   crema en vez de mimetizarse — mío en un azul bien saturado (estilo
+   mensajería típico, contrasta fuerte contra el resto de la paleta
+   dorada/crema del juego, así se distingue de un vistazo quién dijo qué),
+   ajeno en blanco con borde marcado. */
+.chat-bubble {
+  max-width: 70%;
+  padding: 1.3cqmin 1.9cqmin;
+  border-radius: 2cqmin;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2.4cqmin;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  position: relative;
+  box-shadow: 0 0.3cqmin 0.6cqmin rgba(0,0,0,0.18);
+}
+/* Mío: texto blanco con delineado AZUL (no celeste — pedido explícito). */
+.chat-bubble-row.mine .chat-bubble {
+  background: #2f8fe0;
+  color: #ffffff;
+  -webkit-text-stroke: 0.18cqmin #1a4fa0;
+  paint-order: stroke fill;
+  border-bottom-right-radius: 0.4cqmin;
+}
+/* Ajeno: vuelve al estilo original (blanco liso, texto oscuro, sin
+   delineado) — a pedido, "dejalo como estaba antes". */
+.chat-bubble-row.theirs .chat-bubble {
+  background: #ffffff;
+  color: #3a2e00;
+  border: 0.25cqmin solid #ddd4c0;
+  border-bottom-left-radius: 0.4cqmin;
+}
+.chat-bubble.is-pending { opacity: 0.6; box-shadow: none; }
+.chat-bubble.is-failed { border: 0.25cqmin solid #c62828; }
+.chat-bubble-time {
+  display: block;
+  font-size: 1.4cqmin;
+  margin-top: 0.4cqmin;
+  text-align: right;
+  opacity: 0.75;
+}
+.loading-chat-empty {
+  margin: auto;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2.2cqmin;
+  color: #8a7a3a;
+}
+.loading-chat-input-row {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-end; /* el botón queda anclado abajo mientras el textarea crece hacia arriba */
+  gap: 1.4cqmin;
+}
+/* <textarea>, no <input> — un mensaje que no entra en un renglón pasa a un
+   segundo (o tercero, etc.) en vez de recortarse sin poder leerse completo
+   (el reportado). SIN max-height/overflow-y ni scrollbar interna a
+   propósito (pedido explícito) — la caja crece en alto sin techo junto con
+   los renglones (_autoGrowChatInput en chat.js mide scrollHeight); el
+   límite real de largo es el maxlength=400 del HTML, no una altura fija. */
+.loading-chat-input {
+  flex: 1;
+  min-height: 6.4cqmin;
+  padding: 1.6cqmin 2.2cqmin;
+  border-radius: 2.4cqmin;
+  border: 0.35cqmin solid #8b6a00;
+  background: #fffdf6;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2.2cqmin;
+  line-height: 1.3;
+  color: #3a2e00;
+  box-sizing: border-box;
+  resize: none;
+  overflow-y: hidden;
+}
+.loading-chat-input:focus { outline: none; border-color: #fde20e; box-shadow: 0 0 0 0.3cqmin #fde20e55; }
+/* Botón de enviar = mismo pack confirm1/confirm2.png que ya usa GlobeQuiz
+   para confirmar un guess (.gq-guess-btn, ver más arriba) — el hover/press
+   ya viene gratis de esa regla, acá solo se agranda un toque y se empareja
+   con la altura mínima del textarea para quedar centrado en 1 renglón. */
+.loading-chat-send { width: 9.5cqmin; margin-bottom: 0.6cqmin; }
+
 /* Foto y estado de conexión del amigo alineados con la misma posición que
    usa la foto del perfil propio (50% + 33cqmin), ya que el nombre/jugadas
    ahora se centran igual que en el perfil propio.
@@ -4769,6 +5088,49 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1);
   transform: translateZ(0);
   backface-visibility: hidden;
+}
+/* Botón de Mensajes, arriba del de GloboReto — mismo centro horizontal
+   (left + width/2 igual al de .globequiz-btn-wrap), suficiente separación
+   en `bottom` para no pisar la insignia de racha (.loading-globequiz-streak,
+   que sobresale top:-7cqmin por ENCIMA del botón de GloboReto). */
+.loading-messages-btn-wrap {
+  position: absolute;
+  bottom: 70cqmin;
+  left: calc(50% + 50cqmin);
+  width: 14cqmin;
+  z-index: 205;
+  cursor: pointer;
+  pointer-events: all;
+  /* display:none por defecto, igual que .globequiz-btn-wrap — sin esto
+     aparecía desde el arranque mismo de la carga, antes que el resto de
+     los botones (el reportado); el JS lo pone en 'block' en los mismos 3
+     puntos donde ya se muestran perfil/globoreto (ver monuments.js). */
+  display: none;
+  transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1);
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+.loading-messages-btn-wrap:hover { transform: translateZ(0) scale(1.08); }
+/* Label "Mensajes" en blanco+celeste (no el amarillo/marrón por defecto de
+   .profile-btn-label) — mismo criterio de color pedido para las burbujas
+   del chat, acá aplicado al label del botón. */
+#loading-messages-btn .profile-btn-label {
+  color: #ffffff;
+  -webkit-text-stroke: 0.5cqmin #1a5fc4;
+}
+#loading-screen.table-shown .loading-messages-btn-wrap { pointer-events: none; }
+.loading-messages-btn-wrap img {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  /* Misma animación de entrada que el resto de los botones del loading
+     (.profile-account1, .loading-secondary-btn img, .globequiz-btn-wrap no
+     la tenía pero el resto sí) — sin esto este ícono aparecía "seco", sin
+     el pop que tienen todos los demás botones del menú. */
+  animation: pop-in 0.35s cubic-bezier(0.34,1.56,0.64,1);
 }
 .globequiz-btn-wrap:hover { transform: translateZ(0) scale(1.08); }
 #loading-screen.table-shown .globequiz-btn-wrap { pointer-events: none; }
@@ -8869,7 +9231,8 @@ body.is-mobile #splash-screen.mode-monuments .game-bg-city-monuments2 {
 #loading-screen.lobby-interim-bg .loading-panel2-back,
 #loading-screen.lobby-interim-bg #loading-panel2-back,
 #loading-screen.lobby-interim-bg .profile-account-wrap,
-#loading-screen.lobby-interim-bg .globequiz-btn-wrap {
+#loading-screen.lobby-interim-bg .globequiz-btn-wrap,
+#loading-screen.lobby-interim-bg .loading-messages-btn-wrap {
   display: none !important;
 }
 

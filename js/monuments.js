@@ -147,6 +147,8 @@
         if (accountWrap) accountWrap.style.display = 'block';
         const globequizWrap = document.getElementById('globequiz-btn');
         if (globequizWrap) globequizWrap.style.display = 'block';
+        const messagesWrap = document.getElementById('loading-messages-btn');
+        if (messagesWrap) messagesWrap.style.display = 'block';
         if (typeof window.gqRefreshMenuStreakBadge === 'function') window.gqRefreshMenuStreakBadge();
         const resultsBtn = document.getElementById('loading-results-btn');
         if (resultsBtn) resultsBtn.style.display = 'block';
@@ -1040,6 +1042,7 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
     document.querySelector('.loading-plane-wrap'),
     document.getElementById('profile-account-btn'),
     document.getElementById('globequiz-btn'),
+    document.getElementById('loading-messages-btn'),
   ].forEach(el => { if (el) el.style.display = 'none'; });
   const lg = document.querySelector('.loading-logo');
   if (lg) {
@@ -1084,6 +1087,7 @@ document.getElementById('globequiz-btn')?.addEventListener('click', () => {
     document.querySelector('.loading-plane-wrap'),
     document.getElementById('profile-account-btn'),
     document.getElementById('globequiz-btn'),
+    document.getElementById('loading-messages-btn'),
   ].forEach(el => { if (el) el.style.display = 'none'; });
   const lg = document.querySelector('.loading-logo');
   if (lg) {
@@ -1264,6 +1268,8 @@ document.getElementById('loading-panel2-back')?.addEventListener('click', () => 
   if (acct) acct.style.display = 'block';
   const gq = document.getElementById('globequiz-btn');
   if (gq) gq.style.display = 'block';
+  const msgsBtn = document.getElementById('loading-messages-btn');
+  if (msgsBtn) msgsBtn.style.display = 'block';
   const pw = document.querySelector('.loading-plane-wrap');
   if (pw) { pw.style.display = ''; pw.style.opacity = '1'; pw.style.transform = 'translate(-50%,-50%) translateY(0)'; pw.classList.add('plane-above'); }
   const lg = document.querySelector('.loading-logo');
@@ -4612,6 +4618,8 @@ window.showEntranceElementsStatic = function () {
   if (acct) acct.style.display = 'none';
   const gq = document.getElementById('globequiz-btn');
   if (gq) gq.style.display = 'none';
+  const msgsBtn = document.getElementById('loading-messages-btn');
+  if (msgsBtn) msgsBtn.style.display = 'none';
   const resultsBtn = document.getElementById('loading-results-btn');
   if (resultsBtn) resultsBtn.style.display = 'none';
 };
@@ -4677,6 +4685,8 @@ window.replayEntranceAnimations = function () {
   if (acct) acct.style.display = 'block';
   const gq = document.getElementById('globequiz-btn');
   if (gq) gq.style.display = 'block';
+  const msgsBtn = document.getElementById('loading-messages-btn');
+  if (msgsBtn) msgsBtn.style.display = 'block';
   if (typeof window.gqRefreshMenuStreakBadge === 'function') window.gqRefreshMenuStreakBadge();
   const ver = document.getElementById('loading-version');
   if (ver) ver.style.display = '';
@@ -4951,11 +4961,13 @@ window.quitToMenu = quitToMenu;
     } else if (_closeOpenModal()) {
       // modal de cuenta cerrado
     } else if (_panelVisible('loading-friend-group'))    { _clickBack('loading-friend-back-wrap'); }
+    else if (_hasClass('chat-conversation-modal', 'open')) { _clickBack('loading-chat-back'); }
     else if (_panelVisible('loading-addfriend-group'))   { _clickBack('loading-addfriend-back-wrap'); }
     else if (_panelVisible('loading-blocked-group'))     { _clickBack('loading-blocked-back-wrap'); }
     else if (_panelVisible('loading-sent-group'))        { _clickBack('loading-sent-back-wrap'); }
     else if (_panelVisible('loading-rankings-group'))    { _clickBack('loading-rankings-back-wrap'); }
     else if (_panelVisible('loading-social-group'))      { _clickBack('loading-social-back-wrap'); }
+    else if (_hasClass('chat-inbox-modal', 'open'))      { _clickBack('chat-inbox-close'); }
     else if (_panelVisible('loading-table-group')) {
       const sub = document.getElementById('loading-panel2-back');
       if (sub && sub.style.display !== 'none') _clickBack('loading-panel2-back');

@@ -38,6 +38,11 @@ async function loadFriends() {
       cardCode: f.cardCode || '0001',
       cellCode: f.cellCode || '0001',
       panelCode: f.panelCode || '0001',
+      // country_code: mismo motivo que frameCode/cardCode arriba — venía de
+      // sbLoadSocialData pero se descartaba acá, así que nadie que use
+      // getFriends() (ver el chat directo, js/chat.js) podía mostrar la
+      // bandera de un amigo sin pedirla aparte.
+      country_code: f.country_code || null,
       gqStreakCount: f.gqStreakCount || 0,
       gqStreakLastDate: f.gqStreakLastDate || null,
       gqTodayTimeMs: (typeof f.gqTodayTimeMs === 'number') ? f.gqTodayTimeMs : null,
