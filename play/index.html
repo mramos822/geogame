@@ -21,7 +21,7 @@
   <link rel="icon" type="image/png" href="images/planet3.png">
   <title>myGeoChallenge</title>
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6238929099865050" crossorigin="anonymous"></script>
-  <link rel="stylesheet" href="css/style.css?v=3.5.52">
+  <link rel="stylesheet" href="css/style.css?v=3.5.60">
   <link rel="preload" href="images/characters/men3.png" as="image">
   <link rel="preload" href="images/characters/men4.png" as="image">
   <link rel="preload" href="images/characters/girl3.png" as="image">
@@ -517,7 +517,24 @@
       <div class="vs-popup-box">
         <div class="vs-popup-pic-wrap" id="vs-duel-accepted-pic-wrap"><img class="vs-popup-pic" id="vs-duel-accepted-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false"></div>
         <span class="vs-popup-name" id="vs-duel-accepted-name"></span>
-        <span class="vs-popup-sub" data-i18n="vs.duelAccepted">¡Duelo aceptado! Redirigiéndote a la partida…</span>
+        <span class="vs-popup-sub" id="vs-duel-accepted-sub" data-i18n="vs.duelAccepted">¡Duelo aceptado! Redirigiéndote a la partida…</span>
+        <!-- Panel de sincronización (solo GloboReto 1v1): el globo 3D pesa y
+             tarda distinto en cada dispositivo/red — muestra a AMBOS jugadores
+             el progreso de carga propio y del rival, y cuándo va a arrancar.
+             Ver _showGqSyncPanel / _vsGqLoadPhase en js/vs.js. -->
+        <div class="vs-sync" id="vs-sync-block" style="display:none">
+          <div class="vs-popup-timer-wrap"><div class="vs-popup-timer-bar vs-sync-bar" id="vs-sync-bar"></div></div>
+          <div class="vs-sync-rows">
+            <div class="vs-sync-row">
+              <span class="vs-sync-who" id="vs-sync-me-who">Tú</span>
+              <span class="vs-sync-state" id="vs-sync-me-state">Cargando…</span>
+            </div>
+            <div class="vs-sync-row">
+              <span class="vs-sync-who" id="vs-sync-opp-who">Rival</span>
+              <span class="vs-sync-state" id="vs-sync-opp-state">Cargando…</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1338,7 +1355,7 @@
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
     </div>
-    <div id="loading-version">Ver. 3.5.59</div>
+    <div id="loading-version">Ver. 3.5.60</div>
   </div>
 
   <!-- Pantalla de resultado versus (W/L) — fuera del loading-screen para verse tras la partida -->
@@ -2108,7 +2125,7 @@
   <script src="js/guestmsg.js?v=3.5.56"></script>
   <script src="js/profanity-filter.js?v=3.5.52"></script>
   <script src="js/letterbox.js?v=3.5.52"></script>
-  <script src="js/i18n.js?v=3.5.52"></script>
+  <script src="js/i18n.js?v=3.5.60"></script>
   <script src="js/i18n-data.js?v=3.5.52"></script>
   <script src="js/manifest.js?v=3.5.52"></script>
   <script src="js/practice-data.js?v=3.5.52"></script>
@@ -2116,14 +2133,14 @@
   <script src="js/countries.js?v=3.5.52"></script>
   <script src="js/places.js?v=3.5.52"></script>
   <script src="js/friends.js?v=3.5.52"></script>
-  <script src="js/vs.js?v=3.5.52"></script>
+  <script src="js/vs.js?v=3.5.60"></script>
   <script src="js/spectate.js?v=3.5.52"></script>
   <script src="js/lobby.js?v=3.5.52"></script>
   <script src="js/monuments.js?v=3.5.52"></script>
   <script src="js/chat.js?v=3.5.52"></script>
   <script src="js/globequiz-names-es.js?v=3.5.52"></script>
   <script src="js/globequiz-countries-data.js?v=3.5.52"></script>
-  <script src="js/globequiz.js?v=3.5.52"></script>
+  <script src="js/globequiz.js?v=3.5.60"></script>
   <script src="js/flags.js?v=3.5.52"></script>
   <script src="js/shapes.js?v=3.5.52"></script>
   <script src="js/ranks.js?v=3.5.52"></script>

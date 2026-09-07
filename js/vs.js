@@ -44,6 +44,9 @@ window.VS = (() => {
   let _onGameEnd = null; // cb({role, score}) — el rival terminó SU cronómetro (ver reportGameEnd)
   let _onAnswer  = null; // cb(detail) — broadcast 'answer' propio (no el de espectador, ver window._onVsAnswer). Solo usado por GlobeQuiz hoy.
   let _onReady   = null; // cb({role}) — el rival terminó de cargar sus assets pesados (ver reportReady). Solo usado por GlobeQuiz hoy.
+  let _onGqAbort = null; // cb() — GlobeQuiz: uno de los dos no pudo terminar de cargar el globo 3D a tiempo; ambos vuelven al menú SIN ganador ni derrota registrada (ver _handleGqSyncFailed).
+  let _onGqPhase = null; // cb({role, phase}) — GlobeQuiz: hito de carga del rival ('start'|'assets'|'scene'), para la barra de sincronización.
+  let _onGqGo    = null; // cb() — GlobeQuiz: el host confirma que arrancan los dos; el guest agenda su 3-2-1 con el mismo desfase relativo (sin depender de relojes sincronizados).
   // cb(status) — el canal de Realtime NUNCA llegó a autorizarse (típicamente
   // una policy de RLS rota en el server, ver la de sep-2026: un cast inválido
   // hacía que CUALQUIER intento de unirse a 'match-{id}'/'solo-{id}' tirara
@@ -161,6 +164,16 @@ window.VS = (() => {
       .on('broadcast', { event: 'ready' }, ({ payload }) => {
         if (_onReady && payload) _onReady(payload);
       })
+      // GlobeQuiz: el rival avisa que NO pudo terminar de cargar el globo 3D
+      // dentro del margen (CDN de three.js colgado, WebGL bloqueado, red
+      // caída). El modo se gana por ser el primero en acertar, así que
+      // arrancar sin él sería injusto y lo dejaría congelado en el spinner —
+      // se corta la partida para ambos, sin ganador (ver _handleGqSyncFailed).
+      .on('broadcast', { event: 'gqabort' }, () => { if (_onGqAbort) _onGqAbort(); })
+      // GlobeQuiz: hito de carga del rival — alimenta la barra de sincronización.
+      .on('broadcast', { event: 'gqphase' }, ({ payload }) => { if (_onGqPhase && payload) _onGqPhase(payload); })
+      // GlobeQuiz: el host da la orden de arranque (ver _gqTryResolveReady).
+      .on('broadcast', { event: 'gqgo' }, () => { if (_onGqGo) _onGqGo(); })
       // Presencia: detecta cierre de pestaña / pérdida de conexión del rival.
       .on('presence', { event: 'leave' }, ({ key }) => {
         // Un espectador que se desconecta (key 'spectator-{uid}', ver
@@ -379,6 +392,33 @@ window.VS = (() => {
     if (_channel) { try { _channel.send({ type: 'broadcast', event: 'ready', payload: { role: _role } }); } catch (e) {} }
   }
 
+  // GlobeQuiz: avisa al rival que ESTE cliente no llegó a sincronizar la
+  // carga del globo 3D — los dos abandonan la partida sin resultado.
+  function reportGqAbort() {
+    if (_channel) { try { _channel.send({ type: 'broadcast', event: 'gqabort', payload: { role: _role } }); } catch (e) {} }
+  }
+
+  // GlobeQuiz: hito de carga propio ('start'|'assets'|'scene') para la barra
+  // de sincronización que ve el rival.
+  function reportGqPhase(phase) {
+    if (_channel) { try { _channel.send({ type: 'broadcast', event: 'gqphase', payload: { role: _role, phase } }); } catch (e) {} }
+  }
+
+  // GlobeQuiz: solo el host lo manda, cuando sabe que los dos están listos —
+  // el guest arranca su 3-2-1 al recibirlo (ver _gqTryResolveReady).
+  function reportGqGo() {
+    if (_channel) { try { _channel.send({ type: 'broadcast', event: 'gqgo', payload: { role: _role } }); } catch (e) {} }
+  }
+
+  // Cierra la fila del match sin ganador ni derrota (a diferencia de
+  // abandon()/finish()): la partida nunca llegó a arrancar de verdad porque
+  // un lado no pudo cargar. Best-effort, solo si sigue 'active'.
+  async function cancelMatchNoResult() {
+    const id = _matchId;
+    if (!id) return;
+    try { await window.sb.from('matches').update({ status: 'expired' }).eq('id', id).eq('status', 'active'); } catch (e) {}
+  }
+
   // Libera el canal de Realtime de ESTE jugador (sin tocar _matchId/_role —
   // reportScore/reportGameEnd/finish siguen escribiendo bien en la base,
   // solo el .send() de broadcast queda mudo, ver los try/catch de arriba) —
@@ -584,7 +624,7 @@ window.VS = (() => {
     clearTimeout(_oppGoneTimer);
     _oppFinishedGameEnd = false;
     _matchId = _role = _match = null;
-    _onStart = _onScore = _onEnd = _onOppLeft = _onWrong = _onGameEnd = _onAnswer = _onReady = null;
+    _onStart = _onScore = _onEnd = _onOppLeft = _onWrong = _onGameEnd = _onAnswer = _onReady = _onGqAbort = _onGqPhase = _onGqGo = null;
     _started = false;
     _lastPhase = null;
     _lastRoundPayload = null;
@@ -606,6 +646,10 @@ window.VS = (() => {
     reportScore,
     sendWrong,
     reportReady,
+    reportGqAbort,
+    reportGqPhase,
+    reportGqGo,
+    cancelMatchNoResult,
     reportGameEnd,
     releaseChannel,
     reportRound,
@@ -637,6 +681,9 @@ window.VS = (() => {
     onGameEnd: cb => { _onGameEnd = cb; },
     onAnswer:  cb => { _onAnswer = cb; },
     onReady:   cb => { _onReady = cb; },
+    onGqAbort: cb => { _onGqAbort = cb; },
+    onGqPhase: cb => { _onGqPhase = cb; },
+    onGqGo:    cb => { _onGqGo = cb; },
     onSubscribeError: cb => { _onSubscribeError = cb; },
     getMatch: () => _match,
     getRole:  () => _role,
@@ -1354,6 +1401,7 @@ window.refreshVsSpectatorBadge = function (n) {
     if (typeof window.refreshVsSpectatorBadge === 'function') window.refreshVsSpectatorBadge(0);
     _clearGqLoseAnim();
     _gqReadyReset();
+    _hideGqSyncPanel();
   }
 
   // Llamado desde flags.js/shapes.js cuando el jugador responde correcto/incorrecto.
@@ -1668,8 +1716,129 @@ window.refreshVsSpectatorBadge = function (n) {
   // que el rival, una ventaja real en un modo que se gana por ser el primero
   // en acertar (el reportado: "el versus no debe empezar hasta que a ambos
   // les cargue el globo 3D").
-  const GQ_READY_TIMEOUT_MS = 10000;
+  // Margen para que AMBOS confirmen que su globo 3D terminó de cargar. Tiene
+  // que cubrir el peor caso legítimo (móvil lento bajando three.js del CDN +
+  // el reintento interno de loadThree, ver globequiz.js) sin colgar la
+  // partida para siempre si un lado de verdad no puede. Si vence, NO se
+  // arranca solo: se corta para los dos (ver _handleGqSyncFailed).
+  const GQ_READY_TIMEOUT_MS = 25000;
+  // Desfase relativo entre "el host dio la orden" y "arranca el 3-2-1". El
+  // host lo espera después de mandar 'gqgo'; el guest lo espera después de
+  // recibirlo — la diferencia real entre ambos arranques es solo la latencia
+  // de UN mensaje (~50-150ms), sin depender de que los relojes de los dos
+  // dispositivos estén sincronizados (no lo están).
+  const GQ_GO_DELAY_MS = 900;
+  const GQ_GO_FALLBACK_MS = 1500; // el guest arranca igual si el 'gqgo' del host nunca llega (normalmente llega en <200ms)
   let _gqReadyMe = false, _gqReadyOpp = false, _gqReadyDone = false, _gqReadyTimer = null, _gqReadyResolveCb = null;
+  let _gqSyncFailed = false;
+  let _gqGoWaitCb = null, _gqGoFallbackTimer = null;
+  // Progreso 0..1 de cada lado para la barra de sincronización.
+  let _gqMyProg = 0, _gqOppProg = 0;
+
+  // ── Panel de sincronización (dentro de #vs-duel-accepted-popup) ─────────────
+  const GQ_PHASE_PROG = { start: 0.14, assets: 0.48, scene: 0.74, ready: 0.95, go: 1 };
+
+  function _gqSyncSetState(elId, key, isReady) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    el.textContent = T(key, key === 'vs.syncReady' ? '¡Listo!' : key === 'vs.syncAlmost' ? 'Casi listo…' : 'Cargando…');
+    el.classList.toggle('ready', !!isReady);
+  }
+  function _gqSyncRenderBar() {
+    const bar = document.getElementById('vs-sync-bar');
+    if (!bar) return;
+    const pct = Math.round(((_gqMyProg + _gqOppProg) / 2) * 100);
+    bar.style.width = Math.max(8, Math.min(100, pct)) + '%';
+  }
+  function _gqPhaseToText(phase) {
+    if (phase === 'ready' || phase === 'go') return 'vs.syncReady';
+    if (phase === 'scene') return 'vs.syncAlmost';
+    return 'vs.syncLoading';
+  }
+  function _showGqSyncPanel() {
+    const block = document.getElementById('vs-sync-block');
+    const sub   = document.getElementById('vs-duel-accepted-sub');
+    if (sub) sub.textContent = T('vs.syncTitle', 'Sincronizando la partida…');
+    const meWho  = document.getElementById('vs-sync-me-who');
+    const oppWho = document.getElementById('vs-sync-opp-who');
+    if (meWho)  meWho.textContent  = T('vs.syncYou', 'Tú');
+    if (oppWho) oppWho.textContent = _pendingOppName || (window._vsOpponent && window._vsOpponent.name) || 'Rival';
+    _gqMyProg = _gqOppProg = 0;
+    _gqSyncSetState('vs-sync-me-state', 'vs.syncLoading', false);
+    _gqSyncSetState('vs-sync-opp-state', 'vs.syncLoading', false);
+    _gqSyncRenderBar();
+    if (block) block.style.display = 'flex';
+    _showDuelAcceptedPopup();
+  }
+  function _hideGqSyncPanel() {
+    const block = document.getElementById('vs-sync-block');
+    if (block) block.style.display = 'none';
+    // Restaurar el subtítulo por si el próximo duelo NO es GloboReto.
+    const sub = document.getElementById('vs-duel-accepted-sub');
+    if (sub) sub.textContent = T('vs.duelAccepted', '¡Duelo aceptado! Redirigiéndote a la partida…');
+    _hideDuelAcceptedPopup();
+  }
+  function _gqSyncAllReady() {
+    _gqMyProg = _gqOppProg = 1;
+    _gqSyncSetState('vs-sync-me-state', 'vs.syncReady', true);
+    _gqSyncSetState('vs-sync-opp-state', 'vs.syncReady', true);
+    _gqSyncRenderBar();
+    const sub = document.getElementById('vs-duel-accepted-sub');
+    if (sub) sub.textContent = T('vs.syncStarting', '¡Empezando!');
+  }
+
+  // Hito de carga PROPIO (llamado desde globequiz.js) — actualiza mi fila +
+  // barra y se lo cuenta al rival.
+  window._vsGqLoadPhase = function (phase) {
+    if (!window._vsActive || _gqSyncFailed) return;
+    _gqMyProg = Math.max(_gqMyProg, GQ_PHASE_PROG[phase] || 0);
+    _gqSyncSetState('vs-sync-me-state', _gqPhaseToText(phase), phase === 'ready' || phase === 'go');
+    _gqSyncRenderBar();
+    if (window.VS && typeof window.VS.reportGqPhase === 'function') window.VS.reportGqPhase(phase);
+  };
+  function _gqOnOppPhase(phase) {
+    _gqOppProg = Math.max(_gqOppProg, GQ_PHASE_PROG[phase] || 0);
+    _gqSyncSetState('vs-sync-opp-state', _gqPhaseToText(phase), phase === 'ready' || phase === 'go');
+    _gqSyncRenderBar();
+  }
+
+  // GlobeQuiz VS: uno de los dos no pudo dejar listo el globo 3D a tiempo
+  // (three.js del CDN colgado, WebGL bloqueado, red caída, o simplemente
+  // nunca confirmó). Como el modo se gana por ser el PRIMERO en acertar,
+  // arrancar desincronizado es injusto y arrancar solo deja al otro
+  // congelado en el spinner de carga sin ningún aviso (el reportado: "a uno
+  // se le queda congelado y al otro le carga bien"). Se corta para AMBOS,
+  // sin ganador ni derrota registrada, con un cartel y vuelta al menú.
+  function _handleGqSyncFailed(fromOpponent) {
+    if (_gqSyncFailed || _resultShown) return;
+    _gqSyncFailed = true;
+    _gqReadyReset();
+    if (!fromOpponent && window.VS) {
+      if (typeof window.VS.reportGqAbort === 'function') window.VS.reportGqAbort();
+      if (typeof window.VS.cancelMatchNoResult === 'function') window.VS.cancelMatchNoResult();
+    }
+    if (typeof window.showVersusToast === 'function') {
+      window.showVersusToast(T('vs.gqSyncFailed', 'No se pudo sincronizar el globo 3D con el rival. Prueben de nuevo.'));
+    }
+    const spinner = document.getElementById('gq-loading-spinner');
+    if (spinner) spinner.style.display = 'none';
+    _hideGqSyncPanel();
+    // Salida limpia SIN pasar por _showVsResult/_vsAbandon (no hubo partida
+    // real, nadie gana ni pierde). _endedByAbandon/_resultShown en true
+    // cortan cualquier finish()/eco tardío; _teardownVsOpponent baja
+    // _vsActive antes de quitToMenu para que su guard no dispare _vsAbandon.
+    _endedByAbandon = true;
+    _resultShown    = true;
+    try { window.globequizHardReset?.(); } catch (e) {}
+    _teardownVsOpponent();
+    _restoreRandom();
+    if (window.VS && typeof window.VS.cleanup === 'function') window.VS.cleanup();
+    if (typeof window.quitToMenu === 'function') window.quitToMenu();
+    _resultShown = false;
+  }
+  // Llamada desde globequiz.js cuando su Promise.all([loadThree, loadCountries])
+  // rechaza estando en un duelo (ver el .catch de initGlobeQuiz).
+  window._vsGqSyncFailed = function () { _handleGqSyncFailed(false); };
 
   // Registrada en _launchVersus ANTES de llamar initGlobeQuiz() — así el
   // listener ya está enganchado al canal (que a esa altura ya está
@@ -1679,21 +1848,52 @@ window.refreshVsSpectatorBadge = function (n) {
   function _gqReadySetup() {
     _gqReadyMe = false; _gqReadyOpp = false; _gqReadyDone = false;
     clearTimeout(_gqReadyTimer); _gqReadyTimer = null; _gqReadyResolveCb = null;
+    clearTimeout(_gqGoFallbackTimer); _gqGoFallbackTimer = null; _gqGoWaitCb = null;
+    const myRole = () => (window.VS.isHost() ? 'host' : 'guest');
     window.VS.onReady(payload => {
-      if (!payload) return;
-      const myRole = window.VS.isHost() ? 'host' : 'guest';
-      if (payload.role === myRole) return; // eco propio, mismo filtro que 'answer'
+      if (!payload || payload.role === myRole()) return; // eco propio, mismo filtro que 'answer'
       _gqReadyOpp = true;
+      _gqOnOppPhase('ready');
       _gqTryResolveReady();
     });
+    window.VS.onGqPhase(payload => {
+      if (!payload || payload.role === myRole()) return;
+      _gqOnOppPhase(payload.phase);
+    });
+    // Solo relevante para el guest: el host confirma que arrancan los dos.
+    window.VS.onGqGo(() => {
+      if (!_gqGoWaitCb) return;
+      clearTimeout(_gqGoFallbackTimer); _gqGoFallbackTimer = null;
+      const cb = _gqGoWaitCb; _gqGoWaitCb = null;
+      _gqStartCountdownSoon(cb);
+    });
+  }
+  // Arranca el 3-2-1 tras GQ_GO_DELAY_MS, tapando el panel de sincronización
+  // justo antes. Los dos lados llaman a esto con el mismo desfase relativo.
+  function _gqStartCountdownSoon(cb) {
+    _gqSyncAllReady();
+    setTimeout(() => { _hideGqSyncPanel(); cb(); }, GQ_GO_DELAY_MS);
   }
   function _gqTryResolveReady() {
     if (_gqReadyDone || !_gqReadyResolveCb) return;
-    if (_gqReadyMe && _gqReadyOpp) {
-      _gqReadyDone = true;
-      clearTimeout(_gqReadyTimer);
-      const cb = _gqReadyResolveCb; _gqReadyResolveCb = null;
-      cb();
+    if (!(_gqReadyMe && _gqReadyOpp)) return;
+    _gqReadyDone = true;
+    clearTimeout(_gqReadyTimer);
+    const cb = _gqReadyResolveCb; _gqReadyResolveCb = null;
+    if (window.VS.isHost()) {
+      // El host es la referencia única del arranque — evita que los dos
+      // manden 'gqgo' y compitan por cuál gana.
+      window.VS.reportGqGo();
+      _gqStartCountdownSoon(cb);
+    } else {
+      // El guest espera el 'gqgo' del host (con red normal llega en decenas
+      // de ms); si nunca llega, arranca igual pasado el fallback.
+      _gqGoWaitCb = cb;
+      _gqGoFallbackTimer = setTimeout(() => {
+        if (!_gqGoWaitCb) return;
+        const c = _gqGoWaitCb; _gqGoWaitCb = null;
+        _gqStartCountdownSoon(c);
+      }, GQ_GO_FALLBACK_MS);
     }
   }
   // Corte del handshake (abandono/quitToMenu mientras se esperaba) — sin
@@ -1701,8 +1901,10 @@ window.refreshVsSpectatorBadge = function (n) {
   // volvió al menú.
   function _gqReadyReset() {
     clearTimeout(_gqReadyTimer); _gqReadyTimer = null;
+    clearTimeout(_gqGoFallbackTimer); _gqGoFallbackTimer = null;
     _gqReadyMe = _gqReadyOpp = _gqReadyDone = false;
     _gqReadyResolveCb = null;
+    _gqGoWaitCb = null;
   }
 
   // Llamada desde globequiz.js apenas ESTE cliente termina de cargar three.js
@@ -1712,15 +1914,21 @@ window.refreshVsSpectatorBadge = function (n) {
   // generoso para no colgar la partida entera por eso, pero sin dejar a
   // quien sí cargó esperando para siempre.
   window._vsGqAwaitBothReady = function (onBothReady) {
+    if (_gqSyncFailed) return; // el duelo ya se está cerrando por falta de sincronía
     if (!window._vsActive || !window.VS.getMatchId()) { onBothReady(); return; }
     _gqReadyResolveCb = onBothReady;
     _gqReadyMe = true;
+    _gqMyProg = Math.max(_gqMyProg, GQ_PHASE_PROG.ready);
+    _gqSyncSetState('vs-sync-me-state', 'vs.syncReady', true);
+    _gqSyncRenderBar();
     window.VS.reportReady();
     _gqReadyTimer = setTimeout(() => {
       if (_gqReadyDone) return;
       _gqReadyDone = true;
-      const cb = _gqReadyResolveCb; _gqReadyResolveCb = null;
-      if (cb) cb();
+      _gqReadyResolveCb = null;
+      // El rival nunca confirmó que su globo 3D terminó de cargar. NO
+      // arrancamos solos (ver _handleGqSyncFailed) — se corta para los dos.
+      _handleGqSyncFailed(false);
     }, GQ_READY_TIMEOUT_MS);
     _gqTryResolveReady();
   };
@@ -2114,6 +2322,8 @@ window.refreshVsSpectatorBadge = function (n) {
     _myGameEnded = false; _oppGameEnded = false;
     _myFinalScoreCache = null; _oppFinalScoreCache = null;
     _waitingAsSpectator = false;
+    _gqSyncFailed = false;
+    _gqMyProg = _gqOppProg = 0;
     _revealAt = null;
     clearTimeout(_gameEndFallbackTimer);
     clearTimeout(_revealTimer);
@@ -2211,6 +2421,11 @@ window.refreshVsSpectatorBadge = function (n) {
       // three.js/GeoJSON) — ver _gqReadySetup, así el listener de 'ready' ya
       // está enganchado sin importar quién termine de cargar primero.
       _gqReadySetup();
+      // El rival avisó que su globo 3D no cargó → los dos volvemos al menú.
+      window.VS.onGqAbort(() => _handleGqSyncFailed(true));
+      // Panel de sincronización: barra + estado de cada lado + cuándo arranca
+      // (queda sobre la pantalla del juego que carga por detrás).
+      _showGqSyncPanel();
       if (typeof window.initGlobeQuiz === 'function') window.initGlobeQuiz();
     } else {
       if (typeof showFlagsMode === 'function') showFlagsMode();

@@ -63,15 +63,45 @@
     return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   }
 
-  function loadThree() {
-    if (window.THREE) { THREE = window.THREE; return Promise.resolve(); }
+  // Un <script> del CDN que se cuelga a mitad de descarga (red móvil que se
+  // estanca, sin llegar a onload NI onerror) dejaba initGlobeQuiz esperando
+  // para siempre: en 1 player el spinner giraba eterno, y en un duelo 1v1 el
+  // rival arrancaba solo tras el timeout mientras este cliente quedaba
+  // congelado (el reportado: "a uno se le queda congelado y al otro le carga
+  // bien"). Ahora cada intento tiene su propio timeout y hay un reintento.
+  const THREE_SRC = 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js';
+  const THREE_ATTEMPT_TIMEOUT_MS = 10000;
+  function _loadThreeAttempt() {
     return new Promise((resolve, reject) => {
+      if (window.THREE) { THREE = window.THREE; resolve(); return; }
       const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js';
-      s.onload = () => { THREE = window.THREE; resolve(); };
-      s.onerror = reject;
+      s.src = THREE_SRC;
+      let done = false;
+      const to = setTimeout(() => {
+        if (done) return;
+        done = true;
+        s.onload = s.onerror = null;
+        try { s.remove(); } catch (e) {}
+        reject(new Error('three.js load timeout'));
+      }, THREE_ATTEMPT_TIMEOUT_MS);
+      s.onload = () => {
+        if (done) return;
+        done = true; clearTimeout(to);
+        if (window.THREE) { THREE = window.THREE; resolve(); }
+        else reject(new Error('three.js missing after load'));
+      };
+      s.onerror = () => {
+        if (done) return;
+        done = true; clearTimeout(to);
+        try { s.remove(); } catch (e) {}
+        reject(new Error('three.js load error'));
+      };
       document.head.appendChild(s);
     });
+  }
+  function loadThree() {
+    if (window.THREE) { THREE = window.THREE; return Promise.resolve(); }
+    return _loadThreeAttempt().catch(() => _loadThreeAttempt());
   }
 
   // Micro-territorios del Caribe demasiado oscuros/imposibles de adivinar a
@@ -2405,7 +2435,14 @@
         document.getElementById('gq-quit-confirm')?.click();
       });
     }
-    Promise.all([loadThree(), loadCountries()]).then(() => {
+    // Hitos de carga para la barra de sincronización del duelo (ver
+    // _vsGqLoadPhase en vs.js) — 'start' apenas empieza, 'assets' cuando
+    // three.js/GeoJSON ya bajaron, 'scene' con el globo 3D ya armado.
+    const _gqPhase = p => { if (window._vsActive && typeof window._vsGqLoadPhase === 'function') window._vsGqLoadPhase(p); };
+    _gqPhase('start');
+    const _pThree = loadThree(), _pCountries = loadCountries();
+    Promise.all([_pThree, _pCountries]).then(() => {
+      _gqPhase('assets');
       if (!initialized) {
         initThreeScene();
         initialized = true;
@@ -2474,10 +2511,12 @@
       // cargar su globo 3D (three.js + GeoJSON pesan y tardan distinto según
       // dispositivo/red) — sin esto, quien cargaba más rápido arrancaba su
       // cronómetro antes, ventaja real en un modo que se gana por ser el
-      // primero en acertar. El spinner de carga se queda puesto mientras se
-      // espera (ver _vsGqAwaitBothReady en vs.js, incluye timeout de
-      // seguridad por si el rival nunca llega a avisar).
+      // primero en acertar. Mientras se espera, el panel de sincronización
+      // de vs.js (barra + estado de cada lado) tapa la pantalla; el arranque
+      // del 3-2-1 lo coordina el host vía 'gqgo' (ver _gqTryResolveReady en
+      // vs.js, con timeout de seguridad por si el rival nunca avisa).
       if (window._vsActive && typeof window._vsGqAwaitBothReady === 'function') {
+        _gqPhase('scene');
         window._vsGqAwaitBothReady(startGqCountdown);
       } else {
         startGqCountdown();
@@ -2485,6 +2524,14 @@
     }).catch(err => {
       console.error('GlobeQuiz init failed', err);
       if (spinner) spinner.style.display = 'none';
+      // En un duelo 1v1: si mi globo 3D no cargó, no puedo jugar — aviso al
+      // rival para que los dos volvamos al menú sin ganador, en vez de
+      // dejarlo arrancar solo mientras yo quedo acá tildado (ver
+      // _handleGqSyncFailed en vs.js).
+      if (window._vsActive && typeof window._vsGqSyncFailed === 'function') {
+        window._vsGqSyncFailed();
+        return;
+      }
       // Antes esto fallaba en silencio (solo consola) y el input/confirm
       // ni siquiera tenían listeners todavía, así que el jugador escribía
       // y tocaba confirmar sin que pasara nada, sin ninguna pista de qué

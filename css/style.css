@@ -9929,6 +9929,44 @@ body.is-mobile #splash-screen.mode-monuments .game-bg-city-monuments2 {
   width: 100%;
   transition: width 0.5s linear;
 }
+
+/* ── Panel de sincronización de GloboReto 1v1 (dentro de #vs-duel-accepted-popup) ── */
+.vs-sync {
+  display: flex;
+  flex-direction: column;
+  gap: 1.6cqmin;
+  width: 100%;
+  margin-top: 0.6cqmin;
+}
+.vs-sync-bar {
+  width: 8%;
+  background: linear-gradient(90deg, #35c6ff, #4cff72);
+  transition: width 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.vs-sync-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9cqmin;
+}
+.vs-sync-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 2cqmin;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2.4cqmin;
+}
+.vs-sync-who { color: #fffbe6; }
+.vs-sync-state {
+  color: #bfe3ff;
+  transition: color 0.2s;
+}
+.vs-sync-state.ready {
+  color: #4cff72;
+}
+.vs-sync-state.ready::before {
+  content: '✓ ';
+}
 .vs-popup-confirm {
   position: relative;
   width: 22cqmin;
