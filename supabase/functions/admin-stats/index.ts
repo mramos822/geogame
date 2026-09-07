@@ -486,14 +486,12 @@ Deno.serve(async (req) => {
     const gamesByUser: Record<string, any[]> = {};
     for (const r of gameRows as any[]) {
       if (!r.user_id) continue;
-      // El historial por cuenta cuenta como "partida" solo: los 4 modos de una
-      // Gira Mundial (session_type 'campaign'), el versus y el GlobeQuiz (abajo).
-      // Se dejan afuera los modos sueltos jugados fuera de campaña (session_type
-      // 'standalone' o null en eventos viejos) y la práctica (ya filtrada de
-      // gameRows más arriba).
-      if (r.type === 'game' && r.session_type !== 'campaign') continue;
+      // Se incluye cada modo jugado; el front lo etiqueta como "Gira Mundial"
+      // (session_type 'campaign') o "Suelto" (standalone / null en eventos
+      // viejos). La práctica ya se filtró de gameRows más arriba.
       (gamesByUser[r.user_id] = gamesByUser[r.user_id] || []).push({
         type: r.type, mode: r.mode, score: r.score, created_at: r.created_at,
+        session_type: r.session_type || null,
       });
     }
     // Giras Mundiales completas y GlobeQuiz ganado también en el historial
