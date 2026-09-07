@@ -9872,13 +9872,6 @@ body.is-mobile #splash-screen.mode-monuments .game-bg-city-monuments2 {
   background: rgba(8,30,55,0.88);
   z-index: 400;
 }
-/* El popup de "duelo aceptado" / sincronización tapa TODO: mientras el globo
-   3D carga y los dos jugadores se coordinan, no debe verse la pantalla del
-   juego por detrás (fondo sólido, no translúcido). */
-#vs-duel-accepted-popup {
-  background: #081e37;
-  z-index: 420;
-}
 .vs-popup-box {
   display: flex;
   flex-direction: column;
