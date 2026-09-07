@@ -741,7 +741,7 @@
               <th>Estado</th>
               <th class="sortable" data-sort="created_at">Registro <span class="arrow">↕</span></th>
               <th class="sortable" data-sort="last_active">Última act. <span class="arrow">↕</span></th>
-              <th class="sortable" data-sort="play_count" style="text-align:right">Partidas <span class="arrow">↕</span></th>
+              <th class="sortable" data-sort="play_count" style="text-align:right" title="Total histórico (play_count del perfil). Pasá el mouse por el número para ver cuántas fueron en el período elegido.">Partidas <span class="arrow">↕</span></th>
               <th class="sortable" data-sort="hs_total" style="text-align:right">Score total <span class="arrow">↕</span></th>
               <th style="text-align:right">Versus</th>
             </tr></thead>
@@ -1923,7 +1923,7 @@ function drawAccounts(rows){
         <td><span class="status-pill ${st.cls}"><span class="dotstat"></span>${st.label}</span></td>
         <td>${created}</td>
         <td>${active}</td>
-        <td class="n">${a.games_in_range||0}</td>
+        <td class="n" title="${a.games_in_range||0} en el período elegido">${a.play_count||0}</td>
         <td class="n">${(a.hs_total||0).toLocaleString('es')}</td>
         <td class="n">${versusRec}</td>
       </tr>
