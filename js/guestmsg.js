@@ -154,7 +154,15 @@
     function close() {
       markSeen(row.id);
       // Read receipt en el servidor (para saber que ya lo vio).
-      try { if (window.sb) window.sb.rpc('mark_guest_message_read', { p_id: row.id }); } catch (e) {}
+      // OJO: en supabase-js v2 .rpc() es un thenable perezoso; si no se le
+      // encadena .then()/await, el request NUNCA se envia. Por eso el visto
+      // se quedaba eternamente en pendiente.
+      try {
+        if (window.sb) {
+          window.sb.rpc('mark_guest_message_read', { p_id: row.id })
+            .then(function () {}, function () {});
+        }
+      } catch (e) {}
       card.style.animation = 'gmPopOut 0.2s ease-in both';
       overlay.style.transition = 'opacity 0.2s';
       overlay.style.opacity = '0';
