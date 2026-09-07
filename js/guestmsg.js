@@ -6,12 +6,15 @@
 // Destino de cada fila:
 //   user_id    no nulo  -> solo esa cuenta registrada
 //   visitor_id no nulo  -> solo ese dispositivo (sirve para invitados sin cuenta)
-//   ambos nulos          -> todos
+//   ambos nulos          -> broadcast: SOLO a los que están conectados al enviar
 //
 // Comportamiento:
-//   - Al abrir el juego se consultan los mensajes pendientes (fallback fiable).
+//   - Al abrir el juego se consultan los mensajes DIRIGIDOS (visitor_id/user_id).
+//     Los broadcast no se consultan: no deben aparecerle a cada persona nueva.
 //   - Suscripción realtime: si el jugador ya tiene esta versión cargada, el
-//     pop-up aparece en ~1s sin recargar.
+//     pop-up aparece en ~1s sin recargar. Es la única vía de los broadcast, y
+//     solo se muestran si el jugador está en el menú en ese instante (no se
+//     encolan: si está jugando o fuera del juego, se descartan).
 //   - Solo se muestra en el MENÚ (#loading-screen visible). Si llega durante una
 //     partida queda en cola y aparece al volver al menú.
 //   - Cada mensaje se muestra una sola vez por dispositivo (ids en localStorage).
@@ -56,8 +59,16 @@
     return el.offsetParent !== null;
   }
 
+  function isBroadcast(row) { return !row.user_id && !row.visitor_id; }
+
   function enqueue(row) {
     if (!row || row.id == null || isSeen(row.id) || !matchesTarget(row)) return;
+    // Un broadcast ("a todos") solo se muestra si el jugador está en el menú
+    // AHORA. No se encola: si está jugando o fuera del juego, se descarta —
+    // así solo lo reciben los que están conectados en el momento del envío.
+    if (isBroadcast(row)) {
+      if (!loadingVisible()) { markSeen(row.id); return; }
+    }
     for (var i = 0; i < _queue.length; i++) if (_queue[i].id === row.id) return;
     _queue.push(row);
     pump();
@@ -166,9 +177,15 @@
   function fetchPending(sb) {
     var vid = visitorId();
     var uid = currentUid();
-    var ors = ['visitor_id.is.null'];   // los broadcast tienen visitor_id nulo
+    // Solo se recuperan los mensajes DIRIGIDOS a este dispositivo o cuenta.
+    // Los broadcast (visitor_id y user_id nulos) NO se consultan acá: solo
+    // llegan por realtime a quien está conectado en el momento del envío. Así
+    // un mensaje "a todos los invitados" no le aparece a cada persona nueva
+    // que entra después.
+    var ors = [];
     if (vid) ors.push('visitor_id.eq.' + vid);
     if (uid) ors.push('user_id.eq.' + uid);
+    if (!ors.length) return;
     sb.from('guest_messages')
       .select('id,body,visitor_id,user_id,created_at')
       .or(ors.join(','))
