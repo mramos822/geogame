@@ -76,47 +76,59 @@
     render(_queue.shift());
   }
 
+  // Mismo lenguaje visual que las viñetas del juego (#ingame-quit-popup /
+  // .account-modal-box / .versus-menu-btn): caja crema con borde marrón,
+  // fuente VAGRoundBold y botón crema con sombra dorada inferior. Va en px
+  // (no cqmin) porque el overlay es fixed, fuera del #app-stage.
+  var FONT = "'VAGRoundBold','Arial Black',sans-serif";
+
   function render(row) {
     var overlay = document.createElement('div');
     overlay.id = 'guest-msg-overlay';
     overlay.style.cssText =
       'position:fixed;inset:0;z-index:9000;display:flex;align-items:center;' +
-      'justify-content:center;padding:24px;background:rgba(0,0,0,0.55);' +
-      'opacity:0;transition:opacity 0.35s;font-family:system-ui,-apple-system,sans-serif;';
+      'justify-content:center;padding:24px;background:rgba(0,0,0,0.45);' +
+      'opacity:0;transition:opacity 0.3s;font-family:' + FONT + ';';
 
     var card = document.createElement('div');
     card.style.cssText =
-      'max-width:420px;width:100%;background:linear-gradient(160deg,#2b2f3a,#20232c);' +
-      'color:#f4f1e8;border:1px solid rgba(255,255,255,0.12);border-radius:18px;' +
-      'box-shadow:0 18px 50px rgba(0,0,0,0.5);padding:26px 24px 22px;text-align:center;' +
-      'transform:translateY(14px) scale(0.97);transition:transform 0.35s;';
+      'max-width:400px;width:100%;background:#fffbe6;color:#5a4400;' +
+      'border:4px solid #8b6a00;border-radius:18px;' +
+      'box-shadow:0 8px 22px rgba(0,0,0,0.4);padding:30px 26px 26px;text-align:center;' +
+      'transform:translateY(12px) scale(0.94);transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1);';
 
     var heart = document.createElement('div');
     heart.textContent = '🌍';
-    heart.style.cssText = 'font-size:34px;line-height:1;margin-bottom:12px;';
+    heart.style.cssText = 'font-size:38px;line-height:1;margin-bottom:12px;';
 
     var body = document.createElement('div');
     body.textContent = row.body || '';
-    body.style.cssText = 'font-size:16px;line-height:1.5;white-space:pre-wrap;margin-bottom:20px;';
+    body.style.cssText = 'font-size:17px;line-height:1.4;color:#5a4400;white-space:pre-wrap;margin-bottom:24px;';
 
     var btn = document.createElement('button');
     btn.textContent = '¡Gracias!';
-    btn.style.cssText =
-      'appearance:none;border:0;cursor:pointer;font:inherit;font-size:15px;font-weight:600;' +
-      'color:#20232c;background:#f4c95d;padding:11px 30px;border-radius:999px;' +
-      'box-shadow:0 4px 0 rgba(0,0,0,0.25);transition:transform 0.1s;';
-    btn.addEventListener('pointerdown', function () { btn.style.transform = 'translateY(2px)'; });
-    btn.addEventListener('pointerup', function () { btn.style.transform = ''; });
+    var btnBase =
+      'appearance:none;cursor:pointer;font-family:' + FONT + ';font-size:16px;' +
+      'text-transform:uppercase;letter-spacing:0.3px;color:#4a3b00;' +
+      'border:3px solid #8b6a00;border-radius:14px;padding:11px 36px;transition:transform 0.1s,background 0.1s;';
+    function btnUp()   { btn.style.cssText = btnBase + 'background:#fffef5;box-shadow:0 5px 0 #c9a93f;'; }
+    function btnHover(){ btn.style.cssText = btnBase + 'background:#fffbe6;box-shadow:0 5px 0 #c9a93f;transform:translateY(-1px);'; }
+    function btnDown() { btn.style.cssText = btnBase + 'background:#fffbe6;box-shadow:none;transform:translateY(5px);'; }
+    btnUp();
+    btn.addEventListener('mouseenter', btnHover);
+    btn.addEventListener('mouseleave', btnUp);
+    btn.addEventListener('pointerdown', btnDown);
+    btn.addEventListener('pointerup', btnUp);
 
     function close() {
       markSeen(row.id);
       overlay.style.opacity = '0';
-      card.style.transform = 'translateY(14px) scale(0.97)';
+      card.style.transform = 'translateY(12px) scale(0.94)';
       setTimeout(function () {
         try { overlay.remove(); } catch (e) {}
         _showing = false;
         pump();
-      }, 350);
+      }, 320);
     }
     btn.addEventListener('click', close);
     overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
