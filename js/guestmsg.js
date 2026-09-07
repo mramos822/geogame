@@ -142,6 +142,8 @@
 
     function close() {
       markSeen(row.id);
+      // Read receipt en el servidor (para saber que ya lo vio).
+      try { if (window.sb) window.sb.rpc('mark_guest_message_read', { p_id: row.id }); } catch (e) {}
       card.style.animation = 'gmPopOut 0.2s ease-in both';
       overlay.style.transition = 'opacity 0.2s';
       overlay.style.opacity = '0';
