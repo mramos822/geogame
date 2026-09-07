@@ -236,6 +236,19 @@
     border-radius:8px;color:var(--text);font-size:13px;padding:9px 12px;outline:none;transition:border-color .15s;}
   #accounts-search:focus{border-color:var(--accent);}
   .accounts-count{font-size:12px;color:var(--muted);white-space:nowrap;}
+  .msg-compose{display:flex;flex-direction:column;gap:10px;}
+  .msg-compose-row{display:flex;gap:10px;flex-wrap:wrap;}
+  .msg-compose select,.msg-compose input,.msg-compose textarea{background:var(--panel2);border:1px solid var(--border);
+    border-radius:8px;color:var(--text);font-size:13px;padding:9px 12px;outline:none;transition:border-color .15s;font-family:inherit;}
+  .msg-compose select:focus,.msg-compose input:focus,.msg-compose textarea:focus{border-color:var(--accent);}
+  .msg-compose-row input{flex:1;min-width:200px;}
+  .msg-compose textarea{resize:vertical;line-height:1.4;}
+  .msg-compose-foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .msg-err{color:var(--red,#ff6b6b);font-size:12px;}
+  #tbl-messages td{vertical-align:top;}
+  .msg-read{color:#6fdf6f;} .msg-unread{color:var(--muted);}
+  .msg-body-cell{max-width:340px;white-space:pre-wrap;color:var(--muted);font-size:12.5px;}
+  .msg-target-tag{font-size:11px;color:var(--muted);}
   .acc-row{cursor:pointer;transition:background .1s;}
   .acc-row:hover td{background:var(--panel3);}
   .acc-row .caret{display:inline-block;width:14px;color:var(--muted);transition:transform .15s;}
@@ -674,6 +687,42 @@
       </div>
     </section>
 
+    <!-- ── MENSAJES ── -->
+    <section class="tab-page" data-page="mensajes">
+      <div class="box wide">
+        <h2>✉️ Enviar mensaje del creador
+          <span class="sub">aparece como pop-up en el menú del jugador (nunca durante la partida)
+            <span class="help" title="Escribe en guest_messages. El jugador lo ve al abrir el juego o al instante si ya tiene la web abierta en el menú (realtime). Se marca leído cuando cierra la viñeta con el check. Necesita tener cargada la versión 3.5.52 o posterior.">ⓘ</span></span>
+        </h2>
+        <div class="msg-compose">
+          <div class="msg-compose-row">
+            <select id="msg-target-kind">
+              <option value="account">A una cuenta</option>
+              <option value="guest">A un invitado (visitor_id)</option>
+              <option value="all">A todos los invitados</option>
+            </select>
+            <input id="msg-target-value" type="text" placeholder="Nombre de usuario…">
+          </div>
+          <textarea id="msg-body" rows="4" maxlength="1000" placeholder="Escribe el mensaje…"></textarea>
+          <div class="msg-compose-foot">
+            <span id="msg-send-err" class="msg-err"></span>
+            <span class="spacer" style="flex:1"></span>
+            <span id="msg-body-count" class="accounts-count">0 / 1000</span>
+            <button class="guest-link-btn" id="msg-send-btn">Enviar</button>
+          </div>
+        </div>
+      </div>
+      <div class="box wide">
+        <h2>Enviados <span class="sub">últimos 100 · ✓ = leído</span></h2>
+        <div class="table-scroll">
+          <table id="tbl-messages">
+            <thead><tr><th>Para</th><th>Mensaje</th><th>Enviado</th><th>Estado</th></tr></thead>
+            <tbody id="messages-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <!-- ── CUENTAS ── -->
     <section class="tab-page" data-page="cuentas">
       <div class="box wide">
@@ -779,7 +828,7 @@ const RANGE_LABEL = Object.fromEntries(RANGES);
 const PAGES = [
   ['resumen','📊 Resumen'], ['retencion','🔁 Retención'], ['leaderboards','🏆 Leaderboards'],
   ['versus','⚔️ Versus'], ['social','🤝 Social'], ['economia','💰 Economía'], ['integridad','🚩 Integridad'],
-  ['invitados','👻 Invitados'], ['cuentas','👤 Cuentas'], ['fundador','👑 Fundador'],
+  ['invitados','👻 Invitados'], ['mensajes','✉️ Mensajes'], ['cuentas','👤 Cuentas'], ['fundador','👑 Fundador'],
 ];
 const MODE_TABS = [
   ['total','Total'], ['flags','Banderas'], ['shapes','Figuras'], ['cities','Ciudades'], ['monuments','Monumentos'],
@@ -815,6 +864,7 @@ function buildTabsNav(){
       document.querySelectorAll('.tab-page').forEach(p=>p.classList.toggle('active', p.dataset.page===currentPage));
       // Chart.js no dimensiona bien canvases que estaban en display:none.
       Object.values(charts).forEach(c=>c && c.resize && c.resize());
+      if(currentPage==='mensajes') loadMessages();
     });
   });
 }
@@ -866,6 +916,7 @@ function enterDashboard(data){
   buildRangeBar();
   document.querySelectorAll('.tab-page').forEach(p=>p.classList.toggle('active', p.dataset.page===currentPage));
   render(data);
+  if(currentPage==='mensajes') loadMessages();
   startPolling();
 }
 
@@ -1530,6 +1581,87 @@ function applyGuestsView(){
       }
     });
   });
+}
+
+// ── Mensajes del creador ──────────────────────────────────────────────────────
+let _msgWired = false;
+function wireMessages(){
+  if(_msgWired) return; _msgWired = true;
+  const kind = $('msg-target-kind'), val = $('msg-target-value'), body = $('msg-body'), count = $('msg-body-count');
+  kind.addEventListener('change', ()=>{
+    if(kind.value==='all'){ val.style.display='none'; }
+    else { val.style.display=''; val.placeholder = kind.value==='guest' ? 'visitor_id (v-…)' : 'Nombre de usuario…'; val.value=''; }
+  });
+  body.addEventListener('input', ()=>{ count.textContent = body.value.length + ' / 1000'; });
+  $('msg-send-btn').addEventListener('click', sendMessage);
+}
+async function sendMessage(){
+  const kind = $('msg-target-kind').value;
+  const val = $('msg-target-value').value.trim();
+  const text = $('msg-body').value.trim();
+  const err = $('msg-send-err'); err.textContent = '';
+  if(!text){ err.textContent = 'Escribe un mensaje.'; return; }
+  if(kind!=='all' && !val){ err.textContent = kind==='guest' ? 'Falta el visitor_id.' : 'Falta el nombre de usuario.'; return; }
+  if(kind==='all' && !confirm('¿Enviar este mensaje a TODOS los invitados?')) return;
+  const btn = $('msg-send-btn'); btn.disabled = true; btn.textContent = 'Enviando…';
+  try {
+    const payload = { user:creds.user, pass:creds.pass, action:'send_message', target_kind:kind, message_body:text };
+    if(kind==='account') payload.target_username = val;
+    if(kind==='guest') payload.visitor_id = val;
+    const res = await fetch(FN_URL, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'apikey':ANON, 'Authorization':'Bearer '+ANON },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json().catch(()=>({}));
+    if(!res.ok || !json.ok){
+      const m = { account_not_found:'No existe esa cuenta.', missing_params:'Faltan datos.', body_too_long:'Mensaje demasiado largo.' }[json.error] || json.error || 'Error al enviar';
+      throw new Error(m);
+    }
+    $('msg-body').value = ''; $('msg-body-count').textContent = '0 / 1000';
+    loadMessages();
+  } catch(e){
+    err.textContent = e.message || String(e);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Enviar';
+  }
+}
+async function loadMessages(){
+  if(!creds) return;
+  wireMessages();
+  const tb = $('messages-body');
+  tb.innerHTML = '<tr><td colspan="4" class="empty">Cargando…</td></tr>';
+  try {
+    const res = await fetch(FN_URL, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'apikey':ANON, 'Authorization':'Bearer '+ANON },
+      body: JSON.stringify({ user:creds.user, pass:creds.pass, action:'list_messages' }),
+    });
+    const json = await res.json().catch(()=>({}));
+    if(!res.ok || !json.ok) throw new Error(json.error || 'Error');
+    renderMessages(json.messages || []);
+  } catch(e){
+    tb.innerHTML = `<tr><td colspan="4" class="empty">No se pudo cargar: ${escapeHtml(e.message||String(e))}</td></tr>`;
+  }
+}
+function renderMessages(rows){
+  const tb = $('messages-body');
+  if(!rows.length){ tb.innerHTML = '<tr><td colspan="4" class="empty">Todavía no enviaste ningún mensaje</td></tr>'; return; }
+  tb.innerHTML = rows.map(m=>{
+    const t = m.target || {};
+    const tgt = t.kind==='account' ? `👤 ${escapeHtml(t.label)}`
+             : t.kind==='guest' ? `👻 ${escapeHtml(t.label)}`
+             : `📣 Todos`;
+    const st = m.read_at
+      ? `<span class="msg-read">✓ leído</span><div class="msg-target-tag">${timeAgo(m.read_at)}</div>`
+      : `<span class="msg-unread">⧗ pendiente</span>`;
+    return `<tr>
+      <td>${tgt}</td>
+      <td class="msg-body-cell">${escapeHtml(m.body)}</td>
+      <td class="n">${timeAgo(m.created_at)}</td>
+      <td>${st}</td>
+    </tr>`;
+  }).join('');
 }
 
 function renderCountries(rows){

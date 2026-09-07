@@ -83,7 +83,8 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const { user, pass, range: rawRange, action, visitor_id: actionVisitorId, target_username } = body || {};
+    const { user, pass, range: rawRange, action, visitor_id: actionVisitorId, target_username,
+            message_body, target_kind } = body || {};
     const range = (typeof rawRange === 'string' && rawRange in RANGE_DAYS) ? rawRange : '30d';
 
     if (!ADMIN_USER || !ADMIN_PASS) {
@@ -120,6 +121,65 @@ Deno.serve(async (req) => {
         .update({ user_id: targetProfile.id }, { count: 'exact' })
         .eq('visitor_id', actionVisitorId).is('user_id', null);
       return new Response(JSON.stringify({ ok: true, linked_events: (n1 || 0) + (n2 || 0) }), { headers: CORS });
+    }
+
+    // ── Acción manual: mandar un mensaje del creador (pop-up en el menú) ──
+    // Escribe en guest_messages con el service role (bypassa RLS, que no deja
+    // INSERT a nadie). Destino segun target_kind: 'account' (a una cuenta por
+    // username), 'guest' (a un dispositivo por visitor_id) o 'all' (broadcast,
+    // ambos nulos). Ver js/guestmsg.js para como lo recibe el jugador.
+    if (action === 'send_message') {
+      const text = (typeof message_body === 'string' ? message_body : '').trim();
+      if (!text) return new Response(JSON.stringify({ error: 'missing_body' }), { status: 400, headers: CORS });
+      if (text.length > 1000) return new Response(JSON.stringify({ error: 'body_too_long' }), { status: 400, headers: CORS });
+      const row: { body: string; user_id?: string; visitor_id?: string } = { body: text };
+      if (target_kind === 'all') {
+        // user_id y visitor_id quedan nulos
+      } else if (target_kind === 'guest') {
+        if (!actionVisitorId) return new Response(JSON.stringify({ error: 'missing_params' }), { status: 400, headers: CORS });
+        row.visitor_id = actionVisitorId;
+      } else if (target_kind === 'account') {
+        if (!target_username) return new Response(JSON.stringify({ error: 'missing_params' }), { status: 400, headers: CORS });
+        const { data: p, error: pErr } = await sb.from('profiles').select('id').eq('username', target_username).single();
+        if (pErr || !p) return new Response(JSON.stringify({ error: 'account_not_found' }), { status: 404, headers: CORS });
+        row.user_id = p.id;
+      } else {
+        return new Response(JSON.stringify({ error: 'bad_target_kind' }), { status: 400, headers: CORS });
+      }
+      const { data: ins, error: insErr } = await sb.from('guest_messages').insert(row).select('id').single();
+      if (insErr) return new Response(JSON.stringify({ error: String(insErr.message || insErr) }), { status: 500, headers: CORS });
+      return new Response(JSON.stringify({ ok: true, id: ins?.id }), { headers: CORS });
+    }
+
+    // ── Lista de mensajes enviados + estado de lectura (para el panel) ────
+    if (action === 'list_messages') {
+      const { data: msgs } = await sb.from('guest_messages')
+        .select('id, body, visitor_id, user_id, created_at, read_at')
+        .order('created_at', { ascending: false }).limit(100);
+      const rows = msgs || [];
+      const uids = [...new Set(rows.map((m: any) => m.user_id).filter(Boolean))];
+      const nameByUid: Record<string, string> = {};
+      if (uids.length) {
+        const { data: ps } = await sb.from('profiles').select('id, username').in('id', uids);
+        for (const p of ps || []) nameByUid[p.id] = p.username;
+      }
+      const vids = [...new Set(rows.map((m: any) => m.visitor_id).filter(Boolean))];
+      const gnByVid: Record<string, string> = {};
+      if (vids.length) {
+        const { data: gp } = await sb.from('guest_presence')
+          .select('visitor_id, guest_name, last_active').in('visitor_id', vids)
+          .order('last_active', { ascending: false });
+        for (const g of gp || []) if (g.guest_name && !gnByVid[g.visitor_id]) gnByVid[g.visitor_id] = g.guest_name;
+      }
+      const messages = rows.map((m: any) => ({
+        id: m.id, body: m.body, created_at: m.created_at, read_at: m.read_at,
+        target: m.user_id
+          ? { kind: 'account', label: nameByUid[m.user_id] || m.user_id }
+          : m.visitor_id
+            ? { kind: 'guest', label: gnByVid[m.visitor_id] || m.visitor_id, visitor_id: m.visitor_id }
+            : { kind: 'all', label: 'Todos los invitados' },
+      }));
+      return new Response(JSON.stringify({ ok: true, messages }), { headers: CORS });
     }
 
     const now = new Date();
