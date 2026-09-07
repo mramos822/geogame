@@ -384,7 +384,11 @@ Deno.serve(async (req) => {
     ]);
 
     const regRows      = profilesRes.data || [];
-    const gameRows      = gamesRes.data     || [];
+    // El modo Práctica NO cuenta como partida en ningún lado del panel: no tiene
+    // ranking ni recompensas y su score no representa una partida real. Se filtra
+    // acá, en el origen, así queda fuera de "Partidas por modo", del historial
+    // por cuenta, del detalle de actividad, de integridad y de todo lo demás.
+    const gameRows      = (gamesRes.data || []).filter((r: any) => !(r.type === 'game' && r.session_type === 'practice'));
     const visitRows     = visitsRes.data    || [];
     const campaignRows  = campaignsRes.data  || [];
     const globequizRows = globequizRes.data  || [];
@@ -482,6 +486,12 @@ Deno.serve(async (req) => {
     const gamesByUser: Record<string, any[]> = {};
     for (const r of gameRows as any[]) {
       if (!r.user_id) continue;
+      // El historial por cuenta cuenta como "partida" solo: los 4 modos de una
+      // Gira Mundial (session_type 'campaign'), el versus y el GlobeQuiz (abajo).
+      // Se dejan afuera los modos sueltos jugados fuera de campaña (session_type
+      // 'standalone' o null en eventos viejos) y la práctica (ya filtrada de
+      // gameRows más arriba).
+      if (r.type === 'game' && r.session_type !== 'campaign') continue;
       (gamesByUser[r.user_id] = gamesByUser[r.user_id] || []).push({
         type: r.type, mode: r.mode, score: r.score, created_at: r.created_at,
       });
