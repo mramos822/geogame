@@ -76,59 +76,80 @@
     render(_queue.shift());
   }
 
-  // Mismo lenguaje visual que las viñetas del juego (#ingame-quit-popup /
-  // .account-modal-box / .versus-menu-btn): caja crema con borde marrón,
-  // fuente VAGRoundBold y botón crema con sombra dorada inferior. Va en px
+  // Mismo lenguaje visual que las viñetas del juego (.account-modal-box /
+  // #chat-conversation-modal): backdrop oscuro + caja crema con borde marrón,
+  // fuente VAGRoundBold, animacion welcomePopIn (definida en style.css) y el
+  // boton confirm1/confirm2.png de siempre (hover muestra confirm2). Va en px
   // (no cqmin) porque el overlay es fixed, fuera del #app-stage.
   var FONT = "'VAGRoundBold','Arial Black',sans-serif";
+  var _keyframesInjected = false;
+  function injectKeyframes() {
+    if (_keyframesInjected) return;
+    _keyframesInjected = true;
+    // welcomePopIn ya vive en style.css, pero se replica por si acaso + el
+    // fade-out propio del cierre.
+    var st = document.createElement('style');
+    st.textContent =
+      '@keyframes gmPopIn{from{transform:scale(0.7);opacity:0}to{transform:scale(1);opacity:1}}' +
+      '@keyframes gmPopOut{from{transform:scale(1);opacity:1}to{transform:scale(0.7);opacity:0}}';
+    document.head.appendChild(st);
+  }
 
   function render(row) {
+    injectKeyframes();
+
     var overlay = document.createElement('div');
     overlay.id = 'guest-msg-overlay';
     overlay.style.cssText =
       'position:fixed;inset:0;z-index:9000;display:flex;align-items:center;' +
       'justify-content:center;padding:24px;background:rgba(0,0,0,0.45);' +
-      'opacity:0;transition:opacity 0.3s;font-family:' + FONT + ';';
+      'font-family:' + FONT + ';';
 
     var card = document.createElement('div');
     card.style.cssText =
       'max-width:400px;width:100%;background:#fffbe6;color:#5a4400;' +
       'border:4px solid #8b6a00;border-radius:18px;' +
       'box-shadow:0 8px 22px rgba(0,0,0,0.4);padding:30px 26px 26px;text-align:center;' +
-      'transform:translateY(12px) scale(0.94);transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1);';
+      'display:flex;flex-direction:column;align-items:center;gap:6px;' +
+      'animation:gmPopIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both;';
 
     var heart = document.createElement('div');
     heart.textContent = '🌍';
-    heart.style.cssText = 'font-size:38px;line-height:1;margin-bottom:12px;';
+    heart.style.cssText = 'font-size:38px;line-height:1;margin-bottom:6px;';
 
     var body = document.createElement('div');
     body.textContent = row.body || '';
-    body.style.cssText = 'font-size:17px;line-height:1.4;color:#5a4400;white-space:pre-wrap;margin-bottom:24px;';
+    body.style.cssText = 'font-size:17px;line-height:1.4;color:#5a4400;white-space:pre-wrap;margin-bottom:18px;';
 
-    var btn = document.createElement('button');
-    btn.textContent = '¡Gracias!';
-    var btnBase =
-      'appearance:none;cursor:pointer;font-family:' + FONT + ';font-size:16px;' +
-      'text-transform:uppercase;letter-spacing:0.3px;color:#4a3b00;' +
-      'border:3px solid #8b6a00;border-radius:14px;padding:11px 36px;transition:transform 0.1s,background 0.1s;';
-    function btnUp()   { btn.style.cssText = btnBase + 'background:#fffef5;box-shadow:0 5px 0 #c9a93f;'; }
-    function btnHover(){ btn.style.cssText = btnBase + 'background:#fffbe6;box-shadow:0 5px 0 #c9a93f;transform:translateY(-1px);'; }
-    function btnDown() { btn.style.cssText = btnBase + 'background:#fffbe6;box-shadow:none;transform:translateY(5px);'; }
-    btnUp();
-    btn.addEventListener('mouseenter', btnHover);
-    btn.addEventListener('mouseleave', btnUp);
-    btn.addEventListener('pointerdown', btnDown);
-    btn.addEventListener('pointerup', btnUp);
+    // Boton confirm1/confirm2.png de siempre (mismo patron que .founder-popup-confirm).
+    var btn = document.createElement('div');
+    btn.style.cssText = 'position:relative;width:76px;cursor:pointer;margin-top:2px;';
+    var c1 = document.createElement('img');
+    c1.src = '/images/confirm1.png';
+    c1.draggable = false;
+    c1.style.cssText = 'display:block;width:100%;height:auto;pointer-events:none;user-select:none;';
+    var c2 = document.createElement('img');
+    c2.src = '/images/confirm2.png';
+    c2.draggable = false;
+    c2.style.cssText =
+      'position:absolute;top:49%;left:50%;transform:translate(-50%,-50%);' +
+      'width:118%;height:auto;pointer-events:none;user-select:none;opacity:0;transition:opacity 0.1s;';
+    btn.appendChild(c1);
+    btn.appendChild(c2);
+    btn.addEventListener('mouseenter', function () { c2.style.opacity = '1'; });
+    btn.addEventListener('mouseleave', function () { c2.style.opacity = '0'; });
+    btn.addEventListener('pointerdown', function () { c2.style.opacity = '0'; });
 
     function close() {
       markSeen(row.id);
+      card.style.animation = 'gmPopOut 0.2s ease-in both';
+      overlay.style.transition = 'opacity 0.2s';
       overlay.style.opacity = '0';
-      card.style.transform = 'translateY(12px) scale(0.94)';
       setTimeout(function () {
         try { overlay.remove(); } catch (e) {}
         _showing = false;
         pump();
-      }, 320);
+      }, 210);
     }
     btn.addEventListener('click', close);
     overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
@@ -138,11 +159,6 @@
     card.appendChild(btn);
     overlay.appendChild(card);
     document.body.appendChild(overlay);
-
-    requestAnimationFrame(function () {
-      overlay.style.opacity = '1';
-      card.style.transform = 'translateY(0) scale(1)';
-    });
   }
 
   function fetchPending(sb) {
