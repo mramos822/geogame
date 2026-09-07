@@ -1,22 +1,30 @@
-// ── MENSAJES DEL CREADOR PARA INVITADOS ──────────────────────────────────────
-// Un invitado (sin cuenta) no tiene fila en `profiles` ni en `direct_messages`,
-// así que no hay forma de escribirle nada. Esta tabla (`guest_messages`) es el
-// único canal: el admin inserta una fila por SQL (dirigida a un visitor_id, o
-// con visitor_id NULL para todos los invitados) y acá se muestra como un
-// cartelito sobre la pantalla de inicio.
+// ── MENSAJES DEL CREADOR (pop-up en el menú) ─────────────────────────────────
+// Canal para escribirle a cualquier jugador desde el backend. El admin inserta
+// una fila por SQL en `public.guest_messages` y acá se muestra como un pop-up
+// centrado sobre la pantalla de inicio.
 //
+// Destino de cada fila:
+//   user_id    no nulo  -> solo esa cuenta registrada
+//   visitor_id no nulo  -> solo ese dispositivo (sirve para invitados sin cuenta)
+//   ambos nulos          -> todos
+//
+// Comportamiento:
 //   - Al abrir el juego se consultan los mensajes pendientes (fallback fiable).
-//   - Además hay una suscripción realtime: si el invitado ya tiene esta versión
-//     cargada, el cartel aparece en ~1s sin recargar.
+//   - Suscripción realtime: si el jugador ya tiene esta versión cargada, el
+//     pop-up aparece en ~1s sin recargar.
+//   - Solo se muestra en el MENÚ (#loading-screen visible). Si llega durante una
+//     partida queda en cola y aparece al volver al menú.
 //   - Cada mensaje se muestra una sola vez por dispositivo (ids en localStorage).
 //
-// RLS: SELECT público, sin INSERT para anon (solo el admin por SQL).
+// RLS: SELECT público para anon, sin INSERT (solo el admin por SQL).
 (function () {
   var SEEN_KEY = '_gm_seen';
 
   function visitorId() {
     try { return localStorage.getItem('_devstats_vid') || null; } catch (e) { return null; }
   }
+  function currentUid() { return window._sbUserId || null; }
+
   function seenIds() {
     try { return JSON.parse(localStorage.getItem(SEEN_KEY) || '[]') || []; } catch (e) { return []; }
   }
@@ -24,12 +32,18 @@
     try {
       var arr = seenIds();
       if (arr.indexOf(id) === -1) arr.push(id);
-      // no dejar crecer sin límite
       if (arr.length > 200) arr = arr.slice(-200);
       localStorage.setItem(SEEN_KEY, JSON.stringify(arr));
     } catch (e) {}
   }
   function isSeen(id) { return seenIds().indexOf(id) !== -1; }
+
+  // ¿Esta fila es para este jugador?
+  function matchesTarget(row) {
+    if (row.user_id) return row.user_id === currentUid();
+    if (row.visitor_id) return row.visitor_id === visitorId();
+    return true; // broadcast
+  }
 
   var _queue = [];
   var _showing = false;
@@ -43,7 +57,7 @@
   }
 
   function enqueue(row) {
-    if (!row || row.id == null || isSeen(row.id)) return;
+    if (!row || row.id == null || isSeen(row.id) || !matchesTarget(row)) return;
     for (var i = 0; i < _queue.length; i++) if (_queue[i].id === row.id) return;
     _queue.push(row);
     pump();
@@ -52,7 +66,7 @@
   function pump() {
     if (_showing || !_queue.length) return;
     if (!loadingVisible()) {
-      // Post-partida siempre vuelve al loading; reintentar hasta que se vea.
+      // Post-partida siempre vuelve al menú; reintentar hasta que se vea.
       if (!_waitTimer) _waitTimer = setInterval(function () {
         if (loadingVisible()) { clearInterval(_waitTimer); _waitTimer = null; pump(); }
       }, 1000);
@@ -119,12 +133,17 @@
     });
   }
 
-  function fetchPending(sb, vid) {
+  function fetchPending(sb) {
+    var vid = visitorId();
+    var uid = currentUid();
+    var ors = ['visitor_id.is.null'];   // los broadcast tienen visitor_id nulo
+    if (vid) ors.push('visitor_id.eq.' + vid);
+    if (uid) ors.push('user_id.eq.' + uid);
     sb.from('guest_messages')
-      .select('id,body,visitor_id,created_at')
-      .or('visitor_id.is.null,visitor_id.eq.' + vid)
+      .select('id,body,visitor_id,user_id,created_at')
+      .or(ors.join(','))
       .order('created_at', { ascending: true })
-      .limit(20)
+      .limit(30)
       .then(function (res) {
         var rows = (res && res.data) || [];
         for (var i = 0; i < rows.length; i++) enqueue(rows[i]);
@@ -133,15 +152,10 @@
 
   function subscribe(sb, vid) {
     try {
-      sb.channel('gm-' + vid)
+      sb.channel('gm-' + (vid || 'anon'))
         .on('postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'guest_messages' },
-          function (payload) {
-            var row = payload && payload.new;
-            if (!row) return;
-            if (row.visitor_id && row.visitor_id !== vid) return;
-            enqueue(row);
-          })
+          function (payload) { if (payload && payload.new) enqueue(payload.new); })
         .subscribe();
     } catch (e) {}
   }
@@ -154,9 +168,13 @@
       return;
     }
     var vid = visitorId();
-    if (!vid) return; // sin id de dispositivo no hay a quién dirigirlo
-    fetchPending(sb, vid);
     subscribe(sb, vid);
+    fetchPending(sb);
+    // El login puede resolverse después de que corra este script: re-consultar
+    // cuando la sesión esté lista (trae los mensajes dirigidos a la cuenta) y
+    // de nuevo un poco más tarde por si el evento ya había pasado.
+    document.addEventListener('sbSessionReady', function () { fetchPending(sb); });
+    setTimeout(function () { if (currentUid()) fetchPending(sb); }, 4000);
   }
 
   start(0);
