@@ -171,8 +171,24 @@ Deno.serve(async (req) => {
           .order('last_active', { ascending: false });
         for (const g of gp || []) if (g.guest_name && !gnByVid[g.visitor_id]) gnByVid[g.visitor_id] = g.guest_name;
       }
+      // Lecturas individuales (sobre todo para los broadcast: quien la vio).
+      const msgIds = rows.map((m: any) => m.id);
+      const readsByMsg: Record<number, { name: string; at: string }[]> = {};
+      if (msgIds.length) {
+        const { data: rd } = await sb.from('guest_message_reads')
+          .select('message_id, reader_key, reader_name, read_at')
+          .in('message_id', msgIds)
+          .order('read_at', { ascending: true });
+        for (const r of rd || []) {
+          (readsByMsg[r.message_id] ||= []).push({
+            name: r.reader_name || (String(r.reader_key || '').startsWith('u:') ? 'Cuenta' : 'Invitado'),
+            at: r.read_at,
+          });
+        }
+      }
       const messages = rows.map((m: any) => ({
         id: m.id, body: m.body, created_at: m.created_at, read_at: m.read_at,
+        reads: readsByMsg[m.id] || [],
         target: m.user_id
           ? { kind: 'account', label: nameByUid[m.user_id] || m.user_id }
           : m.visitor_id

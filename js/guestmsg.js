@@ -159,7 +159,7 @@
       // se quedaba eternamente en pendiente.
       try {
         if (window.sb) {
-          window.sb.rpc('mark_guest_message_read', { p_id: row.id })
+          window.sb.rpc('mark_guest_message_read', { p_id: row.id, p_visitor: visitorId() })
             .then(function () {}, function () {});
         }
       } catch (e) {}

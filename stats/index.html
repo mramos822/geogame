@@ -692,7 +692,7 @@
       <div class="box wide">
         <h2>✉️ Enviar mensaje del creador
           <span class="sub">aparece como pop-up en el menú del jugador (nunca durante la partida)
-            <span class="help" title="Escribe en guest_messages. El jugador lo ve al abrir el juego o al instante si ya tiene la web abierta en el menú (realtime). Se marca leído cuando cierra la viñeta con el check. Necesita tener cargada la versión 3.5.52 o posterior.">ⓘ</span></span>
+            <span class="help" title="Escribe en guest_messages. El jugador lo ve al abrir el juego o al instante si ya tiene la web abierta en el menú (realtime). Se marca leído cuando cierra la viñeta con el check. Si es "a todos", solo le llega a quien esté en el menú en ese momento, y abajo se lista quién lo vio. Necesita la versión 3.5.56 o posterior.">ⓘ</span></span>
         </h2>
         <div class="msg-compose">
           <div class="msg-compose-row">
@@ -947,6 +947,9 @@ document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && creds
 
 async function refresh(){
   if(!creds) return;
+  // La pestaña de mensajes tiene su propia carga; refrescarla en cada tick
+  // para que el estado "leído" se actualice sin recargar la página.
+  if(currentPage==='mensajes') loadMessages();
   try { render(await callStats(creds.user, creds.pass, currentRange)); }
   catch(e){
     if(/incorrect|unauthor/i.test(e.message)){ $('logout-btn').click(); }
@@ -1652,9 +1655,22 @@ function renderMessages(rows){
     const tgt = t.kind==='account' ? `👤 ${escapeHtml(t.label)}`
              : t.kind==='guest' ? `👻 ${escapeHtml(t.label)}`
              : `📣 Todos`;
-    const st = m.read_at
-      ? `<span class="msg-read">✓ leído</span><div class="msg-target-tag">${timeAgo(m.read_at)}</div>`
-      : `<span class="msg-unread">⧗ pendiente</span>`;
+    const reads = m.reads || [];
+    let st;
+    if (t.kind === 'all') {
+      // Broadcast: lista de quién lo vio (los que estaban en línea al enviarlo).
+      st = reads.length
+        ? `<span class="msg-read">✓ leído · ${reads.length}</span>` +
+          reads.slice(0, 20).map(r =>
+            `<div class="msg-target-tag">${escapeHtml(r.name || '—')} · ${timeAgo(r.at)}</div>`).join('') +
+          (reads.length > 20 ? `<div class="msg-target-tag">+${reads.length - 20} más</div>` : '')
+        : `<span class="msg-unread">⧗ nadie lo vio</span>`;
+    } else {
+      const at = m.read_at || (reads[0] && reads[0].at);
+      st = at
+        ? `<span class="msg-read">✓ leído</span><div class="msg-target-tag">${timeAgo(at)}</div>`
+        : `<span class="msg-unread">⧗ pendiente</span>`;
+    }
     return `<tr>
       <td>${tgt}</td>
       <td class="msg-body-cell">${escapeHtml(m.body)}</td>
