@@ -27,7 +27,10 @@ window.SoloSpectate = (() => {
     if (!uid) return; // no account, no one to authorize to spectate
     _active = true;
     _channel = window.sb
-      .channel('solo-' + uid, { config: { private: true, presence: { key: uid } } })
+      // Not private — see the long comment in vs.js _subscribe: a private
+      // channel's JOIN loses a race against the realtime auth token for
+      // far-from-region clients and silently never joins.
+      .channel('solo-' + uid, { config: { presence: { key: uid } } })
       // 'sync' (not join/leave): the only event that guarantees
       // presenceState() is already consistent — reading it in the 'leave'
       // handler sometimes still included whoever left (timing race), which is
@@ -389,7 +392,7 @@ window.Spectate = (() => {
 
     const uid = _myId();
     _channel = window.sb
-      .channel('match-' + matchId, { config: { private: true, presence: { key: 'spectator-' + (uid || Math.random().toString(36).slice(2)) } } })
+      .channel('match-' + matchId, { config: { presence: { key: 'spectator-' + (uid || Math.random().toString(36).slice(2)) } } }) // not private — see vs.js _subscribe
       .on('postgres_changes', {
         event: 'UPDATE', schema: 'public', table: 'matches',
         filter: 'id=eq.' + matchId,
@@ -497,7 +500,7 @@ window.Spectate = (() => {
 
     const uid = _myId();
     _channel = window.sb
-      .channel('solo-' + userId, { config: { private: true, presence: { key: 'spectator-' + (uid || Math.random().toString(36).slice(2)) } } })
+      .channel('solo-' + userId, { config: { presence: { key: 'spectator-' + (uid || Math.random().toString(36).slice(2)) } } }) // not private — see vs.js _subscribe; app-level _isFriendOf() still gates access
       // Same channel the real player sees (owner of 'solo-{userId}') — the
       // spectator also receives these presence events, so it can show how
       // many people are watching (this one included) without needing a
