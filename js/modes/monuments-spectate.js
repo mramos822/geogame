@@ -1,22 +1,20 @@
 // ============================================================================
-// modes/monuments-spectate.js — Modo espectador de Monumentos (VS 1v1, lobby grupal, 'esperando al rival').
-// Mismo patrón que cities-spectate.js, cambia la revelación de ronda
-// (slideMonumentIn) y los assets. Incluye también citiesSpectatorTimesUpEffect.
-// Carga DESPUÉS de cities-spectate.js (usa _specBuildCountRow).
+// modes/monuments-spectate.js — Monuments spectator mode (1v1 VS, group lobby,
+// 'waiting for rival'). Same pattern as cities-spectate.js, changes the round
+// reveal (slideMonumentIn) and the assets. Also includes
+// citiesSpectatorTimesUpEffect. Loads AFTER cities-spectate.js (uses
+// _specBuildCountRow).
 //
-// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
-// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
-// Son <script> clásicos que comparten un mismo scope global.
+// Classic <script>s sharing one global scope, loaded in order in play/index.html.
 // ============================================================================
 
-// ── MONUMENTS SPECTATOR (espectador de partida individual) ────────────────────
-// Mismo patrón exacto que el bloque de Cities de arriba — misma pantalla real
-// (#game-wrapper/canvas/leaderboard), mismo `state` mínimo, misma reutilización
-// de render()/advanceDot(). Lo único que cambia es la revelación de la ronda
-// (slideMonumentIn en vez de slideTagIn — imagen del monumento en vez de
-// nombre de ciudad+bandera), los assets (check4/wrong4/countdown4/
-// countdownred4, fondo level4complete/level4complete2) y el texto de
-// resultados ('gameover.monuments').
+// ── MONUMENTS SPECTATOR (solo-game spectator) ───────────────────────────────
+// Exact same pattern as the Cities block above — same real screen
+// (#game-wrapper/canvas/leaderboard), same minimal `state`, same reuse of
+// render()/advanceDot(). Only the round reveal changes (slideMonumentIn instead
+// of slideTagIn — monument image instead of city name+flag), the assets
+// (check4/wrong4/countdown4/countdownred4, level4complete/level4complete2
+// background) and the results text ('gameover.monuments').
 let _monumentsSpecMode = false;
 let _monumentsSpecTimesUpT1 = null, _monumentsSpecTimesUpT2 = null;
 let _monumentsSpecIsFirstRound = true;
@@ -37,8 +35,9 @@ window.monumentsSpectatorEnter = function () {
   if (ls) ls.style.display = 'none';
   if (typeof loadGameSFX === 'function') loadGameSFX();
   if (typeof loadBadges === 'function') loadBadges();
-  // Restos de otros modos espectados antes en esta misma pestaña sin pasar
-  // por su propio Exit — mismo caso ya resuelto en flags.js/shapes.js/cities.
+  // Leftovers from other modes spectated earlier in this tab without going
+  // through their own Exit — same case already handled in
+  // flags.js/shapes.js/cities.
   document.querySelectorAll('.shapes-tag').forEach(t => t.remove());
   document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
   document.querySelectorAll('.shapes-stage-el').forEach(el => { try { el.remove(); } catch (e) {} });
@@ -58,7 +57,7 @@ window.monumentsSpectatorEnter = function () {
   clearInterval(timerIntervalId); timerIntervalId = null;
   clearTimeout(pregameTimeout);
   clearTimeout(_monumentsSpecTimesUpT1); clearTimeout(_monumentsSpecTimesUpT2);
-  canvas.style.pointerEvents = 'none'; // solo-lectura: no hay click que resolver
+  canvas.style.pointerEvents = 'none'; // read-only: no click to resolve
   if (canvas.width < DISPLAY_W) { canvas.width = DISPLAY_W; canvas.height = DISPLAY_H; }
   if (badgeOverlay.width < DISPLAY_W) { badgeOverlay.width = DISPLAY_W; badgeOverlay.height = DISPLAY_H; }
 
@@ -77,9 +76,9 @@ window.monumentsSpectatorEnter = function () {
   resultLabel.className = '';
   resultLabel.classList.remove('visible');
 
-  // Construye un `state` MÍNIMO propio (no resetState(), que arma pools de
-  // ciudades/monumentos/práctica pensados para partida REAL) — render() solo
-  // necesita estos campos.
+  // Build a MINIMAL own `state` (not resetState(), which builds
+  // cities/monuments/practice pools meant for a REAL game) — render() only needs
+  // these fields.
   state = {
     phase: 'waiting',
     timeLeft: GAME_DURATION,
@@ -89,9 +88,9 @@ window.monumentsSpectatorEnter = function () {
     starParticles: [], sunburst: null, badgeAnim: null,
     lastTimestamp: null, streak: 0, mapDrawn: false,
   };
-  // updateDotsUI() lee state.dots (recién en 0) para des-rellenar los
-  // puntitos del trencito — sin esto quedaban "filled" con lo último que
-  // dejó otro modo/partida espectada antes en esta misma pestaña.
+  // updateDotsUI() reads state.dots (just 0) to un-fill the train dots —
+  // without this they stayed "filled" with the last value left by another
+  // mode/spectated game in this tab.
   progressContainer.classList.remove('train-animation', 'dots-fade-out');
   updateDotsUI();
   timerNumberEl.textContent = GAME_DURATION;
@@ -100,13 +99,12 @@ window.monumentsSpectatorEnter = function () {
   countdownImg.src = 'images/countdown4.png';
   countdownImg.style.animationPlayState = 'running';
 
-  // Visible desde ya, haya o no un 3-2-1 en curso — mismo motivo que en
-  // citiesSpectatorEnter (#pregame-countdown es transparente).
+  // Visible right away, whether or not a 3-2-1 is running — same reason as
+  // citiesSpectatorEnter (#pregame-countdown is transparent).
   gameWrapper.style.display = 'block';
-  // Ver comentario largo en citiesSpectatorEnter: redimensionarJuego() no
-  // hace nada si gameWrapper todavía está en display:none, así que tiene que
-  // ir DESPUÉS de mostrarlo — con el orden viejo el mapa quedaba mal
-  // posicionado durante todo el 3-2-1.
+  // See long comment in citiesSpectatorEnter: redimensionarJuego() does nothing
+  // while gameWrapper is still display:none, so it must go AFTER showing it —
+  // with the old order the map was mispositioned throughout the 3-2-1.
   redimensionarJuego();
   cityTagEl.style.visibility = 'hidden';
   monumentImgEl.style.display = 'none';
@@ -117,12 +115,12 @@ window.monumentsSpectatorEnter = function () {
   if (typeof window.refreshIngamePower === 'function') window.refreshIngamePower();
 };
 
-// switchingMode=true: la campaña del espectado encadenó a OTRO modo — ver
-// comentario largo en flagsSpectatorExit (mismo mecanismo acá).
+// switchingMode=true: the spectated player's campaign chained to ANOTHER mode —
+// see long comment in flagsSpectatorExit (same mechanism here).
 window.monumentsSpectatorExit = function (switchingMode) {
   _monumentsSpecMode = false;
   if (!switchingMode) window._isSpectating = false;
-  // Ver comentario largo en flagsSpectatorExit.
+  // See long comment in flagsSpectatorExit.
   document.getElementById('monuments-spec-lb-entry')?.remove();
   document.getElementById('monuments-spec-lb-opp')?.remove();
   pregameAborted = true;
@@ -134,9 +132,9 @@ window.monumentsSpectatorExit = function (switchingMode) {
   if (slideMonumentIn._nameTimer) { clearTimeout(slideMonumentIn._nameTimer); slideMonumentIn._nameTimer = null; }
   window.monumentsSpectatorHidePostgame();
   if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
-  // window._vsShowingResult — ver el mismo guard en citiesSpectatorExit/
-  // flagsSpectatorExit/shapesSpectatorExit (el "se quitan los assets de
-  // fondo si pierdo" reportado).
+  // window._vsShowingResult — see the same guard in citiesSpectatorExit/
+  // flagsSpectatorExit/shapesSpectatorExit (the reported "background assets
+  // get removed if I lose").
   if (!window._vsShowingResult) {
     gameWrapper.style.display = 'none';
     monumentImgEl.style.display = 'none';
@@ -195,8 +193,8 @@ window.monumentsSpectatorShowPregame = function (payload) {
 window.monumentsSpectatorShowRound = function (payload) {
   if (!_monumentsSpecMode || !state) return;
   if (typeof window._hideVsWaitSpinner === 'function') window._hideVsWaitSpinner();
-  // Mismo motivo que citiesSpectatorShowRound: no tocar pin1Anim/pin2Anim acá,
-  // se limpian solos cuando su propio fade termina (ver render()).
+  // Same reason as citiesSpectatorShowRound: don't touch pin1Anim/pin2Anim
+  // here, they clear themselves when their own fade ends (see render()).
   state.phase = 'waiting';
   state.cityShownAt = Date.now();
   state.currentCity = { name: payload.monumentName, img: payload.img, lat: payload.lat, lon: payload.lon };
@@ -209,7 +207,7 @@ window.monumentsSpectatorShowRound = function (payload) {
   if (_monumentsSpecIsFirstRound) {
     _monumentsSpecIsFirstRound = false;
     setTimeout(() => {
-      // Mismo guard que citiesSpectatorShowRound — ver comentario ahí.
+      // Same guard as citiesSpectatorShowRound — see comment there.
       if (!_monumentsSpecMode) return;
       if (!_monumentsSpecPregameSeen && typeof playMusic === 'function' && typeof sfxGameMusic !== 'undefined') {
         playMusic(sfxGameMusic);
@@ -228,12 +226,12 @@ window.monumentsSpectatorResolvePick = function (payload) {
 
   if (typeof payload.score === 'number') state.score = payload.score;
 
-  // "+puntos" flotante — SOLO lo del acierto, SIN el inRowBonus (que va aparte
-  // en el badge "IN A ROW"), igual que el jugador real (que ya muestra el
-  // popup sin el inRowBonus).
-  const _acierto = totalGained - (payload.inRowBonus || 0);
-  if (typeof totalGained === 'number' && _acierto > 0 && typeof showScorePopup === 'function') {
-    showScorePopup(_acierto);
+  // Floating "+points" — ONLY the hit value, WITHOUT the inRowBonus (shown
+  // separately in the "IN A ROW" badge), like the real player (whose popup
+  // already excludes the inRowBonus).
+  const _hitPoints = totalGained - (payload.inRowBonus || 0);
+  if (typeof totalGained === 'number' && _hitPoints > 0 && typeof showScorePopup === 'function') {
+    showScorePopup(_hitPoints);
   }
   if (typeof bonusAmt === 'number' && bonusAmt > 0) {
     clearTimeout(speedBonusHideId);
@@ -256,10 +254,10 @@ window.monumentsSpectatorResolvePick = function (payload) {
     permanent: grade === 'perfect', fontSize: _dotFontSize,
   });
 
-  // payload.dots trae el valor REAL post-incremento del jugador espectado —
-  // se pisa el contador local antes de advanceDot() (que hace state.dots++
-  // internamente) para que el trencito llene/vacíe en el mismo momento que
-  // ve el jugador real, sin importar en qué punto de la partida se unió.
+  // payload.dots carries the spectated player's REAL post-increment value —
+  // the local counter is overwritten before advanceDot() (which does
+  // state.dots++ internally) so the train fills/empties at the same moment the
+  // real player sees, regardless of when the spectator joined.
   if (grade !== 'wayoff' && typeof advanceDot === 'function') {
     if (typeof payload.dots === 'number') state.dots = payload.dots - 1;
     advanceDot();
@@ -271,7 +269,7 @@ window.monumentsSpectatorResolvePick = function (payload) {
   const capturedPin1 = state.pin1Anim;
 
   setTimeout(() => {
-    if (!_monumentsSpecMode || state.pin1Anim !== capturedPin1) return; // ronda ya cambió
+    if (!_monumentsSpecMode || state.pin1Anim !== capturedPin1) return; // round already changed
     state.pin2Anim = { x: correctX, y: correctY, progress: 0, opacity: 1, fading: false,
       wobbleTime: 0, starsSpawned: false,
       onLanded: () => {
@@ -279,11 +277,11 @@ window.monumentsSpectatorResolvePick = function (payload) {
         setTimeout(() => {
           if (!_monumentsSpecMode) return;
           showResultLabel(correctX, correctY, grade, 0, 0);
-          // Racha ("in row") — badgeColor real es un <img> del jugador, no
-          // serializable por broadcast; payload.streak sí viaja (número), y
-          // getBadgeImg() es una función pura de ese streak — el espectador
-          // reconstruye la misma imagen localmente. render() ya sabe dibujar
-          // state.badgeAnim solo (mismo overlay que usa el jugador real).
+          // Streak ("in row") — the real badgeColor is an <img>, not
+          // broadcast-serializable; payload.streak does travel (a number), and
+          // getBadgeImg() is a pure function of that streak — the spectator
+          // rebuilds the same image locally. render() already draws
+          // state.badgeAnim on its own (same overlay the real player uses).
           if (typeof payload.streak === 'number' && typeof getBadgeImg === 'function') {
             const badgeColor = getBadgeImg(payload.streak);
             if (badgeColor) {
@@ -326,7 +324,7 @@ window.monumentsSpectatorUpdateScore = function (score, dots) {
   state.score = score;
   state.displayedScore = score;
   scoreValueEl.textContent = (score + (window.campaignBase ? window.campaignBase() : 0)).toLocaleString();
-  // dots: mismo motivo que citiesSpectatorUpdateScore.
+  // dots: same reason as citiesSpectatorUpdateScore.
   if (typeof dots === 'number') {
     state.dots = Math.max(0, Math.min(dots, DOTS_NEEDED - 1));
     updateDotsUI();
@@ -334,7 +332,7 @@ window.monumentsSpectatorUpdateScore = function (score, dots) {
 };
 
 let _monumentsSpecLastCard = null;
-// oppName/oppAvatar/oppScore: ver comentario largo en citiesSpectatorSetPlayerCard.
+// oppName/oppAvatar/oppScore: see long comment in citiesSpectatorSetPlayerCard.
 window.monumentsSpectatorSetPlayerCard = function (name, avatar, score, oppName, oppAvatar, oppScore, cardCode, oppCardCode) {
   if (!_monumentsSpecMode) return;
   _monumentsSpecLastCard = { name, avatar, score, oppName, oppAvatar, oppScore, cardCode, oppCardCode };
@@ -342,9 +340,9 @@ window.monumentsSpectatorSetPlayerCard = function (name, avatar, score, oppName,
   if (!lb) return;
   const rowH = getLbRowHeight();
   const showOpp = !!oppName;
-  // TOP_MARGIN: ver comentario largo en citiesSpectatorSetPlayerCard (mismo
-  // clip-path recorta el emote-bubble de wrongEffect si la fila de arriba
-  // queda pegada a top:0 del contenedor).
+  // TOP_MARGIN: see long comment in citiesSpectatorSetPlayerCard (the same
+  // clip-path clips the wrongEffect emote-bubble if the top row sits at the
+  // container's top:0).
   const TOP_MARGIN = Math.round(rowH * 0.4);
   lb.style.height = (showOpp ? rowH * 2 + LB_GAP + TOP_MARGIN : rowH + TOP_MARGIN) + 'px';
   let el = document.getElementById('monuments-spec-lb-entry');
@@ -385,7 +383,7 @@ window.monumentsSpectatorSetPlayerCard = function (name, avatar, score, oppName,
     if (oppAvatarEl && oppAvatar) oppAvatarEl.src = oppAvatar;
     const oppScoreEl = document.getElementById('monuments-spec-lb-opp-score');
     if (oppScoreEl) oppScoreEl.textContent = (oppScore || 0).toLocaleString();
-    // Reordenar según puesto — ver comentario largo en citiesSpectatorSetPlayerCard.
+    // Reorder by rank — see long comment in citiesSpectatorSetPlayerCard.
     const friendOnTop = (score || 0) >= (oppScore || 0);
     el.style.top    = (TOP_MARGIN + (friendOnTop ? 0 : rowH + LB_GAP)) + 'px';
     oppEl.style.top = (TOP_MARGIN + (friendOnTop ? rowH + LB_GAP : 0)) + 'px';
@@ -403,15 +401,15 @@ window.monumentsSpectatorWrongEffect = function (target) {
   el.style.animation = 'none'; void el.offsetWidth;
   el.style.animation = 'lb-wrong-flash 0.75s ease-out, lb-shake 0.45s ease-in-out';
   setTimeout(() => { el.style.animation = ''; }, 820);
-  // z-index elevado mientras dura el emote — ver comentario largo en citiesSpectatorWrongEffect.
+  // Raised z-index for the emote's duration — see long comment in citiesSpectatorWrongEffect.
   const prevZ = el.style.zIndex;
   el.style.zIndex = '50';
   setTimeout(() => { el.style.zIndex = prevZ; }, 1800);
   if (typeof spawnEmoteBubble === 'function') spawnEmoteBubble(el);
 };
 
-// "Se acabó el tiempo" en la cartilla del espectador 1v1 (cities/monuments) —
-// mismo mecanismo que *SpectatorWrongEffect pero con el cronómetro.
+// "Time's up" on the 1v1 spectator card (cities/monuments) — same mechanism as
+// *SpectatorWrongEffect but with the stopwatch.
 window.citiesSpectatorTimesUpEffect = function (target) {
   if (!_citiesSpecMode) return;
   const el = document.getElementById(target === 'opponent' ? 'cities-spec-lb-opp' : 'cities-spec-lb-entry');
@@ -469,8 +467,8 @@ window.monumentsSpectatorShowPostgame = function (payload) {
   document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl2.png');
   document.querySelectorAll('.game-bg-women1').forEach(el => el.src = 'images/characters/women1.png');
   document.querySelectorAll('.game-bg-women2').forEach(el => el.src = 'images/characters/women1.png');
-  // Selectores propios (game-bg-city-monuments/2), NO .game-bg-city genérico
-  // (ese es el de Cities) — así no se pisa el fondo de Cities por error.
+  // Own selectors (game-bg-city-monuments/2), NOT the generic .game-bg-city
+  // (that's the Cities one) — so the Cities background isn't overwritten.
   document.querySelectorAll('.game-bg-city-monuments').forEach(el => el.src = 'images/bg/level4complete.png');
   document.querySelectorAll('.game-bg-city-monuments2').forEach(el => el.src = 'images/bg/level4complete2.png');
   document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check4.png');
@@ -503,10 +501,10 @@ window.monumentsSpectatorShowPostgame = function (payload) {
   if (wrongTotalEl) wrongTotalEl.textContent = payload.wrongCount || 0;
   const splashWrongEl = document.getElementById('splash-wrong-total');
   if (splashWrongEl) splashWrongEl.textContent = payload.wrongCount || 0;
-  // Contraparte de correctas — mismo elemento que actualiza updateGradeCountsUI()
-  // en el jugador real (gradeCounts.perfect+good+fair, estado LOCAL que acá no
-  // existe) — faltaba del todo, se quedaba con el número de la ÚLTIMA partida
-  // real jugada en esta pestaña en vez del conteo del jugador espectado.
+  // Correct-count counterpart — same element updateGradeCountsUI() updates in
+  // the real player (gradeCounts.perfect+good+fair, LOCAL state that doesn't
+  // exist here) — was missing entirely, stayed with the number from the LAST
+  // real game played in this tab instead of the spectated player's count.
   const correctTotalEl = document.getElementById('gameover-count-total');
   if (correctTotalEl) correctTotalEl.textContent = payload.correctCount || 0;
   const splashCorrectEl = document.getElementById('splash-count-total');

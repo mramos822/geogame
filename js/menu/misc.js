@@ -1,14 +1,12 @@
 // ============================================================================
-// menu/misc.js — IIFEs sueltos de UI global: popup 'necesitás cuenta' del panel Social, botón de
-// pantalla completa (con toast iOS), lock de zoom/scroll del loading screen, aviso
-// de pantalla muy chica, y el hook de test para abrir la pantalla de results.
+// menu/misc.js — loose global-UI IIFEs: Social panel "account required" popup,
+// fullscreen button (with iOS toast), loading-screen zoom/scroll lock,
+// screen-too-small warning, and the test hook to open the results screen.
 //
-// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
-// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
-// Son <script> clásicos que comparten un mismo scope global.
+// Classic <script>s sharing one global scope, loaded in order in play/index.html.
 // ============================================================================
 
-// ── Popup "necesitás cuenta" del panel Social ────────────────────────────────
+// ── Social panel "account required" popup ────────────────────────────────────
 (function () {
   const popup = document.getElementById('social-lock-popup');
   document.getElementById('social-lock-close')?.addEventListener('click', () => {
@@ -18,7 +16,7 @@
   document.getElementById('social-lock-login')?.addEventListener('click', () => {
     sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
     popup?.classList.remove('open');
-    // Abre el modal de cuenta directo en la vista de login
+    // Open the account modal straight to the login view
     const accountModal = document.getElementById('account-modal');
     const viewLogin    = document.getElementById('account-view-login');
     if (accountModal && viewLogin) {
@@ -54,7 +52,7 @@
     toast._t = setTimeout(() => { toast.style.opacity = '0'; }, 3500);
   }
 
-  // Fallbacks con prefijo (Opera, Safari): no todos exponen la API sin prefijo.
+  // Prefixed fallbacks (Opera, Safari): not all expose the unprefixed API.
   function fsElement() {
     return document.fullscreenElement || document.webkitFullscreenElement || null;
   }
@@ -78,8 +76,8 @@
       if (!isStandalone) showIOSToast();
       return;
     }
-    // Pantalla completa de la página entera (el stage centrado la rellena). En Opera
-    // la API suele requerir el prefijo webkit; sin él, el botón no hacía nada.
+    // Fullscreen the whole page (the centered stage fills it). In Opera the API
+    // usually needs the webkit prefix; without it the button did nothing.
     if (!fsElement()) {
       requestFs(document.documentElement);
     } else {
@@ -89,9 +87,9 @@
 })();
 
 // ── LOCK LOADING SCREEN ZOOM & POSITION ───────────────────────────────────────
-// DESACTIVADO: el #app-stage de aspecto fijo ya maneja el escalado/posición. Este
-// bloque ponía width/height/transform inline al loading-screen en cada resize del
-// visualViewport (= innerWidth), descuadrando todo dentro del stage.
+// DISABLED: the fixed-aspect #app-stage already handles scaling/position. This
+// block set inline width/height/transform on loading-screen on every
+// visualViewport resize (= innerWidth), throwing off everything inside the stage.
 (function () {
   return;
   const el = document.getElementById('loading-screen');
@@ -121,9 +119,9 @@
     const msg  = document.getElementById('screen-warning-msg');
     const sub  = document.getElementById('screen-warning-sub');
     if (icon) icon.textContent = '📱';
-    // Antes mostraba español e inglés a la vez, fijo. Ahora un solo idioma,
-    // el actual del juego — y se re-aplica solo si el jugador cambia de
-    // idioma en caliente (ver onLangChange, js/i18n.js) sin recargar.
+    // Used to show Spanish and English at once, hardcoded. Now a single
+    // language, the game's current one — re-applied if the player switches
+    // language live (see onLangChange, js/i18n.js) without reloading.
     const applyRotateMsg = () => {
       if (msg) msg.textContent = (typeof t === 'function') ? t('screen.rotate') : 'Rotá el teléfono a horizontal para jugar.';
       if (sub) sub.textContent = '';

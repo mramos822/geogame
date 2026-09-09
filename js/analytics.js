@@ -1,46 +1,44 @@
-// ── ANALYTICS (event logging para la página admin de stats) ───────────────────
-// Inserta eventos append-only en la tabla `analytics_events` vía el cliente anon
-// (window.sb). RLS permite INSERT pero NO SELECT al rol anon: solo la Edge Function
-// admin-stats (service role) puede leer y agregar. Fire-and-forget: nunca lanza ni
-// bloquea el juego.
+// ── ANALYTICS (event logging for the admin stats page) ───────────────────────
+// Inserts append-only events into the `analytics_events` table via the anon
+// client (window.sb). RLS allows INSERT but NOT SELECT for the anon role: only
+// the admin-stats Edge Function (service role) can read and aggregate.
+// Fire-and-forget: never throws or blocks the game.
 //
-// API pública:
-//   window.Analytics.logVisit()             -> 1 visita por sesión de navegador
-//   window.Analytics.logGame(mode, score)   -> 1 evento por modo jugado (para el
-//                                              desglose "Partidas por modo"; NO es
-//                                              "1 partida" a efectos de las métricas
-//                                              totales del dashboard)
-//   window.Analytics.logVersus(mode)        -> 1 evento por partida versus terminada
-//   window.Analytics.logCampaign(score)     -> 1 evento por Gira Mundial COMPLETA
-//                                              (los 4 modos terminados); esto es lo
-//                                              que cuenta como "1 partida" en los
-//                                              totales del dashboard junto a versus
+// Public API:
+//   window.Analytics.logVisit()             -> 1 visit per browser session
+//   window.Analytics.logGame(mode, score)   -> 1 event per mode played (for the
+//                                              "Games per mode" breakdown; NOT
+//                                              "1 game" for the dashboard's total
+//                                              metrics)
+//   window.Analytics.logVersus(mode)        -> 1 event per finished versus game
+//   window.Analytics.logCampaign(score)     -> 1 event per COMPLETE Gira Mundial
+//                                              (all 4 modes finished); this is
+//                                              what counts as "1 game" in the
+//                                              dashboard totals alongside versus
 (function () {
-  // ID anónimo estable por dispositivo (reusa el del viejo overlay si existe).
+  // Stable anonymous per-device ID (reuses the old overlay's if present).
   let visitorId = localStorage.getItem('_devstats_vid');
   if (!visitorId) {
     visitorId = 'v-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
     localStorage.setItem('_devstats_vid', visitorId);
   }
 
-  // Se llama al cerrar sesión (ver _doLogout, js/profile/profile-account.js): genera un
-  // visitor_id NUEVO para este dispositivo. Sin esto, dos cuentas distintas
-  // usando el mismo dispositivo como invitado (sin loguearse) compartirían
-  // el mismo visitor_id, y claim_anonymous_events() podría mezclar las
-  // partidas de invitado de ambas al vincular la primera cuenta que se
-  // loguee (el RPC solo protege eventos que YA tienen user_id asignado, no
-  // los que todavía están sueltos como invitado).
+  // Called on logout (see _doLogout, js/profile/profile-account.js): generates a
+  // NEW visitor_id for this device. Without this, two different accounts using
+  // the same device as guests (without logging in) would share the same
+  // visitor_id, and claim_anonymous_events() could mix both their guest games
+  // when linking the first account to log in (the RPC only protects events that
+  // ALREADY have a user_id assigned, not the ones still loose as guest).
   function resetVisitorId() {
     visitorId = 'v-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
     try { localStorage.setItem('_devstats_vid', visitorId); } catch (e) {}
   }
 
-  // País vía IP (cacheado en localStorage; solo se pide una vez por dispositivo).
-  // Resuelto server-side por la Edge Function get-country — antes pegaba
-  // directo a ipinfo.io desde el navegador, y un bloqueador de trackers
-  // (uBlock Origin, protección de Firefox/Zen) cortaba el fetch en
-  // silencio dejando el país sin detectar para siempre (ver misma nota en
-  // _getCountryCodeForSignup, js/sb.js).
+  // Country via IP (cached in localStorage; fetched once per device).
+  // Resolved server-side by the get-country Edge Function — it used to hit
+  // ipinfo.io directly from the browser, and a tracker blocker (uBlock Origin,
+  // Firefox/Zen protection) silently cut the fetch, leaving the country
+  // undetected forever (see same note in _getCountryCodeForSignup, js/sb.js).
   async function getCountryCode() {
     const cached = localStorage.getItem('_an_country');
     if (cached) return cached || null;
@@ -60,28 +58,28 @@
         return d.country;
       }
     } catch (e) {}
-    localStorage.setItem('_an_country', ''); // evitar reintentos en bucle
+    localStorage.setItem('_an_country', ''); // avoid retry loops
     return null;
   }
 
-  // Nombre que el invitado se puso localmente (input de nombre en el splash,
-  // ver js/profile/profile-account.js) — solo tiene sentido mandarlo mientras es invitado; una
-  // vez con cuenta ya se identifica por username real desde profiles.
+  // Name the guest set locally (name input on the splash, see
+  // js/profile/profile-account.js) — only worth sending while they're a guest;
+  // once they have an account they're identified by real username from profiles.
   function guestName() {
     if (window._sbUserId) return null;
     try { return localStorage.getItem('playerName') || null; } catch (e) { return null; }
   }
 
-  // navigator.maxTouchPoints > 1 (mismo criterio que _sbDeviceType en js/sb.js)
-  // para no depender de userAgent, que se puede spoofear/desactualizar.
+  // navigator.maxTouchPoints > 1 (same rule as _sbDeviceType in js/sb.js) so it
+  // doesn't depend on userAgent, which can be spoofed/stale.
   function deviceType() {
     return (navigator.maxTouchPoints > 1) ? 'mobile' : 'pc';
   }
 
-  // Atribución de campaña (ej. play/?src=yt en el anuncio de YouTube).
-  // First-touch: una vez guardado en localStorage no se pisa con visitas
-  // posteriores sin el parámetro, para no perder de dónde vino este
-  // dispositivo la primera vez.
+  // Campaign attribution (e.g. play/?src=yt in the YouTube ad).
+  // First-touch: once stored in localStorage it isn't overwritten by later
+  // visits without the parameter, so we don't lose where this device first came
+  // from.
   function getSource() {
     try {
       const fromUrl = new URLSearchParams(location.search).get('src');
@@ -94,15 +92,15 @@
     const sb = window.sb;
     if (!sb) return;
     try {
-      // 'device' solo tiene sentido para eventos de juego/visita (no para
-      // currency_ledger, que usa la misma insertEvent con table='currency_ledger').
+      // 'device' only makes sense for game/visit events (not for
+      // currency_ledger, which uses the same insertEvent with table='currency_ledger').
       const full = (table && table !== 'analytics_events') ? row : { ...row, device: deviceType() };
       await sb.from(table || 'analytics_events').insert(full);
-    } catch (e) { /* silencioso: nunca debe afectar al juego */ }
+    } catch (e) { /* silent: must never affect the game */ }
   }
 
   async function logVisit() {
-    // Una visita por sesión de pestaña/navegador.
+    // One visit per tab/browser session.
     if (sessionStorage.getItem('_an_visit')) return;
     sessionStorage.setItem('_an_visit', '1');
     const cc = await getCountryCode();
@@ -116,11 +114,10 @@
     });
   }
 
-  // 'practice' (modo práctica libre) | 'campaign' (Gira Mundial, encadena los 4
-  // modos) | 'standalone' (un modo suelto jugado fuera de campaña). Se lee acá
-  // en vez de recibirlo como parámetro para no tener que tocar flags/shapes/
-  // js/core/campaign.js: ambos flags ya son globales y están seteados cuando termina
-  // la partida.
+  // 'practice' (free practice mode) | 'campaign' (Gira Mundial, chains all 4
+  // modes) | 'standalone' (a single mode played outside a campaign). Read here
+  // instead of received as a parameter to avoid touching flags/shapes/
+  // js/core/campaign.js: both flags are already global and set when the game ends.
   function currentSessionType() {
     if (window.practiceConfig && window.practiceConfig.active) return 'practice';
     if (window.campaign && window.campaign.active) return 'campaign';
@@ -141,10 +138,10 @@
     });
   }
 
-  // 1 evento por partida versus terminada (llamado por el host al cerrar el match).
-  // Separado de `matches`: esa tabla es estado efímero y sus filas 'finished' se
-  // borran en la limpieza de salas (ver lobby.js _cleanupStale), así que no sirve
-  // como fuente de historial para el panel de stats.
+  // 1 event per finished versus game (called by the host when closing the match).
+  // Separate from `matches`: that table is ephemeral state and its 'finished'
+  // rows are deleted in the room cleanup (see lobby.js _cleanupStale), so it's
+  // no use as a history source for the stats panel.
   async function logVersus(mode) {
     const cc = (localStorage.getItem('_an_country') || null) || null;
     insertEvent({
@@ -156,12 +153,12 @@
     });
   }
 
-  // Funnel de invitaciones 1v1: 1 evento por cada transición de estado de un
-  // match (enviada/aceptada/rechazada/expirada/abandonada). `matches` es
-  // estado efímero (se borra en la limpieza de salas, ver logVersus arriba)
-  // así que sin esto no hay forma de reconstruir en qué paso se pierde la
-  // gente entre "invitó" y "terminó la partida" (ver logVersus, que solo
-  // cubre el desenlace final). `outcome` es uno de:
+  // 1v1 invite funnel: 1 event per match state transition
+  // (sent/accepted/declined/expired/abandoned). `matches` is ephemeral state
+  // (deleted in the room cleanup, see logVersus above) so without this there's
+  // no way to reconstruct at which step people drop off between "invited" and
+  // "finished the game" (see logVersus, which only covers the final outcome).
+  // `outcome` is one of:
   //   sent | accepted | accept_failed | declined | expired | abandoned
   async function logVersusFunnel(outcome, mode) {
     const cc = (localStorage.getItem('_an_country') || null) || null;
@@ -175,9 +172,9 @@
     });
   }
 
-  // 1 evento por Gira Mundial completa (los 4 modos terminados sin salir antes).
-  // Llamado por js/core/campaign.js justo cuando la campaña llega al último modo y
-  // window.campaign.active pasa a false. `score` es el puntaje acumulado total.
+  // 1 event per complete Gira Mundial (all 4 modes finished without quitting).
+  // Called by js/core/campaign.js right when the campaign reaches the last mode
+  // and window.campaign.active goes false. `score` is the total accumulated score.
   async function logCampaign(score) {
     const cc = (localStorage.getItem('_an_country') || null) || null;
     insertEvent({
@@ -191,13 +188,13 @@
     });
   }
 
-  // 1 evento por partida de GlobeQuiz GANADA. Cuenta como "1 partida" propia
-  // en los totales del dashboard (junto a campaign/versus) — no es parte de
-  // la Gira Mundial de 4 modos, es un modo standalone independiente.
-  // `score` = cantidad de intentos, `durationMs` = tiempo hasta acertar,
-  // `streak` = racha de días jugados en el momento de esta partida (0 si es
-  // invitado o no se pudo leer) — para poder ver en /stats quién juega este
-  // modo, cuánto tarda y qué tan seguido vuelve.
+  // 1 event per WON GlobeQuiz game. Counts as its own "1 game" in the dashboard
+  // totals (alongside campaign/versus) — it's not part of the 4-mode Gira
+  // Mundial, it's an independent standalone mode.
+  // `score` = number of attempts, `durationMs` = time to guess right,
+  // `streak` = days-played streak at the time of this game (0 if guest or
+  // couldn't be read) — so /stats can show who plays this mode, how long they
+  // take and how often they come back.
   async function logGlobequiz(score, durationMs, streak) {
     const cc = (localStorage.getItem('_an_country') || null) || null;
     insertEvent({
@@ -212,14 +209,14 @@
     });
   }
 
-  // Ledger de XP/monedas (currency_ledger) — arranca antes de que exista la
-  // UI real del sistema de XP/monedas, para no perder historial: cuando se
-  // lance, el saldo de cada cuenta se calcula sumando lo ya acumulado acá.
-  // Versus amistoso NO otorga nada por ahora (a propósito, sin hook acá).
+  // XP/coins ledger (currency_ledger) — started before the real XP/coins UI
+  // exists, so no history is lost: when it launches, each account's balance is
+  // computed by summing what's already accumulated here.
+  // Friendly versus grants NOTHING for now (deliberately, no hook here).
   //
-  // Gira Mundial: base fija + un extra por cada 250 puntos de score (65
-  // campañas históricas, promedio 17418, rango 2923-45099 → con esta fórmula
-  // da ~21-190 monedas y ~83-590 xp).
+  // Gira Mundial: fixed base + an extra per 250 score points (65 historical
+  // campaigns, avg 17418, range 2923-45099 → this formula gives ~21-190 coins
+  // and ~83-590 xp).
   const CAMPAIGN_BASE_COINS = 10, CAMPAIGN_BASE_XP = 50;
   const CAMPAIGN_POINTS_STEP = 250, CAMPAIGN_STEP_COINS = 1, CAMPAIGN_STEP_XP = 3;
   function coinsFromScore(score) {
@@ -231,13 +228,12 @@
     return CAMPAIGN_BASE_XP + steps * CAMPAIGN_STEP_XP;
   }
 
-  // GlobeQuiz: base fija por victoria (10 monedas / 20 xp), multiplicada
-  // x1.15 cada 10 días de racha activa, hasta un tope de 10 aplicaciones
-  // (racha >= 100 días ya no sigue multiplicando, mult queda fijo en
-  // 1.15^10 ≈ 4.05x). Con x1.5 el multiplicador llegaba a ~57.7x y una
-  // racha larga por sí sola alcanzaba nivel 50 en ~4 meses sin jugar
-  // ninguna Gira Mundial — x1.15 lo deja como un bonus fuerte pero no
-  // reemplaza jugar el resto de los modos.
+  // GlobeQuiz: fixed base per win (10 coins / 20 xp), multiplied x1.15 every 10
+  // days of active streak, capped at 10 applications (streak >= 100 days stops
+  // multiplying, mult stays fixed at 1.15^10 ≈ 4.05x). At x1.5 the multiplier
+  // reached ~57.7x and a long streak alone hit level 50 in ~4 months without
+  // playing any Gira Mundial — x1.15 keeps it a strong bonus that doesn't
+  // replace playing the other modes.
   const GQ_BASE_COINS = 10, GQ_BASE_XP = 20;
   const GQ_MULT_STEP_DAYS = 10, GQ_MULT_FACTOR = 1.15, GQ_MULT_MAX_STEPS = 10;
   function gqMultiplier(streakDays) {
@@ -258,29 +254,28 @@
   function logCampaignCurrency(score) {
     logCurrencyEvent(coinsFromScore(score), xpFromScore(score), 'campaign_complete', score);
   }
-  // Se llama SOLO la primera vez que se gana en el día (cuando la racha
-  // recién avanzó, isNewDay en updateStreak) — ver showEndgameModal en
-  // globequiz.js. Ganar de nuevo el mismo día no vuelve a otorgar nada.
+  // Called ONLY the first time you win in a day (when the streak just advanced,
+  // isNewDay in updateStreak) — see showEndgameModal in globequiz.js. Winning
+  // again the same day grants nothing.
   function logGlobequizCurrency(streakDays) {
     const mult = gqMultiplier(streakDays);
     logCurrencyEvent(GQ_BASE_COINS * mult, GQ_BASE_XP * mult, 'globequiz_win', streakDays);
   }
 
-  // ── Presencia en vivo de invitados (sin cuenta) ───────────────────────────
-  // Espejo minimalista de sbUpdateLastActive/sbSetPlaying (js/sb.js), pero
-  // para quien todavía no tiene cuenta: esas funciones escriben en
-  // `profiles`, que no tiene fila para invitados, así que /stats "En línea
-  // ahora"/"Jugando ahora" nunca podía verlos jugar en vivo — solo quedaban
-  // eventos puntuales (visit/game) sin ningún latido continuo.
-  // Append-only (mismo modelo que analytics_events, no upsert): un
-  // ON CONFLICT DO UPDATE contra RLS con rol anon sin policy de SELECT no
-  // funciona (confirmado insertando de prueba como anon — "new row violates
-  // row-level security policy"), así que cada latido es una fila nueva; el
-  // server (admin-stats) se queda con la más reciente por visitor_id. Un
-  // cron diario poda filas de más de 2 días para que no crezca sin límite.
+  // ── Live guest presence (no account) ─────────────────────────────────────
+  // Minimal mirror of sbUpdateLastActive/sbSetPlaying (js/sb.js), but for those
+  // without an account yet: those functions write to `profiles`, which has no
+  // row for guests, so /stats "online now" / "playing now" could never see them
+  // play live — only one-off events (visit/game) with no continuous heartbeat.
+  // Append-only (same model as analytics_events, not upsert): an
+  // ON CONFLICT DO UPDATE against RLS with the anon role and no SELECT policy
+  // doesn't work (confirmed by a test insert as anon — "new row violates
+  // row-level security policy"), so each heartbeat is a new row; the server
+  // (admin-stats) keeps the most recent per visitor_id. A daily cron prunes
+  // rows older than 2 days so it doesn't grow unbounded.
   let _guestPlaying = false, _guestPlayingMode = null;
   async function guestHeartbeat() {
-    if (window._sbUserId || !window.sb) return; // ya tiene cuenta -> profiles
+    if (window._sbUserId || !window.sb) return; // has an account -> profiles
     const cc = localStorage.getItem('_an_country') || null;
     try {
       await window.sb.from('guest_presence').insert({
@@ -292,23 +287,23 @@
         country_code: cc,
         device: deviceType(),
       });
-    } catch (e) { /* silencioso, igual que el resto de analytics.js */ }
+    } catch (e) { /* silent, like the rest of analytics.js */ }
   }
-  // Llamado desde window._setPlaying (js/core/campaign.js) para invitados, mismo
-  // punto que sbSetPlaying para cuentas.
+  // Called from window._setPlaying (js/core/campaign.js) for guests, same point
+  // as sbSetPlaying for accounts.
   function guestSetPlaying(playing, mode) {
     _guestPlaying = !!playing;
     _guestPlayingMode = playing ? (mode || null) : null;
     guestHeartbeat();
   }
 
-  // Latido inmediato sin pasar por el freno de 15s de _guestActivityPing —
-  // para momentos que SÍ importa que se vean al instante en /stats (recién
-  // puso su nombre) y que no siempre coinciden con un 'click' que burbujee
-  // a document (confirmar con Enter no dispara 'click'; y si el freno ya
-  // estaba consumido por un clic anterior —ej. entrar al input—, el clic
-  // real de "Confirmar" quedaba silenciado hasta el próximo latido de
-  // fondo, hasta 25s después).
+  // Immediate heartbeat bypassing _guestActivityPing's 15s throttle — for
+  // moments that DO matter to show instantly in /stats (just set their name)
+  // and that don't always coincide with a 'click' that bubbles to document
+  // (confirming with Enter doesn't fire 'click'; and if the throttle was
+  // already consumed by an earlier click — e.g. focusing the input — the real
+  // "Confirm" click stayed silent until the next background heartbeat, up to
+  // 25s later).
   function guestPing() { guestHeartbeat(); }
 
   window.Analytics = {
@@ -316,7 +311,7 @@
     logCampaignCurrency, logGlobequizCurrency, resetVisitorId, guestSetPlaying, guestPing,
   };
 
-  // Registrar la visita en cuanto el cliente sb esté listo.
+  // Log the visit as soon as the sb client is ready.
   function tryVisit(attempt) {
     if (window.sb) { logVisit(); guestHeartbeat(); return; }
     if (attempt > 20) return;
@@ -324,10 +319,10 @@
   }
   tryVisit(0);
 
-  // Heartbeat periódico + en actividad, mismo patrón que el de cuentas en
-  // js/sb.js (25s en background visible + ping en interacción, throttle
-  // 15s) — pero se auto-desactiva solo si en algún momento se logueó
-  // (guestHeartbeat() es no-op con _sbUserId puesto).
+  // Periodic + on-activity heartbeat, same pattern as the accounts one in
+  // js/sb.js (25s while visible + ping on interaction, 15s throttle) — but it
+  // auto-disables if they ever log in (guestHeartbeat() is a no-op with
+  // _sbUserId set).
   setInterval(() => {
     if (!window._sbUserId && document.visibilityState === 'visible') guestHeartbeat();
   }, 25 * 1000);

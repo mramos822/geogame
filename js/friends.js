@@ -1,11 +1,11 @@
 // ── FRIENDS DATA LAYER ────────────────────────────────────────────────────────
-// Fuente de verdad de la lista de amigos para la barra ingame + results/final.
-// Carga desde Supabase cuando hay sesión activa; vacía si no hay cuenta.
+// Source of truth for the friends list used by the ingame bar + results/final.
+// Loads from Supabase when there's an active session; empty if no account.
 //
-// API pública:
-//   getFriends()          -> [{name, score}] actual (síncrono)
-//   loadFriends()         -> Promise; carga de Supabase y notifica
-//   onFriendsUpdate(cb)   -> callback cuando la lista cambia
+// Public API:
+//   getFriends()          -> current [{name, score}] (synchronous)
+//   loadFriends()         -> Promise; loads from Supabase and notifies
+//   onFriendsUpdate(cb)   -> callback when the list changes
 
 let _friendsCache = [];
 
@@ -30,25 +30,25 @@ async function loadFriends() {
       avatar: f.avatar || '', last_active: f.last_active || null,
       is_playing: f.is_playing || false,
       is_practicing: f.is_practicing || false,
-      // frameCode/cardCode ya venían en sbLoadSocialData pero se
-      // descartaban acá — sin esto, el rival de VS (vs.js _setupVsOpponent
-      // busca acá con getFriends()) siempre quedaba con marco/card default
-      // al espectarlo, sin importar qué tuviera equipado de verdad.
+      // frameCode/cardCode already came from sbLoadSocialData but were
+      // discarded here — without this, the VS rival (vs.js _setupVsOpponent
+      // looks here via getFriends()) always got the default frame/card when
+      // spectated, regardless of what they actually had equipped.
       frameCode: f.frameCode || '0001',
       cardCode: f.cardCode || '0001',
       cellCode: f.cellCode || '0001',
       panelCode: f.panelCode || '0001',
-      // country_code: mismo motivo que frameCode/cardCode arriba — venía de
-      // sbLoadSocialData pero se descartaba acá, así que nadie que use
-      // getFriends() (ver el chat directo, js/chat.js) podía mostrar la
-      // bandera de un amigo sin pedirla aparte.
+      // country_code: same reason as frameCode/cardCode above — came from
+      // sbLoadSocialData but was discarded here, so nobody using getFriends()
+      // (see the direct chat, js/chat.js) could show a friend's flag without
+      // fetching it separately.
       country_code: f.country_code || null,
       gqStreakCount: f.gqStreakCount || 0,
       gqStreakLastDate: f.gqStreakLastDate || null,
       gqTodayTimeMs: (typeof f.gqTodayTimeMs === 'number') ? f.gqTodayTimeMs : null,
     }));
   } catch (e) {
-    console.warn('[friends] error cargando:', e.message);
+    console.warn('[friends] error loading:', e.message);
     _friendsCache = [];
   }
   _notifyFriends();

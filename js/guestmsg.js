@@ -1,25 +1,25 @@
-// ── MENSAJES DEL CREADOR (pop-up en el menú) ─────────────────────────────────
-// Canal para escribirle a cualquier jugador desde el backend. El admin inserta
-// una fila por SQL en `public.guest_messages` y acá se muestra como un pop-up
-// centrado sobre la pantalla de inicio.
+// ── CREATOR MESSAGES (menu pop-up) ──────────────────────────────────────────
+// Channel to message any player from the backend. The admin inserts a row via
+// SQL into `public.guest_messages` and here it shows as a pop-up centered over
+// the home screen.
 //
-// Destino de cada fila:
-//   user_id    no nulo  -> solo esa cuenta registrada
-//   visitor_id no nulo  -> solo ese dispositivo (sirve para invitados sin cuenta)
-//   ambos nulos          -> broadcast: SOLO a los que están conectados al enviar
+// Each row's target:
+//   user_id    non-null  -> only that registered account
+//   visitor_id non-null  -> only that device (for account-less guests)
+//   both null            -> broadcast: ONLY to those connected when it's sent
 //
-// Comportamiento:
-//   - Al abrir el juego se consultan los mensajes DIRIGIDOS (visitor_id/user_id).
-//     Los broadcast no se consultan: no deben aparecerle a cada persona nueva.
-//   - Suscripción realtime: si el jugador ya tiene esta versión cargada, el
-//     pop-up aparece en ~1s sin recargar. Es la única vía de los broadcast, y
-//     solo se muestran si el jugador está en el menú en ese instante (no se
-//     encolan: si está jugando o fuera del juego, se descartan).
-//   - Solo se muestra en el MENÚ (#loading-screen visible). Si llega durante una
-//     partida queda en cola y aparece al volver al menú.
-//   - Cada mensaje se muestra una sola vez por dispositivo (ids en localStorage).
+// Behavior:
+//   - On opening the game, TARGETED messages (visitor_id/user_id) are queried.
+//     Broadcasts aren't queried: they must not appear to every new person.
+//   - Realtime subscription: if the player has this version loaded, the pop-up
+//     appears in ~1s without reloading. It's the only path for broadcasts, and
+//     they only show if the player is in the menu at that instant (not queued:
+//     if playing or outside the game, they're discarded).
+//   - Only shown in the MENU (#loading-screen visible). If it arrives during a
+//     game it queues and appears on return to the menu.
+//   - Each message is shown once per device (ids in localStorage).
 //
-// RLS: SELECT público para anon, sin INSERT (solo el admin por SQL).
+// RLS: public SELECT for anon, no INSERT (admin only via SQL).
 (function () {
   var SEEN_KEY = '_gm_seen';
 
@@ -41,7 +41,7 @@
   }
   function isSeen(id) { return seenIds().indexOf(id) !== -1; }
 
-  // ¿Esta fila es para este jugador?
+  // Is this row for this player?
   function matchesTarget(row) {
     if (row.user_id) return row.user_id === currentUid();
     if (row.visitor_id) return row.visitor_id === visitorId();
@@ -63,9 +63,9 @@
 
   function enqueue(row) {
     if (!row || row.id == null || isSeen(row.id) || !matchesTarget(row)) return;
-    // Un broadcast ("a todos") solo se muestra si el jugador está en el menú
-    // AHORA. No se encola: si está jugando o fuera del juego, se descarta —
-    // así solo lo reciben los que están conectados en el momento del envío.
+    // A broadcast ("to everyone") only shows if the player is in the menu NOW.
+    // Not queued: if playing or outside the game, it's discarded — so only
+    // those connected when it's sent receive it.
     if (isBroadcast(row)) {
       if (!loadingVisible()) { markSeen(row.id); return; }
     }
@@ -77,7 +77,7 @@
   function pump() {
     if (_showing || !_queue.length) return;
     if (!loadingVisible()) {
-      // Post-partida siempre vuelve al menú; reintentar hasta que se vea.
+      // Post-game always returns to the menu; retry until it's visible.
       if (!_waitTimer) _waitTimer = setInterval(function () {
         if (loadingVisible()) { clearInterval(_waitTimer); _waitTimer = null; pump(); }
       }, 1000);
@@ -87,18 +87,18 @@
     render(_queue.shift());
   }
 
-  // Mismo lenguaje visual que las viñetas del juego (.account-modal-box /
-  // #chat-conversation-modal): backdrop oscuro + caja crema con borde marrón,
-  // fuente VAGRoundBold, animacion welcomePopIn (definida en style.css) y el
-  // boton confirm1/confirm2.png de siempre (hover muestra confirm2). Va en px
-  // (no cqmin) porque el overlay es fixed, fuera del #app-stage.
+  // Same visual language as the game's bubbles (.account-modal-box /
+  // #chat-conversation-modal): dark backdrop + cream box with brown border,
+  // VAGRoundBold font, welcomePopIn animation (defined in style.css) and the
+  // usual confirm1/confirm2.png button (hover shows confirm2). In px (not cqmin)
+  // because the overlay is fixed, outside #app-stage.
   var FONT = "'VAGRoundBold','Arial Black',sans-serif";
   var _keyframesInjected = false;
   function injectKeyframes() {
     if (_keyframesInjected) return;
     _keyframesInjected = true;
-    // welcomePopIn ya vive en style.css, pero se replica por si acaso + el
-    // fade-out propio del cierre.
+    // welcomePopIn already lives in style.css, but replicated just in case +
+    // the close's own fade-out.
     var st = document.createElement('style');
     st.textContent =
       '@keyframes gmPopIn{from{transform:scale(0.7);opacity:0}to{transform:scale(1);opacity:1}}' +
@@ -134,7 +134,7 @@
     body.textContent = row.body || '';
     body.style.cssText = 'font-size:17px;line-height:1.4;color:#5a4400;white-space:pre-wrap;margin-bottom:18px;';
 
-    // Boton confirm1/confirm2.png de siempre (mismo patron que .founder-popup-confirm).
+    // Usual confirm1/confirm2.png button (same pattern as .founder-popup-confirm).
     var btn = document.createElement('div');
     btn.style.cssText = 'position:relative;width:76px;cursor:pointer;margin-top:2px;';
     var c1 = document.createElement('img');
@@ -155,10 +155,10 @@
 
     function close() {
       markSeen(row.id);
-      // Read receipt en el servidor (para saber que ya lo vio).
-      // OJO: en supabase-js v2 .rpc() es un thenable perezoso; si no se le
-      // encadena .then()/await, el request NUNCA se envia. Por eso el visto
-      // se quedaba eternamente en pendiente.
+      // Read receipt on the server (to know they've seen it).
+      // NOTE: in supabase-js v2 .rpc() is a lazy thenable; without a chained
+      // .then()/await, the request is NEVER sent. That's why the read status
+      // stayed pending forever.
       try {
         if (window.sb) {
           window.sb.rpc('mark_guest_message_read', { p_id: row.id, p_visitor: visitorId() })
@@ -187,11 +187,10 @@
   function fetchPending(sb) {
     var vid = visitorId();
     var uid = currentUid();
-    // Solo se recuperan los mensajes DIRIGIDOS a este dispositivo o cuenta.
-    // Los broadcast (visitor_id y user_id nulos) NO se consultan acá: solo
-    // llegan por realtime a quien está conectado en el momento del envío. Así
-    // un mensaje "a todos los invitados" no le aparece a cada persona nueva
-    // que entra después.
+    // Only messages TARGETED at this device or account are fetched. Broadcasts
+    // (null visitor_id and user_id) are NOT queried here: they only arrive via
+    // realtime to whoever is connected when it's sent. So a "to all guests"
+    // message doesn't appear to every new person who joins later.
     var ors = [];
     if (vid) ors.push('visitor_id.eq.' + vid);
     if (uid) ors.push('user_id.eq.' + uid);
@@ -227,9 +226,9 @@
     var vid = visitorId();
     subscribe(sb, vid);
     fetchPending(sb);
-    // El login puede resolverse después de que corra este script: re-consultar
-    // cuando la sesión esté lista (trae los mensajes dirigidos a la cuenta) y
-    // de nuevo un poco más tarde por si el evento ya había pasado.
+    // Login may resolve after this script runs: re-query when the session is
+    // ready (brings the account-targeted messages) and again a bit later in
+    // case the event had already passed.
     document.addEventListener('sbSessionReady', function () { fetchPending(sb); });
     setTimeout(function () { if (currentUid()) fetchPending(sb); }, 4000);
   }

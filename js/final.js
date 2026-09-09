@@ -5,7 +5,7 @@ const finalScreen = document.getElementById('final-screen');
 function fitRankLabel(id, maxWidthVmin) {
   const el = document.getElementById(id);
   if (!el) return;
-  // Todo en vmin para que escale con el viewport. maxWidthVmin en vmin → px.
+  // All in vmin so it scales with the viewport. maxWidthVmin in vmin → px.
   const vminPx = Math.min(window.STAGE_W, window.STAGE_H) / 100;
   const maxW = maxWidthVmin * vminPx;
   el.style.fontSize = '';
@@ -29,10 +29,10 @@ function _onFinalResize() {
 }
 
 function showFinalScreen() {
-  // Conversión de Google Ads "Juega partida diaria": completar una Gira
-  // Mundial entera es la señal de compromiso real que decidimos usar en vez
-  // de solo entrar a jugar. typeof-check por si un bloqueador de anuncios
-  // impide que cargue gtag.js — no debe romper el resto de la pantalla final.
+  // Google Ads "play daily game" conversion: completing a whole Gira Mundial is
+  // the real engagement signal we chose to use instead of just starting a game.
+  // typeof-check in case an ad blocker stops gtag.js from loading — it must not
+  // break the rest of the final screen.
   if (typeof gtag === 'function') {
     gtag('event', 'conversion', {
       'send_to': 'AW-18355179202/cZ38COS379ccEMKdt7BE',
@@ -42,8 +42,8 @@ function showFinalScreen() {
   }
   finalScreen.style.display = 'block';
   if (typeof window._setPlaying === 'function') window._setPlaying(false);
-  // Espejo local SIEMPRE (con cuenta o sin ella): si falla el guardado en el
-  // servidor (sin conexión), el perfil no debe mostrar 0 — cae a este respaldo.
+  // Local mirror ALWAYS (with or without an account): if the server save fails
+  // (offline), the profile must not show 0 — it falls back to this.
   localStorage.setItem('playCount', String(parseInt(localStorage.getItem('playCount') || '0', 10) + 1));
   const backWrap = document.getElementById('final-confirm-back-wrap');
   if (backWrap) {
@@ -56,17 +56,17 @@ function showFinalScreen() {
   const hs2  = (cs.shapes    != null) ? cs.shapes    : (parseInt(localStorage.getItem('shapesHighscore'))        || 0);
   const hs3  = (cs.game      != null) ? cs.game      : (parseInt(localStorage.getItem('geochallenge_highscore')) || 0);
   const hs4  = (cs.monuments != null) ? cs.monuments : (parseInt(localStorage.getItem('monumentsHighscore'))     || 0);
-  // Acumular para promedios por modo (segunda columna del loading) — espejo
-  // local siempre, misma razón que playCount arriba.
+  // Accumulate for per-mode averages (second loading column) — local mirror
+  // always, same reason as playCount above.
   [['flags', hs1], ['shapes', hs2], ['game', hs3], ['monuments', hs4]].forEach(([k, v]) => {
     localStorage.setItem('avgSum_' + k,   String(parseInt(localStorage.getItem('avgSum_' + k)   || '0', 10) + v));
     localStorage.setItem('avgCount_' + k, String(parseInt(localStorage.getItem('avgCount_' + k) || '0', 10) + 1));
   });
   const total = hs1 + hs2 + hs3 + hs4;
-  // Precarga la posición en el ranking real ni bien se muestra la pantalla final
-  // (no cuando se abre el popup): así, para cuando el jugador toca "atrás" —que
-  // suele tardar unos segundos por las animaciones— el dato ya está listo y el
-  // popup no se abre con el mensaje en blanco esperando la consulta a Supabase.
+  // Preload the position in the real ranking as soon as the final screen shows
+  // (not when the popup opens): so by the time the player taps "back" — usually
+  // a few seconds later because of the animations — the data is ready and the
+  // popup doesn't open with a blank message waiting on the Supabase query.
   if (!window._accountLoggedIn) _guestRankPromise = _guestRankPosition(total);
   const rank  = typeof getRank === 'function' ? getRank(total) : null;
   const label = document.getElementById('final-rank-label');
@@ -94,7 +94,7 @@ function showFinalScreen() {
       }
       const avatarRect = avatarEl.getBoundingClientRect();
       const nameRect   = nameEl.getBoundingClientRect();
-      const GAP = 36; // px de separación entre foto y nombre
+      const GAP = 36; // px gap between photo and name
       const overlap = avatarRect.right - nameRect.left + GAP;
       if (overlap > 0) {
         const pct = overlap / groupW * 100;
@@ -127,8 +127,8 @@ function showFinalScreen() {
       getComputedStyle(document.documentElement).getPropertyValue('--app-fit');
     }
     buildFriendClouds(ranking, pos);
-    // iOS: visualViewport puede estar desactualizado en el primer render.
-    // Segundo refresh a 300ms garantiza que el viewport está estabilizado.
+    // iOS: visualViewport can be stale on the first render. A second refresh at
+    // 300ms ensures the viewport has stabilized.
     setTimeout(() => {
       if (finalScreen.style.display === 'none') return;
       if (typeof window.letterboxRefresh === 'function') window.letterboxRefresh();
@@ -137,36 +137,36 @@ function showFinalScreen() {
   }));
 }
 
-// Genera un cloud5 por cada puesto en diagonal 2:1, dejando un hueco en mi puesto.
-// El trail entra desde la derecha y se detiene cuando mi hueco llega al centro.
+// Generates one cloud5 per position on a 2:1 diagonal, leaving a gap at my spot.
+// The trail enters from the right and stops when my gap reaches the center.
 function buildFriendClouds(ranking, playerPos) {
   const container = document.getElementById('final-clouds5');
   if (!container) return;
   container.innerHTML = '';
-  const CQW = window.STAGE_W / 100; // 1cqw en px (19.2 en diseño 1920)
-  const STEP_X = 22 * CQW;  // px por puesto
-  const STEP_Y = -11 * CQW; // px por puesto (2:1)
+  const CQW = window.STAGE_W / 100; // 1cqw in px (19.2 in the 1920 design)
+  const STEP_X = 22 * CQW;  // px per position
+  const STEP_Y = -11 * CQW; // px per position (2:1)
   const playerName = localStorage.getItem('playerName') || 'John';
 
-  // Ventana de 10 posiciones (yo incluido como hueco): 4 por encima + yo + 5 por debajo.
-  // En los bordes se desplaza para mantener 10 (si hay suficientes).
+  // Window of 10 positions (me included as a gap): 4 above + me + 5 below.
+  // At the edges it shifts to keep 10 (if there are enough).
   const WINDOW = 10;
   const fullN = ranking.length;
-  let start = playerPos - Math.floor((WINDOW - 1) / 2); // 4 por encima
+  let start = playerPos - Math.floor((WINDOW - 1) / 2); // 4 above
   let end   = start + WINDOW - 1;
   if (start < 1)      { end += (1 - start);     start = 1; }
   if (end > fullN)    { start -= (end - fullN); end = fullN; }
   if (start < 1)      start = 1;
-  const windowed = ranking.slice(start - 1, end); // sigue ordenado desc
+  const windowed = ranking.slice(start - 1, end); // still sorted desc
   const N = windowed.length;                       // <= 10
-  const localPlayerPos = playerPos - start + 1;    // mi puesto dentro de la ventana
+  const localPlayerPos = playerPos - start + 1;    // my spot within the window
 
   for (let i = N - 1; i >= 0; i--) {
     const entry = windowed[i];
-    const realPos = start + i; // puesto real en el ranking completo
-    // dejar hueco en mi puesto
+    const realPos = start + i; // real position in the full ranking
+    // leave a gap at my spot
     if ((i + 1) === localPlayerPos && entry.name === playerName) continue;
-    const k = (N - 1) - i; // 0 = más bajo
+    const k = (N - 1) - i; // 0 = lowest
     const rk = typeof getRank === 'function' ? getRank(entry.score) : null;
     const labelId = `final-fc-label-${i}`;
 
@@ -190,24 +190,24 @@ function buildFriendClouds(ranking, playerPos) {
     const cloudImg = group.querySelector('.final-cloud5');
     if (cloudImg) {
       const dur = 6 + Math.random() * 5;       // 6–11s
-      const delay = -Math.random() * dur;      // arranca en fase aleatoria
+      const delay = -Math.random() * dur;      // start at a random phase
       cloudImg.style.animationDuration = dur.toFixed(2) + 's';
       cloudImg.style.animationDelay = delay.toFixed(2) + 's';
     }
   }
 
-  // mi puesto desde abajo (0 = más bajo), relativo a la ventana
+  // my spot from the bottom (0 = lowest), relative to the window
   const playerK = N - localPlayerPos;
   const endX = -(playerK * STEP_X);
   const endY = -(playerK * STEP_Y);
   const startX = endX + 240 * CQW;
   const startY = endY - 120 * CQW;
 
-  // CSS transition en lugar de Web Animations API — en iOS el WAAPI pone el
-  // elemento bajo el compositor antes de que el layout del display:block esté
-  // comprometido, causando posición incorrecta. CSS transition + rAF es más
-  // confiable: el rAF garantiza que el transform inicial ya fue pintado antes
-  // de que se añada la transición.
+  // CSS transition instead of the Web Animations API — on iOS the WAAPI puts
+  // the element under the compositor before the display:block layout is
+  // committed, causing a wrong position. CSS transition + rAF is more reliable:
+  // the rAF guarantees the initial transform was painted before the transition
+  // is added.
   container.style.transform = `translate(${startX}px, ${startY}px)`;
 
   const ANIM_DUR   = 7500;
@@ -234,7 +234,7 @@ function buildFriendClouds(ranking, playerPos) {
     else checkPassMath(1);
   }
 
-  // rAF para que iOS commitee el transform inicial antes de añadir la transición
+  // rAF so iOS commits the initial transform before the transition is added
   requestAnimationFrame(() => {
     const tid = setTimeout(() => {
       container.style.transition = `transform ${ANIM_DUR}ms ease-out`;
@@ -245,7 +245,7 @@ function buildFriendClouds(ranking, playerPos) {
       loopActive = true;
       requestAnimationFrame(loop);
     }, ANIM_DELAY);
-    // exponer para cleanup si se oculta el final antes de que acabe
+    // expose for cleanup if the final is hidden before it finishes
     container._animTid = tid;
   });
 }
@@ -276,17 +276,17 @@ document.getElementById('final-confirm-back-wrap')?.addEventListener('click', ()
   document.getElementById('loading-table-group')?.classList.add('table-gone');
   if (typeof window.replayEntranceAnimations === 'function') window.replayEntranceAnimations();
   if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
-  // Liberar la RAM de la campaña recién terminada (fondos/personajes/ranks/canvas/
-  // video). Así la app no acumula memoria entre sesiones y la siguiente partida o
-  // entrar a social arranca con baseline bajo, sin necesidad de recargar la página.
+  // Free the just-finished campaign's RAM (backgrounds/characters/ranks/canvas/
+  // video). So the app doesn't accumulate memory between sessions and the next
+  // game or opening social starts with a low baseline, with no page reload.
   if (typeof window.releaseGameMemory === 'function') window.releaseGameMemory();
   if (!window._accountLoggedIn && localStorage.getItem('hideGuestRankPopup') !== '1') {
     showGuestRankPopup(_finalTotal || 0);
   }
-  // Popup de Fundador: recién acá, de vuelta en el menú tras terminar una
-  // Vuelta Mundial completa (flag puesta en js/modes/mapgame-misc.js al cerrar la
-  // campaña) — window._sbProfile ya viene fresco del guardado de resultados
-  // (ver js/results.js). Solo desbloquea, no equipa nada (ver showFounderWelcomePopup).
+  // Founder popup: only here, back at the menu after finishing a full Gira
+  // Mundial (flag set in js/modes/mapgame-misc.js when the campaign closes) —
+  // window._sbProfile is already fresh from the results save (see
+  // js/results.js). Only unlocks, equips nothing (see showFounderWelcomePopup).
   if (window._pendingFounderPopupCheck) {
     window._pendingFounderPopupCheck = false;
     const p = window._sbProfile;
@@ -298,11 +298,11 @@ document.getElementById('final-confirm-back-wrap')?.addEventListener('click', ()
 document.getElementById('final-confirm-back-wrap')?.addEventListener('mouseenter', () => { if (typeof playSelect === 'function') playSelect(); });
 document.getElementById('final-confirm-back-wrap')?.addEventListener('mouseleave', () => { if (typeof playSelect === 'function') playSelect(); });
 
-// ── Popup: puesto en el ranking para invitados ────────────────────────────────
-// Los invitados no entran al ranking real (visitor_id no es una identidad
-// confiable, ver conversación de diseño), así que en vez de eso se les muestra
-// dónde caerían + un CTA a crear cuenta. Se dispara cada vez que vuelven al menú
-// tras terminar una Gira Mundial, salvo que hayan marcado "no mostrar de nuevo".
+// ── Popup: ranking position for guests ──────────────────────────────────────
+// Guests don't enter the real ranking (visitor_id isn't a reliable identity),
+// so instead they're shown where they'd land + a CTA to create an account.
+// Fires every time they return to the menu after finishing a Gira Mundial,
+// unless they checked "don't show again".
 async function _guestRankPosition(total) {
   if (!window.sb) return null;
   try {
@@ -315,9 +315,9 @@ async function _guestRankPosition(total) {
   } catch (e) { return null; }
 }
 
-// Corta la espera si el pedido tarda demasiado (sin internet, servidor caído, etc.):
-// sin esto un fetch colgado dejaría el popup esperando indefinidamente antes de
-// poder abrirse, ya que ahora se espera el dato antes de mostrar la viñeta.
+// Cuts the wait if the request takes too long (no internet, server down, etc.):
+// without this a hung fetch would leave the popup waiting indefinitely before it
+// could open, since the data is now awaited before showing the bubble.
 function _withTimeout(promise, ms) {
   let timer;
   const timeout = new Promise(resolve => { timer = setTimeout(() => resolve(null), ms); });
@@ -326,7 +326,7 @@ function _withTimeout(promise, ms) {
 
 function showConnErrorPopup() {
   const popup = document.getElementById('conn-error-popup');
-  if (!popup || popup.classList.contains('open')) return; // no duplicar si ya está abierta
+  if (!popup || popup.classList.contains('open')) return; // don't duplicate if already open
   popup.classList.add('open');
 }
 window.showConnErrorPopup = showConnErrorPopup;
@@ -335,17 +335,17 @@ document.getElementById('conn-error-popup-close')?.addEventListener('click', () 
   document.getElementById('conn-error-popup')?.classList.remove('open');
 });
 
-// Utilidad reusable: envuelve cualquier pedido a Supabase con el mismo timeout +
-// viñeta de error de conexión que ya usa el popup de invitado. Cualquier otra
-// parte del juego que cargue algo del servidor puede usarla:
+// Reusable utility: wraps any Supabase request with the same timeout +
+// connection-error bubble the guest popup already uses. Any other part of the
+// game that loads something from the server can use it:
 //   const data = await window.withConnCheck(window.sb.from(...).select(...), 6000);
-//   if (data === null) return; // ya se mostró la viñeta de error, no seguir
-// IMPORTANTE: en ambas variantes de abajo hay que cancelar el setTimeout una vez
-// que la carrera termina. Si el pedido real resuelve rápido (ej. "usuario no
-// encontrado" en unos ms) pero el timer de 6s sigue vivo sin cancelar, dispara
-// solo más tarde y muestra la viñeta de error igual — aunque ya haya terminado
-// bien. Con varios clics seguidos, esos timers "fantasma" se van acumulando y
-// la viñeta termina apareciendo sola, de la nada, varias veces.
+//   if (data === null) return; // error bubble already shown, don't continue
+// IMPORTANT: in both variants below the setTimeout must be cleared once the race
+// ends. If the real request resolves fast (e.g. "user not found" in a few ms)
+// but the 6s timer is still alive uncleared, it fires later and shows the error
+// bubble anyway — even though it already succeeded. With several clicks in a
+// row, those "ghost" timers pile up and the bubble ends up appearing on its
+// own, out of nowhere, several times.
 const _CONN_TIMEOUT = Symbol('conn-timeout');
 window.withConnCheck = function (promise, ms = 6000) {
   let timer;
@@ -358,29 +358,29 @@ window.withConnCheck = function (promise, ms = 6000) {
     });
 };
 
-// Variante para flujos con errores de negocio legítimos (login: contraseña
-// incorrecta; registro: usuario ya existe, etc.) que NO deben tratarse como
-// falla de conexión. A diferencia de withConnCheck, esta NO atrapa el rechazo
-// original — solo corta la espera si nadie respondió (ni éxito ni error) en
-// `ms`, mostrando la viñeta y devolviendo undefined; los .then/.catch del
-// caller siguen funcionando igual que siempre para errores reales.
+// Variant for flows with legitimate business errors (login: wrong password;
+// register: user already exists, etc.) that should NOT be treated as a
+// connection failure. Unlike withConnCheck, this does NOT catch the original
+// rejection — it only cuts the wait if nobody responded (neither success nor
+// error) within `ms`, showing the bubble and returning undefined; the caller's
+// .then/.catch keep working as usual for real errors.
 window.withConnTimeout = function (promise, ms = 6000) {
   let timer;
-  promise.catch(() => {}); // evita "unhandled rejection" si el original rechaza después del timeout
+  promise.catch(() => {}); // avoids "unhandled rejection" if the original rejects after the timeout
   const timeout = new Promise(resolve => { timer = setTimeout(() => { showConnErrorPopup(); resolve(undefined); }, ms); });
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 };
 
-// Detección automática: en cuanto el navegador pierde la conexión (evento nativo
-// 'offline', no depende de que algo la pida), se muestra la viñeta sola, sin
-// esperar a que el jugador dispare alguna acción que necesite internet.
+// Auto-detection: as soon as the browser loses its connection (native 'offline'
+// event, not dependent on something requesting it), the bubble shows on its
+// own, without waiting for the player to trigger an internet-needing action.
 window.addEventListener('offline', () => showConnErrorPopup());
 
 async function showGuestRankPopup(total) {
-  // Espera el dato ANTES de decidir qué popup abrir. Usa la precarga arrancada
-  // en showFinalScreen() si está lista (lo normal, dado el tiempo que pasa
-  // hasta tocar "atrás"); si no, la pide en el momento. Con timeout: si no hay
-  // internet o el servidor no responde a tiempo, no se cuelga esperando.
+  // Await the data BEFORE deciding which popup to open. Uses the preload started
+  // in showFinalScreen() if it's ready (the normal case, given the time until
+  // "back" is tapped); otherwise fetches it now. With a timeout: if there's no
+  // internet or the server doesn't respond in time, it doesn't hang waiting.
   const r = await _withTimeout(_guestRankPromise || _guestRankPosition(total), 6000);
   if (!r) { showConnErrorPopup(); return; }
 

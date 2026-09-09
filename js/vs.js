@@ -1,5 +1,5 @@
 // ── VERSUS MODE ───────────────────────────────────────────────────────────────
-// Matchmaking, Realtime channel, y lógica de partida 1v1.
+// Matchmaking, Realtime channel, and 1v1 match logic.
 let _vsCurrentMode = 'flags';
 function _startSeededRandom(seed, mode) {
   _vsCurrentMode = mode || 'flags';
@@ -34,43 +34,41 @@ window.VS = (() => {
   let _role      = null; // 'host' | 'guest'
   let _channel   = null;
   let _match     = null;
-  let _onInvite  = null; // cb(match) — notifica al guest de una invitación entrante
-  let _onInviteCancel = null; // cb(match) — el host canceló/expiró el reto
-  let _onStart   = null; // cb(match) — ambos jugadores arrancan
+  let _onInvite  = null; // cb(match) — notify the guest of an incoming invite
+  let _onInviteCancel = null; // cb(match) — host cancelled/expired the challenge
+  let _onStart   = null; // cb(match) — both players start
   let _onScore   = null; // cb(hostScore, guestScore)
   let _onEnd     = null; // cb(winnerId)
-  let _onOppLeft = null; // cb() — el rival se desconectó/abandonó
-  let _onWrong   = null; // cb() — el rival falló una pregunta
-  let _onGameEnd = null; // cb({role, score}) — el rival terminó SU cronómetro (ver reportGameEnd)
-  let _onAnswer  = null; // cb(detail) — broadcast 'answer' propio (no el de espectador, ver window._onVsAnswer). Solo usado por GlobeQuiz hoy.
-  let _onReady   = null; // cb({role}) — el rival terminó de cargar sus assets pesados (ver reportReady). Solo usado por GlobeQuiz hoy.
-  let _onGqAbort = null; // cb() — GlobeQuiz: uno de los dos no pudo terminar de cargar el globo 3D a tiempo; ambos vuelven al menú SIN ganador ni derrota registrada (ver _handleGqSyncFailed).
-  let _onGqPhase = null; // cb({role, phase}) — GlobeQuiz: hito de carga del rival ('start'|'assets'|'scene'), para la barra de sincronización.
-  let _onGqGo    = null; // cb() — GlobeQuiz: el host confirma que arrancan los dos; el guest agenda su 3-2-1 con el mismo desfase relativo (sin depender de relojes sincronizados).
-  // cb(status) — el canal de Realtime NUNCA llegó a autorizarse (típicamente
-  // una policy de RLS rota en el server, ver la de sep-2026: un cast inválido
-  // hacía que CUALQUIER intento de unirse a 'match-{id}'/'solo-{id}' tirara
-  // CHANNEL_ERROR). Antes esto no se manejaba en absoluto: el .subscribe()
-  // de más abajo solo reaccionaba a 'SUBSCRIBED', así que un fallo dejaba
-  // _vsLaunching/_vsActive trabados en true para siempre (nada volvía a
-  // false) — el jugador quedaba con el juego colgado sin ningún cartel de
-  // error, sin poder arrancar OTRO duelo hasta recargar la página a mano, y
-  // la fila de matches se quedaba en 'active' para siempre en la base (el
-  // reportado: "ya lo hice [refrescar] y aun nada"). Registrado UNA vez al
-  // iniciar sesión (ver "VERSUS UI" más abajo), no por partida.
+  let _onOppLeft = null; // cb() — opponent disconnected/abandoned
+  let _onWrong   = null; // cb() — opponent missed a question
+  let _onGameEnd = null; // cb({role, score}) — opponent finished THEIR timer (see reportGameEnd)
+  let _onAnswer  = null; // cb(detail) — own 'answer' broadcast (not the spectator one, see window._onVsAnswer). Only used by GlobeQuiz today.
+  let _onReady   = null; // cb({role}) — opponent finished loading their heavy assets (see reportReady). Only used by GlobeQuiz today.
+  let _onGqAbort = null; // cb() — GlobeQuiz: one side couldn't finish loading the 3D globe in time; both return to menu with NO winner or loss recorded (see _handleGqSyncFailed).
+  let _onGqPhase = null; // cb({role, phase}) — GlobeQuiz: opponent load milestone ('start'|'assets'|'scene'), for the sync bar.
+  let _onGqGo    = null; // cb() — GlobeQuiz: host confirms both are starting; the guest schedules its 3-2-1 with the same relative offset (no dependence on synced clocks).
+  // cb(status) — the Realtime channel NEVER got authorized (typically a
+  // broken RLS policy on the server, see the sep-2026 one: an invalid cast
+  // made ANY attempt to join 'match-{id}'/'solo-{id}' throw CHANNEL_ERROR).
+  // This wasn't handled at all before: the .subscribe() below only reacted to
+  // 'SUBSCRIBED', so a failure left _vsLaunching/_vsActive stuck true forever
+  // (nothing went back to false) — the player was left with the game hung,
+  // no error message, unable to start ANOTHER duel until manually reloading
+  // the page, and the matches row stayed 'active' forever in the DB.
+  // Registered ONCE at login (see "VERSUS UI" below), not per match.
   let _onSubscribeError = null;
   let _pollId    = null;
-  let _started   = false; // evita que _onStart se dispare más de una vez
-  let _oppGoneTimer = null; // gracia antes de declarar abandono por presencia
+  let _started   = false; // prevents _onStart from firing more than once
+  let _oppGoneTimer = null; // grace period before declaring abandonment by presence
   const OPP_GRACE_MS = 6000;
-  // El rival avisó (broadcast 'gameend', ver reportGameEnd) que terminó SU
-  // cronómetro y va a soltar su canal para espectarme de prestado
-  // (_enterWaitAsSpectator) — esa desconexión de su lado es ESPERADA, no un
-  // abandono. Sin esta bandera, el handler de presence 'leave' de más abajo
-  // no tiene forma de distinguir "el rival cerró la pestaña" de "el rival
-  // cambió de canal para espectarme", y terminaba arrancando la cuenta
-  // regresiva de abandono igual (el "aun reconoce como si abandonara"
-  // reportado, viéndose desde el lado del que sigue jugando).
+  // The opponent announced (broadcast 'gameend', see reportGameEnd) that they
+  // finished THEIR timer and are about to release their channel to spectate
+  // me on loan (_enterWaitAsSpectator) — that disconnect on their side is
+  // EXPECTED, not an abandonment. Without this flag, the presence 'leave'
+  // handler below can't tell "opponent closed the tab" from "opponent
+  // switched channels to spectate me", and would start the abandonment
+  // countdown anyway (the reported "still treats it as an abandonment", seen
+  // from the side of whoever is still playing).
   let _oppFinishedGameEnd = false;
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -84,8 +82,8 @@ window.VS = (() => {
     return data;
   }
 
-  // Cuenta espectadores conectados (presence keys 'spectator-*') y expone el
-  // total para el ícono de ojo + contador en el HUD del jugador espectado.
+  // Counts connected spectators (presence keys 'spectator-*') and exposes the
+  // total for the eye icon + counter in the spectated player's HUD.
   function _updateSpectatorCount() {
     if (!_channel) return;
     try {
@@ -96,7 +94,7 @@ window.VS = (() => {
     } catch (e) {}
   }
 
-  // ── Canal Realtime ─────────────────────────────────────────────────────────
+  // ── Realtime channel ───────────────────────────────────────────────────────
 
   function _subscribe(matchId) {
     if (_channel) _channel.unsubscribe();
@@ -111,10 +109,10 @@ window.VS = (() => {
         _match = m;
         if (m.status === 'active' && _onStart && !_started) { _started = true; _onStart(m); }
         if (m.status === 'finished' && _onEnd)  _onEnd(m.winner_id);
-        // Abandono explícito del rival (escribió status=abandoned con winner=nosotros)
+        // Explicit opponent abandonment (wrote status=abandoned with winner=us)
         if (m.status === 'abandoned' && _onOppLeft) { clearTimeout(_oppGoneTimer); _onOppLeft(); }
         if (m.status === 'active' && _onScore) _onScore(m.host_score, m.guest_score);
-        // Guest rechazó / no está disponible → notificar al host
+        // Guest declined / not available → notify the host
         if ((m.status === 'declined' || m.status === 'expired') && _role === 'host' && !_started) {
           _hideOutgoingPopup();
           const T2 = (k, d) => (typeof t === 'function' ? t(k) : d);
@@ -126,71 +124,71 @@ window.VS = (() => {
           cleanup();
         }
       })
-      // Score en tiempo real del rival: broadcast inmediato (no espera el WAL de postgres_changes)
+      // Opponent's real-time score: immediate broadcast (doesn't wait for the postgres_changes WAL)
       .on('broadcast', { event: 'score' }, ({ payload }) => {
         if (!payload || !_match) return;
         if (_role === 'host') _match.guest_score = payload.score || 0;
         else                  _match.host_score  = payload.score || 0;
         if (_onScore) _onScore(_match.host_score, _match.guest_score);
       })
-      // El rival falló → señal visual en mi pantalla
+      // Opponent missed → visual cue on my screen
       .on('broadcast', { event: 'wrong' }, () => { if (_onWrong) _onWrong(); })
-      // El rival terminó SU cronómetro (ver reportGameEnd/_vsHandleGameEnd) —
-      // el bonus de "+5s" por dots corre de forma independiente en cada
-      // jugador, así que los dos relojes pueden desincronizarse: uno puede
-      // terminar antes que el otro. Sin esta señal, el primero en terminar
-      // mostraba resultado YA (con el rival todavía jugando sus segundos de
-      // bonus) — o peor, marcaba la partida 'finished' en la base y le
-      // cortaba esos segundos al rival de golpe (el "5 segundos más, pero
-      // termina en post" reportado). Ahora cada lado espera a que AMBOS
-      // hayan avisado que terminaron antes de mostrar el resultado.
+      // Opponent finished THEIR timer (see reportGameEnd/_vsHandleGameEnd) —
+      // the "+5s" dot bonus runs independently on each player, so the two
+      // clocks can desync: one can finish before the other. Without this
+      // signal, the first to finish showed the result RIGHT AWAY (with the
+      // opponent still playing their bonus seconds) — or worse, marked the
+      // match 'finished' in the DB and cut those seconds off the opponent
+      // abruptly (the reported "5 more seconds, but it ends in post"). Now
+      // each side waits for BOTH to have announced they finished before
+      // showing the result.
       .on('broadcast', { event: 'gameend' }, ({ payload }) => {
         if (!payload) return;
         _oppFinishedGameEnd = true;
         if (_onGameEnd) _onGameEnd(payload);
       })
-      // Selección exacta del rival (índice/opción elegida) — consumido por el
-      // modo espectador para recrear el click en tiempo real; no afecta al juego.
+      // Opponent's exact selection (index/chosen option) — consumed by
+      // spectator mode to recreate the click in real time; doesn't affect the game.
       .on('broadcast', { event: 'answer' }, ({ payload }) => {
         if (window._onVsAnswer && payload) window._onVsAnswer(payload);
         if (_onAnswer && payload) _onAnswer(payload);
       })
-      // El rival terminó de cargar sus assets pesados (hoy solo GlobeQuiz:
-      // three.js + GeoJSON, ver reportReady/_vsGqAwaitBothReady) — mientras
-      // NO se persiste en la fila de matches (es efímero, como 'score'), no
-      // hace falta: este listener se registra ANTES de arrancar la propia
-      // carga (ver _launchVersus), así que llega a tiempo sin importar quién
-      // termine de cargar primero.
+      // Opponent finished loading their heavy assets (today only GlobeQuiz:
+      // three.js + GeoJSON, see reportReady/_vsGqAwaitBothReady) — not
+      // persisted to the matches row (it's ephemeral, like 'score'), no need:
+      // this listener is registered BEFORE starting our own load (see
+      // _launchVersus), so it arrives in time regardless of who loads first.
       .on('broadcast', { event: 'ready' }, ({ payload }) => {
         if (_onReady && payload) _onReady(payload);
       })
-      // GlobeQuiz: el rival avisa que NO pudo terminar de cargar el globo 3D
-      // dentro del margen (CDN de three.js colgado, WebGL bloqueado, red
-      // caída). El modo se gana por ser el primero en acertar, así que
-      // arrancar sin él sería injusto y lo dejaría congelado en el spinner —
-      // se corta la partida para ambos, sin ganador (ver _handleGqSyncFailed).
+      // GlobeQuiz: opponent reports they COULDN'T finish loading the 3D globe
+      // within the margin (three.js CDN hung, WebGL blocked, network down).
+      // The mode is won by being first to guess right, so starting without
+      // them would be unfair and would leave them frozen on the spinner —
+      // the match is cancelled for both, no winner (see _handleGqSyncFailed).
       .on('broadcast', { event: 'gqabort' }, () => { if (_onGqAbort) _onGqAbort(); })
-      // GlobeQuiz: hito de carga del rival — alimenta la barra de sincronización.
+      // GlobeQuiz: opponent load milestone — feeds the sync bar.
       .on('broadcast', { event: 'gqphase' }, ({ payload }) => { if (_onGqPhase && payload) _onGqPhase(payload); })
-      // GlobeQuiz: el host da la orden de arranque (ver _gqTryResolveReady).
+      // GlobeQuiz: the host gives the start order (see _gqTryResolveReady).
       .on('broadcast', { event: 'gqgo' }, () => { if (_onGqGo) _onGqGo(); })
-      // Presencia: detecta cierre de pestaña / pérdida de conexión del rival.
+      // Presence: detects tab close / connection loss of the opponent.
       .on('presence', { event: 'leave' }, ({ key }) => {
-        // Un espectador que se desconecta (key 'spectator-{uid}', ver
-        // Spectate.watch()) comparte este MISMO canal — sin este filtro,
-        // cualquier espectador que cerrara su sesión disparaba este mismo
-        // "leave" acá, y este código lo trataba como si el RIVAL real se
-        // hubiera ido: arrancaba la cuenta regresiva de OPP_GRACE_MS y
-        // terminaba declarando abandono/victoria falsa, cortando una
-        // partida que en realidad seguía en curso entre los dos jugadores
-        // reales (el "el espectador salió y termina el juego" reportado).
+        // A spectator disconnecting (key 'spectator-{uid}', see
+        // Spectate.watch()) shares this SAME channel — without this filter,
+        // any spectator closing their session fired this same "leave" here,
+        // and this code treated it as if the real OPPONENT had left: it
+        // started the OPP_GRACE_MS countdown and ended up declaring a false
+        // abandonment/win, cutting off a match that was actually still going
+        // between the two real players (the reported "the spectator left and
+        // the game ends").
         if (!key || key === uid || key.indexOf('spectator-') === 0) return;
-        // Ver _oppFinishedGameEnd arriba: si el rival ya avisó que terminó su
-        // cronómetro, esta desconexión es él soltando su canal para
-        // espectarme de prestado — no un abandono real. Nada que declarar acá.
+        // See _oppFinishedGameEnd above: if the opponent already announced
+        // they finished their timer, this disconnect is them releasing their
+        // channel to spectate me on loan — not a real abandonment. Nothing to
+        // declare here.
         if (_oppFinishedGameEnd) return;
         clearTimeout(_oppGoneTimer);
-        // Gris permanente: mostrar desconexión visual inmediatamente
+        // Permanent grey: show the disconnect visually right away
         if (typeof window.flagsSetVsDisconnected === 'function') window.flagsSetVsDisconnected(true);
         if (typeof window.shapesSetVsDisconnected === 'function') window.shapesSetVsDisconnected(true);
         if (typeof window.citiesSetVsDisconnected === 'function') window.citiesSetVsDisconnected(true);
@@ -199,29 +197,29 @@ window.VS = (() => {
       .on('presence', { event: 'join' }, ({ key }) => {
         if (!key) return;
         if (key.indexOf('spectator-') === 0) {
-          // Pequeño delay: recién se unió, dar tiempo a que sus propios
-          // listeners de broadcast terminen de registrarse antes de reenviar.
-          // Antes eran 150ms — sus listeners (_wireCommonCallbacks) ya
-          // quedan registrados ANTES de siquiera intentar la conexión, así
-          // que ese margen era más de lo necesario; se achica para que
-          // _enterWaitAsSpectator (vs.js) no sienta esta demora sumada a las
-          // demás (soltar canal + reconectar) como "tarda la vida" en
-          // mostrar al rival.
+          // Small delay: they just joined, give their own broadcast listeners
+          // time to finish registering before resending. It was 150ms before
+          // — their listeners (_wireCommonCallbacks) are registered BEFORE
+          // even attempting the connection, so that margin was more than
+          // needed; shrunk so _enterWaitAsSpectator (vs.js) doesn't feel this
+          // delay on top of the others (release channel + reconnect) as
+          // "takes forever" to show the opponent.
           setTimeout(_resendStateTo, 40);
           return;
         }
-        if (key !== uid) clearTimeout(_oppGoneTimer); // rival volvió a tiempo; gris queda permanente
+        if (key !== uid) clearTimeout(_oppGoneTimer); // opponent came back in time; grey stays permanent
       })
-      // Contador de espectadores: 'sync' (no join/leave) porque es el único
-      // evento que garantiza que presenceState() ya está consistente — leerlo
-      // dentro del handler de 'leave' a veces todavía traía al que se fue
-      // (race de timing), por eso el contador no bajaba al salir alguien.
+      // Spectator counter: 'sync' (not join/leave) because it's the only
+      // event that guarantees presenceState() is already consistent — reading
+      // it inside the 'leave' handler sometimes still included whoever left
+      // (timing race), which is why the counter didn't drop when someone left.
       .on('presence', { event: 'sync' }, () => { _updateSpectatorCount(); })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
           try { await _channel.track({ uid: uid, t: Date.now() }); } catch (e) {}
-          // Catch-up: si el rival aceptó mientras la suscripción se confirmaba,
-          // el evento realtime ya pasó; verificamos el estado actual en DB.
+          // Catch-up: if the opponent accepted while the subscription was
+          // confirming, the realtime event already passed; check the current
+          // state in the DB.
           if (_matchId && _onStart && !_started) {
             try {
               const m = await _getMatch(_matchId);
@@ -234,8 +232,8 @@ window.VS = (() => {
       });
   }
 
-  // ── Escuchar invitaciones entrantes (guest) ────────────────────────────────
-  // Suscribe al usuario a cambios de matches donde es guest y status=pending.
+  // ── Listen for incoming invites (guest) ────────────────────────────────────
+  // Subscribes the user to changes on matches where they are guest and status=pending.
 
   let _inviteChannel = null;
 
@@ -259,7 +257,7 @@ window.VS = (() => {
         filter: 'guest_id=eq.' + uid,
       }, payload => {
         const m = payload.new;
-        // El host canceló/expiró el reto antes de que yo respondiera → descartar la noti
+        // Host cancelled/expired the challenge before I answered → dismiss the notif
         if ((m.status === 'expired' || m.status === 'declined' || m.status === 'cancelled') && _onInviteCancel) _onInviteCancel(m);
       })
       .subscribe();
@@ -269,7 +267,7 @@ window.VS = (() => {
     if (_inviteChannel) { _inviteChannel.unsubscribe(); _inviteChannel = null; }
   }
 
-  // ── Crear invitación (host) ────────────────────────────────────────────────
+  // ── Create invite (host) ───────────────────────────────────────────────────
 
   async function invite(guestId, mode = 'flags') {
     const uid = _myId();
@@ -285,23 +283,23 @@ window.VS = (() => {
     _match   = data;
     _subscribe(_matchId);
     if (window.Analytics && typeof window.Analytics.logVersusFunnel === 'function') window.Analytics.logVersusFunnel('sent', mode);
-    // Auto-expirar si el guest no responde en 30s
+    // Auto-expire if the guest doesn't answer within 30s
     setTimeout(() => expire(), 30000);
     return data;
   }
 
-  // ── Aceptar invitación (guest) ─────────────────────────────────────────────
+  // ── Accept invite (guest) ──────────────────────────────────────────────────
 
-  // START_DELAY_MS: margen entre "el guest aceptó" y "arrancan los dos" —
-  // suficiente para que la notificación realtime le llegue al HOST con
-  // tiempo de sobra sin importar la latencia de red. Antes cada cliente
-  // arrancaba apenas SU PROPIO lado se enteraba: el guest, apenas terminaba
-  // su propio accept() (~instantáneo, es su propia escritura); el host,
-  // recién cuando la notificación de esa escritura le llegaba por Realtime
-  // (WAL + broadcast, con latencia real de red de por medio) — el guest
-  // siempre arrancaba antes, de milisegundos a veces hasta un segundo entero
-  // (el "es injusto" reportado). Ahora ambos esperan al MISMO started_at
-  // (reloj de pared, no "cuando me enteré yo") antes de arrancar de verdad.
+  // START_DELAY_MS: margin between "the guest accepted" and "both start" —
+  // enough for the realtime notification to reach the HOST with time to
+  // spare regardless of network latency. Each client used to start as soon
+  // as ITS OWN side found out: the guest, as soon as its own accept()
+  // finished (~instant, it's its own write); the host, only when the
+  // notification of that write arrived via Realtime (WAL + broadcast, with
+  // real network latency in between) — the guest always started first, from
+  // milliseconds to sometimes a whole second (the reported "it's unfair").
+  // Now both wait for the SAME started_at (wall clock, not "when I found
+  // out") before actually starting.
   const START_DELAY_MS = 1500;
 
   async function accept(matchId) {
@@ -312,7 +310,7 @@ window.VS = (() => {
       if (!_match || _match.status !== 'pending') throw new Error('match_not_available');
       _subscribe(matchId);
       const startedAt = new Date(Date.now() + START_DELAY_MS).toISOString();
-      // Solo actualiza si todavía está pending; expirado/cancelado devuelve 0 filas
+      // Only updates if still pending; expired/cancelled returns 0 rows
       const { data: updated, error } = await window.sb
         .from('matches').update({ status: 'active', started_at: startedAt }).eq('id', matchId).eq('status', 'pending').select();
       if (error) throw error;
@@ -321,12 +319,12 @@ window.VS = (() => {
       if (window.Analytics && typeof window.Analytics.logVersusFunnel === 'function') window.Analytics.logVersusFunnel('accepted', _match.mode);
     } catch (e) {
       if (window.Analytics && typeof window.Analytics.logVersusFunnel === 'function') window.Analytics.logVersusFunnel('accept_failed');
-      cleanup(); // limpiar estado sucio si falló a mitad
+      cleanup(); // clean up dirty state if it failed midway
       throw e;
     }
   }
 
-  // ── Rechazar invitación (guest) ────────────────────────────────────────────
+  // ── Decline invite (guest) ─────────────────────────────────────────────────
 
   async function decline(matchId) {
     await window.sb.from('matches')
@@ -335,7 +333,7 @@ window.VS = (() => {
     cleanup();
   }
 
-  // ── Expirar (host, sin respuesta) ─────────────────────────────────────────
+  // ── Expire (host, no response) ─────────────────────────────────────────────
 
   async function expire() {
     if (!_matchId) return;
@@ -348,31 +346,31 @@ window.VS = (() => {
     }
   }
 
-  // ── Cancelar el reto (host, con el botón back del popup de "esperando") ─────
-  // Marca el match como expirado para que al guest se le descarte la notificación.
+  // ── Cancel the challenge (host, via the back button of the "waiting" popup) ─
+  // Marks the match expired so the guest's notification gets dismissed.
   async function cancelInvite() {
     const id = _matchId;
     cleanup();
     if (id) { try { await window.sb.from('matches').update({ status: 'expired' }).eq('id', id); } catch (e) {} }
   }
 
-  // ── Reportar score (ambos) ─────────────────────────────────────────────────
-  // `detail` (opcional) es la selección exacta de esta ronda —
-  // { index, pick, correct } — usada solo por el modo espectador para recrear
-  // el click en tiempo real. No afecta el scoring ni requiere que el llamador
-  // lo pase (flags/shapes/monuments siguen funcionando igual si se omite).
+  // ── Report score (both) ────────────────────────────────────────────────────
+  // `detail` (optional) is this round's exact selection —
+  // { index, pick, correct } — used only by spectator mode to recreate the
+  // click in real time. Doesn't affect scoring and doesn't require the caller
+  // to pass it (flags/shapes/monuments still work the same if omitted).
 
   async function reportScore(score, detail) {
     if (!_matchId || !_role) return;
     const scoreField = _role === 'host' ? 'host_score' : 'guest_score';
     const stateField = _role === 'host' ? 'host_state'  : 'guest_state';
-    // Broadcast inmediato para que el rival (y espectadores) vean el score sin
-    // esperar el WAL de postgres_changes. Faltaba 'role' acá — el handler del
-    // espectador (Spectate.watch()) decide a qué campo (host_score/
-    // guest_score) aplicar este score revisando payload.role; sin él, NINGUNA
-    // rama coincidía nunca y el broadcast rápido quedaba mudo (el puntaje
-    // solo terminaba actualizándose cuando llegaba el postgres_changes más
-    // lento, o directamente no se notaba el cambio en la sesión).
+    // Immediate broadcast so the opponent (and spectators) see the score
+    // without waiting for the postgres_changes WAL. 'role' was missing here —
+    // the spectator handler (Spectate.watch()) decides which field
+    // (host_score/guest_score) to apply this score to by checking
+    // payload.role; without it, NO branch ever matched and the fast
+    // broadcast was mute (the score only updated when the slower
+    // postgres_changes arrived, or the change wasn't noticed at all).
     if (_channel) { try { _channel.send({ type: 'broadcast', event: 'score', payload: { role: _role, score } }); } catch (e) {} }
     const update = { [scoreField]: score };
     if (detail) {
@@ -386,63 +384,61 @@ window.VS = (() => {
     if (_channel) { try { _channel.send({ type: 'broadcast', event: 'wrong', payload: { role: _role } }); } catch (e) {} }
   }
 
-  // Avisa que ESTE cliente terminó de cargar sus assets pesados y ya puede
-  // arrancar (ver _vsGqAwaitBothReady, "GlobeQuiz: victoria instantánea").
+  // Announces that THIS client finished loading its heavy assets and can
+  // start (see _vsGqAwaitBothReady, "GlobeQuiz: instant win").
   function reportReady() {
     if (_channel) { try { _channel.send({ type: 'broadcast', event: 'ready', payload: { role: _role } }); } catch (e) {} }
   }
 
-  // GlobeQuiz: avisa al rival que ESTE cliente no llegó a sincronizar la
-  // carga del globo 3D — los dos abandonan la partida sin resultado.
+  // GlobeQuiz: tells the opponent that THIS client failed to sync the 3D
+  // globe load — both abandon the match with no result.
   function reportGqAbort() {
     if (_channel) { try { _channel.send({ type: 'broadcast', event: 'gqabort', payload: { role: _role } }); } catch (e) {} }
   }
 
-  // GlobeQuiz: hito de carga propio ('start'|'assets'|'scene') para la barra
-  // de sincronización que ve el rival.
+  // GlobeQuiz: own load milestone ('start'|'assets'|'scene') for the sync
+  // bar the opponent sees.
   function reportGqPhase(phase) {
     if (_channel) { try { _channel.send({ type: 'broadcast', event: 'gqphase', payload: { role: _role, phase } }); } catch (e) {} }
   }
 
-  // GlobeQuiz: solo el host lo manda, cuando sabe que los dos están listos —
-  // el guest arranca su 3-2-1 al recibirlo (ver _gqTryResolveReady).
+  // GlobeQuiz: only the host sends it, once it knows both are ready — the
+  // guest starts its 3-2-1 on receipt (see _gqTryResolveReady).
   function reportGqGo() {
     if (_channel) { try { _channel.send({ type: 'broadcast', event: 'gqgo', payload: { role: _role } }); } catch (e) {} }
   }
 
-  // Cierra la fila del match sin ganador ni derrota (a diferencia de
-  // abandon()/finish()): la partida nunca llegó a arrancar de verdad porque
-  // un lado no pudo cargar. Best-effort, solo si sigue 'active'.
+  // Closes the match row with no winner or loss (unlike abandon()/finish()):
+  // the match never actually started because one side couldn't load.
+  // Best-effort, only if still 'active'.
   async function cancelMatchNoResult() {
     const id = _matchId;
     if (!id) return;
     try { await window.sb.from('matches').update({ status: 'expired' }).eq('id', id).eq('status', 'active'); } catch (e) {}
   }
 
-  // Libera el canal de Realtime de ESTE jugador (sin tocar _matchId/_role —
-  // reportScore/reportGameEnd/finish siguen escribiendo bien en la base,
-  // solo el .send() de broadcast queda mudo, ver los try/catch de arriba) —
-  // usado por _enterWaitAsSpectator (vs.js, "VERSUS UI") cuando el jugador
-  // termina antes que el rival y quiere mirarlo en tiempo real de prestado
-  // vía openSpectator: Supabase Realtime no deja tener DOS canales
-  // suscriptos al mismo tema 'match-{id}' desde el mismo cliente (tirar
-  // "cannot add postgres_changes callbacks... after subscribe()" si se
-  // intenta) — hay que soltar este canal para que el de Spectate.watch()
-  // pueda tomar ese mismo tema.
-  // async + esperando el unsubscribe de verdad: antes esto era "fire and
-  // forget" (no esperaba nada), así que Spectate.watch() podía intentar
-  // suscribirse al MISMO tema 'match-{id}' ANTES de que el servidor de
-  // Realtime terminara de procesar la salida de este canal — la carrera
-  // dependía de timing de red, así que a veces funcionaba (como en las
-  // pruebas) y a veces no (en juego real, con menos demora incidental de por
-  // medio) — cuando fallaba, Spectate.watch() tiraba el mismo error de
-  // "cannot add postgres_changes callbacks... after subscribe()" que ya se
-  // había diagnosticado, openSpectator(..., {instant:true}) lo tragaba en
-  // silencio sin re-suscribir nada, y el jugador quedaba sin ver a su rival
-  // — atascado hasta el salvavidas de 12s, que entonces mostraba resultado
-  // con datos incompletos y lo mandaba derecho a la pantalla de resultado en
-  // vez de dejarlo viendo al rival (el "lo kickea al menu de frente"
-  // reportado).
+  // Releases THIS player's Realtime channel (without touching _matchId/_role
+  // — reportScore/reportGameEnd/finish still write fine to the DB, only the
+  // broadcast .send() goes mute, see the try/catch above) — used by
+  // _enterWaitAsSpectator (vs.js, "VERSUS UI") when the player finishes
+  // before the opponent and wants to watch them live on loan via
+  // openSpectator: Supabase Realtime doesn't allow TWO channels subscribed
+  // to the same topic 'match-{id}' from the same client (throws "cannot add
+  // postgres_changes callbacks... after subscribe()" if attempted) — this
+  // channel must be released so Spectate.watch()'s can take that same topic.
+  // async + actually awaiting the unsubscribe: this used to be "fire and
+  // forget" (awaited nothing), so Spectate.watch() could try to subscribe to
+  // the SAME topic 'match-{id}' BEFORE the Realtime server finished
+  // processing this channel leaving — the race depended on network timing,
+  // so it sometimes worked (as in testing) and sometimes not (in real play,
+  // with less incidental delay) — when it failed, Spectate.watch() threw the
+  // same "cannot add postgres_changes callbacks... after subscribe()" error
+  // already diagnosed, openSpectator(..., {instant:true}) swallowed it
+  // silently without re-subscribing anything, and the player was left unable
+  // to see their opponent — stuck until the 12s lifeline, which then showed
+  // a result with incomplete data and sent them straight to the result
+  // screen instead of letting them watch the opponent (the reported "it
+  // kicks me straight to the menu").
   async function releaseChannel() {
     if (_channel) {
       const ch = _channel;
@@ -451,18 +447,18 @@ window.VS = (() => {
     }
   }
 
-  // Avisa que MI cronómetro llegó a 0 — ver comentario largo en el .on(
-  // 'broadcast', {event:'gameend'}...) de más arriba. También lo persiste en
-  // host_state/guest_state (igual mecanismo que reportScore con `detail`)
-  // para que alguien que llegue tarde (reconexión) pueda leerlo desde la fila
-  // en vez de depender solo del broadcast efímero.
-  // revealAt (opcional): reloj de pared en el que TODOS (ambos jugadores y
-  // cualquier espectador) deben mostrar el resultado — ver comentario largo
-  // en _tryShowVsResultWhenBothDone (vs.js, "VERSUS UI"). Solo lo manda
-  // quien YA SABE que ambos terminaron al momento de llamar esta función
-  // (el segundo en terminar, que se entera de que el primero ya había
-  // avisado apenas llama a esto) — el otro lado lo recibe acá mismo, en el
-  // mismo broadcast que le confirma que el rival terminó.
+  // Announces that MY timer hit 0 — see the long comment on the .on(
+  // 'broadcast', {event:'gameend'}...) above. Also persists it to
+  // host_state/guest_state (same mechanism as reportScore with `detail`) so
+  // someone arriving late (reconnect) can read it from the row instead of
+  // relying only on the ephemeral broadcast.
+  // revealAt (optional): wall clock at which EVERYONE (both players and any
+  // spectator) must show the result — see the long comment in
+  // _tryShowVsResultWhenBothDone (vs.js, "VERSUS UI"). Only sent by whoever
+  // ALREADY KNOWS both finished at the moment of calling this function (the
+  // second to finish, who learns the first had already announced as soon as
+  // they call this) — the other side receives it right here, in the same
+  // broadcast that confirms the opponent finished.
   function reportGameEnd(score, revealAt) {
     if (!_matchId || !_role) return;
     const payload = { role: _role, score };
@@ -472,37 +468,35 @@ window.VS = (() => {
     window.sb.from('matches').update({ [stateField]: { finished: true, score, ts: Date.now() } }).eq('id', _matchId).then(() => {}, () => {});
   }
 
-  // ── Anunciar el inicio de una ronda (solo para el modo espectador) ─────────
-  // No persiste en DB (es efímero, como 'score'/'wrong') — el espectador lo usa
-  // para mostrar las mismas opciones antes de que el jugador responda.
-  // Se cachea la última ronda/tick transmitidos: si un espectador entra a
-  // mitad de ronda (el jugador ya está pensando, no clickeó nada todavía) no
-  // hay ningún evento 'round' nuevo en camino — sin este cache se quedaría
-  // pegado en la pantalla de carga hasta la SIGUIENTE ronda. Al detectar un
-  // 'join' de espectador se reenvía el último round conocido.
-  // _lastPhase es cuál de los tres estados mutuamente excluyentes está
-  // vigente ahora mismo (ronda en curso / cuenta 3-2-1 / resultados) — un
-  // espectador que se une tarde necesita saber CUÁL de los tres reenviar, no
-  // solo la última ronda: si se une mientras el jugador está mirando su
-  // pantalla de resultados (que puede durar varios segundos), antes se
-  // quedaba sin nada hasta la ronda SIGUIENTE en vez de ver los resultados
-  // actuales de una.
+  // ── Announce the start of a round (spectator mode only) ────────────────────
+  // Not persisted to DB (it's ephemeral, like 'score'/'wrong') — the spectator
+  // uses it to show the same options before the player answers.
+  // The last round/tick broadcast is cached: if a spectator joins mid-round
+  // (the player is already thinking, hasn't clicked anything yet) there's no
+  // new 'round' event coming — without this cache they'd be stuck on the
+  // loading screen until the NEXT round. On detecting a spectator 'join' the
+  // last known round is resent.
+  // _lastPhase is which of the three mutually exclusive states is current
+  // right now (round in progress / 3-2-1 countdown / results) — a spectator
+  // joining late needs to know WHICH of the three to resend, not just the
+  // last round: if they join while the player is looking at their results
+  // screen (which can last several seconds), they used to get nothing until
+  // the NEXT round instead of seeing the current results right away.
   let _lastPhase         = null; // 'round' | 'pregame' | 'postgame'
   let _lastRoundPayload  = null;
   let _lastTick          = null;
   let _lastPregamePayload  = null;
   let _lastPostgamePayload = null;
 
-  // Guarda una FOTO completa del estado en curso (fase + round + pregame +
-  // postgame) en host_state/guest_state — antes esto vivía SOLO en la
-  // memoria de ESTE cliente, y quien quisiera verlo (un espectador nuevo)
-  // tenía que esperar un "join" de presence + un resend en vivo del rival
-  // (con latencia de red real de por medio, sumada a la de soltar/reconectar
-  // el propio canal en _enterWaitAsSpectator) — ahora cualquiera que
-  // consulte la fila de la partida (una sola llamada REST, sin esperar nada
-  // en tiempo real) puede reconstruir el estado actual de una. Pensado
-  // también para el futuro carrusel de POVs en versus grupal: cambiar de
-  // jugador ahí va a necesitar exactamente este mismo mecanismo.
+  // Saves a full SNAPSHOT of the current state (phase + round + pregame +
+  // postgame) into host_state/guest_state — this used to live ONLY in THIS
+  // client's memory, and anyone wanting to see it (a new spectator) had to
+  // wait for a presence "join" + a live resend from the opponent (with real
+  // network latency, on top of releasing/reconnecting the own channel in
+  // _enterWaitAsSpectator) — now anyone querying the match row (a single
+  // REST call, no real-time waiting) can reconstruct the current state right
+  // away. Also intended for the future POV carousel in group versus:
+  // switching players there will need exactly this same mechanism.
   function _persistLiveState() {
     if (!_matchId || !_role) return;
     const stateField = _role === 'host' ? 'host_state' : 'guest_state';
@@ -524,28 +518,27 @@ window.VS = (() => {
     _persistLiveState();
   }
 
-  // Tiempo restante (1x/seg) — solo para que el modo espectador muestre el
-  // mismo contador que ve el jugador; no se persiste, es efímero como 'score'.
+  // Time remaining (1x/sec) — only so spectator mode shows the same counter
+  // the player sees; not persisted, ephemeral like 'score'.
   function reportTick(timeLeft) {
     if (!_channel || !_role) return;
     _lastTick = timeLeft;
     try { _channel.send({ type: 'broadcast', event: 'tick', payload: { role: _role, timeLeft } }); } catch (e) {}
   }
 
-  // Reenvía SOLO la fase vigente a quien se acaba de unir como espectador (no
-  // al rival, que ya está sincronizado por su propio juego).
+  // Resends ONLY the current phase to whoever just joined as a spectator (not
+  // to the opponent, who is already synced by their own game).
   function _resendStateTo() {
-    // El 'round' es lo único que trae `mode` — onPregame/onRound del lado
-    // espectador usan `_mode` para decidir qué UI real montar (banderas vs
-    // siluetas), y esa variable arranca en 'flags' por default hasta que
-    // llega un round de verdad. Si alguien se une justo durante el 3-2-1 (o
-    // mirando resultados) y acá se reenviaba SOLO pregame/postgame sin el
-    // round de esa misma pregunta, `_mode` se quedaba mal (en 'flags') hasta
-    // que llegaba el round REAL varios segundos después — el jugador veía
-    // texturas de banderas durante todo el 3-2-1 de siluetas. _lastRoundPayload
-    // siempre corresponde a la MISMA pregunta que el pregame/postgame vigente
-    // (se cachea justo antes, en el mismo broadcast real), así que reenviarlo
-    // primero es seguro.
+    // 'round' is the only one carrying `mode` — the spectator side's
+    // onPregame/onRound use `_mode` to decide which real UI to mount (flags
+    // vs shapes), and that variable starts at 'flags' by default until a real
+    // round arrives. If someone joins right during the 3-2-1 (or while
+    // watching results) and only pregame/postgame was resent here without
+    // that same question's round, `_mode` stayed wrong (at 'flags') until the
+    // REAL round arrived seconds later — the player saw flag textures during
+    // the entire shapes 3-2-1. _lastRoundPayload always corresponds to the
+    // SAME question as the current pregame/postgame (cached just before, in
+    // the same real broadcast), so resending it first is safe.
     if (_lastPhase === 'pregame' && _lastPregamePayload) {
       if (_lastRoundPayload) reportRound(_lastRoundPayload);
       reportPregame(_lastPregamePayload);
@@ -560,17 +553,17 @@ window.VS = (() => {
     if (_lastTick != null) reportTick(_lastTick);
   }
 
-  // Se acabó el tiempo de esta ronda de juego (no la partida versus completa)
-  // — el espectador muestra el mismo cartel "TIME'S UP" con su sonido.
+  // This game round's time ran out (not the full versus match) — the
+  // spectator shows the same "TIME'S UP" banner with its sound.
   function reportTimesUp() {
     if (!_channel || !_role) return;
     try { _channel.send({ type: 'broadcast', event: 'timesup', payload: { role: _role } }); } catch (e) {}
   }
 
-  // Cuenta 3-2-1 antes de que arranque la ronda — el espectador reproduce la
-  // MISMA animación (runFlagsPregame) en su cliente; el payload solo trae la
-  // duración total (para mostrar el número correcto desde el arranque, antes
-  // de que llegue el primer 'tick').
+  // 3-2-1 countdown before the round starts — the spectator plays the SAME
+  // animation (runFlagsPregame) on their client; the payload only carries
+  // the total duration (to show the right number from the start, before the
+  // first 'tick' arrives).
   function reportPregame(payload) {
     if (!_channel || !_role) return;
     _lastPhase = 'pregame';
@@ -579,9 +572,9 @@ window.VS = (() => {
     _persistLiveState();
   }
 
-  // Pantalla de resultados — el W/L final del duelo, llamado desde
-  // _showVsResult() en el momento en que cada cliente decide su outcome
-  // localmente (ver ahí el detalle del payload host/guest).
+  // Results screen — the duel's final W/L, called from _showVsResult() at
+  // the moment each client decides its outcome locally (see there for the
+  // host/guest payload detail).
   function reportPostgame(payload) {
     if (!_channel || !_role) return;
     _lastPhase = 'postgame';
@@ -590,7 +583,7 @@ window.VS = (() => {
     _persistLiveState();
   }
 
-  // ── Terminar partida (host cierra, decide winner) ──────────────────────────
+  // ── Finish match (host closes, decides winner) ─────────────────────────────
 
   async function finish() {
     if (!_matchId) return;
@@ -603,8 +596,8 @@ window.VS = (() => {
     }
   }
 
-  // ── Abandonar (yo me voy → el rival gana) ──────────────────────────────────
-  // best-effort: notifica al rival por DB; la presencia del canal lo cubre igual.
+  // ── Abandon (I leave → the opponent wins) ──────────────────────────────────
+  // best-effort: notifies the opponent via DB; channel presence covers it anyway.
   async function abandon() {
     if (!_matchId || !_role) { cleanup(); return; }
     const winnerId = _role === 'host' ? (_match && _match.guest_id) : (_match && _match.host_id);
@@ -616,7 +609,7 @@ window.VS = (() => {
     cleanup();
   }
 
-  // ── Limpiar estado ─────────────────────────────────────────────────────────
+  // ── Clean up state ─────────────────────────────────────────────────────────
 
   function cleanup() {
     if (_channel) { _channel.unsubscribe(); _channel = null; }
@@ -634,7 +627,7 @@ window.VS = (() => {
     _restoreRandom();
   }
 
-  // ── API pública ────────────────────────────────────────────────────────────
+  // ── Public API ─────────────────────────────────────────────────────────────
 
   return {
     invite,
@@ -662,16 +655,16 @@ window.VS = (() => {
     cleanup,
     onStart:   cb => {
       _onStart = cb;
-      // invite() llama a _subscribe() de forma NO bloqueante (no espera a que
-      // el canal quede 'SUBSCRIBED') y recién DESPUÉS quien invitó registra
-      // este callback — con latencia de red real (ej. rival en Chile
-      // aceptando casi al instante), el 'SUBSCRIBED'/catch-up de _subscribe()
-      // podía llegar y encontrar _onStart TODAVÍA null, perdiendo la única
-      // notificación real de que el duelo arrancó — el host se quedaba sin
-      // entrar nunca a la partida mientras al guest (que arranca por su
-      // propio accept(), sin depender de Realtime) sí le funcionaba siempre
-      // (reportado). Cierra la otra mitad de esa carrera: si para cuando
-      // esto se registra el match YA está activo, disparar ya mismo.
+      // invite() calls _subscribe() NON-blockingly (doesn't wait for the
+      // channel to become 'SUBSCRIBED') and only AFTERWARD does the inviter
+      // register this callback — with real network latency (e.g. opponent in
+      // Chile accepting almost instantly), _subscribe()'s 'SUBSCRIBED'/catch-up
+      // could arrive and find _onStart STILL null, losing the only real
+      // notification that the duel started — the host never entered the match
+      // while the guest (who starts via its own accept(), no Realtime
+      // dependence) always worked (reported). Closes the other half of that
+      // race: if the match is ALREADY active by the time this registers,
+      // fire right away.
       if (_match && _match.status === 'active' && !_started) { _started = true; cb(_match); }
     },
     onScore:   cb => { _onScore = cb; },
@@ -693,22 +686,22 @@ window.VS = (() => {
   };
 })();
 
-// Ícono de ojo + contador en el HUD del jugador espectado — actualizado tanto
-// por vs.js (partida versus) como por SoloSpectate (partida individual/Gira
-// Mundial) cada vez que un espectador entra/sale.
+// Eye icon + counter in the spectated player's HUD — updated both by vs.js
+// (versus match) and by SoloSpectate (solo/World Tour match) whenever a
+// spectator joins/leaves.
 window.refreshVsSpectatorBadge = function (n) {
   const isFlags = window.pendingGameMode === 'flags';
   const badge   = document.getElementById(isFlags ? 'flags-vs-spectator-badge' : 'vs-spectator-badge');
   const countEl = document.getElementById(isFlags ? 'flags-vs-spectator-count' : 'vs-spectator-count');
-  // El OTRO badge (el del modo que ya no está activo) se apaga siempre,
-  // explícito — la campaña cambia de modo (banderas→siluetas→ciudades) sin
-  // que esta función necesariamente se vuelva a llamar en ese instante (solo
-  // reacciona a cambios de presence), así que sin esto el badge del modo
-  // VIEJO se quedaba pegado visible para siempre si alguna vez había llegado
-  // a mostrarse — el jugador seguía viendo "te están espectando" después de
-  // cambiar de modo, después de salir al menú (SoloSpectate.stop() llama acá
-  // con n=0, pero solo apagaba el badge del modo ACTUAL), y al reconectar el
-  // espectador se veían dos badges a la vez (uno de cada modo).
+  // The OTHER badge (the one for the mode no longer active) is always turned
+  // off, explicitly — the campaign switches mode (flags→shapes→cities)
+  // without this function necessarily being called again at that moment (it
+  // only reacts to presence changes), so without this the OLD mode's badge
+  // stayed visible forever if it had ever been shown — the player kept
+  // seeing "you're being spectated" after switching mode, after leaving to
+  // the menu (SoloSpectate.stop() calls here with n=0, but only turned off
+  // the CURRENT mode's badge), and on the spectator reconnecting two badges
+  // showed at once (one per mode).
   const otherBadge = document.getElementById(isFlags ? 'vs-spectator-badge' : 'flags-vs-spectator-badge');
   if (otherBadge) otherBadge.style.display = 'none';
   if (!badge) return;
@@ -717,12 +710,12 @@ window.refreshVsSpectatorBadge = function (n) {
   if (countEl) countEl.textContent = n;
 };
 
-// Pupila (eye2.png) del ícono de espectadores: cada tanto "mira" un poquito a
-// la derecha (transform, 0.1s) y vuelve — timing aleatorio en cada ciclo para
-// que no se sienta mecánico. Corre siempre en segundo plano (los badges están
-// display:none la mayor parte del tiempo, así que no cuesta nada) — cada
-// instancia (vs-spectator-badge/flags-vs-spectator-badge) tiene su propio
-// loop independiente, no sincronizado entre sí.
+// Pupil (eye2.png) of the spectator icon: every so often it "looks" slightly
+// right (transform, 0.1s) and comes back — random timing each cycle so it
+// doesn't feel mechanical. Always runs in the background (the badges are
+// display:none most of the time, so it costs nothing) — each instance
+// (vs-spectator-badge/flags-vs-spectator-badge) has its own independent
+// loop, not synced with each other.
 (function spectatorEyeLook() {
   const pupils = document.querySelectorAll('.spectator-badge-eye-pupil');
   pupils.forEach(pupil => {
@@ -740,10 +733,10 @@ window.refreshVsSpectatorBadge = function (n) {
   });
 })();
 
-// Parpadeo del ícono de espectadores: aplasta el ojo entero (contenedor
-// .spectator-badge-eye, eye1+eye2 juntos) por un instante y vuelve — ciclo
-// propio, independiente y no sincronizado con spectatorEyeLook() de arriba
-// (un ojo real no mira y parpadea al mismo ritmo).
+// Spectator icon blink: squashes the whole eye (container
+// .spectator-badge-eye, eye1+eye2 together) for an instant and comes back —
+// its own cycle, independent and not synced with spectatorEyeLook() above
+// (a real eye doesn't look and blink at the same rhythm).
 (function spectatorEyeBlink() {
   const eyes = document.querySelectorAll('.spectator-badge-eye');
   eyes.forEach(eye => {
@@ -765,57 +758,54 @@ window.refreshVsSpectatorBadge = function (n) {
 
 (function() {
   const TIMEOUT_MS = 30000;
-  let _resultShown = false;    // evita mostrar la pantalla de resultado dos veces
-  let _gqLoseHandled = false;  // GloboReto: evita procesar el broadcast de victoria del rival dos veces
-  let _matchResultRecorded = false; // evita contar el mismo match en vs_wins/vs_losses dos veces
-  let _endedByAbandon = false; // el match terminó por abandono del rival
-  // Espera a que AMBOS jugadores terminen su propio cronómetro antes de
-  // mostrar el resultado — ver comentario largo en _vsHandleGameEnd. El
-  // bonus de "+5s" corre independiente en cada cliente, así que uno puede
-  // terminar antes que el otro.
+  let _resultShown = false;    // prevents showing the result screen twice
+  let _gqLoseHandled = false;  // GloboReto: prevents processing the opponent's win broadcast twice
+  let _matchResultRecorded = false; // prevents counting the same match in vs_wins/vs_losses twice
+  let _endedByAbandon = false; // the match ended by opponent abandonment
+  // Waits for BOTH players to finish their own timer before showing the
+  // result — see the long comment in _vsHandleGameEnd. The "+5s" bonus runs
+  // independently on each client, so one can finish before the other.
   let _myGameEnded = false, _oppGameEnded = false;
   let _myFinalScoreCache = null, _oppFinalScoreCache = null;
   let _gameEndFallbackTimer = null;
-  let _waitingAsSpectator = false; // ver _enterWaitAsSpectator
-  // Rearma el salvavidas de 12s — ver comentario largo en _vsHandleGameEnd.
-  // Antes esto se armaba UNA sola vez, fijo, contado desde el instante en que
-  // YO terminaba, sin importar cuánto le quedara de verdad al rival — si el
-  // rival todavía tenía, por ejemplo, 15s de partida (rachas de bonus +5s
-  // encadenadas alargan bastante una ronda), a los 12s este salvavidas
-  // disparaba igual, mostrando MI resultado con el puntaje del rival a MITAD
-  // de jugar, todavía activo — no perdido/trabado, como estaba pensado (el
-  // "me kickea a mi resultado antes de tiempo, con el rival a 1-2s de
-  // terminar" reportado). Cada señal REAL de que el rival sigue jugando
-  // (tick/round que sí llegó, vía Spectate mientras _enterWaitAsSpectator lo
-  // mira de prestado) reprograma este mismo timer 12s hacia adelante — así
-  // solo se dispara si el rival de verdad se quedó en silencio ese tiempo
-  // (glitch de red/desconexión), no simplemente porque le quedaba más tiempo
-  // de juego que el salvavidas original.
+  let _waitingAsSpectator = false; // see _enterWaitAsSpectator
+  // Re-arms the 12s lifeline — see the long comment in _vsHandleGameEnd.
+  // This used to be armed ONCE, fixed, counted from the moment I finished,
+  // regardless of how much time the opponent actually had left — if the
+  // opponent still had, say, 15s of match (chained +5s bonus streaks stretch
+  // a round quite a bit), this lifeline fired at 12s anyway, showing MY
+  // result with the opponent's score MID-play, still active — not lost/stuck
+  // as intended (the reported "it kicks me to my result early, with the
+  // opponent 1-2s from finishing"). Every REAL signal that the opponent is
+  // still playing (a tick/round that did arrive, via Spectate while
+  // _enterWaitAsSpectator watches them on loan) reschedules this same timer
+  // 12s forward — so it only fires if the opponent truly went silent for
+  // that long (network glitch/disconnect), not just because they had more
+  // game time left than the original lifeline.
   function _armGameEndFallback() {
     clearTimeout(_gameEndFallbackTimer);
     _gameEndFallbackTimer = setTimeout(() => _tryShowVsResultWhenBothDone(true), 12000);
   }
-  // Reloj de pared compartido en el que se debe mostrar el resultado — ver
-  // comentario largo en _tryShowVsResultWhenBothDone. Antes cada cliente
-  // mostraba resultado apenas SE ENTERABA (localmente) de que ambos habían
-  // terminado, y como esa noticia le llega a cada uno en un momento distinto
-  // (el que termina segundo lo sabe al toque; el que terminó primero recién
-  // cuando el broadcast del segundo le llega, con latencia de red de por
-  // medio), las dos pantallas de resultado — y la del espectador — aparecían
-  // en instantes distintos (el "la pantalla de perdí la recibió antes que el
-  // otro" reportado).
+  // Shared wall clock at which the result must be shown — see the long
+  // comment in _tryShowVsResultWhenBothDone. Each client used to show the
+  // result as soon as it FOUND OUT (locally) that both had finished, and
+  // since that news reaches each side at a different moment (the second to
+  // finish knows immediately; the first only when the second's broadcast
+  // arrives, with network latency in between), the two result screens — and
+  // the spectator's — appeared at different instants (the reported "the
+  // 'I lost' screen came up before the other one").
   let _revealAt = null;
   let _revealTimer = null;
   const REVEAL_BUFFER_MS = 700;
-  let _vsLaunching = false;    // evita doble lanzamiento de la partida versus
-  let _vsStartScheduled = false; // ver _scheduleVersusStart — evita agendar el setTimeout de arranque dos veces
+  let _vsLaunching = false;    // prevents double launch of the versus match
+  let _vsStartScheduled = false; // see _scheduleVersusStart — prevents scheduling the start setTimeout twice
   let _outTimer = null;
   let _inTimer  = null;
-  let _pendingOppName   = null; // nombre del oponente guardado para ambos lados
+  let _pendingOppName   = null; // opponent name kept for both sides
   let _pendingOppAvatar = null;
-  let _pendingOppFrameCode = null; // marco real del oponente, ver _showDuelAcceptedPopup
+  let _pendingOppFrameCode = null; // opponent's real frame, see _showDuelAcceptedPopup
 
-  // ── Navegación de pantallas del panel ─────────────────────────────────────
+  // ── Panel screen navigation ───────────────────────────────────────────────
   const T = (k, d) => (typeof t === 'function' ? t(k) : d);
   const VERSUS_SCREENS = ['root', 'amistoso', 'amigos', 'grupo', 'aleatorio', 'lobby'];
   const VERSUS_SUBTITLES = {
@@ -826,7 +816,7 @@ window.refreshVsSpectatorBadge = function (n) {
     aleatorio: () => T('versus.subRandom', 'Únete a una sala pública'),
     lobby:     () => T('versus.subLobby', 'Sala de juego'),
   };
-  // Pila de navegación para el botón "back"
+  // Navigation stack for the "back" button
   let _versusStack = ['root'];
 
   // Refresh subtitle when language changes (textContent is set via JS, not data-i18n)
@@ -850,12 +840,12 @@ window.refreshVsSpectatorBadge = function (n) {
     }
     const sub = document.getElementById('versus-subtitle');
     if (sub) sub.textContent = (VERSUS_SUBTITLES[name] || (() => ''))();
-    // Botón "volver a mi sala": visible si tengo una sala activa y no estoy viéndola
+    // "Return to my room" button: visible if I have an active room and am not viewing it
     const ret = document.getElementById('versus-return-lobby');
     if (ret) ret.style.display = (name !== 'lobby' && window.LB && window.LB.getId()) ? 'flex' : 'none';
   }
 
-  // Navega a una pantalla y la apila (para el back). reset=true reinicia la pila.
+  // Navigates to a screen and pushes it (for back). reset=true resets the stack.
   function versusGoTo(name, reset) {
     if (reset) _versusStack = ['root'];
     if (_versusStack[_versusStack.length - 1] !== name) _versusStack.push(name);
@@ -870,8 +860,8 @@ window.refreshVsSpectatorBadge = function (n) {
   window.versusGoTo = versusGoTo;
 
   function _versusBack() {
-    // En el lobby, "back" sale de la PANTALLA pero NO abandona la sala: podés volver
-    // con el botón "Mi sala". Para abandonar de verdad está el botón "Salir".
+    // In the lobby, "back" leaves the SCREEN but does NOT leave the room: you can
+    // come back with the "My room" button. To actually leave there's the "Exit" button.
     if (_versusStack[_versusStack.length - 1] === 'lobby') {
       _versusStack = ['root', 'amistoso'];
       _showScreen('amistoso');
@@ -882,7 +872,7 @@ window.refreshVsSpectatorBadge = function (n) {
     _showScreen(_versusStack[_versusStack.length - 1]);
   }
 
-  // ── Panel: Gira Competitiva ───────────────────────────────────────────────
+  // ── Panel: Competitive Tour ───────────────────────────────────────────────
 
   function showVersusPanel() {
     const panel = document.getElementById('loading-versus-group');
@@ -903,7 +893,7 @@ window.refreshVsSpectatorBadge = function (n) {
     window.Lobby?.stopPublicRealtime?.();
   }
 
-  // Toast stack reutilizable por lobby.js — máximo 6 mensajes, opacidad escalonada
+  // Toast stack reusable by lobby.js — max 6 messages, staggered opacity
   const _TOAST_MAX = 6;
   const _TOAST_DURATION = 2800;
   let _toastEntries = [];
@@ -923,14 +913,14 @@ window.refreshVsSpectatorBadge = function (n) {
     stack.appendChild(item);
     const entry = { el: item, fadeTimer: null, removeTimer: null };
     _toastEntries.push(entry);
-    // quitar excedente por arriba
+    // drop overflow from the top
     while (_toastEntries.length > _TOAST_MAX) {
       const old = _toastEntries.shift();
       clearTimeout(old.fadeTimer); clearTimeout(old.removeTimer);
       old.el.remove();
     }
     _updateToastOpacities();
-    // auto-eliminar
+    // auto-remove
     entry.fadeTimer = setTimeout(() => {
       item.style.opacity = '0';
       entry.removeTimer = setTimeout(() => {
@@ -941,7 +931,7 @@ window.refreshVsSpectatorBadge = function (n) {
     }, _TOAST_DURATION);
   };
 
-  // Confirmación modal genérica (Sí/No)
+  // Generic modal confirmation (Yes/No)
   let _confirmYes = null;
   window.versusConfirm = function(msg, onYes) {
     const pop = document.getElementById('versus-confirm-popup');
@@ -998,13 +988,13 @@ window.refreshVsSpectatorBadge = function (n) {
     }
   }
 
-  // Crear sala: si ya tengo una activa, pedir confirmación para abandonarla
+  // Create room: if I already have an active one, ask for confirmation to leave it
   async function _doCreateRoom(isPublic, btn) {
     _setBtnLoading(btn, true);
     try {
       const _p = window.LB.create(isPublic);
       const result = typeof window.withConnTimeout === 'function' ? await window.withConnTimeout(_p, 6000) : await _p;
-      if (result === undefined) return; // timeout: ya se mostró la viñeta de error de conexión
+      if (result === undefined) return; // timeout: the connection-error bubble was already shown
       versusGoTo('lobby'); window.Lobby.enterLobby();
     }
     catch (e) { window.showVersusToast(T('lobby.createError', 'No se pudo crear la sala')); }
@@ -1021,13 +1011,13 @@ window.refreshVsSpectatorBadge = function (n) {
     }
   }
 
-  // Diff incremental (no destruye/recrea todo cada vez, ver comentario largo
-  // más abajo en _renderOnlineFriends) — reusa la fila existente de un
-  // amigo si su estado "jugando" no cambió, solo actualizando texto/foto.
-  // Recrearla de cero reiniciaba la animación CSS del titileo verde desde
-  // 0% en cada refresco (el "se corta de golpe y reinicia" reportado — la
-  // lista se refresca sola cada pocos segundos vía onFriendsUpdate/
-  // setInterval, así que el corte se notaba tipo "heartbeat").
+  // Incremental diff (doesn't destroy/recreate everything each time, see the
+  // long comment below in _renderOnlineFriends) — reuses a friend's existing
+  // row if their "playing" state didn't change, only updating text/photo.
+  // Recreating it from scratch reset the green-blink CSS animation from 0%
+  // on every refresh (the reported "it cuts off abruptly and restarts" — the
+  // list refreshes itself every few seconds via onFriendsUpdate/setInterval,
+  // so the cut showed like a "heartbeat").
   function _buildFriendRow(f, playing, T) {
     const statusTxt = playing ? T('social.playing', 'Jugando') : T('versus.online', 'Conectado');
     const row = document.createElement('div');
@@ -1054,10 +1044,10 @@ window.refreshVsSpectatorBadge = function (n) {
   function _applyFriendRowCustomize(row, f, playing) {
     row.className = 'versus-friend-row' + (playing ? ' playing' : '')
       + (window.CUSTOMIZE_CELL_LIGHT_TEXT?.has(f.cellCode) ? ' cell-light-text' : '');
-    // Marco real (aro de la pfp) + celda real de fondo. applyCellForStatus
-    // (no cellUrl directo) para que si está jugando y la celda tiene
-    // variante -green (ver CUSTOMIZE_CELL_GREEN_VARIANTS en js/sb.js)
-    // titile igual que en el panel social.
+    // Real frame (pfp ring) + real background cell. applyCellForStatus (not
+    // cellUrl directly) so that if they're playing and the cell has a -green
+    // variant (see CUSTOMIZE_CELL_GREEN_VARIANTS in js/sb.js) it blinks the
+    // same as in the social panel.
     window.CustomizeAssets?.applyFrame(row.querySelector('.versus-friend-avatar-wrap'), f.frameCode || '0001');
     window.CustomizeAssets?.applyCellForStatus(row, f.cellCode || '0001', playing ? 'playing' : 'online');
   }
@@ -1070,7 +1060,7 @@ window.refreshVsSpectatorBadge = function (n) {
     const statusOf = f => (typeof getStatusObj === 'function')
       ? getStatusObj(f).cls
       : ((f.last_active && (Date.now() - new Date(f.last_active)) / 1000 < 120) ? (f.is_playing ? 'playing' : 'online') : 'offline');
-    const online = friends.filter(f => statusOf(f) !== 'offline'); // conectados Y jugando
+    const online = friends.filter(f => statusOf(f) !== 'offline'); // online AND playing
 
     if (online.length === 0) {
       list.innerHTML = '';
@@ -1090,20 +1080,20 @@ window.refreshVsSpectatorBadge = function (n) {
       if (row) {
         existingRows.delete(String(f.id));
         const wasPlaying = row.classList.contains('playing');
-        // Nombre/foto/celda pueden cambiar sin que cambie el estado
-        // "jugando" (ej. equipó otra celda) — se actualizan siempre, pero
-        // SOLO se toca className/animación si el estado realmente cambió,
-        // para no cortar la animación en curso por nada.
+        // Name/photo/cell can change without the "playing" state changing
+        // (e.g. equipped another cell) — always updated, but className/
+        // animation is only touched if the state actually changed, so as not
+        // to cut the running animation for nothing.
         const nameEl = row.querySelector('.versus-friend-name');
         if (nameEl && nameEl.textContent !== f.name) nameEl.textContent = f.name;
         const avatarEl = row.querySelector('.versus-friend-avatar');
         const newAvatar = f.avatar || 'images/profilepic/ppdefault.png';
         if (avatarEl && avatarEl.src !== newAvatar) avatarEl.src = newAvatar;
         if (wasPlaying !== playing) {
-          // Transición real de estado (empezó o dejó de jugar) — acá SÍ
-          // corresponde recrear la fila (btn/texto/clases cambian de
-          // verdad), la animación arranca de cero porque es una fila
-          // "nueva" en ese estado, no un refresco de lo mismo.
+          // Real state transition (started or stopped playing) — here it IS
+          // right to recreate the row (btn/text/classes really change), the
+          // animation starts from scratch because it's a "new" row in that
+          // state, not a refresh of the same.
           const fresh = _buildFriendRow(f, playing, T);
           list.replaceChild(fresh, row);
           row = fresh;
@@ -1114,17 +1104,17 @@ window.refreshVsSpectatorBadge = function (n) {
         row = _buildFriendRow(f, playing, T);
         list.appendChild(row);
       }
-      // Reordenar sin recrear: insertBefore de un nodo YA EN EL DOM no
-      // reinicia sus animaciones CSS (solo crear el nodo de nuevo lo hace).
+      // Reorder without recreating: insertBefore of a node ALREADY IN THE DOM
+      // doesn't reset its CSS animations (only recreating the node does).
       const wantedNext = prevEl ? prevEl.nextSibling : list.firstChild;
       if (wantedNext !== row) list.insertBefore(row, wantedNext);
       prevEl = row;
     });
-    // Amigos que ya no están online/existen — sacarlos.
+    // Friends no longer online/existing — remove them.
     existingRows.forEach(el => el.remove());
   }
 
-  // Estado de amigos en vivo en el panel de duelo 1v1 (igual que el panel social)
+  // Live friend status in the 1v1 duel panel (same as the social panel)
   if (typeof onFriendsUpdate === 'function') {
     onFriendsUpdate(() => {
       const sc = document.getElementById('versus-screen-amigos');
@@ -1132,9 +1122,9 @@ window.refreshVsSpectatorBadge = function (n) {
     });
   }
 
-  // El poll social solo corre con el panel social abierto. Acá refrescamos los amigos
-  // mientras el panel versus o el popup de invitar estén abiertos, para que el estado
-  // "Jugando"/"Conectado" se actualice en vivo también en competitivo.
+  // The social poll only runs with the social panel open. Here we refresh
+  // friends while the versus panel or the invite popup are open, so the
+  // "Playing"/"Online" status updates live in competitive too.
   setInterval(() => {
     if (!window._accountLoggedIn || typeof loadFriends !== 'function') return;
     const panel = document.getElementById('loading-versus-group');
@@ -1150,7 +1140,7 @@ window.refreshVsSpectatorBadge = function (n) {
     if (!pop) { _sendInvite(guestId, guestName, guestAvatar, 'flags'); return; }
     document.getElementById('vs-mode-sel-name').textContent = guestName;
     document.getElementById('vs-mode-sel-pic').src = guestAvatar || 'images/profilepic/ppdefault.png';
-    // Marco real del amigo invitado — antes siempre quedaba en el default.
+    // Invited friend's real frame — it always stayed at the default before.
     const guestFriend = (typeof getFriends === 'function') ? getFriends().find(f => f.id === guestId) : null;
     window.CustomizeAssets?.applyFrame(document.getElementById('vs-mode-sel-pic-wrap'), guestFriend?.frameCode || '0001');
     pop.style.display = 'flex';
@@ -1171,8 +1161,8 @@ window.refreshVsSpectatorBadge = function (n) {
       await window.VS.invite(guestId, mode);
     } catch(e) { console.warn('[VS] invite error:', e); return; }
 
-    // NO cerrar el panel competitivo: el popup de "esperando" se muestra encima y al
-    // cancelar/expirar volvés al panel de amigos, no al panel 2.
+    // Do NOT close the competitive panel: the "waiting" popup shows on top and
+    // on cancel/expire you return to the friends panel, not panel 2.
     _showOutgoingPopup(guestName, guestAvatar, _pendingOppFrameCode);
 
     window.VS.onStart(match => {
@@ -1189,7 +1179,7 @@ window.refreshVsSpectatorBadge = function (n) {
     document.getElementById('vs-out-pic').src = avatar || 'images/profilepic/ppdefault.png';
     window.CustomizeAssets?.applyFrame(document.getElementById('vs-out-pic-wrap'), frameCode || '0001');
     pop.style.display = 'flex';
-    // Barra de countdown
+    // Countdown bar
     bar.style.transition = 'none';
     bar.style.width = '100%';
     requestAnimationFrame(() => {
@@ -1209,12 +1199,12 @@ window.refreshVsSpectatorBadge = function (n) {
   // ── Incoming invite (guest) ───────────────────────────────────────────────
 
   function _showIncomingPopup(match) {
-    // Buscar datos del host en la lista de amigos
+    // Look up the host's data in the friends list
     const friends = (typeof getFriends === 'function') ? getFriends() : [];
     const host    = friends.find(f => f.id === match.host_id);
     const name    = host ? host.name   : 'Alguien';
     const avatar  = host ? host.avatar : 'images/profilepic/ppdefault.png';
-    // Guardar para el leaderboard versus (el guest puede no tener la caché cargada)
+    // Save for the versus leaderboard (the guest may not have the cache loaded)
     _pendingOppName   = name;
     _pendingOppAvatar = avatar;
     _pendingOppFrameCode = host?.frameCode || '0001';
@@ -1222,12 +1212,12 @@ window.refreshVsSpectatorBadge = function (n) {
     document.getElementById('vs-in-pic').src = avatar;
     window.CustomizeAssets?.applyFrame(document.getElementById('vs-in-pic-wrap'), _pendingOppFrameCode);
 
-    // Guardar en inbox para que el usuario pueda recuperar la invitación si perdió el banner
+    // Save to inbox so the user can recover the invite if they missed the banner
     if (typeof window.addVersusNotif === 'function') {
       window.addVersusNotif({ type: 'vs', id: match.id, matchId: match.id, fromName: name, fromAvatar: avatar, ts: Date.now() });
     }
 
-    // Reto 1v1 → misma notificación NO bloqueante que las invitaciones a sala
+    // 1v1 challenge → same NON-blocking notification as room invites
     if (typeof window.showInviteNotif === 'function') {
       window.showInviteNotif({
         persistent: true,
@@ -1263,19 +1253,19 @@ window.refreshVsSpectatorBadge = function (n) {
     clearTimeout(_inTimer);
   }
 
-  // ── Eventos de botones ────────────────────────────────────────────────────
+  // ── Button events ─────────────────────────────────────────────────────────
 
   document.addEventListener('DOMContentLoaded', () => {
     const _sfx = () => { if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); } };
 
-    // Back del panel versus (navega hacia atrás en la pila de pantallas)
+    // Versus panel back (navigates back through the screen stack)
     document.getElementById('versus-back-wrap')?.addEventListener('click', () => {
       _sfx(); _versusBack();
     });
 
     // ── ROOT ──
     document.getElementById('versus-btn-amistoso')?.addEventListener('click', () => { _sfx(); versusGoTo('amistoso'); });
-    // versus-btn-competitivo está deshabilitado (próximamente)
+    // versus-btn-competitivo is disabled (coming soon)
 
     // ── AMISTOSO ──
     document.getElementById('versus-btn-amigos')?.addEventListener('click', () => { _sfx(); versusGoTo('amigos'); });
@@ -1287,7 +1277,7 @@ window.refreshVsSpectatorBadge = function (n) {
       _sfx(); _createRoomGuarded(true, this);
     });
 
-    // Confirmación (Sí/No)
+    // Confirmation (Yes/No)
     document.getElementById('versus-confirm-yes')?.addEventListener('click', () => {
       _sfx(); const cb = _confirmYes; _hideConfirm(); if (cb) cb();
     });
@@ -1301,7 +1291,7 @@ window.refreshVsSpectatorBadge = function (n) {
       try {
         const _p = window.LB.joinByCode(code);
         const result = typeof window.withConnTimeout === 'function' ? await window.withConnTimeout(_p, 6000) : await _p;
-        if (result === undefined) return; // timeout: ya se mostró la viñeta de error de conexión
+        if (result === undefined) return; // timeout: the connection-error bubble was already shown
         versusGoTo('lobby'); window.Lobby.enterLobby();
       }
       catch (e) {
@@ -1317,27 +1307,27 @@ window.refreshVsSpectatorBadge = function (n) {
       _sfx(); _createRoomGuarded(true, this);
     });
 
-    // Volver a mi sala (cuando navegué fuera del lobby sin abandonarlo)
+    // Return to my room (when I navigated away from the lobby without leaving it)
     document.getElementById('versus-return-lobby')?.addEventListener('click', () => {
       _sfx();
       if (window.LB && window.LB.getId()) { versusGoTo('lobby'); window.Lobby.enterLobby(); }
     });
 
-    // Cancelar invitación saliente (avisa al guest para que se le descarte la noti)
+    // Cancel outgoing invite (notifies the guest so their notif gets dismissed)
     document.getElementById('vs-out-cancel')?.addEventListener('click', () => {
       if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
       window.VS.cancelInvite();
       _hideOutgoingPopup();
     });
 
-    // Aceptar invitación
+    // Accept invite
     document.getElementById('vs-in-accept')?.addEventListener('click', async () => {
       if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
       const matchId = document.getElementById('vs-in-accept').dataset.matchId;
       _hideIncomingPopup();
       try {
         await window.VS.accept(matchId);
-        // El guest arranca directamente con los datos del match ya conocidos
+        // The guest starts directly with the already-known match data
         const match = window.VS.getMatch();
         if (match) _scheduleVersusStart(match);
         else throw new Error('no match');
@@ -1348,7 +1338,7 @@ window.refreshVsSpectatorBadge = function (n) {
       }
     });
 
-    // Rechazar invitación
+    // Decline invite
     document.getElementById('vs-in-decline')?.addEventListener('click', () => {
       if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
       const matchId = document.getElementById('vs-in-decline').dataset.matchId;
@@ -1356,10 +1346,10 @@ window.refreshVsSpectatorBadge = function (n) {
       _hideIncomingPopup();
     });
 
-    // Volver al menú desde la pantalla de resultado versus — mismo botón
-    // reusado para el espectador (ver vsSpectatorShowResult): si está
-    // espectando, cierra ESA sesión en vez de _vsReturnToMenu() (que
-    // finalizaría/limpiaría un match VERDADERO que este cliente no tiene).
+    // Return to menu from the versus result screen — same button reused for
+    // the spectator (see vsSpectatorShowResult): if spectating, it closes
+    // THAT session instead of _vsReturnToMenu() (which would finish/clean up
+    // a REAL match this client doesn't have).
     document.getElementById('vs-result-back')?.addEventListener('click', () => {
       if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
       if (window._isSpectating) {
@@ -1370,10 +1360,10 @@ window.refreshVsSpectatorBadge = function (n) {
     });
   });
 
-  // ── Oponente en el leaderboard real de flags ───────────────────────────────
-  // No hay widget aparte: el oponente entra como única "fila de amigo" en el
-  // leaderboard de flags, con su score en vivo y la misma animación de
-  // adelantamiento/emotes que la barra de amigos normal (ver flags.js).
+  // ── Opponent in the real flags leaderboard ─────────────────────────────────
+  // No separate widget: the opponent enters as the single "friend row" in
+  // the flags leaderboard, with their live score and the same overtake/emote
+  // animation as the normal friends bar (see flags.js).
 
   function _setupVsOpponent(match) {
     const isHost   = window.VS.isHost();
@@ -1384,10 +1374,10 @@ window.refreshVsSpectatorBadge = function (n) {
       id:     oppId,
       name:   opp ? opp.name   : (_pendingOppName   || 'Rival'),
       avatar: opp ? opp.avatar : (_pendingOppAvatar || 'images/profilepic/ppdefault.png'),
-      // Usado por openSpectator (js/spectate.js) para aplicarle su marco
-      // real al espectarlo desde acá (_armSpectatorFallback más abajo) — sin
-      // esto quedaba siempre en el default, sin importar qué tuviera
-      // equipado de verdad.
+      // Used by openSpectator (js/spectate.js) to apply their real frame
+      // when spectating them from here (_armSpectatorFallback below) —
+      // without this it always stayed at the default, regardless of what
+      // they actually had equipped.
       frameCode: opp ? opp.frameCode : '0001',
       cardCode:  opp ? opp.cardCode  : '0001',
     };
@@ -1406,25 +1396,25 @@ window.refreshVsSpectatorBadge = function (n) {
     _hideGqSyncPanel();
   }
 
-  // Llamado desde flags.js/shapes.js cuando el jugador responde correcto/incorrecto.
-  // `detail` (opcional) = { index, pick } — selección exacta de esta ronda, para
-  // que el modo espectador pueda recrearla en tiempo real.
+  // Called from flags.js/shapes.js when the player answers right/wrong.
+  // `detail` (optional) = { index, pick } — this round's exact selection, so
+  // spectator mode can recreate it in real time.
   window._vsReportAnswer = function(correct, score, detail) {
     if (!window.VS.getMatchId()) return;
     window.VS.reportScore(score, detail ? { ...detail, correct } : undefined);
     if (!correct) window.VS.sendWrong();
   };
 
-  // Llamado desde flags.js/shapes.js al arrancar una ronda nueva (antes de que
-  // el jugador responda) — solo para que el modo espectador pueda mostrar las
-  // mismas opciones en tiempo real. `payload` = { index, country/label, correctSlot, options }.
+  // Called from flags.js/shapes.js when a new round starts (before the player
+  // answers) — only so spectator mode can show the same options in real
+  // time. `payload` = { index, country/label, correctSlot, options }.
   window._vsReportRound = function(payload) {
     if (!window.VS.getMatchId()) return;
     window.VS.reportRound(payload);
   };
 
-  // Llamado 1x/seg desde startFlagsTimer() con el tiempo restante real, para
-  // que el modo espectador muestre el mismo contador que el jugador.
+  // Called 1x/sec from startFlagsTimer() with the real time remaining, so
+  // spectator mode shows the same counter as the player.
   window._vsReportTick = function(timeLeft) {
     if (!window.VS.getMatchId()) return;
     window.VS.reportTick(timeLeft);
@@ -1445,13 +1435,13 @@ window.refreshVsSpectatorBadge = function (n) {
     window.VS.reportPostgame(payload);
   };
 
-  // Ver comentario largo en #vs-wait-spinner (css/style.css) — cubre el
-  // hueco de red entre "terminé, ya limpié mis assets" y "llegaron los datos
-  // del rival". _showVsWaitSpinner se llama apenas se decide esperar;
-  // _hideVsWaitSpinner corre desde flags.js/shapes.js en el mismo punto
-  // donde se revela contenido real (flagsSpectatorShowRound/
-  // _flagsSpecRevealAfterPregame y equivalentes), y como salvavidas acá
-  // mismo al mostrar el resultado o al salir de la espera por abandono.
+  // See the long comment on #vs-wait-spinner (css/style.css) — covers the
+  // network gap between "I finished, already cleaned my assets" and "the
+  // opponent's data arrived". _showVsWaitSpinner is called as soon as we
+  // decide to wait; _hideVsWaitSpinner runs from flags.js/shapes.js at the
+  // same point where real content is revealed (flagsSpectatorShowRound/
+  // _flagsSpecRevealAfterPregame and equivalents), and as a lifeline right
+  // here when showing the result or leaving the wait due to abandonment.
   window._showVsWaitSpinner = function () {
     const el = document.getElementById('vs-wait-spinner');
     if (el) el.style.display = 'flex';
@@ -1461,73 +1451,73 @@ window.refreshVsSpectatorBadge = function (n) {
     if (el) el.style.display = 'none';
   };
 
-  // ── Fin de partida → pantalla de resultado W/L ─────────────────────────────
-  // Llamado desde flags.js (hideFlagsMode) cuando termina el tiempo en versus.
-  // El bonus de "+5s" por dots corre independiente en cada cliente (depende
-  // de CUÁNTAS respuestas correctas consecutivas tuvo cada uno), así que los
-  // dos relojes pueden desincronizarse — quien termina antes YA NO muestra
-  // resultado de una: avisa que terminó y ESPERA a que el rival también
-  // avise (ver window.VS.onGameEnd más arriba, en _launchVersus). Antes esto
-  // mostraba resultado enseguida (con el rival todavía jugando su bonus) y
-  // encima marcaba la partida 'finished' apenas alguien decidía su
-  // resultado — cortándole esos segundos de más al rival de golpe (el "5
-  // segundos más, pero termina en post" reportado).
+  // ── Match end → W/L result screen ─────────────────────────────────────────
+  // Called from flags.js (hideFlagsMode) when time runs out in versus.
+  // The "+5s" dot bonus runs independently on each client (depends on HOW
+  // MANY consecutive correct answers each had), so the two clocks can desync
+  // — whoever finishes first NO LONGER shows the result right away: it
+  // announces it finished and WAITS for the opponent to announce too (see
+  // window.VS.onGameEnd above, in _launchVersus). This used to show the
+  // result immediately (with the opponent still playing their bonus) and on
+  // top of that marked the match 'finished' as soon as someone decided their
+  // result — cutting those extra seconds off the opponent abruptly (the
+  // reported "5 more seconds, but it ends in post").
   window._vsHandleGameEnd = function(myFinalScore) {
     if (_resultShown) return;
     _myGameEnded = true;
     _myFinalScoreCache = myFinalScore;
-    // OJO: antes acá se llamaba a _flagsCleanupVisuals()/_shapesCleanupVisuals()
-    // para borrar YA mis propios assets (máquina/maletines/tablero) apenas
-    // termina mi cronómetro, pensado para la transición hacia
-    // _enterWaitAsSpectator() — pero corría SIEMPRE que `!_oppGameEnded` en
-    // este punto, incluso en un final casi simultáneo donde 600ms después se
-    // termina yendo derecho al resultado sin espectar nada (ver el setTimeout
-    // de más abajo), y aun en el camino normal de espera, el jugador quería
-    // ver su propio tablero seguir ahí (congelado) detrás del spinner/overlay
-    // de resultado, no una pantalla vacía — el "se quitan los assets del
-    // juego" reportado. Ya no se borra nada acá: el tablero queda tal cual
-    // hasta que, si corresponde, flagsSpectatorEnter/shapesSpectatorEnter lo
-    // repueblan con los datos del rival (mismos elementos, sin parpadeo).
+    // NOTE: this used to call _flagsCleanupVisuals()/_shapesCleanupVisuals()
+    // to wipe my own assets (machine/suitcases/board) as soon as my timer
+    // ends, meant for the transition into _enterWaitAsSpectator() — but it
+    // ran WHENEVER `!_oppGameEnded` at this point, even on an almost
+    // simultaneous finish where 600ms later it goes straight to the result
+    // without spectating anything (see the setTimeout below), and even on the
+    // normal wait path, the player wanted to see their own board still there
+    // (frozen) behind the result spinner/overlay, not an empty screen — the
+    // reported "the game assets get removed". Nothing is wiped here anymore:
+    // the board stays as is until, if applicable, flagsSpectatorEnter/
+    // shapesSpectatorEnter repopulate it with the opponent's data (same
+    // elements, no flicker).
     if (!_oppGameEnded && typeof window._showVsWaitSpinner === 'function') window._showVsWaitSpinner();
     if (window.VS.getMatchId()) {
       window.VS.reportScore(myFinalScore);
-      // Si YA sé que el rival terminó (soy el segundo en terminar), calculo
-      // ahora el instante compartido de revelación y lo mando en el mismo
-      // aviso — ver comentario largo en _revealAt/reportGameEnd.
+      // If I ALREADY know the opponent finished (I'm the second to finish), I
+      // now compute the shared reveal instant and send it in the same
+      // announcement — see the long comment in _revealAt/reportGameEnd.
       const revealAt = _oppGameEnded ? (Date.now() + REVEAL_BUFFER_MS) : null;
       if (revealAt) _revealAt = revealAt;
       window.VS.reportGameEnd(myFinalScore, revealAt);
     }
-    // Salvavidas: si el broadcast/estado del rival se pierde por lo que sea
-    // (glitch de red), no dejar a este jugador esperando para siempre — a
-    // los 12s SIN NINGUNA señal de que el rival sigue activo se muestra el
-    // resultado igual con lo último conocido de él (ver _armGameEndFallback,
-    // que es quien realmente rearma este timer cada vez que sí llega una
-    // señal real mientras se lo mira de prestado).
+    // Lifeline: if the opponent's broadcast/state is lost for whatever
+    // reason (network glitch), don't leave this player waiting forever — at
+    // 12s WITH NO signal that the opponent is still active the result is
+    // shown anyway with the last known data from them (see
+    // _armGameEndFallback, which is what actually re-arms this timer each
+    // time a real signal does arrive while watching them on loan).
     _armGameEndFallback();
-    // Margen corto antes de decidir si hay que espectar al rival de prestado
-    // — cubre tanto "por si el rival YA había avisado antes de que yo
-    // terminara" (ver _revealAt/REVEAL_BUFFER_MS) COMO el caso de un final
-    // casi simultáneo: si el rival termina su cronómetro casi al mismo
-    // instante que yo, su 'gameend' puede llegar unos cientos de ms después
-    // del mío por latencia de red normal. Antes esto entraba a
-    // _enterWaitAsSpectator() DE UNA, sin esperar nada — si el rival hacía
-    // lo mismo conmigo al mismo tiempo, los DOS soltaban su canal para
-    // "mirar de prestado" al otro simultáneamente, y ninguno de los dos
-    // volvía a generar tick/round (ambos ya habían dejado de jugar) —
-    // quedaban mutuamente esperándose sin ninguna señal real hasta el
-    // salvavidas de 12s (el "los dos quieren espectear al otro" reportado).
-    // Esperar este margen antes de comprometerse a espectar cubre ese caso:
-    // si en ese ratito llega el aviso del rival, vamos derecho al resultado
-    // sin pasar por el modo espectador para nada.
+    // Short margin before deciding whether to spectate the opponent on loan
+    // — covers both "in case the opponent ALREADY announced before I
+    // finished" (see _revealAt/REVEAL_BUFFER_MS) AND the near-simultaneous
+    // finish case: if the opponent finishes their timer almost the same
+    // instant as me, their 'gameend' can arrive a few hundred ms after mine
+    // due to normal network latency. This used to enter _enterWaitAsSpectator()
+    // RIGHT AWAY, without waiting — if the opponent did the same with me at
+    // the same time, BOTH released their channel to "watch on loan" the other
+    // simultaneously, and neither generated tick/round again (both had
+    // stopped playing) — they were left mutually waiting on each other with
+    // no real signal until the 12s lifeline (the reported "both want to
+    // spectate the other"). Waiting this margin before committing to
+    // spectate covers that case: if the opponent's announcement arrives in
+    // that little while, we go straight to the result without going through
+    // spectator mode at all.
     setTimeout(() => {
       if (_resultShown) return;
       if (_oppGameEnded) { _tryShowVsResultWhenBothDone(); return; }
-      // El rival sigue jugando de verdad, en vez de dejar al jugador mirando
-      // una pantalla congelada/el overlay de TIME'S UP ya apagado, lo
-      // metemos de prestado al modo espectador DE SU PROPIO RIVAL (mismo
-      // pipeline que ya usan los amigos para espectar) hasta que el rival
-      // también termine.
+      // The opponent is genuinely still playing; instead of leaving the
+      // player staring at a frozen screen / the already-off TIME'S UP
+      // overlay, we drop them on loan into spectator mode OF THEIR OWN
+      // OPPONENT (same pipeline friends already use to spectate) until the
+      // opponent also finishes.
       _enterWaitAsSpectator();
     }, 600);
   };
@@ -1537,23 +1527,23 @@ window.refreshVsSpectatorBadge = function (n) {
     const matchId = window.VS.getMatchId();
     if (typeof window.openSpectator !== 'function' || !matchId || !window._vsOpponent) return;
     _waitingAsSpectator = true;
-    // Supabase Realtime no deja tener dos canales suscriptos al mismo tema
-    // 'match-{id}' desde el mismo cliente (confirmado en vivo: tira "cannot
-    // add postgres_changes callbacks... after subscribe()") — hay que
-    // soltar el canal de ESTE jugador (VS, ya conectado desde que arrancó la
-    // partida) para que Spectate.watch() pueda tomar ese mismo tema y
-    // renderizar al rival. reportScore/reportGameEnd ya se mandaron arriba
-    // en _vsHandleGameEnd, antes de esto — no se pierde nada de lo propio.
-    // ESPERAR a que el unsubscribe termine de verdad (ver comentario largo
-    // en releaseChannel) antes de que Spectate.watch() intente tomar el
-    // mismo tema — si no, es una carrera que a veces fallaba en juego real
-    // (el "lo kickea al menu de frente" reportado, porque Spectate.watch()
-    // tiraba error y openSpectator lo tragaba en silencio sin reintentar).
+    // Supabase Realtime doesn't allow two channels subscribed to the same
+    // topic 'match-{id}' from the same client (confirmed live: throws
+    // "cannot add postgres_changes callbacks... after subscribe()") — THIS
+    // player's channel (VS, connected since the match started) must be
+    // released so Spectate.watch() can take that same topic and render the
+    // opponent. reportScore/reportGameEnd were already sent above in
+    // _vsHandleGameEnd, before this — nothing of our own is lost.
+    // WAIT for the unsubscribe to actually finish (see the long comment in
+    // releaseChannel) before Spectate.watch() tries to take the same topic —
+    // otherwise it's a race that sometimes failed in real play (the reported
+    // "it kicks me straight to the menu", because Spectate.watch() threw and
+    // openSpectator swallowed it silently without retrying).
     await window.VS.releaseChannel();
-    if (_resultShown) return; // se resolvió mientras esperábamos (ej. abandono)
-    // La detección de "el rival también terminó" ya no puede venir del
-    // canal de VS (recién liberado) — se reemplaza por el mismo evento
-    // 'gameend', pero recibido a través del canal que abre Spectate.watch().
+    if (_resultShown) return; // resolved while we were waiting (e.g. abandonment)
+    // Detecting "the opponent also finished" can no longer come from the VS
+    // channel (just released) — it's replaced by the same 'gameend' event,
+    // but received through the channel Spectate.watch() opens.
     window.Spectate.onGameEnd(payload => {
       if (!payload || _resultShown) return;
       _oppGameEnded = true;
@@ -1561,58 +1551,58 @@ window.refreshVsSpectatorBadge = function (n) {
       if (payload.revealAt) _revealAt = payload.revealAt;
       _tryShowVsResultWhenBothDone();
     });
-    // (Los assets propios ya se limpiaron arriba en _vsHandleGameEnd, apenas
-    // se supo que había que esperar — ver ese comentario largo.)
-    // Mientras dure este mirado-de-prestado, cada tick/round real que llegue
-    // del rival (spectate.js los procesa para dibujar la UI, y de paso llama
-    // a este hook — ver _wireCommonCallbacks) reprograma el salvavidas de
-    // 12s — ver _armGameEndFallback. Sin esto el salvavidas original (armado
-    // UNA sola vez en _vsHandleGameEnd, contado desde MI fin) disparaba igual
-    // aunque el rival siguiera jugando normal con más de 12s por delante.
+    // (Own assets were already cleaned above in _vsHandleGameEnd, as soon as
+    // we knew we had to wait — see that long comment.)
+    // While this watch-on-loan lasts, every real tick/round arriving from the
+    // opponent (spectate.js processes them to draw the UI, and also calls
+    // this hook — see _wireCommonCallbacks) reschedules the 12s lifeline —
+    // see _armGameEndFallback. Without this the original lifeline (armed ONCE
+    // in _vsHandleGameEnd, counted from MY finish) fired anyway even if the
+    // opponent was still playing normally with more than 12s ahead.
     window._vsSpectatorHeartbeat = _armGameEndFallback;
     window.openSpectator(matchId, window._vsOpponent, { instant: true });
-    // El cartelito de "ESPECTANDO" (miniHud, ver spectator-mini-tag en
-    // index.html) es para un espectador EXTERNO mirando a un amigo — acá el
-    // que está mirando es EL PROPIO JUGADOR, esperando a que el rival
-    // termine su cronómetro para poder ver el resultado. "ESPECTANDO" no
-    // tiene sentido en ese contexto — se pisa con un mensaje de espera.
+    // The "SPECTATING" tag (miniHud, see spectator-mini-tag in index.html)
+    // is for an EXTERNAL spectator watching a friend — here the one watching
+    // is THE PLAYER THEMSELVES, waiting for the opponent to finish their
+    // timer to see the result. "SPECTATING" makes no sense in that context —
+    // it's overwritten with a waiting message.
     const tagEl = document.getElementById('spectator-mini-tag');
     if (tagEl) tagEl.textContent = (typeof t === 'function') ? t('vs.waitingForOthers', 'Esperando a los otros jugadores...') : 'Esperando a los otros jugadores...';
   }
 
-  // Saca al jugador del modo espectador "de prestado" sin pasar por la
-  // pantalla de menú (ver closeSpectator(message, silent) en spectate.js) —
-  // a diferencia de un espectador externo, este jugador vuelve directo a SU
-  // PROPIA pantalla de resultado, no al menú.
+  // Takes the player out of "on loan" spectator mode without going through
+  // the menu screen (see closeSpectator(message, silent) in spectate.js) —
+  // unlike an external spectator, this player goes straight back to THEIR
+  // OWN result screen, not the menu.
   function _exitWaitAsSpectator() {
     if (!_waitingAsSpectator) return;
     _waitingAsSpectator = false;
     if (window._vsSpectatorHeartbeat === _armGameEndFallback) window._vsSpectatorHeartbeat = null;
-    // A punto de mostrar MI PROPIO resultado del duelo — mismo flag que ya
-    // usa _onOpponentAbandoned antes de su hardReset. flagsSpectatorExit()
-    // (llamado adentro de closeSpectator, ver más abajo) ahora también lo
-    // respeta: sin esto borraba los assets de fondo del juego (máquina/
-    // maletines/banderas) antes de que apareciera el overlay de resultado,
-    // dejándolo sobre un fondo vacío en vez de la partida congelada detrás
-    // (el "se quitan los assets de fondo si pierdo" reportado).
+    // About to show MY OWN duel result — same flag _onOpponentAbandoned
+    // already uses before its hardReset. flagsSpectatorExit() (called inside
+    // closeSpectator, see below) now also respects it: without this it wiped
+    // the game's background assets (machine/suitcases/flags) before the
+    // result overlay appeared, leaving it on an empty background instead of
+    // the frozen match behind (the reported "the background assets get
+    // removed if I lose").
     window._vsShowingResult = true;
     if (typeof window.closeSpectator === 'function') window.closeSpectator(null, true);
   }
 
-  // Antes esto llamaba a _showVsResult() directo, apenas ESTE cliente se
-  // enteraba (localmente) de que ambos habían terminado — y esa noticia le
-  // llega a cada lado en un momento distinto (quien termina segundo ya lo
-  // sabe al toque; quien terminó primero recién cuando el broadcast del
-  // segundo le llega). Ahora ambos (y cualquier espectador, vía el mismo
-  // 'gameend' relayado por Spectate.watch) esperan al MISMO _revealAt de
-  // reloj de pared antes de mostrar nada — ver _revealAt más arriba.
+  // This used to call _showVsResult() directly, as soon as THIS client
+  // found out (locally) that both had finished — and that news reaches each
+  // side at a different moment (the second to finish knows immediately; the
+  // first only when the second's broadcast arrives). Now both (and any
+  // spectator, via the same 'gameend' relayed by Spectate.watch) wait for
+  // the SAME wall-clock _revealAt before showing anything — see _revealAt
+  // above.
   function _tryShowVsResultWhenBothDone(force) {
     if (_resultShown || !_myGameEnded) return;
-    if (!_oppGameEnded && !force) return; // seguir esperando al rival
+    if (!_oppGameEnded && !force) return; // keep waiting for the opponent
     clearTimeout(_gameEndFallbackTimer);
-    // Sin revealAt (el broadcast del rival se perdió y llegamos acá por el
-    // salvavidas de 12s, o por alguna razón nunca se calculó) — no tiene
-    // sentido seguir esperando, se muestra ya con lo último conocido.
+    // No revealAt (the opponent's broadcast was lost and we got here via the
+    // 12s lifeline, or for some reason it was never computed) — no point
+    // waiting more, show it now with the last known data.
     const delay = _revealAt ? Math.max(0, _revealAt - Date.now()) : 0;
     clearTimeout(_revealTimer);
     _revealTimer = setTimeout(() => {
@@ -1629,20 +1619,20 @@ window.refreshVsSpectatorBadge = function (n) {
     }, delay);
   }
 
-  // El rival se desconectó o abandonó → gano por abandono.
+  // The opponent disconnected or abandoned → I win by abandonment.
   function _onOpponentAbandoned() {
     if (_resultShown) return;
     window._hideVsWaitSpinner();
-    // Si estaba mirando al rival de prestado (ver _enterWaitAsSpectator) hay
-    // que sacarlo de ahí ANTES de tocar el hard reset del modo real — la UI
-    // de espectador está montada sobre los mismos elementos del juego real,
-    // así que hacer ambas cosas a la vez pisaría el DOM.
+    // If they were watching the opponent on loan (see _enterWaitAsSpectator)
+    // they must be taken out of there BEFORE touching the real mode's hard
+    // reset — the spectator UI is mounted on the same elements as the real
+    // game, so doing both at once would clobber the DOM.
     _exitWaitAsSpectator();
     _endedByAbandon = true;
-    // Marcar que el resultado VS está visible para que los hardResets no limpien assets
+    // Mark the VS result as visible so the hardResets don't clean assets
     window._vsShowingResult = true;
-    // Parar timers/RAF del modo actual sin borrar assets ni ocultar elementos del juego
-    // (el overlay del resultado cubre todo con su fondo oscuro)
+    // Stop the current mode's timers/RAF without wiping assets or hiding game
+    // elements (the result overlay covers everything with its dark background)
     if (_vsCurrentMode === 'shapes') {
       if (typeof window.shapesHardReset === 'function') { try { window.shapesHardReset(); } catch(e) {} }
     } else if (_vsCurrentMode === 'cities' || _vsCurrentMode === 'monuments') {
@@ -1654,21 +1644,21 @@ window.refreshVsSpectatorBadge = function (n) {
     }
     const m = window.VS.getMatch() || {};
     const isHost   = window.VS.isHost();
-    // MI propio puntaje NO se lee solo de m.host_score/guest_score — ese
-    // valor viene del eco de postgres_changes de mi ÚLTIMO reportScore(), que
-    // tarda un rato en llegar (WAL real, no instantáneo); si el rival
-    // abandona justo después de que yo sumé puntos, ese eco todavía puede no
-    // haber llegado y el cache queda en 0 o desactualizado — el "mi puntaje
-    // final marca 0" reportado. La fuente viva (el propio contador del modo
-    // en curso) es inmediata, sin esa demora.
+    // MY own score is NOT read only from m.host_score/guest_score — that
+    // value comes from the postgres_changes echo of my LAST reportScore(),
+    // which takes a while to arrive (real WAL, not instant); if the opponent
+    // abandons right after I scored points, that echo may not have arrived
+    // yet and the cache is left at 0 or stale — the reported "my final score
+    // shows 0". The live source (the current mode's own counter) is
+    // immediate, without that delay.
     const liveScore = _getLiveScore();
     const myScoreFromMatch = isHost ? (m.host_score || 0) : (m.guest_score || 0);
     const myScore  = Math.max(liveScore, myScoreFromMatch);
     const oppScore = isHost ? (m.guest_score || 0) : (m.host_score || 0);
     _showVsResult('win', myScore, oppScore, 'abandon');
-    // GlobeQuiz no tiene puntaje numérico comparable — pisar los spans con mi
-    // mejor km logrado (o "—" si no llegué a adivinar ninguno) y "—" para el
-    // rival, que abandonó.
+    // GlobeQuiz has no comparable numeric score — overwrite the spans with my
+    // best km achieved (or "—" if I didn't guess any) and "—" for the
+    // opponent, who abandoned.
     if (_vsCurrentMode === 'globequiz') {
       const summary = window.globequizGetVsSummary?.() || {};
       _patchGqResultScores(
@@ -1678,10 +1668,10 @@ window.refreshVsSpectatorBadge = function (n) {
     }
   }
 
-  // Pisa los dos spans numéricos de #vs-result-screen con texto propio de
-  // GlobeQuiz (tiempo/km en vez de un score con toLocaleString()) — llamada
-  // siempre DESPUÉS de _showVsResult(), que ya hizo todo el resto (ocultar
-  // HUD, registrar win/lose, reportPostgame/finish).
+  // Overwrites the two numeric spans of #vs-result-screen with GlobeQuiz's
+  // own text (time/km instead of a score with toLocaleString()) — always
+  // called AFTER _showVsResult(), which already did everything else (hide
+  // HUD, record win/lose, reportPostgame/finish).
   function _patchGqResultScores(meText, oppText) {
     const meEl  = document.getElementById('vs-result-me-score');
     const oppEl = document.getElementById('vs-result-opp-score');
@@ -1689,10 +1679,10 @@ window.refreshVsSpectatorBadge = function (n) {
     if (oppEl) oppEl.textContent = oppText;
   }
 
-  // País revelado + intentos propios, debajo de los avatares — mismo texto
-  // que usa el modal de fin de juego 1 player (globequiz.hintCorrect/
-  // attempts, ver gq-endgame-country-label/gq-endgame-attempts en
-  // globequiz.js), acá pegado en el panel W/L en vez de un modal aparte.
+  // Revealed country + own attempts, below the avatars — same text the
+  // 1-player end-of-game modal uses (globequiz.hintCorrect/attempts, see
+  // gq-endgame-country-label/gq-endgame-attempts in globequiz.js), here
+  // placed in the W/L panel instead of a separate modal.
   function _patchGqResultExtra(countryName, guessCount) {
     const wrap        = document.getElementById('vs-result-gq-extra');
     const countryEl   = document.getElementById('vs-result-gq-country');
@@ -1710,34 +1700,34 @@ window.refreshVsSpectatorBadge = function (n) {
     wrap.style.display = 'flex';
   }
 
-  // ── GlobeQuiz VS: esperar a que AMBOS carguen el globo 3D ──────────────────
-  // Cada cliente arranca su propio Promise.all([loadThree(), loadCountries()])
-  // por su cuenta (ver initGlobeQuiz en globequiz.js) — sin este handshake, el
-  // 3-2-1 arrancaba apenas terminaba de cargar CADA UNO por separado, así que
-  // quien cargaba más rápido (mejor red/CPU) arrancaba su cronómetro antes
-  // que el rival, una ventaja real en un modo que se gana por ser el primero
-  // en acertar (el reportado: "el versus no debe empezar hasta que a ambos
-  // les cargue el globo 3D").
-  // Margen para que AMBOS confirmen que su globo 3D terminó de cargar. Tiene
-  // que cubrir el peor caso legítimo (móvil lento bajando three.js del CDN +
-  // el reintento interno de loadThree, ver globequiz.js) sin colgar la
-  // partida para siempre si un lado de verdad no puede. Si vence, NO se
-  // arranca solo: se corta para los dos (ver _handleGqSyncFailed).
+  // ── GlobeQuiz VS: wait for BOTH to load the 3D globe ──────────────────────
+  // Each client runs its own Promise.all([loadThree(), loadCountries()])
+  // (see initGlobeQuiz in globequiz.js) — without this handshake, the 3-2-1
+  // started as soon as EACH ONE finished loading separately, so whoever
+  // loaded faster (better network/CPU) started their timer before the
+  // opponent, a real advantage in a mode won by being first to guess right
+  // (the reported "versus must not start until both have the 3D globe
+  // loaded").
+  // Margin for BOTH to confirm their 3D globe finished loading. Must cover
+  // the worst legitimate case (slow mobile downloading three.js from the CDN
+  // + loadThree's internal retry, see globequiz.js) without hanging the
+  // match forever if one side truly can't. If it expires, it does NOT start
+  // solo: it's cancelled for both (see _handleGqSyncFailed).
   const GQ_READY_TIMEOUT_MS = 25000;
-  // Desfase relativo entre "el host dio la orden" y "arranca el 3-2-1". El
-  // host lo espera después de mandar 'gqgo'; el guest lo espera después de
-  // recibirlo — la diferencia real entre ambos arranques es solo la latencia
-  // de UN mensaje (~50-150ms), sin depender de que los relojes de los dos
-  // dispositivos estén sincronizados (no lo están).
+  // Relative offset between "the host gave the order" and "the 3-2-1 starts".
+  // The host waits it after sending 'gqgo'; the guest waits it after
+  // receiving it — the real difference between the two starts is just ONE
+  // message's latency (~50-150ms), without depending on the two devices'
+  // clocks being synced (they aren't).
   const GQ_GO_DELAY_MS = 900;
-  const GQ_GO_FALLBACK_MS = 1500; // el guest arranca igual si el 'gqgo' del host nunca llega (normalmente llega en <200ms)
+  const GQ_GO_FALLBACK_MS = 1500; // the guest starts anyway if the host's 'gqgo' never arrives (normally arrives in <200ms)
   let _gqReadyMe = false, _gqReadyOpp = false, _gqReadyDone = false, _gqReadyTimer = null, _gqReadyResolveCb = null;
   let _gqSyncFailed = false;
   let _gqGoWaitCb = null, _gqGoFallbackTimer = null;
-  // Progreso 0..1 de cada lado para la barra de sincronización.
+  // 0..1 progress of each side for the sync bar.
   let _gqMyProg = 0, _gqOppProg = 0;
 
-  // ── Panel de sincronización (dentro de #vs-duel-accepted-popup) ─────────────
+  // ── Sync panel (inside #vs-duel-accepted-popup) ───────────────────────────
   const GQ_PHASE_PROG = { start: 0.14, assets: 0.48, scene: 0.74, ready: 0.95, go: 1 };
 
   function _gqSyncSetState(elId, key, isReady) {
@@ -1775,7 +1765,7 @@ window.refreshVsSpectatorBadge = function (n) {
   function _hideGqSyncPanel() {
     const block = document.getElementById('vs-sync-block');
     if (block) block.style.display = 'none';
-    // Restaurar el subtítulo por si el próximo duelo NO es GloboReto.
+    // Restore the subtitle in case the next duel is NOT GloboReto.
     const sub = document.getElementById('vs-duel-accepted-sub');
     if (sub) sub.textContent = T('vs.duelAccepted', '¡Duelo aceptado! Redirigiéndote a la partida…');
     _hideDuelAcceptedPopup();
@@ -1789,8 +1779,8 @@ window.refreshVsSpectatorBadge = function (n) {
     if (sub) sub.textContent = T('vs.syncStarting', '¡Empezando!');
   }
 
-  // Hito de carga PROPIO (llamado desde globequiz.js) — actualiza mi fila +
-  // barra y se lo cuenta al rival.
+  // OWN load milestone (called from globequiz.js) — updates my row + bar and
+  // tells the opponent.
   window._vsGqLoadPhase = function (phase) {
     if (!window._vsActive || _gqSyncFailed) return;
     _gqMyProg = Math.max(_gqMyProg, GQ_PHASE_PROG[phase] || 0);
@@ -1804,13 +1794,13 @@ window.refreshVsSpectatorBadge = function (n) {
     _gqSyncRenderBar();
   }
 
-  // GlobeQuiz VS: uno de los dos no pudo dejar listo el globo 3D a tiempo
-  // (three.js del CDN colgado, WebGL bloqueado, red caída, o simplemente
-  // nunca confirmó). Como el modo se gana por ser el PRIMERO en acertar,
-  // arrancar desincronizado es injusto y arrancar solo deja al otro
-  // congelado en el spinner de carga sin ningún aviso (el reportado: "a uno
-  // se le queda congelado y al otro le carga bien"). Se corta para AMBOS,
-  // sin ganador ni derrota registrada, con un cartel y vuelta al menú.
+  // GlobeQuiz VS: one side couldn't get the 3D globe ready in time (three.js
+  // CDN hung, WebGL blocked, network down, or simply never confirmed). Since
+  // the mode is won by being FIRST to guess right, starting desynced is
+  // unfair and starting solo leaves the other frozen on the loading spinner
+  // with no warning (the reported "one gets frozen and the other loads
+  // fine"). It's cancelled for BOTH, no winner or loss recorded, with a
+  // banner and return to the menu.
   function _handleGqSyncFailed(fromOpponent) {
     if (_gqSyncFailed || _resultShown) return;
     _gqSyncFailed = true;
@@ -1825,10 +1815,10 @@ window.refreshVsSpectatorBadge = function (n) {
     const spinner = document.getElementById('gq-loading-spinner');
     if (spinner) spinner.style.display = 'none';
     _hideGqSyncPanel();
-    // Salida limpia SIN pasar por _showVsResult/_vsAbandon (no hubo partida
-    // real, nadie gana ni pierde). _endedByAbandon/_resultShown en true
-    // cortan cualquier finish()/eco tardío; _teardownVsOpponent baja
-    // _vsActive antes de quitToMenu para que su guard no dispare _vsAbandon.
+    // Clean exit WITHOUT going through _showVsResult/_vsAbandon (there was no
+    // real match, nobody wins or loses). _endedByAbandon/_resultShown true
+    // cut off any late finish()/echo; _teardownVsOpponent clears _vsActive
+    // before quitToMenu so its guard doesn't fire _vsAbandon.
     _endedByAbandon = true;
     _resultShown    = true;
     try { window.globequizHardReset?.(); } catch (e) {}
@@ -1840,22 +1830,22 @@ window.refreshVsSpectatorBadge = function (n) {
     _gqLoseHandled = false;
     _matchResultRecorded = false;
   }
-  // Llamada desde globequiz.js cuando su Promise.all([loadThree, loadCountries])
-  // rechaza estando en un duelo (ver el .catch de initGlobeQuiz).
+  // Called from globequiz.js when its Promise.all([loadThree, loadCountries])
+  // rejects while in a duel (see initGlobeQuiz's .catch).
   window._vsGqSyncFailed = function () { _handleGqSyncFailed(false); };
 
-  // Registrada en _launchVersus ANTES de llamar initGlobeQuiz() — así el
-  // listener ya está enganchado al canal (que a esa altura ya está
-  // suscripto) pase lo que pase con el orden de carga de cada lado; no hace
-  // falta persistir nada en la fila de matches para cubrir la carrera de
-  // "el aviso del rival llega antes de que yo escuche".
+  // Registered in _launchVersus BEFORE calling initGlobeQuiz() — so the
+  // listener is already hooked to the channel (subscribed by then) whatever
+  // happens with each side's load order; no need to persist anything in the
+  // matches row to cover the "opponent's notice arrives before I listen"
+  // race.
   function _gqReadySetup() {
     _gqReadyMe = false; _gqReadyOpp = false; _gqReadyDone = false;
     clearTimeout(_gqReadyTimer); _gqReadyTimer = null; _gqReadyResolveCb = null;
     clearTimeout(_gqGoFallbackTimer); _gqGoFallbackTimer = null; _gqGoWaitCb = null;
     const myRole = () => (window.VS.isHost() ? 'host' : 'guest');
     window.VS.onReady(payload => {
-      if (!payload || payload.role === myRole()) return; // eco propio, mismo filtro que 'answer'
+      if (!payload || payload.role === myRole()) return; // own echo, same filter as 'answer'
       _gqReadyOpp = true;
       _gqOnOppPhase('ready');
       _gqTryResolveReady();
@@ -1864,7 +1854,7 @@ window.refreshVsSpectatorBadge = function (n) {
       if (!payload || payload.role === myRole()) return;
       _gqOnOppPhase(payload.phase);
     });
-    // Solo relevante para el guest: el host confirma que arrancan los dos.
+    // Only relevant for the guest: the host confirms both are starting.
     window.VS.onGqGo(() => {
       if (!_gqGoWaitCb) return;
       clearTimeout(_gqGoFallbackTimer); _gqGoFallbackTimer = null;
@@ -1872,8 +1862,8 @@ window.refreshVsSpectatorBadge = function (n) {
       _gqStartCountdownSoon(cb);
     });
   }
-  // Arranca el 3-2-1 tras GQ_GO_DELAY_MS, tapando el panel de sincronización
-  // justo antes. Los dos lados llaman a esto con el mismo desfase relativo.
+  // Starts the 3-2-1 after GQ_GO_DELAY_MS, hiding the sync panel just before.
+  // Both sides call this with the same relative offset.
   function _gqStartCountdownSoon(cb) {
     _gqSyncAllReady();
     setTimeout(() => { _hideGqSyncPanel(); cb(); }, GQ_GO_DELAY_MS);
@@ -1885,13 +1875,14 @@ window.refreshVsSpectatorBadge = function (n) {
     clearTimeout(_gqReadyTimer);
     const cb = _gqReadyResolveCb; _gqReadyResolveCb = null;
     if (window.VS.isHost()) {
-      // El host es la referencia única del arranque — evita que los dos
-      // manden 'gqgo' y compitan por cuál gana.
+      // The host is the single reference for the start — prevents both from
+      // sending 'gqgo' and racing over which one wins.
       window.VS.reportGqGo();
       _gqStartCountdownSoon(cb);
     } else {
-      // El guest espera el 'gqgo' del host (con red normal llega en decenas
-      // de ms); si nunca llega, arranca igual pasado el fallback.
+      // The guest waits for the host's 'gqgo' (arrives in tens of ms on a
+      // normal network); if it never arrives, it starts anyway after the
+      // fallback.
       _gqGoWaitCb = cb;
       _gqGoFallbackTimer = setTimeout(() => {
         if (!_gqGoWaitCb) return;
@@ -1900,9 +1891,9 @@ window.refreshVsSpectatorBadge = function (n) {
       }, GQ_GO_FALLBACK_MS);
     }
   }
-  // Corte del handshake (abandono/quitToMenu mientras se esperaba) — sin
-  // esto, un timeout viejo podía disparar el 3-2-1 sobre una pantalla que ya
-  // volvió al menú.
+  // Handshake cutoff (abandonment/quitToMenu while waiting) — without this,
+  // a stale timeout could fire the 3-2-1 over a screen that already returned
+  // to the menu.
   function _gqReadyReset() {
     clearTimeout(_gqReadyTimer); _gqReadyTimer = null;
     clearTimeout(_gqGoFallbackTimer); _gqGoFallbackTimer = null;
@@ -1911,14 +1902,14 @@ window.refreshVsSpectatorBadge = function (n) {
     _gqGoWaitCb = null;
   }
 
-  // Llamada desde globequiz.js apenas ESTE cliente termina de cargar three.js
-  // + el GeoJSON — avisa al rival y llama a onBothReady() recién cuando LOS
-  // DOS avisaron, o a los GQ_READY_TIMEOUT_MS si el rival nunca llega a
-  // avisar (falló su carga, se le cortó la conexión, etc.) — un timeout
-  // generoso para no colgar la partida entera por eso, pero sin dejar a
-  // quien sí cargó esperando para siempre.
+  // Called from globequiz.js as soon as THIS client finishes loading three.js
+  // + the GeoJSON — notifies the opponent and calls onBothReady() only once
+  // BOTH have announced, or after GQ_READY_TIMEOUT_MS if the opponent never
+  // announces (their load failed, connection dropped, etc.) — a generous
+  // timeout so the whole match doesn't hang over it, but without leaving
+  // whoever did load waiting forever.
   window._vsGqAwaitBothReady = function (onBothReady) {
-    if (_gqSyncFailed) return; // el duelo ya se está cerrando por falta de sincronía
+    if (_gqSyncFailed) return; // the duel is already closing due to sync failure
     if (!window._vsActive || !window.VS.getMatchId()) { onBothReady(); return; }
     _gqReadyResolveCb = onBothReady;
     _gqReadyMe = true;
@@ -1930,38 +1921,40 @@ window.refreshVsSpectatorBadge = function (n) {
       if (_gqReadyDone) return;
       _gqReadyDone = true;
       _gqReadyResolveCb = null;
-      // El rival nunca confirmó que su globo 3D terminó de cargar. NO
-      // arrancamos solos (ver _handleGqSyncFailed) — se corta para los dos.
+      // The opponent never confirmed their 3D globe finished loading. We do
+      // NOT start solo (see _handleGqSyncFailed) — it's cancelled for both.
       _handleGqSyncFailed(false);
     }, GQ_READY_TIMEOUT_MS);
     _gqTryResolveReady();
   };
 
-  // ── GlobeQuiz: victoria instantánea ─────────────────────────────────────────
-  // A diferencia de flags/shapes/cities/monuments (score que sube con cada
-  // acierto, comparado recién al cortar un timer), acá solo hay UN ganador
-  // posible: el primero en acertar. No hay que esperar nada del rival — ni
-  // _vsHandleGameEnd ni el "revealAt" compartido aplican, se corta ya mismo
-  // en ambos lados (yo lo sé de una porque acerté; el rival se entera por el
-  // broadcast de abajo, ver _handleGqOpponentWin).
+  // ── GlobeQuiz: instant win ─────────────────────────────────────────────────
+  // Unlike flags/shapes/cities/monuments (a score that climbs with each
+  // correct answer, compared only when a timer ends), here there's only ONE
+  // possible winner: the first to guess right. There's nothing to wait for
+  // from the opponent — neither _vsHandleGameEnd nor the shared "revealAt"
+  // apply, it ends right away on both sides (I know immediately because I
+  // guessed right; the opponent finds out via the broadcast below, see
+  // _handleGqOpponentWin).
 
-  // Llamada desde globequiz.js (submitGuess) apenas ESTE cliente acierta —
-  // manda el broadcast YA MISMO (sin esperar el festejo local) para que el
-  // rival vea el game over lo antes posible. NO toca la UI de este cliente
-  // todavía (ver _vsShowGqWinResult, llamada 2s después con el festejo ya
-  // visto).
+  // Called from globequiz.js (submitGuess) as soon as THIS client guesses
+  // right — sends the broadcast RIGHT AWAY (without waiting for the local
+  // celebration) so the opponent sees the game over as soon as possible.
+  // Does NOT touch this client's UI yet (see _vsShowGqWinResult, called 2s
+  // later once the celebration has been seen).
   window._vsReportGqWin = function(elapsedMs, countryName, iso2) {
     if (_resultShown) return;
     if (!window.VS.getMatchId()) return;
-    // Reusa el broadcast 'answer' existente (VS.reportScore con detail) — el
-    // rival ya lo escucha vía VS.onAnswer (ver _launchVersus, rama globequiz).
+    // Reuses the existing 'answer' broadcast (VS.reportScore with detail) —
+    // the opponent already listens via VS.onAnswer (see _launchVersus,
+    // globequiz branch).
     window.VS.reportScore(1, { win: true, elapsedMs, countryName, iso2, correct: true });
   };
 
-  // Llamada desde globequiz.js JUNTO con _vsReportGqWin (mismo instante) —
-  // el ganador ve su "GANASTE" al mismo tiempo que el rival recibe el
-  // broadcast y ve su "PERDISTE" (ver _handleGqOpponentWin más abajo), sin
-  // delay de festejo de por medio.
+  // Called from globequiz.js TOGETHER with _vsReportGqWin (same instant) —
+  // the winner sees their "YOU WON" at the same time the opponent receives
+  // the broadcast and sees their "YOU LOST" (see _handleGqOpponentWin
+  // below), with no celebration delay in between.
   window._vsShowGqWinResult = function(elapsedMs) {
     if (_resultShown) return;
     _showVsResult('win', 0, 0);
@@ -1970,19 +1963,19 @@ window.refreshVsSpectatorBadge = function (n) {
     _patchGqResultExtra(summary.countryName, summary.guessCount);
   };
 
-  // Llamada desde VS.onAnswer (ver _launchVersus) cuando el rival avisó que
-  // ganó — nunca desde acá se decide nada, solo se refleja. Mismo criterio
-  // que el 1 player: mientras el ganador ve su festejo (showWin, ver
-  // submitGuess en globequiz.js), acá se ve la animación de gameover.png
-  // (mismo overlay/timing que usa #powerquit-overlay para "quitaste en
-  // práctica" — timeup-in/timeup-out) durante GQ_VS_ANIM_MS, y recién
-  // terminada esa animación aparece el cartel de "PERDISTE".
+  // Called from VS.onAnswer (see _launchVersus) when the opponent announced
+  // they won — nothing is ever decided here, only reflected. Same approach
+  // as 1-player: while the winner sees their celebration (showWin, see
+  // submitGuess in globequiz.js), here the gameover.png animation plays
+  // (same overlay/timing #powerquit-overlay uses for "you quit in practice"
+  // — timeup-in/timeup-out) for GQ_VS_ANIM_MS, and only once that animation
+  // ends does the "YOU LOST" banner appear.
   let _gqLoseAnimT1 = null, _gqLoseAnimT2 = null, _gqLoseResultT = null;
   function _handleGqOpponentWin(payload) {
-    // _resultShown recién se activa ~2s después (en _gqLoseResultT), así que un
-    // segundo broadcast 'answer' con win:true (eco/duplicado de Realtime, común
-    // con alta latencia) reentraba y disparaba la animación de derrota de nuevo
-    // — el "you lost dos veces" reportado. Guard propio, inmediato.
+    // _resultShown only turns on ~2s later (in _gqLoseResultT), so a second
+    // 'answer' broadcast with win:true (Realtime echo/duplicate, common with
+    // high latency) reentered and fired the loss animation again — the
+    // reported "you lost twice". Own guard, immediate.
     if (_resultShown || _gqLoseHandled) return;
     _gqLoseHandled = true;
     window.globequizVsShowLoss?.();
@@ -2010,9 +2003,9 @@ window.refreshVsSpectatorBadge = function (n) {
       _patchGqResultExtra(summary.countryName, summary.guessCount);
     }, animMs);
   }
-  // Corte de la animación de arriba (abandono del rival, quitToMenu genérico)
-  // — sin esto, el overlay de gameover.png o el timeout podían dispararse
-  // sobre una pantalla que ya volvió al menú.
+  // Cutoff for the animation above (opponent abandonment, generic quitToMenu)
+  // — without this, the gameover.png overlay or the timeout could fire over
+  // a screen that already returned to the menu.
   function _clearGqLoseAnim() {
     if (_gqLoseAnimT1) { clearTimeout(_gqLoseAnimT1); _gqLoseAnimT1 = null; }
     if (_gqLoseAnimT2) { clearTimeout(_gqLoseAnimT2); _gqLoseAnimT2 = null; }
@@ -2021,26 +2014,26 @@ window.refreshVsSpectatorBadge = function (n) {
     if (goOverlay) { goOverlay.style.display = 'none'; goOverlay.classList.remove('timeup-in', 'timeup-out'); }
   }
 
-  // Lee el puntaje EN VIVO del modo actualmente en curso, directo de la
-  // variable global de cada juego (flags/shapes/cities/monuments
-  // comparten el mismo scope global, sin build step) — no depende de que
-  // reportScore() ya haya hecho ida y vuelta a la base.
+  // Reads the LIVE score of the mode currently in progress, straight from
+  // each game's global variable (flags/shapes/cities/monuments share the
+  // same global scope, no build step) — doesn't depend on reportScore()
+  // having already round-tripped to the DB.
   function _getLiveScore() {
     if (_vsCurrentMode === 'shapes')    return Math.round(typeof shapesScore !== 'undefined' ? shapesScore : 0);
     if (_vsCurrentMode === 'cities' || _vsCurrentMode === 'monuments') {
       return Math.round((typeof state !== 'undefined' && state && typeof state.score === 'number') ? state.score : 0);
     }
-    if (_vsCurrentMode === 'globequiz') return 0; // sin score numérico — ver _patchGqResultScores
+    if (_vsCurrentMode === 'globequiz') return 0; // no numeric score — see _patchGqResultScores
     return Math.round(typeof flagsScore !== 'undefined' ? flagsScore : 0);
   }
 
-  // Llamado desde quitToMenu cuando salgo de una partida versus en curso.
+  // Called from quitToMenu when I leave an in-progress versus match.
   window._vsAbandon = function() {
-    // Quien abandona pierde: registrar derrota en mi propio record.
-    // sbRecordVersusResult NO es idempotente (hace vs_losses+1 con read-modify-
-    // write), y también se llama desde _showVsResult('lose') — sin este guard,
-    // perder y después disparar quitToMenu con _vsActive aún vivo contaba la
-    // derrota dos veces.
+    // Whoever abandons loses: record a loss on my own record.
+    // sbRecordVersusResult is NOT idempotent (does vs_losses+1 with
+    // read-modify-write), and is also called from _showVsResult('lose') —
+    // without this guard, losing and then firing quitToMenu with _vsActive
+    // still alive counted the loss twice.
     if (!_matchResultRecorded && window._sbUserId && typeof window.sbRecordVersusResult === 'function') {
       _matchResultRecorded = true;
       window.sbRecordVersusResult(window._sbUserId, false).catch(() => {});
@@ -2053,24 +2046,23 @@ window.refreshVsSpectatorBadge = function (n) {
   function _showVsResult(outcome, myScore, oppScore, reason) {
     if (_resultShown) return;
     _resultShown = true;
-    // Apagar is_playing YA (no recién al volver al menú) — sin esto, el
-    // ícono de espectar en la celda de este jugador dentro del panel de
-    // amigos seguía visible/clickeable durante TODO el rato que se queda
-    // mirando su propia pantalla de resultado, aunque la partida ya haya
-    // terminado (matches.status también se adelanta acá abajo, con
-    // VS.finish() — mismo motivo, dos flags distintos que hay que apagar a
-    // la vez). Se llama en AMBOS clientes (no solo host): cada uno apaga su
-    // PROPIO is_playing, no el del rival.
+    // Turn off is_playing NOW (not only on returning to the menu) — without
+    // this, the spectate icon on this player's cell in the friends panel
+    // stayed visible/clickable for the WHOLE time they sit looking at their
+    // own result screen, even though the match already ended (matches.status
+    // is also advanced below, with VS.finish() — same reason, two different
+    // flags to turn off at once). Called on BOTH clients (not just host):
+    // each turns off its OWN is_playing, not the opponent's.
     if (typeof window._setPlaying === 'function') window._setPlaying(false);
-    // Avisar a un posible espectador el resultado final — antes esto no
-    // pasaba nunca (reportPostgame() estaba definida en vs.js pero nadie la
-    // llamaba para versus, ver comentario viejo ahí mismo), así que el
-    // espectador se quedaba con la última ronda congelada hasta que el host
-    // volvía al menú (recién ahí matches.status pasaba a 'finished' y el
-    // espectador cerraba la sesión con un mensaje genérico, sin ver nunca el
-    // resultado real). Se llama desde AMBOS clientes (host y guest, cada uno
-    // corre _showVsResult de forma independiente) — inofensivo, el
-    // espectador recibe el mismo resultado dos veces.
+    // Tell a possible spectator the final result — this never happened
+    // before (reportPostgame() was defined in vs.js but nobody called it for
+    // versus, see the old comment right there), so the spectator was left
+    // with the last round frozen until the host returned to the menu (only
+    // then did matches.status become 'finished' and the spectator closed the
+    // session with a generic message, never seeing the real result). Called
+    // from BOTH clients (host and guest, each runs _showVsResult
+    // independently) — harmless, the spectator receives the same result
+    // twice.
     if (window.VS && window.VS.getMatchId() && typeof window.VS.reportPostgame === 'function') {
       const isHost = window.VS.isHost();
       const myName   = localStorage.getItem('playerName')  || 'Jugador';
@@ -2087,17 +2079,17 @@ window.refreshVsSpectatorBadge = function (n) {
         guestScore:  isHost ? oppScore  : myScore,
         reason: reason || null,
       });
-      // Marcar la partida como terminada YA (no recién cuando el host vuelve
-      // al menú, que es cuando _vsReturnToMenu() llamaba a esto antes) — sin
-      // esto, un espectador podía seguir "entrando" a esta partida (matches.
-      // status seguía en 'active') durante todo el rato que el ganador se
-      // quedaba mirando su propia pantalla de resultado, viendo el mismo
-      // resultado ya decidido en vez de que se le niegue el acceso, como
-      // corresponde a una partida ya terminada. _endedByAbandon es false acá
-      // (si fuera abandono, quien abandonó ya escribió status='abandoned'
-      // directo — este código ni se llama en ese caso con _resultShown
-      // todavía false). isHost: mismo dueño que ya tenía el permiso de
-      // escritura en _vsReturnToMenu, no se duplica el criterio.
+      // Mark the match as finished NOW (not only when the host returns to the
+      // menu, which is when _vsReturnToMenu() used to call this) — without
+      // this, a spectator could keep "entering" this match (matches.status
+      // still 'active') for the whole time the winner sat looking at their
+      // own result screen, seeing the same already-decided result instead of
+      // being denied access, as befits an already-finished match.
+      // _endedByAbandon is false here (if it were an abandonment, whoever
+      // abandoned already wrote status='abandoned' directly — this code isn't
+      // even called in that case with _resultShown still false). isHost: same
+      // owner that already had write permission in _vsReturnToMenu, the
+      // criterion isn't duplicated.
       if (isHost && !_endedByAbandon && typeof window.VS.finish === 'function') {
         try { window.VS.finish(); } catch (e) {}
       }
@@ -2107,15 +2099,15 @@ window.refreshVsSpectatorBadge = function (n) {
      'shapes-countdown-widget','pregame-countdown','flags-pregame-countdown',
      'right-panel','flags-right-panel','timeup-overlay','flags-timeup-overlay',
      'speed-bonus-text','flags-speed-bonus-text','game-wrapper',
-     // País/intentos de GlobeQuiz: oculto por defecto, lo reactiva
-     // _patchGqResultExtra() solo cuando el modo es globequiz — así otros
-     // modos nunca arrastran texto viejo de un duelo anterior.
+     // GlobeQuiz country/attempts: hidden by default, re-enabled by
+     // _patchGqResultExtra() only when the mode is globequiz — so other
+     // modes never carry over stale text from a previous duel.
      'vs-result-gq-extra'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.style.display = 'none';
     });
-    // Registrar el resultado en mi propio record (las tablas no cuentan empates).
-    // Guard de idempotencia: ver comentario en _vsAbandon.
+    // Record the result on my own record (the tables don't count draws).
+    // Idempotency guard: see the comment in _vsAbandon.
     if (!_matchResultRecorded && (outcome === 'win' || outcome === 'lose') && window._sbUserId
         && typeof window.sbRecordVersusResult === 'function') {
       _matchResultRecorded = true;
@@ -2158,8 +2150,9 @@ window.refreshVsSpectatorBadge = function (n) {
     window._vsShowingResult = false;
     const screen = document.getElementById('vs-result-screen');
     if (screen) screen.style.display = 'none';
-    // Registrar el match como finalizado en la DB (solo partidas normales; el abandono
-    // ya quedó marcado por el que se fue). Antes de cleanup (que borra el matchId).
+    // Record the match as finished in the DB (normal matches only; an
+    // abandonment was already marked by whoever left). Before cleanup (which
+    // clears the matchId).
     if (!_endedByAbandon && window.VS && window.VS.isHost() && typeof window.VS.finish === 'function') {
       try { window.VS.finish(); } catch (e) {}
     }
@@ -2169,21 +2162,22 @@ window.refreshVsSpectatorBadge = function (n) {
     _endedByAbandon = false;
     _vsLaunching = false;
     if (window.VS && typeof window.VS.cleanup === 'function') window.VS.cleanup();
-    // Importante: limpiar el estado versus ANTES de quitToMenu, para que su guard de
-    // abandono (if window._vsActive) no se dispare (la partida ya terminó normal).
+    // Important: clear the versus state BEFORE quitToMenu, so its abandonment
+    // guard (if window._vsActive) doesn't fire (the match already ended
+    // normally).
     _teardownVsOpponent();
     _restoreRandom();
-    // Si el lobby del host quedó en 'active' por la cuenta regresiva que corrió mientras
-    // estaba en el versus, resetearlo a 'waiting' para que otros puedan unirse de nuevo.
+    // If the host's lobby was left 'active' by the countdown that ran while
+    // they were in the versus, reset it to 'waiting' so others can join again.
     try {
       const lid = window.LB?.getId?.();
       if (lid && window.LB?.isHost?.() && window.LB?.getLobby?.()?.status === 'active') {
         window.sb?.from('lobbies').update({ status: 'waiting', seed: null }).eq('id', lid).catch(() => {});
       }
     } catch (e) {}
-    // Volver al MENÚ PRINCIPAL (panel 1) con el flujo probado de quitToMenu, que resetea
-    // todos los paneles del loading. Antes usábamos showEntranceElementsStatic (panel 2),
-    // que dejaba el panel 1 y el 2 mezclados.
+    // Return to the MAIN MENU (panel 1) via the tested quitToMenu flow, which
+    // resets all the loading panels. We used to use showEntranceElementsStatic
+    // (panel 2), which left panels 1 and 2 mixed.
     if (typeof window.quitToMenu === 'function') {
       window.quitToMenu();
     } else if (typeof window.resetEntranceElements === 'function') {
@@ -2194,13 +2188,13 @@ window.refreshVsSpectatorBadge = function (n) {
     }
   }
 
-  // ── Resultado del duelo, versión espectador ─────────────────────────────────
-  // Reusa el mismo #vs-result-screen que ven los jugadores reales, pero en
-  // modo neutral (host vs guest, sin "vos"/"rival") y solo-lectura (el botón
-  // de volver al menú no debe reaccionar — cerraría/reiniciaría la sesión de
-  // ESTE cliente, no tiene sentido para un espectador). payload viene de
-  // _showVsResult() vía VS.reportPostgame(): {hostName, hostAvatar, hostScore,
-  // guestName, guestAvatar, guestScore, reason}.
+  // ── Duel result, spectator version ────────────────────────────────────────
+  // Reuses the same #vs-result-screen the real players see, but in neutral
+  // mode (host vs guest, no "you"/"opponent") and read-only (the return-to-
+  // menu button must not react — it would close/restart THIS client's
+  // session, which makes no sense for a spectator). payload comes from
+  // _showVsResult() via VS.reportPostgame(): {hostName, hostAvatar,
+  // hostScore, guestName, guestAvatar, guestScore, reason}.
   window.vsSpectatorShowResult = function (payload) {
     if (!payload) return;
     const screen = document.getElementById('vs-result-screen');
@@ -2211,7 +2205,7 @@ window.refreshVsSpectatorBadge = function (n) {
     const winnerName = outcome === 'host' ? (payload.hostName || 'Host') : (payload.guestName || 'Guest');
     const T = (k, d, vars) => (typeof t === 'function' ? t(k, vars) : d);
     if (title) {
-      title.className = 'vs-result-title win'; // color neutro (verde) — no hay "perdiste" para un espectador
+      title.className = 'vs-result-title win'; // neutral color (green) — there's no "you lost" for a spectator
       title.textContent = outcome === 'draw'
         ? T('vs.result.draw', '¡EMPATE!')
         : T('vs.result.spectatorWins', `¡GANA ${winnerName}!`, { name: winnerName });
@@ -2234,10 +2228,11 @@ window.refreshVsSpectatorBadge = function (n) {
     if (oppNameEl)  oppNameEl.textContent  = payload.guestName || 'Guest';
     if (oppPicEl)   oppPicEl.src           = payload.guestAvatar || 'images/profilepic/ppdefault.png';
     if (oppScoreEl) oppScoreEl.textContent = guestScore.toLocaleString();
-    // Mismo motivo que _showVsResult() real: sin esto, los countdown widgets
-    // (z-index:1000) quedaban DIBUJADOS ENCIMA del panel de resultado
-    // (.vs-popup-overlay, z-index:400) — el jugador real nunca lo nota porque
-    // su propio _showVsResult() ya los oculta, pero acá faltaba del todo.
+    // Same reason as the real _showVsResult(): without this, the countdown
+    // widgets (z-index:1000) were DRAWN ON TOP of the result panel
+    // (.vs-popup-overlay, z-index:400) — the real player never notices
+    // because their own _showVsResult() already hides them, but here it was
+    // missing entirely.
     ['score-display','countdown-widget','flags-score-display','flags-countdown-widget',
      'shapes-countdown-widget','pregame-countdown','flags-pregame-countdown',
      'right-panel','flags-right-panel','timeup-overlay','flags-timeup-overlay',
@@ -2245,12 +2240,12 @@ window.refreshVsSpectatorBadge = function (n) {
       const el = document.getElementById(id);
       if (el) el.style.display = 'none';
     });
-    // El botón de volver real dispara _vsReturnToMenu() (finaliza SU match,
-    // limpia estado VS de ESTE cliente) — no tiene sentido para un
-    // espectador. En vez de ocultarlo sin reemplazo (dejando al espectador
-    // sin forma de salir de esta pantalla, el "agregá un botón de volver"
-    // reportado), se reusa el mismo botón visual pero con closeSpectator()
-    // como acción — ver el guard al principio del listener real, más abajo.
+    // The real return button fires _vsReturnToMenu() (finishes ITS match,
+    // clears THIS client's VS state) — makes no sense for a spectator.
+    // Instead of hiding it with no replacement (leaving the spectator with
+    // no way out of this screen, the reported "add a back button"), the same
+    // visual button is reused but with closeSpectator() as its action — see
+    // the guard at the start of the real listener, below.
     const backBtn = document.getElementById('vs-result-back');
     if (backBtn) { backBtn.style.pointerEvents = ''; backBtn.style.visibility = ''; }
     if (screen) screen.style.display = 'flex';
@@ -2264,20 +2259,20 @@ window.refreshVsSpectatorBadge = function (n) {
     if (screen) screen.style.display = 'none';
   };
 
-  // ── Arrancar partida versus ───────────────────────────────────────────────
+  // ── Start versus match ────────────────────────────────────────────────────
 
-  // Espera hasta match.started_at (reloj de pared, seteado por accept() con
-  // START_DELAY_MS de margen) antes de arrancar de verdad — sin esto, cada
-  // cliente llamaba a _launchVersus() apenas SE ENTERABA de que la partida
-  // ya estaba activa, y el guest siempre se enteraba antes que el host (es
-  // su propia escritura vs. la notificación realtime de esa escritura
-  // llegándole al host, con latencia de red real de por medio) — arrancaban
-  // desincronizados, de milisegundos a veces hasta un segundo entero.
-  // Popup corto ("¡Duelo aceptado!") mostrado a AMBOS jugadores (host y
-  // guest) apenas se sabe que el duelo va a arrancar — llena visualmente el
-  // margen de START_DELAY_MS entre "el guest aceptó" y el 3-2-1 real, que
-  // antes se sentía como un salto directo/seco de "esperando respuesta" a la
-  // pantalla de juego sin ninguna confirmación de por medio.
+  // Waits until match.started_at (wall clock, set by accept() with a
+  // START_DELAY_MS margin) before actually starting — without this, each
+  // client called _launchVersus() as soon as it FOUND OUT the match was
+  // active, and the guest always found out before the host (its own write
+  // vs. the realtime notification of that write reaching the host, with
+  // real network latency in between) — they started desynced, from
+  // milliseconds to sometimes a whole second.
+  // Short popup ("Duel accepted!") shown to BOTH players (host and guest) as
+  // soon as the duel is known to be starting — visually fills the
+  // START_DELAY_MS margin between "the guest accepted" and the real 3-2-1,
+  // which used to feel like a blunt jump from "waiting for response" to the
+  // game screen with no confirmation in between.
   function _showDuelAcceptedPopup() {
     const pop = document.getElementById('vs-duel-accepted-popup');
     if (!pop) return;
@@ -2294,15 +2289,15 @@ window.refreshVsSpectatorBadge = function (n) {
   }
 
   function _scheduleVersusStart(match) {
-    if (_vsLaunching) return; // ya se programó/arrancó desde otro call site
+    if (_vsLaunching) return; // already scheduled/started from another call site
     _showDuelAcceptedPopup();
     const startedAtMs = match.started_at ? new Date(match.started_at).getTime() : Date.now();
     const delay = Math.max(0, startedAtMs - Date.now());
     if (delay <= 0) { _launchVersus(match); return; }
-    // Bloquea otros call sites mientras se espera, sin marcar _vsLaunching
-    // todavía (eso lo hace _launchVersus, recién cuando arranca de verdad) —
-    // un flag propio evita que dos triggers casi simultáneos (ej. el
-    // callback de onStart Y un resend tardío) agenden el setTimeout dos veces.
+    // Blocks other call sites while waiting, without marking _vsLaunching yet
+    // (_launchVersus does that, only when it actually starts) — an own flag
+    // prevents two near-simultaneous triggers (e.g. the onStart callback AND
+    // a late resend) from scheduling the setTimeout twice.
     if (_vsStartScheduled) return;
     _vsStartScheduled = true;
     setTimeout(() => { _vsStartScheduled = false; _launchVersus(match); }, delay);
@@ -2312,10 +2307,10 @@ window.refreshVsSpectatorBadge = function (n) {
     if (_vsLaunching) return;
     _vsLaunching = true;
     const mode = match.mode || 'flags';
-    // Garantiza que quitToMenu no llame a _lobbyAbandon (que haría LB.leave()) al volver
+    // Ensures quitToMenu doesn't call _lobbyAbandon (which would do LB.leave()) on return
     window._lobbyActive = false;
     const seed = match.seed;
-    // Cancelar la cuenta regresiva del lobby si estaba corriendo
+    // Cancel the lobby countdown if it was running
     if (window.Lobby?.cancelCountdown) window.Lobby.cancelCountdown();
     if (window.LB?.isHost?.() && window.LB.getId()) window.LB.sendCancel?.();
 
@@ -2324,7 +2319,7 @@ window.refreshVsSpectatorBadge = function (n) {
     window.pendingGameMode = mode;
     if (typeof window._setPlaying === 'function') window._setPlaying(true);
 
-    // Ocultar loading/versus/splash, dejar solo el juego
+    // Hide loading/versus/splash, leave only the game
     document.getElementById('loading-screen').style.display      = 'none';
     document.getElementById('loading-versus-group')?.classList.add('table-gone');
     document.getElementById('loading-versus-group')?.classList.remove('panel-visible');
@@ -2351,15 +2346,15 @@ window.refreshVsSpectatorBadge = function (n) {
     _setupVsOpponent(match);
 
     window.VS.onOppLeft(_onOpponentAbandoned);
-    // El rival avisó que SU cronómetro llegó a 0 (ver reportGameEnd) — si yo
-    // también ya terminé el mío, ahora sí se puede mostrar el resultado.
+    // The opponent announced THEIR timer hit 0 (see reportGameEnd) — if I've
+    // also finished mine, now the result can be shown.
     window.VS.onGameEnd(payload => {
       if (!payload || _resultShown) return;
       _oppGameEnded = true;
       _oppFinalScoreCache = payload.score || 0;
       if (payload.revealAt) _revealAt = payload.revealAt;
-      // Al rival se le acabó el tiempo (terminó su cronómetro) → temblor +
-      // cronómetro en su cartilla (mismo sistema que el flash de 'wrong').
+      // The opponent's time ran out (their timer ended) → shake + timer on
+      // their card (same system as the 'wrong' flash).
       if (mode === 'shapes') window.shapesTriggerOpponentTimesUp?.();
       else if (mode === 'cities') window.citiesTriggerOpponentTimesUp?.();
       else if (mode === 'monuments') window.monumentsTriggerOpponentTimesUp?.();
@@ -2367,7 +2362,7 @@ window.refreshVsSpectatorBadge = function (n) {
       _tryShowVsResultWhenBothDone();
     });
 
-    // Actualizar leaderboard del oponente según el modo
+    // Update the opponent's leaderboard per mode
     window.VS.onScore((hostScore, guestScore) => {
       const isHost   = window.VS.isHost();
       const oppScore = isHost ? guestScore : hostScore;
@@ -2378,14 +2373,14 @@ window.refreshVsSpectatorBadge = function (n) {
       } else if (mode === 'monuments') {
         window.monumentsSetVsOpponentScore?.(oppScore);
       } else if (mode === 'globequiz') {
-        // No-op — GlobeQuiz no tiene score numérico, el progreso del rival
-        // viaja por el broadcast 'answer' (ver VS.onAnswer más abajo).
+        // No-op — GlobeQuiz has no numeric score, the opponent's progress
+        // travels via the 'answer' broadcast (see VS.onAnswer below).
       } else {
         if (typeof window.flagsSetVsOpponentScore === 'function') window.flagsSetVsOpponentScore(oppScore);
       }
     });
 
-    // Flash rojo en leaderboard del rival cuando falla
+    // Red flash on the opponent's leaderboard when they miss
     window.VS.onWrong(() => {
       if (mode === 'shapes') {
         if (typeof window.shapesTriggerOpponentWrong === 'function') window.shapesTriggerOpponentWrong();
@@ -2394,24 +2389,24 @@ window.refreshVsSpectatorBadge = function (n) {
       } else if (mode === 'monuments') {
         window.monumentsTriggerOpponentWrong?.();
       } else if (mode === 'globequiz') {
-        // No-op — GlobeQuiz no tiene concepto de "wrong" con flash, solo
-        // guesses más cerca/lejos (ver VS.onAnswer).
+        // No-op — GlobeQuiz has no "wrong" concept with a flash, only guesses
+        // closer/farther (see VS.onAnswer).
       } else {
         if (typeof window.flagsTriggerOpponentWrong === 'function') window.flagsTriggerOpponentWrong();
       }
     });
 
-    // GlobeQuiz: progreso del rival (km/dir) y victoria instantánea — ver
-    // "GlobeQuiz: victoria instantánea" más arriba en este archivo.
+    // GlobeQuiz: opponent progress (km/dir) and instant win — see
+    // "GlobeQuiz: instant win" above in this file.
     if (mode === 'globequiz') {
       window.VS.onAnswer(payload => {
         if (!payload) return;
-        // El broadcast 'answer' vuelve también a quien lo mandó (eco del
-        // propio canal de Supabase Realtime) — sin este filtro, el que
-        // acababa de ganar recibía su PROPIO aviso de victoria como si fuera
-        // el rival, y terminaba viendo la pantalla de "perdiste"/timesup
-        // encima de su propio festejo (el reportado: "al ganador le sale lo
-        // de juego terminado como si fuera 1v1... y no el panel de ganaste").
+        // The 'answer' broadcast also comes back to whoever sent it (echo
+        // from the own Supabase Realtime channel) — without this filter, the
+        // one who just won received their OWN win notice as if it were the
+        // opponent's, and ended up seeing the "you lost"/timesup screen over
+        // their own celebration (the reported "the winner gets the
+        // game-over screen as if it were 1v1... and not the you-won panel").
         const myRole = window.VS.isHost() ? 'host' : 'guest';
         if (payload.role === myRole) return;
         if (payload.win) _handleGqOpponentWin(payload);
@@ -2424,7 +2419,7 @@ window.refreshVsSpectatorBadge = function (n) {
       _teardownVsOpponent();
     });
 
-    // Arrancar con RNG seeded → mismas preguntas para ambos
+    // Start with seeded RNG → same questions for both
     _startSeededRandom(seed, mode);
     if (mode === 'shapes') {
       if (typeof showShapesMode === 'function') showShapesMode();
@@ -2437,14 +2432,14 @@ window.refreshVsSpectatorBadge = function (n) {
       document.getElementById('globequiz-screen').style.display = 'block';
       if (typeof window.letterboxRefresh === 'function') window.letterboxRefresh();
       window.globequizVsPrepareOpponentRow?.();
-      // Registrado ANTES de initGlobeQuiz() (que dispara la carga async de
-      // three.js/GeoJSON) — ver _gqReadySetup, así el listener de 'ready' ya
-      // está enganchado sin importar quién termine de cargar primero.
+      // Registered BEFORE initGlobeQuiz() (which triggers the async load of
+      // three.js/GeoJSON) — see _gqReadySetup, so the 'ready' listener is
+      // already hooked regardless of who loads first.
       _gqReadySetup();
-      // El rival avisó que su globo 3D no cargó → los dos volvemos al menú.
+      // The opponent announced their 3D globe didn't load → both return to the menu.
       window.VS.onGqAbort(() => _handleGqSyncFailed(true));
-      // Panel de sincronización: barra + estado de cada lado + cuándo arranca
-      // (queda sobre la pantalla del juego que carga por detrás).
+      // Sync panel: bar + each side's status + when it starts (sits over the
+      // game screen loading behind it).
       _showGqSyncPanel();
       if (typeof window.initGlobeQuiz === 'function') window.initGlobeQuiz();
     } else {
@@ -2452,17 +2447,17 @@ window.refreshVsSpectatorBadge = function (n) {
     }
   }
 
-  // ── Escuchar invitaciones al loguear ─────────────────────────────────────
+  // ── Listen for invites on login ──────────────────────────────────────────
 
-  // Recuperación de un canal de duelo que nunca llegó a autorizarse (ver
-  // _onSubscribeError en la definición de window.VS más arriba) — registrado
-  // UNA sola vez por sesión, no por partida, porque el fallo puede darse en
-  // cualquier momento del flujo (esperando que el rival acepte, cargando el
-  // 3-2-1, ya jugando). quitToMenu() ya sabe hacer TODO lo necesario cuando
-  // window._vsActive es true (llama a _vsAbandon(), corre gameStoppers,
-  // vuelve al loading screen) — antes de esto, un CHANNEL_ERROR dejaba
-  // _vsLaunching/_vsActive trabados en true para siempre, sin cartel de
-  // error, bloqueando cualquier duelo nuevo hasta recargar la página a mano.
+  // Recovery of a duel channel that never got authorized (see
+  // _onSubscribeError in the window.VS definition above) — registered ONCE
+  // per session, not per match, because the failure can happen at any point
+  // in the flow (waiting for the opponent to accept, loading the 3-2-1,
+  // already playing). quitToMenu() already knows how to do EVERYTHING needed
+  // when window._vsActive is true (calls _vsAbandon(), runs gameStoppers,
+  // returns to the loading screen) — before this, a CHANNEL_ERROR left
+  // _vsLaunching/_vsActive stuck true forever, with no error message,
+  // blocking any new duel until manually reloading the page.
   window.VS.onSubscribeError(() => {
     if (typeof window.showVersusToast === 'function') {
       window.showVersusToast(T('vs.connectionFailed', 'No se pudo conectar al duelo, volviendo al menú'));
@@ -2484,10 +2479,10 @@ window.refreshVsSpectatorBadge = function (n) {
       m => {
         if (m && typeof window.removeVersusNotif === 'function') window.removeVersusNotif(m.id);
         if (typeof window.dismissInviteNotif === 'function') window.dismissInviteNotif();
-      } // host canceló / expiró
+      } // host cancelled / expired
     );
-    // Consulta inmediata de invitaciones pendientes que llegaron antes de conectar.
-    // Solo se muestra una vez por match (localStorage evita que reaparezca al recargar).
+    // Immediate query for pending invites that arrived before connecting.
+    // Only shown once per match (localStorage prevents it reappearing on reload).
     const uid = window._sbUserId;
     if (uid && window.sb) {
       window.sb.from('matches')
@@ -2499,7 +2494,7 @@ window.refreshVsSpectatorBadge = function (n) {
           const match = data[0];
           const seenKey = '_seenMatchInvite_' + uid;
           const seen = JSON.parse(localStorage.getItem(seenKey) || '[]');
-          if (seen.includes(match.id)) return; // ya se mostró antes
+          if (seen.includes(match.id)) return; // already shown before
           seen.unshift(match.id);
           localStorage.setItem(seenKey, JSON.stringify(seen.slice(0, 10)));
           _showIncomingPopup(match);
@@ -2507,7 +2502,7 @@ window.refreshVsSpectatorBadge = function (n) {
     }
   };
 
-  // Aceptar una invitación 1v1 directamente desde el inbox (sin pasar por el banner)
+  // Accept a 1v1 invite directly from the inbox (without going through the banner)
   window._vsAcceptFromInbox = async function(matchId) {
     try {
       await window.VS.accept(matchId);
@@ -2521,7 +2516,7 @@ window.refreshVsSpectatorBadge = function (n) {
     }
   };
 
-  // Exponer funciones para los modos de mapa (js/modes/)
+  // Expose functions for the map modes (js/modes/)
   window.showVersusPanel = showVersusPanel;
   window.hideVersusPanel = hideVersusPanel;
 })();

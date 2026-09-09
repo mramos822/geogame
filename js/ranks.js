@@ -1,7 +1,7 @@
 // ── RANKS ────────────────────────────────────────────────────────────────────
 
 const RANKS = [
-  // 0 – 11,999 (18 rangos, ~667 c/u)
+  // 0 – 11,999 (18 ranks, ~667 each)
   { min:     0, max:   935, name: 'Agorafóbico', desc: 'Parece que el mundo todavía te parece un lugar muy grande. ¡No te preocupes, con práctica irás perdiendo el miedo a explorarlo!', img: 'images/ranks/1.png'  },
   { min:   936, max:  1871, name: 'Explorador del Jardín', desc: 'Tu aventura geográfica está apenas comenzando. El mundo es grande, pero con cada paso que das lo vas conociendo un poco mejor.', img: 'images/ranks/2.png'  },
   { min:  1872, max:  2807, name: 'Colegial', desc: 'Estás aprendiendo los fundamentos del mundo. Con la misma dedicación que en el aula, pronto dominarás el mapa completo.', img: 'images/ranks/3.png'  },
@@ -21,7 +21,7 @@ const RANKS = [
   { min: 10672, max: 11338, name: 'Viajero', desc: 'Has recorrido el mundo en tu mente con una precisión envidiable. ¡Con este nivel, cada viaje que hagas será una aventura bien planificada!', img: 'images/ranks/17.png' },
   { min: 11339, max: 11999, name: 'Miembro de la alta sociedad', desc: 'Tu refinado conocimiento del mundo te abre puertas en cualquier círculo. Conversas de geografía con la misma soltura que de arte o moda.', img: 'images/ranks/18.png' },
 
-  // 12,000 – 24,999 (10 rangos, ~1300 c/u)
+  // 12,000 – 24,999 (10 ranks, ~1300 each)
   { min: 12000, max: 13299, name: 'Hombre del tiempo', desc: 'Conoces el mundo tan bien que podrías predecir dónde sopla el viento. ¡Tu sentido de orientación global es digno de cualquier pantalla de noticias!', img: 'images/ranks/19.png' },
   { min: 13300, max: 14599, name: 'Profesor de Geografía', desc: 'Tu dominio geográfico es tan sólido que podrías enseñarle al mundo. ¡Más de uno aprendería mucho sentándose en tu clase!', img: 'images/ranks/20.png' },
   { min: 14600, max: 15899, name: 'Explorador', desc: 'Tu curiosidad por el mundo no tiene límites. Como un verdadero explorador, siempre encuentras nuevos territorios que conquistar en el mapa.', img: 'images/ranks/21.png' },
@@ -33,12 +33,12 @@ const RANKS = [
   { min: 22400, max: 23699, name: 'Cartógrafo', desc: 'Podrías crear un mapa del mundo con solo tu memoria. ¡No hay muchas personas que puedan realizar eso!', img: 'images/ranks/27.png' },
   { min: 23700, max: 24999, name: 'Co-Piloto', desc: 'Estás a solo un paso del mando. Tu conocimiento geográfico ya es digno de los cielos, ¡sigue así y pronto liderarás la ruta!', img: 'images/ranks/28.png' },
 
-  // 25,000 – 39,999 (3 rangos, ~5000 c/u)
+  // 25,000 – 39,999 (3 ranks, ~5000 each)
   { min: 25000, max: 26499, name: 'Piloto de Aerolínea', desc: 'Los pilotos de aerolínea son extremadamente buenos viajeros con un excelente conocimiento del mundo alrededor de ellos, ¡Así como tú!', img: 'images/ranks/29.png' },
   { min: 26500, max: 27999, name: 'Escritor de Viajes', desc: 'Tu conocimiento del mundo sería suficiente para llenar páginas enteras. ¡Tendrías mucho que contar y el mundo estaría encantado de escucharte!', img: 'images/ranks/30.png' },
   { min: 28000, max: 39999, name: 'Corresponsal Extranjero', desc: 'Podrías ser alguien muy seguro de ti mismo para informar de eventos globales de cualquier país con tu conocimiento. Excelente trabajo.', img: 'images/ranks/31.png' },
 
-  // 40,000 – 79,999 (3 rangos, ~13333 c/u)
+  // 40,000 – 79,999 (3 ranks, ~13333 each)
   { min: 40000, max: 49999, name: 'Diplomático', desc: 'Con tu gran conocimiento de los países, podrías ser un excelente diplomático, capaz de identificarte con cualquiera en el mundo.', img: 'images/ranks/32.png' },
   { min: 50000, max: 59999, name: 'Embajador', desc: 'Tus conocimientos en geografía son un orgullo para tu país. ¡Estarías muy comodo trabajando en cualquier embajada en el mundo!', img: 'images/ranks/33.png' },
   { min: 60000, max: 79999, name: 'Gurú de la Geografía', desc: 'No hay muchas personas en el mundo que tengan un conocimiento global como el tuyo. ¡Deberías sentirte orgulloso!', img: 'images/ranks/34.png' },
@@ -47,7 +47,7 @@ const RANKS = [
   { min: 80000, max: Infinity, name: 'Superhumano', desc: '¡Tus habilidades en geografía están fuera de alcance! ¡Como si todo un atlas hubiera sido descargado directamente a tu cabeza!', img: 'images/ranks/35.png' },
 ];
 
-// Traducción al inglés (mismo índice que RANKS). El idioma sale de getLang() (i18n.js).
+// English translation (same index as RANKS). The language comes from getLang() (i18n.js).
 const RANKS_EN = [
   { name: 'Agoraphobe', desc: "It seems the world still feels like a very big place to you. Don't worry — with practice you'll lose your fear of exploring it!" },
   { name: 'Backyard Explorer', desc: 'Your geographic adventure is just beginning. The world is big, but with every step you take you get to know it a little better.' },
@@ -92,14 +92,14 @@ function getRank(totalScore) {
   return rankAt(idx);
 }
 
-// Índice del rango por puntaje (consistente con getRank). Útil para animaciones
-// que necesitan el índice (no comparar por identidad de objeto, que rompe en EN).
+// Rank index by score (consistent with getRank). Useful for animations that
+// need the index (don't compare by object identity, which breaks in EN).
 function rankIndex(totalScore) {
   const idx = RANKS.findIndex(r => totalScore >= r.min && totalScore <= r.max);
   return idx < 0 ? 0 : idx;
 }
 
-// Rango por índice, ya localizado al idioma actual.
+// Rank by index, already localized to the current language.
 function rankAt(idx) {
   const base = RANKS[idx] || RANKS[0];
   const lang = (typeof getLang === 'function') ? getLang() : 'es';

@@ -1,4 +1,4 @@
-// AUTO-GENERADO: lista de todos los assets para precargar antes de jugar.
+// AUTO-GENERATED: list of all assets to preload before playing.
 window.ASSET_MANIFEST = {
   images: [
     "images/back1.png",

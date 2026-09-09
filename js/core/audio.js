@@ -1,19 +1,17 @@
 // ============================================================================
-// core/audio.js — SFX, música en loop (HTML5 <audio> en PC, Web Audio en iOS), mute global
-// y detección de plataforma (IS_IOS / IS_MOBILE / IS_CHROME_IOS).
+// core/audio.js — SFX, looping music (HTML5 <audio> on PC, Web Audio on iOS),
+// global mute and platform detection (IS_IOS / IS_MOBILE / IS_CHROME_IOS).
 //
-// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
-// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
-// Son <script> clásicos que comparten un mismo scope global.
+// Classic <script>s sharing one global scope, loaded in order in play/index.html.
 // ============================================================================
 
 // ── SFX ───────────────────────────────────────────────────────────────────────
-// Solo check y postgame se necesitan en el splash — el resto se difiere al primer juego
+// Only check and postgame are needed on the splash — the rest is deferred to the first game
 const sfxCheck     = new Audio('sfx/check.mp3');
 const sfxPostgame  = new Audio('sfx/postgameloop.mp3');
 sfxPostgame.loop   = true;
-// Splash/pre-ronda (antes de jugar) — distinto de sfxPostgame (pantalla de
-// resultados); antes ambos reusaban postgameloop.mp3 para las dos cosas.
+// Splash/pre-round (before playing) — distinct from sfxPostgame (results screen);
+// both used to reuse postgameloop.mp3 for both.
 const sfxPregame   = new Audio('sfx/pregameloop.mp3');
 sfxPregame.loop    = true;
 const sfxGameMusic = new Audio('sfx/gamemusic.mp3');
@@ -47,34 +45,33 @@ const sfxSelect    = new Audio('sfx/select.mp3');
 if (localStorage.getItem('muted') === 'true') { sfxCheck.volume = 0; sfxPostgame.volume = 0; sfxPregame.volume = 0; sfxGameMusic.volume = 0; sfxMenuMusic.volume = 0; sfxSelect.volume = 0; }
 [sfxCheck, sfxSelect].forEach(sfx => { sfx.load(); });
 
-// ── MÚSICA EN LOOP: motor Web Audio SOLO en iOS ───────────────────────────────
-// En PC se usa el <audio loop> de siempre (camino intacto, sin riesgo). En iOS el
-// <audio loop> deja gaps al repetir, llega tarde o se congela; ahí decodificamos
-// el buffer una vez y lo reproducimos con AudioBufferSourceNode.loop (gapless).
+// ── LOOPING MUSIC: Web Audio engine on iOS ONLY ──────────────────────────────
+// PC uses the plain <audio loop> (untouched, no risk). On iOS <audio loop> leaves
+// gaps on repeat, lags, or freezes; there we decode the buffer once and play it
+// with AudioBufferSourceNode.loop (gapless).
 const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) ||
   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const IS_MOBILE = IS_IOS || navigator.maxTouchPoints > 1;
 if (IS_IOS)    document.body.classList.add('is-ios');
 if (IS_MOBILE) document.body.classList.add('is-mobile');
 
-// Chrome para iOS (token 'CriOS' en el UA) corre sobre el mismo WebKit que Safari,
-// pero es un build distinto de Apple/Google — un jugador reportó (Ver.3.5.41, iPhone
-// 13 Pro Max, 6GB, NO es un device viejo/débil) que el proceso de la pestaña crashea
-// ("Can't open this page") apenas en el 1er confirm de la 1ra partida, justo en
-// howtoVideo.play() — la primera decodificación de video de la sesión, sin nada
-// acumulado de antes (toda la investigación previa del crash de iOS, ver memoria
-// project_ios_crash_investigation, se probó siempre con Safari, nunca con Chrome-iOS).
-// Sin poder reproducirlo ni tener más dispositivos para probar, la mitigación más
-// segura es no depender del decoder de video para ESTE combo puntual: se muestra un
-// frame estático (poster) del tutorial en vez de reproducirlo — ver swapHowtoVideo y
-// el confirm handler (~confirmStep 0→1) más abajo en este archivo.
+// Chrome for iOS ('CriOS' in the UA) runs on the same WebKit as Safari but is a
+// different Apple/Google build — a player reported (Ver.3.5.41, iPhone 13 Pro
+// Max, 6GB, not an old/weak device) that the tab process crashes ("Can't open
+// this page") on the 1st confirm of the 1st game, right at howtoVideo.play() —
+// the session's first video decode, nothing accumulated before it (all prior
+// iOS-crash investigation, see project_ios_crash_investigation, was on Safari,
+// never Chrome-iOS). Unable to reproduce it or test on more devices, the safest
+// mitigation is not to depend on the video decoder for THIS combo: show a static
+// poster frame of the tutorial instead of playing it — see swapHowtoVideo and
+// the confirm handler (~confirmStep 0→1) below.
 const IS_CHROME_IOS = IS_IOS && /CriOS/i.test(navigator.userAgent);
 
 // ── VOLUME TOGGLE ─────────────────────────────────────────────────────────────
 let isMuted = localStorage.getItem('muted') === 'true';
 
-// En iOS, currentTime=0 puede resetear el estado muted. Siempre aplicar muted
-// justo antes de play() para garantizar que el estado persiste.
+// On iOS, currentTime=0 can reset the muted state. Always apply muted right
+// before play() so it persists.
 function sfxPlay(sfx) {
   sfx.muted = isMuted;
   try { sfx.volume = isMuted ? 0 : 1; } catch(e) {}
@@ -116,12 +113,12 @@ document.getElementById('vol-btn')?.addEventListener('click', () => {
   localStorage.setItem('muted', isMuted);
   const vol = isMuted ? 0 : 1;
   getAllSfx().forEach(sfx => { sfx.volume = vol; sfx.muted = isMuted; });
-  applyMusicMute(); // iOS: la música va por Web Audio (gain); en PC es no-op
+  applyMusicMute(); // iOS: music runs through Web Audio (gain); no-op on PC
   document.getElementById('vol-img').src = isMuted ? 'images/vol2.png' : 'images/vol1.png';
   const _a = new Audio('sfx/check.mp3'); _a.play();
 });
 
-// ── SFX de juego (lazy: se instancian en el primer juego) ─────────────────────
+// ── Game SFX (lazy: instantiated on the first game) ──────────────────────────
 let sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus, sfxTickdown, sfxTimesUp;
 
 function loadGameSFX() {
@@ -136,16 +133,16 @@ function loadGameSFX() {
   sfxTickdown  = new Audio('sfx/countdown.mp3');
   sfxTimesUp   = new Audio('sfx/timesup.mp3');
   if (isMuted) getAllSfx().forEach(sfx => { sfx.volume = 0; sfx.muted = true; });
-  // Forzar preload en iOS: sin .load() el primer play() dispara la descarga y decodificación
+  // Force preload on iOS: without .load() the first play() triggers download + decode
   [sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus, sfxTickdown, sfxTimesUp]
     .forEach(sfx => { sfx.load(); });
 }
 
-// Camino PC (y fallback): <audio> HTML de siempre. NO TOCAR.
+// PC path (and fallback): plain HTML <audio>. DO NOT TOUCH.
 function playMusicHTML(track) {
   [sfxPostgame, sfxPregame, sfxGameMusic, sfxMenuMusic].forEach(t => { if (t !== track) { t.pause(); t.currentTime = 0; } });
   if (!track) return;
-  // si el mismo track ya está sonando, dejarlo continuar (no reiniciar el loop)
+  // if the same track is already playing, let it continue (don't restart the loop)
   if (!track.paused && !track.ended) {
     const p = track.play();
     if (p) p.catch(() => {});
@@ -170,9 +167,9 @@ const _iosMusicURL = new Map([
 let _iosCtx    = null;
 const _iosBufs = new Map();   // url -> AudioBuffer
 let _iosGain   = null;
-let _iosNode   = null;        // AudioBufferSourceNode sonando
-let _iosToken  = null;        // track (HTMLAudio) que representa lo que suena
-let _iosWanted = null;        // último track pedido (decode es async)
+let _iosNode   = null;        // playing AudioBufferSourceNode
+let _iosToken  = null;        // track (HTMLAudio) representing what's playing
+let _iosWanted = null;        // last requested track (decode is async)
 
 function iosCtx() {
   if (_iosCtx) return _iosCtx;
@@ -230,17 +227,17 @@ function iosStartMusic(token, buf) {
 function playMusicIOS(track) {
   const ctx = iosCtx();
   if (!ctx || (track && !_iosMusicURL.has(track))) {
-    // sin Web Audio o track desconocido: caer al <audio> de siempre
+    // no Web Audio or unknown track: fall back to plain <audio>
     iosStopMusic();
     return playMusicHTML(track);
   }
   _iosWanted = track;
-  // que ningún <audio> de música suene en paralelo al motor
+  // keep any music <audio> from playing alongside the engine
   [sfxPostgame, sfxPregame, sfxGameMusic, sfxMenuMusic].forEach(t => t.pause());
   if (ctx.state === 'suspended') ctx.resume().catch(() => {});
 
-  if (!track) { iosStopMusic(); return; }                       // corte inmediato
-  if (_iosToken === track && _iosNode) { applyMusicMute(); return; } // ya suena: no reiniciar
+  if (!track) { iosStopMusic(); return; }                       // immediate stop
+  if (_iosToken === track && _iosNode) { applyMusicMute(); return; } // already playing: don't restart
 
   iosLoadBuf(_iosMusicURL.get(track)).then(buf => {
     if (_iosWanted !== track) return;
@@ -249,8 +246,8 @@ function playMusicIOS(track) {
   }).catch(() => playMusicHTML(track));
 }
 
-// Desbloqueo en iOS: reanudar el contexto y precargar/decodificar los loops en el
-// primer gesto, para que el primer playMusic sea instantáneo y no se quede mudo.
+// iOS unlock: resume the context and preload/decode the loops on the first
+// gesture, so the first playMusic is instant and not silent.
 if (IS_IOS) {
   const iosUnlock = () => {
     const ctx = iosCtx();

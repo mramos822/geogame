@@ -1,4 +1,4 @@
-// ── MODO BANDERAS ─────────────────────────────────────────────────────────────
+// ── FLAGS MODE ──────────────────────────────────────────────────────────────
 document.addEventListener('contextmenu', e => {
   if (e.target.closest('#flags-luggage-wrap')) e.preventDefault();
 });
@@ -26,10 +26,10 @@ flagsFindLuggage.addEventListener('dragstart', e => e.preventDefault());
 const flagsLuggageWrap   = document.getElementById('flags-luggage-wrap');
 flagsLuggageWrap.addEventListener('dragstart', e => e.preventDefault());
 
-// El maletín y sus banderas usan un sistema de coordenadas en px (offsets de los
-// grupos, clip-path: path(...) y matrix3d) que NO se puede expresar en vmin. Para
-// que escale con el viewport como el resto, se escala el wrap completo como unidad.
-// Factor = min(vw,vh)/911 → 1.0 en el viewport de referencia (9.11px por vmin).
+// The suitcase and its flags use a px coordinate system (group offsets, clip-path:
+// path(...) and matrix3d) that CANNOT be expressed in vmin. To scale with the
+// viewport like everything else, the whole wrap is scaled as a unit.
+// Factor = min(vw,vh)/911 → 1.0 at the reference viewport (9.11px per vmin).
 function flagsLuggageScale() {
   return Math.min(window.STAGE_W, window.STAGE_H) / 911;
 }
@@ -51,8 +51,8 @@ const flagsResultLabel   = document.getElementById('flags-result-label');
 
 let flagsTimerIntervalId = null;
 let flagsTimeLeft        = FLAGS_GAME_DURATION;
-// Fuente de verdad real del cronómetro (ver startFlagsTimer) — flagsTimeLeft
-// es solo el valor derivado que se muestra.
+// The timer's real source of truth (see startFlagsTimer) — flagsTimeLeft is
+// just the derived value that's displayed.
 let flagsTimerDuration   = FLAGS_GAME_DURATION;
 let flagsTimerStartedAt  = 0;
 let flagsScore           = 0;
@@ -69,12 +69,12 @@ const FLAGS_PREGAME_STEPS = [
 ];
 
 // ── SHOW / HIDE ───────────────────────────────────────────────────────────────
-// Pre-decodifica todas las banderas en background al entrar al modo.
-// No bloquea el main thread. concurrency más alto (16 en vez de 4) para el
-// espectador: a diferencia del jugador real (que llega acá después de rato
-// en el loading screen, con el manifest ya precargado de sobra), puede
-// entrar en cualquier momento — más streams en paralelo acorta la ventana en
-// la que las banderas de la ronda actual todavía no terminaron de bajar.
+// Pre-decodes all flags in the background on entering the mode.
+// Doesn't block the main thread. Higher concurrency (16 instead of 4) for the
+// spectator: unlike the real player (who arrives here after a while on the
+// loading screen, with the manifest already amply preloaded), they can enter
+// at any time — more parallel streams shortens the window in which the current
+// round's flags haven't finished downloading.
 function prewarmFlagTextures(concurrency) {
   const urls = Object.values(COUNTRY_FLAGS);
   let i = 0;
@@ -101,7 +101,7 @@ function showFlagsMode() {
   flagsWrapper.style.height    = gameCanvas.height + 'px';
   flagsWrapper.style.display   = 'block';
 
-  // Aplicar el mismo scale que redimensionarJuego calcula
+  // Apply the same scale redimensionarJuego computes
   const anchoVentana = window.STAGE_W;
   const altoVentana  = window.STAGE_H;
   const margenHorizontal = anchoVentana * 0.35;
@@ -130,32 +130,32 @@ function showFlagsMode() {
 
   if (typeof loadBadges !== 'undefined') loadBadges();
 
-  // Resetear el puntaje ANTES de la cuenta regresiva para que el widget no
-  // muestre el puntaje de la partida anterior durante el conteo.
+  // Reset the score BEFORE the countdown so the widget doesn't show the
+  // previous game's score during the count.
   flagsScore          = 0;
   flagsDisplayedScore = 0;
   flagsScoreEl.textContent = (((typeof window.campaignBase === 'function') ? window.campaignBase() : 0)).toLocaleString();
   flagsLastLbScore = -1;
 
-  // Refrescar amigos antes de armar la barra: si no se recarga acá, la lista
-  // queda con el cardCode/avatar de la última vez que se hizo login (o de la
-  // última vez que se abrió el panel social) — un amigo que cambió de carta
-  // recién en su sesión anterior se seguía viendo con la vieja acá.
+  // Refresh friends before building the bar: without reloading here, the list
+  // keeps the cardCode/avatar from the last login (or the last time the social
+  // panel was opened) — a friend who changed their card only in their previous
+  // session still showed the old one here.
   if (typeof loadFriends === 'function') loadFriends();
   initFlagsLeaderboard();
 
   if (typeof window._specReportPregame === 'function') {
-    // startedAt: para que un espectador que se une a mitad del 3-2-1 pueda
-    // calcular cuánto ya pasó y arrancar en el número correcto.
-    // mode:'flags' — hasta ahora "zafaba" sin este campo porque _mode en
-    // spectate.js arranca en 'flags' por default (siempre es el primer modo
-    // de la campaña), pero eso era casualidad de orden, no una garantía real
-    // — ver el mismo campo agregado en js/modes/mapgame-play.js (Cities), donde SÍ hacía
-    // falta de verdad.
-    // campaignBaseAtStart: el jugador real muestra este número desde el
-    // arranque del 3-2-1 (antes de cualquier respuesta) — el espectador no
-    // tiene forma propia de saberlo, así que viaja acá para poder arrancar
-    // el marcador en el valor correcto en vez de 0.
+    // startedAt: so a spectator joining mid 3-2-1 can compute how much passed
+    // and start at the right number.
+    // mode:'flags' — it "got away with" not having this field before because
+    // _mode in spectate.js starts at 'flags' by default (always the first
+    // campaign mode), but that was luck of ordering, not a real guarantee —
+    // see the same field added in js/modes/mapgame-play.js (Cities), where it
+    // was genuinely needed.
+    // campaignBaseAtStart: the real player shows this number from the start of
+    // the 3-2-1 (before any answer) — the spectator has no way of its own to
+    // know it, so it travels here to start the scoreboard at the right value
+    // instead of 0.
     window._specReportPregame({
       mode: 'flags',
       duration: flagsTimerEl.textContent,
@@ -194,7 +194,7 @@ function showFlagsMode() {
     flagsLastChosen = null;
     if (_flagsSyncedVersus()) flagsVsIndex = 0;
     if (window.practiceConfig && window.practiceConfig.active) {
-      // Reiniciar desbloqueos para que la primera ronda siempre empiece en inicio
+      // Reset unlocks so the first round always starts at inicio
       flagsEasyUnlocked = false; flagsMediumUnlocked = false;
       flagsHardUnlocked = false; flagsInsaneUnlocked = false;
       flagsCorrectCount = 0;
@@ -231,32 +231,32 @@ function showFlagsMode() {
   });
 }
 
-// ── MODO ESPECTADOR: la MISMA pantalla que ve el jugador ──────────────────────
-// En vez de un panelcito aparte, mostramos el #flags-wrapper real (máquina,
-// maletines, banderas) y lo manejamos a mano con los datos que llegan por
-// broadcast — nunca corre flagsRunning/flagsScore/el timer real, así que no
-// puede pisar el estado de una partida real si esta misma pestaña juega después.
+// ── SPECTATOR MODE: the SAME screen the player sees ─────────────────────────
+// Instead of a separate mini-panel, we show the real #flags-wrapper (machine,
+// suitcases, flags) and drive it by hand with the data arriving by broadcast —
+// it never runs flagsRunning/flagsScore/the real timer, so it can't overwrite
+// a real game's state if this same tab plays afterward.
 let _flagsSpecMode = false;
-// Igual mecanismo que shapes.js: la primera ronda tras entrar espera un margen
-// corto para confirmar si de verdad viene un pregame (llega poco después,
-// mismo orden real de broadcasts) — solo se usa para decidir CUÁNDO arrancar
-// sfxGameMusic (si hay pregame, lo arranca su propio onDone al terminar el
-// 3-2-1; si no, se confirma que es unión a mitad de ronda y arranca acá).
+// Same mechanism as shapes.js: the first round after entering waits a short
+// margin to confirm a pregame is really coming (arrives shortly after, same
+// real broadcast order) — only used to decide WHEN to start sfxGameMusic (if
+// there's a pregame, its own onDone starts it when the 3-2-1 ends; if not, a
+// mid-round join is confirmed and it starts here).
 let _flagsSpecIsFirstRound = true;
 let _flagsSpecPregameSeen  = false;
-// Gate contra el race de "3-2-1 local termina antes de que llegue el 'round'
-// real por la red" (y viceversa): revelar maletines/findluggage/flagid (ver
-// _flagsSpecRevealAfterPregame) solo puede pasar una vez que ambas cosas
-// pasaron — el countdown local terminó Y ya tenemos datos reales de la
-// ronda. _flagsSpecShowRound() sigue poblando el DOM (oculto) apenas llega
-// el broadcast sin importar el orden; el reveal lo dispara lo que llegue
-// SEGUNDO de las dos condiciones. Ambos arrancan en true (unión a mitad de
-// ronda, sin pregame de por medio, ya revelado por flagsSpectatorEnter) —
-// flagsSpectatorShowPregame los resetea a false al arrancar el 3-2-1.
+// Gate against the "local 3-2-1 ends before the real 'round' arrives over the
+// network" race (and vice versa): revealing suitcases/findluggage/flagid (see
+// _flagsSpecRevealAfterPregame) can only happen once both things happened — the
+// local countdown ended AND we have real round data. _flagsSpecShowRound()
+// keeps populating the DOM (hidden) as soon as the broadcast arrives regardless
+// of order; the reveal is triggered by whichever of the two conditions arrives
+// SECOND. Both start true (mid-round join, no pregame, already revealed by
+// flagsSpectatorEnter) — flagsSpectatorShowPregame resets them to false when
+// the 3-2-1 starts.
 let _flagsSpecCountdownDone = true;
 let _flagsSpecRevealed      = true;
-// true una vez que flagsSpectatorShowRound() populó el DOM (oculto o no) con
-// los datos del 'round' actual — se resetea a false al arrancar cada 3-2-1.
+// true once flagsSpectatorShowRound() populated the DOM (hidden or not) with
+// the current 'round' data — reset to false at the start of each 3-2-1.
 let _flagsSpecShowRoundApplied = true;
 let _flagsSpecEliminationTimeouts = [];
 function _flagsSpecClearElimination() {
@@ -264,12 +264,11 @@ function _flagsSpecClearElimination() {
   _flagsSpecEliminationTimeouts = [];
 }
 
-// Animación de subida del marcador — mismo mecanismo que flagsAnimateScore()
-// (arriba, jugador real): interpola _flagsSpecDisplayedScore hacia
-// _flagsSpecTargetScore en vez de saltar de golpe. _flagsSpecTargetScore YA
-// viene con campaignBase() sumado desde el broadcaster (ver
-// _specReportAnswer/_specReportPregame en el jugador real) — acá no hace
-// falta sumarlo de nuevo.
+// Scoreboard count-up animation — same mechanism as flagsAnimateScore()
+// (above, real player): interpolates _flagsSpecDisplayedScore toward
+// _flagsSpecTargetScore instead of jumping. _flagsSpecTargetScore ALREADY has
+// campaignBase() added by the broadcaster (see _specReportAnswer/
+// _specReportPregame in the real player) — no need to add it again here.
 let _flagsSpecTargetScore    = 0;
 let _flagsSpecDisplayedScore = 0;
 let _flagsSpecScoreRafId     = null;
@@ -297,24 +296,24 @@ window.flagsSpectatorEnter = function () {
   _flagsSpecCountdownDone = true;
   _flagsSpecRevealed = true;
   _flagsSpecShowRoundApplied = true;
-  // getModeCheckImg()/getModeWrongImg() (usadas en la pantalla de resultados)
-  // deciden la imagen según window.pendingGameMode — sin esto quedaba con lo
-  // último que jugó ESTA pestaña (o sin definir), y el postgame del espectador
-  // mostraba check3/wrong3 (el default) en vez de check1/wrong1 de banderas.
+  // getModeCheckImg()/getModeWrongImg() (used on the results screen) pick the
+  // image by window.pendingGameMode — without this it kept what THIS tab last
+  // played (or undefined), and the spectator postgame showed check3/wrong3
+  // (the default) instead of flags' check1/wrong1.
   window.pendingGameMode = 'flags';
-  // #loading-screen tiene z-index 200 (con fondo opaco) y #flags-wrapper tiene
-  // z-index 15 — si no se oculta el loading-screen (con el panel de amigos/menú
-  // que esté abierto en ese momento) queda tapando todo el juego por completo.
+  // #loading-screen has z-index 200 (opaque background) and #flags-wrapper has
+  // z-index 15 — if the loading-screen isn't hidden (with whatever
+  // friends/menu panel is open at that moment) it covers the whole game.
   const ls = document.getElementById('loading-screen');
   if (ls) ls.style.display = 'none';
-  // sfxError/sfxAcertar/etc. se inicializan recién/perezosamente acá (son
-  // `let` sin asignar hasta la primera partida real) — sin esto quedaban
-  // undefined y el chequeo typeof en flagsSpectatorResolvePick bloqueaba
-  // TODO el sonido en silencio, incluso el check que sí existe siempre.
+  // sfxError/sfxAcertar/etc. are lazily initialized here (they're `let`
+  // unassigned until the first real game) — without this they were undefined
+  // and the typeof check in flagsSpectatorResolvePick silently blocked ALL
+  // sound, even the check that always exists.
   if (typeof loadGameSFX === 'function') loadGameSFX();
-  // imgBadgeGold/etc. son Image() sin .src hasta acá (carga diferida) — sin
-  // esto getBadgeImg(streak) devuelve una imagen en blanco y drawImage no
-  // dibuja nada, sin tirar ningún error.
+  // imgBadgeGold/etc. are Image() with no .src until here (lazy load) —
+  // without this getBadgeImg(streak) returns a blank image and drawImage draws
+  // nothing, without throwing.
   if (typeof loadBadges === 'function') loadBadges();
   if (typeof prewarmFlagTextures === 'function') prewarmFlagTextures(16);
   flagsWrapper.style.display     = 'block';
@@ -324,36 +323,36 @@ window.flagsSpectatorEnter = function () {
   flagsMachine3b.style.display   = 'block';
   flagsLuggageWrap.style.display = 'block';
   flagsLuggageWrap.classList.remove('flags-game-ended', 'flags-six-mode');
-  // Espectador es solo-lectura: reusa la misma clase que usa el juego real al
-  // terminar la partida para apagar hover/cursor de los maletines (no hay
-  // click que hacer, no debe parecer clickeable).
+  // The spectator is read-only: reuses the same class the real game uses on
+  // game end to turn off suitcase hover/cursor (there's no click to make, it
+  // must not look clickable).
   flagsLuggageWrap.classList.add('flags-game-ended');
-  // mainRightPanel es el panel de Cities/Monuments, no de banderas — siempre va
-  // oculto acá. flagsRightPanel SÍ se muestra, pero con una sola tarjeta armada
-  // a mano (flagsSpectatorSetPlayerCard) con los datos del jugador REAL — el
-  // leaderboard normal (initFlagsLeaderboard) siempre agrega una tarjeta "vos"
-  // con tu propio perfil, que acá sería incorrecta.
+  // mainRightPanel is the Cities/Monuments panel, not flags' — always hidden
+  // here. flagsRightPanel IS shown, but with a single hand-built card
+  // (flagsSpectatorSetPlayerCard) with the REAL player's data — the normal
+  // leaderboard (initFlagsLeaderboard) always adds a "you" card with your own
+  // profile, which would be wrong here.
   mainRightPanel.style.display  = 'none';
   flagsRightPanel.style.display = 'flex';
   const specLb = document.getElementById('flags-leaderboard');
   if (specLb) specLb.innerHTML = '';
   flagsScoreDisplay.style.display = 'block';
-  // Placeholder hasta que llegue el primer dato real (pregame con
-  // campaignBaseAtStart, o un answer si es unión a mitad de ronda) —
-  // flagsSpectatorShowPregame/flagsSpectatorResolvePick lo corrigen.
+  // Placeholder until the first real data arrives (pregame with
+  // campaignBaseAtStart, or an answer if it's a mid-round join) —
+  // flagsSpectatorShowPregame/flagsSpectatorResolvePick correct it.
   _flagsSpecTargetScore = 0;
   _flagsSpecDisplayedScore = 0;
   flagsScoreEl.textContent = '0';
-  // Restos de siluetas si esta pestaña jugó/espectó eso antes en esta misma
-  // sesión sin pasar por shapesSpectatorExit — mismo caso que el findluggage
-  // de banderas colándose en siluetas, ahora al revés.
+  // Shapes leftovers if this tab played/spectated that earlier in this same
+  // session without going through shapesSpectatorExit — same case as flags'
+  // findluggage leaking into shapes, now in reverse.
   document.querySelectorAll('.shapes-tag').forEach(t => t.remove());
   document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
   document.querySelectorAll('.shapes-stage-el').forEach(el => { try { el.remove(); } catch (e) {} });
   document.getElementById('shapes-countdown-widget')?.remove();
-  // Por si esta pestaña ya jugó una partida real antes: hideIngameHud() deja
-  // este cartel con display:none pegado (ver bug del bonus de velocidad que
-  // no aparecía después de la primera partida).
+  // In case this tab already played a real game: hideIngameHud() leaves this
+  // sign stuck at display:none (see the speed-bonus bug where it didn't
+  // appear after the first game).
   flagsSpeedBonusText.style.display = '';
   const cw = document.getElementById('flags-countdown-widget');
   if (cw) cw.style.display = 'block';
@@ -361,17 +360,17 @@ window.flagsSpectatorEnter = function () {
   flagsTimerEl.style.color = '';
   flagsTimerImg.src = 'images/countdown2.png';
   flagsTimerImg.style.animationPlayState = 'running';
-  // findluggage-scroll es una animación 'forwards' (no infinite) — si el tab ya
-  // corrió una partida real antes, puede haber quedado con display:none o la
-  // clase 'scrolling' ya aplicada (que entonces NO reinicia sola). Reset limpio
-  // con reflow forzado, igual que hace showFlagsMode() con el jugador real.
-  // OJO: NO se muestran acá — recién con datos REALES de la ronda (en
-  // flagsSpectatorShowRound/ShowPregame). Antes esto los mostraba de una,
-  // con lo que hubiera quedado de src en los <img> de una sesión anterior de
-  // ESTA MISMA pestaña (o directamente vacío) — un instante de maletines con
-  // banderas viejas/vacías antes de que la ronda real del rival llegara por
-  // la red y recién ahí los reemplazara (el "flagid vacío y maletines con
-  // banderas random, el del medio sin nada" reportado).
+  // findluggage-scroll is a 'forwards' animation (not infinite) — if the tab
+  // already ran a real game, it may have been left at display:none or with the
+  // 'scrolling' class already applied (which then does NOT restart on its
+  // own). Clean reset with a forced reflow, like showFlagsMode() does for the
+  // real player. NOTE: they are NOT shown here — only with REAL round data (in
+  // flagsSpectatorShowRound/ShowPregame). This used to show them right away,
+  // with whatever src was left in the <img>s from an earlier session of THIS
+  // SAME tab (or just empty) — a moment of suitcases with old/empty flags
+  // before the rival's real round arrived over the network and only then
+  // replaced them (the reported "empty flagid and suitcases with random flags,
+  // the middle one empty").
   flagsFindLuggage.style.display = 'none';
   flagsFindLuggage.style.transition = '';
   flagsFindLuggage.style.animation  = 'none';
@@ -383,58 +382,57 @@ window.flagsSpectatorEnter = function () {
   [...flagsTopGroupIds, ...flagsBottomGroupIds].forEach(id => {
     const g = document.getElementById(id);
     if (!g) return;
-    g.style.pointerEvents = 'none'; // solo mira, no clickea
+    g.style.pointerEvents = 'none'; // just watches, no clicking
     g.classList.remove('flags-faded');
     g.style.opacity = '';
     g.style.transform  = '';
     g.style.transition = '';
     g.style.willChange = '';
-    // Limpiar cualquier bandera vieja de una sesión anterior de esta pestaña
-    // — sin esto, aunque el WRAPPER se ocultara, el <img> interno seguía con
-    // el src de la última bandera que esta pestaña haya mostrado alguna vez.
+    // Clear any old flag from a previous session of this tab — without this,
+    // even if the WRAPPER was hidden, the inner <img> kept the src of the last
+    // flag this tab ever showed.
     const imgId = flagsSlotImgIds[id];
     const img = imgId && document.getElementById(imgId);
     if (img) { img.src = ''; img.style.display = 'none'; }
   });
   flagsBottomGroupIds.forEach(id => { const g = document.getElementById(id); if (g) g.style.display = 'none'; });
-  // Trencito de puntos: arrancar limpio (si el tab jugó una partida real antes,
-  // podía quedar con puntos rellenos o a mitad de la animación de tren).
+  // Points train: start clean (if the tab played a real game before, it could
+  // be left with filled dots or mid train-animation).
   const dotsContainer = document.getElementById('flags-progress-dots');
   if (dotsContainer) {
     dotsContainer.classList.remove('train-animation', 'dots-fade-out');
     dotsContainer.querySelectorAll('.dot').forEach(d => d.classList.remove('filled'));
   }
-  // OJO: acá NO se arranca sfxGameMusic — Enter() corre mientras todavía se
-  // está mostrando la pantalla de carga del espectador, antes de saber si lo
-  // que sigue es un pregame (que debe sonar en silencio hasta el GO) o una
-  // ronda ya en curso. Se arranca recién en flagsSpectatorShowRound, en el
-  // punto exacto donde se confirma que no viene ningún pregame (unión a
-  // mitad de ronda) — "entrás a donde corresponde", no antes.
+  // NOTE: sfxGameMusic is NOT started here — Enter() runs while the spectator
+  // loading screen is still showing, before knowing whether what follows is a
+  // pregame (which must be silent until GO) or a round already in progress. It
+  // starts only in flagsSpectatorShowRound, at the exact point where no
+  // pregame is confirmed (mid-round join) — "you enter where you should", not
+  // before.
   if (typeof window.refreshIngamePower === 'function') window.refreshIngamePower();
 };
 
-// switchingMode=true: la campaña del espectado encadenó a OTRO modo (banderas
-// → siluetas/etc.) — solo hay que desmontar el DOM de banderas, sin tocar
-// _isSpectating ni mostrar el loading-screen (seguimos espectando, solo que
-// otro modo está por montarse encima en el mismo instante). Sin esto, cambiar
-// de modo cerraba la sesión entera de espectador a mitad de camino.
+// switchingMode=true: the spectated player's campaign chained to ANOTHER mode
+// (flags → shapes/etc.) — only the flags DOM needs tearing down, without
+// touching _isSpectating or showing the loading-screen (we're still
+// spectating, another mode is about to mount over it at the same instant).
+// Without this, switching modes closed the whole spectator session midway.
 window.flagsSpectatorExit = function (switchingMode) {
   _flagsSpecMode = false;
   if (!switchingMode) window._isSpectating = false;
-  // Filas extra del leaderboard (amigo/rival, ver flagsSpectatorSetPlayerCard)
-  // quedaban huérfanas en #flags-leaderboard si nadie las sacaba al cerrar —
-  // sin la del rival ni molestaba visualmente (el modo normal no la toca),
-  // pero con el "jugador terminó antes y entra de prestado a espectar al
-  // rival" (ver vs.js _enterWaitAsSpectator) el MISMO jugador vuelve a jugar
-  // otra partida después, y encontraba estas filas viejas todavía puestas.
+  // Extra leaderboard rows (friend/rival, see flagsSpectatorSetPlayerCard)
+  // were left orphaned in #flags-leaderboard if nobody removed them on close —
+  // the rival's one didn't even show visually (normal mode doesn't touch it),
+  // but with "player finished first and enters on loan to spectate the rival"
+  // (see vs.js _enterWaitAsSpectator) the SAME player plays another game after,
+  // and found these old rows still there.
   document.getElementById('flags-spec-lb-entry')?.remove();
   document.getElementById('flags-spec-lb-opp')?.remove();
-  // Igual que flagsHardReset() (el quit REAL): sin esto, el showStep() del
-  // 3-2-1 seguía corriendo solo en segundo plano (nunca se abortaba), y
-  // eventualmente llegaba a su onDone() — que arranca sfxGameMusic — PISANDO
-  // la música de menú que closeSpectator() ya había puesto momentos antes.
-  // También el beep del countdown (sfxCountdown) seguía sonando de fondo
-  // porque nada lo pausaba.
+  // Like flagsHardReset() (the REAL quit): without this, the 3-2-1's
+  // showStep() kept running in the background (never aborted), and eventually
+  // reached its onDone() — which starts sfxGameMusic — OVERWRITING the menu
+  // music closeSpectator() had just set. The countdown beep (sfxCountdown)
+  // also kept playing because nothing paused it.
   flagsAborted = true;
   clearTimeout(flagsPregameTimeout); flagsPregameTimeout = null;
   if (typeof sfxCountdown !== 'undefined') { try { sfxCountdown.pause(); sfxCountdown.currentTime = 0; } catch (e) {} }
@@ -448,15 +446,15 @@ window.flagsSpectatorExit = function (switchingMode) {
   if (flagsPregameEl) flagsPregameEl.style.display = 'none';
   flagsTimeupEl.style.display = 'none';
   flagsTimeupEl.classList.remove('timeup-in', 'timeup-out');
-  // window._vsShowingResult (ver _exitWaitAsSpectator en vs.js): este exit no
-  // es un espectador EXTERNO cerrando su sesión para volver al menú — es EL
-  // PROPIO JUGADOR que estaba mirando a su rival de prestado, a punto de ver
-  // SU PROPIO resultado del duelo. flagsHardReset() ya respeta esta misma
-  // bandera para no borrar los assets de fondo cuando el rival abandona
-  // (_onOpponentAbandoned) — sin el mismo respeto acá, el camino normal
-  // (ambos terminan su cronómetro) SÍ los borraba, dejando el overlay de
-  // resultado sobre un fondo vacío en vez del juego congelado detrás (el "se
-  // quitan los assets de fondo si pierdo" reportado).
+  // window._vsShowingResult (see _exitWaitAsSpectator in vs.js): this exit
+  // isn't an EXTERNAL spectator closing their session to return to the menu —
+  // it's THE PLAYER themselves who was watching their rival on loan, about to
+  // see THEIR OWN duel result. flagsHardReset() already respects this same
+  // flag to not delete the background assets when the rival abandons
+  // (_onOpponentAbandoned) — without the same respect here, the normal path
+  // (both finish their timer) DID delete them, leaving the result overlay over
+  // an empty background instead of the frozen game behind (the reported
+  // "background assets get removed if I lose").
   if (!window._vsShowingResult) {
     flagsWrapper.style.display     = 'none';
     flagsMachine.style.display     = 'none';
@@ -476,36 +474,36 @@ window.flagsSpectatorExit = function (switchingMode) {
     const ls = document.getElementById('loading-screen');
     if (ls) ls.style.display = 'flex';
   }
-  // Resetear TODO estado de animación dejado por la partida espectada — a
-  // diferencia de una partida real terminando (flagsHardReset), acá nunca se
-  // pasa por ese reset porque no es "mi" partida, así que si no se limpia acá
-  // explícitamente queda pegado (trencito con puntos rellenos, machine2
-  // pausada/desincronizada, countdown con el titileo negro trabado) cuando
-  // arranca la partida real siguiente.
+  // Reset ALL animation state left by the spectated game — unlike a real game
+  // ending (flagsHardReset), we never go through that reset here because it's
+  // not "my" game, so if it isn't explicitly cleared here it stays stuck
+  // (train with filled dots, machine2 paused/desynced, countdown with the black
+  // blink jammed) when the next real game starts.
   [flagsMachine, flagsMachine2, flagsMachine3, flagsMachine3b].forEach(m => {
     if (!m) return;
     m.style.animationPlayState = '';
     m.classList.remove('scrolling');
   });
-  // findluggage/machine son elementos SUELTOS (hermanos de #flags-wrapper, no
-  // hijos — ocultar flagsWrapper no los tapa) — sin este display:none acá
-  // quedaban visibles pisando el menú después de salir del espectador. Igual
-  // que arriba, si es window._vsShowingResult no corresponde ocultarlo: debe
-  // quedar congelado de fondo detrás del overlay de resultado.
+  // findluggage/machine are LOOSE elements (siblings of #flags-wrapper, not
+  // children — hiding flagsWrapper doesn't cover them) — without this
+  // display:none they stayed visible over the menu after exiting the
+  // spectator. As above, if window._vsShowingResult it shouldn't be hidden: it
+  // must stay frozen in the background behind the result overlay.
   if (!window._vsShowingResult) flagsFindLuggage.style.display = 'none';
   flagsFindLuggage.style.transition = '';
   flagsFindLuggage.style.animation  = '';
   flagsFindLuggage.style.transform  = '';
   flagsFindLuggage.classList.remove('scrolling');
-  // Maletines sueltos con transform/transition residual de un pick de ESTA
-  // sesión (ver flagsSpectatorResolvePick, que mueve el maletín elegido hacia
-  // findluggage con translate3d inline) — flagsSpectatorEnter() ya limpia
-  // esto al volver a entrar, pero se limpia también ACÁ, al salir, para no
-  // depender de ese orden: si en el futuro algo entra a una UI real sin pasar
-  // por flagsSpectatorEnter (ej. el switch de POV entre los dos amigos de un
-  // mismo versus, que reabre openSpectator con un friend distinto sobre la
-  // MISMA partida), el maletín no debe quedar animando hacia una posición de
-  // la SESIÓN ANTERIOR (el "posición de findluggage no coordinada" reportado).
+  // Loose suitcases with residual transform/transition from a pick of THIS
+  // session (see flagsSpectatorResolvePick, which moves the chosen suitcase
+  // toward findluggage with inline translate3d) — flagsSpectatorEnter() already
+  // cleans this on re-entry, but it's also cleaned HERE, on exit, so as not to
+  // depend on that order: if in the future something enters a real UI without
+  // going through flagsSpectatorEnter (e.g. the POV switch between the two
+  // friends of the same versus, which reopens openSpectator with a different
+  // friend on the SAME game), the suitcase must not keep animating toward a
+  // position from the PREVIOUS SESSION (the reported "findluggage position not
+  // coordinated").
   [...flagsTopGroupIds, ...flagsBottomGroupIds].forEach(id => {
     const g = document.getElementById(id);
     if (!g) return;
@@ -531,26 +529,26 @@ window.flagsSpectatorExit = function (switchingMode) {
   if (typeof window.refreshIngamePower === 'function') window.refreshIngamePower();
 };
 
-// Tarjeta única en el panel derecho con el jugador REAL espectado (nombre,
-// avatar, score) — reemplaza al leaderboard normal, que agregaría tu propia
-// tarjeta como si estuvieras jugando vos.
-// oppName/oppAvatar/oppScore: en versus, el rival del amigo espectado — ver
-// comentario largo en citiesSpectatorSetPlayerCard (mismo motivo/patrón).
+// Single card in the right panel with the spectated REAL player (name, avatar,
+// score) — replaces the normal leaderboard, which would add your own card as
+// if you were playing.
+// oppName/oppAvatar/oppScore: in versus, the spectated friend's rival — see
+// long comment in citiesSpectatorSetPlayerCard (same reason/pattern).
 window.flagsSpectatorSetPlayerCard = function (name, avatar, score, oppName, oppAvatar, oppScore, cardCode, oppCardCode) {
   if (!_flagsSpecMode) return;
   const lb = document.getElementById('flags-leaderboard');
   if (!lb) return;
-  // #flags-leaderboard no tiene contenido normal-flow (sus filas son
-  // position:absolute), así que sin un height explícito mide 0 — y como
-  // #flags-right-panel está anclado por `bottom`, con height:0 su propio
-  // origen queda pegado abajo de todo, empujando cualquier fila con top:0
-  // fuera de la pantalla. El leaderboard real siempre setea este height
-  // (flagsPositionLeaderboard) — acá alcanza con una fila.
+  // #flags-leaderboard has no normal-flow content (its rows are
+  // position:absolute), so without an explicit height it measures 0 — and
+  // since #flags-right-panel is anchored by `bottom`, with height:0 its origin
+  // sits at the very bottom, pushing any row at top:0 off screen. The real
+  // leaderboard always sets this height (flagsPositionLeaderboard) — here one
+  // row is enough.
   const rowH = getFlagsLbRowHeight();
   const showOpp = !!oppName;
-  // TOP_MARGIN: ver comentario largo en citiesSpectatorSetPlayerCard —
-  // #flags-leaderboard tiene el mismo clip-path:inset(0 -300px) que recorta
-  // el emote-bubble de wrongEffect si la fila de arriba está en top:0.
+  // TOP_MARGIN: see long comment in citiesSpectatorSetPlayerCard —
+  // #flags-leaderboard has the same clip-path:inset(0 -300px) that clips the
+  // wrongEffect emote-bubble if the top row is at top:0.
   const TOP_MARGIN = Math.round(rowH * 0.4);
   lb.style.height = (showOpp ? rowH * 2 + FLAGS_LB_GAP + TOP_MARGIN : rowH + TOP_MARGIN) + 'px';
   let el = document.getElementById('flags-spec-lb-entry');
@@ -589,21 +587,21 @@ window.flagsSpectatorSetPlayerCard = function (name, avatar, score, oppName, opp
     const oppAvatarEl = document.getElementById('flags-spec-lb-opp-avatar');
     if (oppAvatarEl && oppAvatar) oppAvatarEl.src = oppAvatar;
     document.getElementById('flags-spec-lb-opp-score').textContent = (oppScore || 0).toLocaleString();
-    // Reordenar según puesto — ver comentario largo en citiesSpectatorSetPlayerCard.
+    // Reorder by rank — see long comment in citiesSpectatorSetPlayerCard.
     const friendOnTop = (score || 0) >= (oppScore || 0);
     el.style.top    = (TOP_MARGIN + (friendOnTop ? 0 : rowH + FLAGS_LB_GAP)) + 'px';
     oppEl.style.top = (TOP_MARGIN + (friendOnTop ? rowH + FLAGS_LB_GAP : 0)) + 'px';
-    // Número de puesto (1°/2°) — mismo mecanismo que el leaderboard real
+    // Rank number (1st/2nd) — same mechanism as the real leaderboard
     // (positionLeaderboard: rankEl.textContent + className rank-1/rank-2).
-    // Faltaba del todo acá: el <span class="lb-rank"> quedaba siempre vacío
-    // con la clase genérica "rank-other" puesta en la creación, sin importar
-    // quién iba ganando. Y AUNQUE se le pusiera el texto, .lb-rank tiene
-    // display:none por defecto en el CSS — solo se muestra con la regla
-    // "#flags-leaderboard.vs-active .lb-rank", clase que agrega
-    // initLeaderboard() (bloqueada mientras se espectea, ver window._isSpectating
-    // ahí mismo) — así que en espectador NUNCA se activaba esa clase y el
-    // número quedaba invisible aunque el texto/clase estuvieran bien puestos.
-    // Se fuerza acá con display inline, sin depender de esa clase.
+    // Was missing entirely here: the <span class="lb-rank"> stayed empty with
+    // the generic "rank-other" class set on creation, regardless of who was
+    // winning. And EVEN if the text were set, .lb-rank is display:none by
+    // default in CSS — only shown by the rule
+    // "#flags-leaderboard.vs-active .lb-rank", a class initLeaderboard() adds
+    // (blocked while spectating, see window._isSpectating there) — so in
+    // spectator that class was NEVER activated and the number stayed invisible
+    // even with the text/class set right. Forced here with inline display,
+    // not depending on that class.
     const elRankEl  = el.querySelector('.lb-rank');
     const oppRankEl = oppEl.querySelector('.lb-rank');
     if (elRankEl)  { elRankEl.textContent  = friendOnTop ? '1' : '2'; elRankEl.className  = 'lb-rank ' + (friendOnTop ? 'rank-1' : 'rank-2'); elRankEl.style.display  = 'block'; }
@@ -622,15 +620,15 @@ window.flagsSpectatorWrongEffect = function (target) {
   el.style.animation = 'none'; void el.offsetWidth;
   el.style.animation = 'lb-wrong-flash 0.75s ease-out, lb-shake 0.45s ease-in-out';
   setTimeout(() => { el.style.animation = ''; }, 820);
-  // z-index elevado mientras dura el emote — ver comentario largo en citiesSpectatorWrongEffect (js/modes/cities-spectate.js).
+  // Raised z-index for the emote's duration — see long comment in citiesSpectatorWrongEffect (js/modes/cities-spectate.js).
   const prevZ = el.style.zIndex;
   el.style.zIndex = '50';
   setTimeout(() => { el.style.zIndex = prevZ; }, 1800);
   if (typeof spawnEmoteBubble === 'function') spawnEmoteBubble(el);
 };
 
-// "Se acabó el tiempo" en la cartilla del espectador 1v1 (amigo/rival) — mismo
-// mecanismo que flagsSpectatorWrongEffect pero con el cronómetro.
+// "Time's up" on the 1v1 spectator card (friend/rival) — same mechanism as
+// flagsSpectatorWrongEffect but with the stopwatch.
 window.flagsSpectatorTimesUpEffect = function (target) {
   if (!_flagsSpecMode) return;
   const el = document.getElementById(target === 'opponent' ? 'flags-spec-lb-opp' : 'flags-spec-lb-entry');
@@ -641,18 +639,17 @@ window.flagsSpectatorTimesUpEffect = function (target) {
   if (typeof window._applyTimesUpEffect === 'function') window._applyTimesUpEffect(el);
 };
 
-// dots = flagsDots del jugador real luego de sumar esta ronda — el "trencito"
-// de puntos y el bonus de +5s se derivan localmente del mismo umbral
-// (FLAGS_DOTS_NEEDED) que usa flagsAdvanceDot(), sin necesitar más datos.
+// dots = the real player's flagsDots after adding this round — the points
+// "train" and the +5s bonus are derived locally from the same threshold
+// (FLAGS_DOTS_NEEDED) flagsAdvanceDot() uses, with no extra data needed.
 let _flagsSpecDots = 0;
 window.flagsSpectatorAdvanceDot = function (dots) {
   if (!_flagsSpecMode) return;
-  // Último valor conocido — el reset de más abajo lo relee EN VIVO acá (no el
-  // "dots" capturado por closure en el momento en que se armó el setTimeout).
-  // Sin esto, si llegaba un punto nuevo MIENTRAS corría la animación del
-  // trencito completo (2.5s), el reset lo pisaba con el valor viejo y ese
-  // punto se perdía visualmente — flagsAdvanceDot() real relee flagsDots en
-  // vivo por la misma razón.
+  // Last known value — the reset below re-reads it LIVE here (not the "dots"
+  // captured by closure when the setTimeout was set). Without this, if a new
+  // dot arrived WHILE the full train animation was running (2.5s), the reset
+  // overwrote it with the old value and that dot was lost visually — the real
+  // flagsAdvanceDot() re-reads flagsDots live for the same reason.
   _flagsSpecDots = dots;
   const container = document.getElementById('flags-progress-dots');
   if (!container) return;
@@ -660,10 +657,10 @@ window.flagsSpectatorAdvanceDot = function (dots) {
   if (dots >= FLAGS_DOTS_NEEDED && !container.classList.contains('train-animation')) {
     container.classList.add('train-animation');
     if (typeof playTimeBonus === 'function') playTimeBonus(document.getElementById('flags-time-bonus'), FLAGS_BONUS_TIME);
-    // Mismo flash verde que hace flagsAdvanceDot() real en el número del
-    // cronómetro al ganar el bonus de +tiempo — faltaba acá del todo, el
-    // trencito/popup de "+5s" se veían pero el número nunca cambiaba de
-    // color, a diferencia de lo que ve el jugador real.
+    // Same green flash the real flagsAdvanceDot() does on the timer number
+    // when earning the +time bonus — was missing here entirely, the
+    // train/"+5s" popup showed but the number never changed color, unlike what
+    // the real player sees.
     const origColor = flagsTimerEl.style.color;
     flagsTimerEl.style.color = '#00ff88';
     setTimeout(() => {
@@ -674,9 +671,9 @@ window.flagsSpectatorAdvanceDot = function (dots) {
         container.classList.remove('train-animation', 'dots-fade-out');
         const finalDots = Math.max(0, _flagsSpecDots - FLAGS_DOTS_NEEDED);
         container.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('filled', i < finalDots));
-        // _flagsSpecLastTick: último timeLeft real conocido (ver
-        // flagsSpectatorUpdateTimer) — decide si vuelve a blanco (últimos
-        // 10s) o al color original, igual que el jugador real.
+        // _flagsSpecLastTick: last known real timeLeft (see
+        // flagsSpectatorUpdateTimer) — decides whether it goes back to white
+        // (last 10s) or the original color, like the real player.
         if (_flagsSpecLastTick != null && _flagsSpecLastTick > 0 && _flagsSpecLastTick <= 10) {
           flagsTimerEl.style.color = '#ffffff';
         } else {
@@ -687,11 +684,11 @@ window.flagsSpectatorAdvanceDot = function (dots) {
   }
 };
 
-// Se acabó el tiempo de esta ronda de juego — mismo cartel "TIME'S UP" que ve
-// el jugador real (reusa #flags-timeup-overlay), con su sonido y cortando la
-// música. A diferencia de endFlagsGame() del jugador real, NO llama a
-// hideFlagsMode() — el espectador se queda esperando la próxima ronda (si
-// sigue en banderas) o el fin real de la partida/sesión (onEnd).
+// Time's up for this game round — the same "TIME'S UP" sign the real player
+// sees (reuses #flags-timeup-overlay), with its sound and cutting the music.
+// Unlike the real player's endFlagsGame(), it does NOT call hideFlagsMode() —
+// the spectator waits for the next round (if still in flags) or the real end
+// of the game/session (onEnd).
 let _flagsSpecTimesUpTimeout1 = null, _flagsSpecTimesUpTimeout2 = null;
 window.flagsSpectatorShowTimesUp = function () {
   if (!_flagsSpecMode) return;
@@ -699,8 +696,8 @@ window.flagsSpectatorShowTimesUp = function () {
   clearTimeout(_flagsSpecTimesUpTimeout2);
   if (typeof playMusic === 'function') playMusic(null);
   if (typeof sfxTimesUp !== 'undefined' && typeof sfxPlay === 'function') { sfxTimesUp.currentTime = 0; sfxPlay(sfxTimesUp); }
-  // Mismo paso que endFlagsGame() del jugador real: parar el titileo rojo/negro
-  // del countdown — sin esto sigue parpadeando de fondo detrás del overlay.
+  // Same step as the real player's endFlagsGame(): stop the countdown's
+  // red/black blink — without this it keeps blinking behind the overlay.
   if (flagsTimerImg) flagsTimerImg.style.animationPlayState = 'paused';
   flagsTimeupEl.classList.remove('timeup-out');
   flagsTimeupEl.classList.add('timeup-in');
@@ -717,24 +714,24 @@ window.flagsSpectatorShowTimesUp = function () {
   }, 1800);
 };
 
-// Cuenta 3-2-1 antes de la ronda: reusa el 100% de la animación real
-// (runFlagsPregame ya vive en este mismo archivo, sin nada que dependa de
-// "mi" partida) — el espectador ve exactamente el mismo conteo que el
-// jugador, con su mismo sonido. onDone vacío: el primer 'round' que llegue
-// después ya se encarga de mostrar la ronda real.
+// 3-2-1 count before the round: reuses 100% of the real animation
+// (runFlagsPregame already lives in this file, with nothing that depends on
+// "my" game) — the spectator sees exactly the same count as the player, with
+// the same sound. Empty onDone: the first 'round' that arrives after handles
+// showing the real round.
 window.flagsSpectatorShowPregame = function (payload) {
   if (!_flagsSpecMode) return;
-  // Sincrónico, apenas llega el broadcast — lo usa el timer de "fallback" de
-  // flagsSpectatorShowRound para decidir si de verdad hay un 3-2-1 en curso
-  // o si nadie va a mandar un pregame (unión a mitad de ronda).
+  // Synchronous, as soon as the broadcast arrives — used by
+  // flagsSpectatorShowRound's "fallback" timer to decide whether a 3-2-1 is
+  // really running or nobody will send a pregame (mid-round join).
   _flagsSpecPregameSeen = true;
   _flagsSpecCountdownDone = false;
   _flagsSpecRevealed = false;
   _flagsSpecShowRoundApplied = false;
   window.flagsSpectatorHidePostgame();
-  // Igual que showFlagsMode() del jugador real justo antes de runFlagsPregame:
-  // maletines/findluggage/flagid ocultos hasta que termine la cuenta — antes
-  // quedaban visibles (vacíos) de la ronda anterior durante todo el 3-2-1.
+  // Like the real player's showFlagsMode() right before runFlagsPregame:
+  // suitcases/findluggage/flagid hidden until the count ends — they used to
+  // stay visible (empty) from the previous round through the whole 3-2-1.
   flagsFindLuggage.style.display = 'none';
   flagsLuggageWrap.style.display = 'none';
   flagsFlagidWrap.style.display  = 'none';
@@ -745,45 +742,45 @@ window.flagsSpectatorShowPregame = function (payload) {
   flagsTimerEl.style.color = '';
   flagsTimerImg.src = 'images/countdown2.png';
   flagsTimerImg.style.animationPlayState = 'paused';
-  // Igual que showFlagsMode() real (línea justo antes de runFlagsPregame): sin
-  // música durante el 3-2-1, solo el beep del countdown.
+  // Like real showFlagsMode() (line just before runFlagsPregame): no music
+  // during the 3-2-1, only the countdown beep.
   if (typeof playMusic === 'function') playMusic(null);
-  // El jugador real ya muestra su puntaje acumulado de campaña desde el
-  // arranque del 3-2-1 (no arranca en 0 salvo que sea el primer modo) — acá
-  // sin animación, es el estado base antes de la primera respuesta.
+  // The real player already shows their accumulated campaign score from the
+  // start of the 3-2-1 (doesn't start at 0 unless it's the first mode) — here
+  // without animation, the base state before the first answer.
   if (payload && typeof payload.campaignBaseAtStart === 'number') {
     _flagsSpecTargetScore = payload.campaignBaseAtStart;
     _flagsSpecDisplayedScore = payload.campaignBaseAtStart;
     flagsScoreEl.textContent = payload.campaignBaseAtStart.toLocaleString();
   }
-  // flagsSpectatorEnter() arranca este scroll de una (para el caso de unirse a
-  // mitad de una ronda ya en curso, sin pregame) — durante el 3-2-1 real la
-  // máquina de identificación NO se mueve todavía, recién en el onDone. Sin
-  // este freno acá, la máquina se veía moviéndose desde el arranque.
+  // flagsSpectatorEnter() starts this scroll immediately (for the case of
+  // joining mid-round already in progress, with no pregame) — during the real
+  // 3-2-1 the ID machine does NOT move yet, only in onDone. Without this
+  // brake, the machine was seen moving from the start.
   flagsMachine3.classList.remove('scrolling');
   flagsMachine3b.classList.remove('scrolling');
-  // Si el espectador se unió a mitad del 3-2-1 (p.ej. el jugador real ya va
-  // por el "1"), payload.startedAt permite calcular cuánto ya pasó y
-  // arrancar ahí mismo (número Y audio), en vez de mostrar siempre "3".
+  // If the spectator joined mid 3-2-1 (e.g. the real player is already on
+  // "1"), payload.startedAt lets us compute how much passed and start right
+  // there (number AND audio), instead of always showing "3".
   let elapsedMs = (payload && typeof payload.startedAt === 'number') ? (Date.now() - payload.startedAt) : 0;
-  // Salvaguarda contra desfasaje de reloj entre la máquina del jugador real y
-  // la de este cliente (Date.now() no está garantizado sincronizado entre dos
-  // computadoras distintas) o contra el resend tardío empujando el cálculo
-  // más allá de la duración total del 3-2-1 — sin este clamp, un elapsedMs
-  // inflado hacía que runFlagsPregame saltara DIRECTO a onDone sin mostrar
-  // nada del conteo (mismo fix aplicado en shapes.js).
+  // Safeguard against clock skew between the real player's machine and this
+  // client's (Date.now() isn't guaranteed synced between two different
+  // computers) or against a late resend pushing the calc past the total 3-2-1
+  // duration — without this clamp, an inflated elapsedMs made runFlagsPregame
+  // jump STRAIGHT to onDone showing none of the count (same fix applied in
+  // shapes.js).
   const _pregameTotalMs = FLAGS_PREGAME_STEPS.reduce((s, x) => s + x.hold, 0);
   if (elapsedMs > _pregameTotalMs - 400) elapsedMs = Math.max(0, _pregameTotalMs - 400);
   runFlagsPregame(() => {
     _flagsSpecCountdownDone = true;
     // _flagsSpecShowRoundApplied (seteado dentro de flagsSpectatorShowRound)
-    // dice si el 'round' real ya llegó y populó el DOM (oculto) mientras
-    // corría este 3-2-1 — caso normal, con margen de sobra. Si todavía no
-    // llegó (latencia/resend justo al filo), NO se revela nada acá: hacerlo
-    // mostraría los maletines vacíos o con la bandera de la ronda VIEJA.
-    // flagsSpectatorShowRound() revela apenas llegue el dato real (mismo
-    // chequeo de _flagsSpecCountdownDone+_flagsSpecRevealed al final de esa
-    // función).
+    // says whether the real 'round' already arrived and populated the DOM
+    // (hidden) while this 3-2-1 was running — normal case, with plenty of
+    // margin. If it hasn't arrived yet (latency/resend right at the edge),
+    // NOTHING is revealed here: doing so would show empty suitcases or the OLD
+    // round's flags. flagsSpectatorShowRound() reveals as soon as the real
+    // data arrives (same _flagsSpecCountdownDone+_flagsSpecRevealed check at
+    // the end of that function).
     if (!_flagsSpecRevealed && _flagsSpecShowRoundApplied) {
       _flagsSpecRevealAfterPregame();
       _flagsSpecRevealed = true;
@@ -791,33 +788,33 @@ window.flagsSpectatorShowPregame = function (payload) {
   }, elapsedMs);
 };
 
-// Datos de la eliminación progresiva pendientes de programar — se guardan acá
-// en vez de armarse el setTimeout directo en flagsSpectatorShowRound(), que
-// puede correr mientras el 3-2-1 local TODAVÍA está en pantalla (los datos ya
-// llegaron pero la ronda sigue oculta detrás del conteo). Si se programaran
-// ahí, el fade quedaría corriendo "en el fondo" antes de que el espectador
-// viera nada, desincronizado del jugador real — se arma recién en
-// _flagsSpecRevealAfterPregame(), relativo al momento en que la ronda
-// REALMENTE se hace visible, no a cuándo llegó el broadcast.
+// Progressive-elimination data pending scheduling — stored here instead of
+// building the setTimeout directly in flagsSpectatorShowRound(), which can run
+// while the local 3-2-1 is STILL on screen (data arrived but the round is
+// still hidden behind the count). Scheduling it there would leave the fade
+// running "in the background" before the spectator saw anything, desynced from
+// the real player — it's built only in _flagsSpecRevealAfterPregame(),
+// relative to the moment the round ACTUALLY becomes visible, not to when the
+// broadcast arrived.
 let _flagsSpecPendingElimination = null; // { slotCount, order }
 
-// Reveal compartido: muestra maletines/findluggage/flagid, arranca música y
-// programa la eliminación progresiva — lo dispara flagsSpectatorShowRound()
-// la primera vez que hay datos reales para mostrar después de un 3-2-1 (ver
-// gate de _flagsSpecCountdownDone).
+// Shared reveal: shows suitcases/findluggage/flagid, starts music and
+// schedules progressive elimination — triggered by flagsSpectatorShowRound()
+// the first time there's real data to show after a 3-2-1 (see the
+// _flagsSpecCountdownDone gate).
 function _flagsSpecRevealAfterPregame() {
   if (typeof window._hideVsWaitSpinner === 'function') window._hideVsWaitSpinner();
-  // Cuánto tiempo REAL ya pasó desde que la ronda arrancó de verdad (unión a
-  // mitad de ronda: _enterWaitAsSpectator, una reconexión, o el snapshot
-  // inicial de openSpectator con host_state/guest_state ya en curso) — sin
-  // esto, findluggage SIEMPRE arrancaba su recorrido desde el frame 0 (el
-  // inicio) sin importar cuánto ya llevaba recorrido el del jugador real,
-  // aunque la eliminación progresiva de más abajo SÍ tenga en cuenta este
-  // mismo roundStartedAt — quedaban desincronizados entre sí (el "findluggage
-  // no está en el lugar correcto, siempre aparece en el inicio" reportado).
-  // Un animation-delay NEGATIVO salta la animación directo a ese punto en vez
-  // de reiniciarla desde el principio (mismo truco que ya usa
-  // flagsSpectatorShowPregame con el 3-2-1, ver elapsedMs ahí).
+  // How much REAL time already passed since the round really started
+  // (mid-round join: _enterWaitAsSpectator, a reconnection, or openSpectator's
+  // initial snapshot with host_state/guest_state already in progress) —
+  // without this, findluggage ALWAYS started its travel from frame 0 (the
+  // start) regardless of how far the real player's had traveled, even though
+  // the progressive elimination below DOES account for this same
+  // roundStartedAt — they were desynced from each other (the reported
+  // "findluggage isn't in the right place, always appears at the start").
+  // A NEGATIVE animation-delay skips the animation straight to that point
+  // instead of restarting it from the beginning (same trick
+  // flagsSpectatorShowPregame already uses with the 3-2-1, see elapsedMs there).
   const _roundStartedAt = _flagsSpecPendingElimination && _flagsSpecPendingElimination.roundStartedAt;
   const _elapsedMs = _roundStartedAt ? Math.min(FLAGS_ROUND_TIME * 1000, Math.max(0, Date.now() - _roundStartedAt)) : 0;
   const _seekDelay = _elapsedMs ? `-${_elapsedMs}ms` : '';
@@ -841,15 +838,15 @@ function _flagsSpecRevealAfterPregame() {
       if (g) g.classList.add('flags-faded');
     };
     const roundMs = FLAGS_ROUND_TIME * 1000;
-    // Cuánto tiempo REAL ya pasó desde que la ronda arrancó de verdad (ver
-    // roundStartedAt en _specReportRound, flags.js) — si el espectador se
-    // conectó a mitad de ronda (ej. _enterWaitAsSpectator, o una
-    // reconexión), esto puede ser varios segundos, no cero. Cada umbral de
-    // eliminación que YA pasó se aplica DE UNA (sin esperar el setTimeout);
-    // los que faltan se agendan con el tiempo restante real, no el completo.
-    // Antes esto siempre agendaba desde 0, mostrando las 6 opciones intactas
-    // aunque el jugador real ya tuviera solo 2 (el "cuando yo veo 6, mi rival
-    // en verdad tiene 2" reportado).
+    // How much REAL time already passed since the round really started (see
+    // roundStartedAt in _specReportRound, flags.js) — if the spectator joined
+    // mid-round (e.g. _enterWaitAsSpectator, or a reconnection), this can be
+    // several seconds, not zero. Every elimination threshold that ALREADY
+    // passed is applied IMMEDIATELY (no setTimeout); the remaining ones are
+    // scheduled with the real time left, not the full time. This used to
+    // always schedule from 0, showing all 6 options intact even though the
+    // real player already had only 2 (the reported "when I see 6, my rival
+    // actually has 2").
     const elapsed = Math.max(0, Date.now() - roundStartedAt);
     const scheduleFade = (thresholdMs, slots) => {
       if (elapsed >= thresholdMs) { slots.forEach(fadeSlot); return; }
@@ -863,28 +860,27 @@ function _flagsSpecRevealAfterPregame() {
   }
 }
 
-// Pantalla de resultados (solo el camino solo/campaña de hideFlagsMode() —
-// versus tiene su propia pantalla W/L, no cubierta acá todavía). Solo-lectura:
-// pointer-events:none + confirm1/confirm2 ocultos, porque el espectador no
-// puede avanzar la campaña REAL del jugador espectado con ese mismo botón.
+// Results screen (solo/campaign path of hideFlagsMode() only — versus has its
+// own W/L screen, not covered here yet). Read-only: pointer-events:none +
+// confirm1/confirm2 hidden, because the spectator can't advance the spectated
+// player's REAL campaign with that button.
 window.flagsSpectatorShowPostgame = function (payload) {
   if (!_flagsSpecMode) return;
   const gameoverScreen = document.getElementById('gameover-screen');
   if (!gameoverScreen) return;
-  // Igual que hideFlagsMode() real: el countdown no tiene sentido acá.
+  // Like real hideFlagsMode(): the countdown makes no sense here.
   const cw = document.getElementById('flags-countdown-widget');
   if (cw) cw.style.display = 'none';
-  // Igual que hideFlagsMode() real: el marcador tampoco — sin esto quedaba
-  // pegado, visible de fondo en la pantalla de resultados.
+  // Like real hideFlagsMode(): the scoreboard makes no sense either — without
+  // this it stayed stuck, visible in the background of the results screen.
   flagsScoreDisplay.style.display = 'none';
   gameoverScreen.classList.add('mode-flags');
   gameoverScreen.classList.remove('mode-shapes', 'mode-monuments');
   gameoverScreen.style.pointerEvents = 'none';
-  // Mismo swap de sprites que hace el click en #loading-flags-btn del jugador
-  // real — estos personajes son elementos COMPARTIDOS entre modos (shapes/
-  // cities/monuments les ponen otra imagen), así que sin este swap acá se ve
-  // lo que haya quedado puesto por el último modo que los tocó, no los de
-  // banderas.
+  // Same sprite swap the real player's #loading-flags-btn click does — these
+  // characters are SHARED elements between modes (shapes/cities/monuments give
+  // them other images), so without this swap here you see whatever the last
+  // mode that touched them set, not flags'.
   document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men3.png');
   document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men4.png');
   document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl3.png');
@@ -924,17 +920,17 @@ window.flagsSpectatorHidePostgame = function () {
   if (confirmWrap) confirmWrap.style.display = '';
 };
 
-// tick = tiempo restante real del jugador (broadcast cada 1s desde startFlagsTimer).
+// tick = the player's real time remaining (broadcast every 1s from startFlagsTimer).
 let _flagsSpecLastTick = null;
-// Además del guard por VALOR de arriba: unirse a mitad de partida dispara un
-// resend de 'round'+'tick' (ver _resendStateTo en spectate.js) casi
-// inmediatamente, y el PRÓXIMO tick en vivo llega con su cadencia normal de
-// 1s — pero medida desde el tick REAL anterior del jugador, no desde este
-// resend. Si el resend cae, por ejemplo, 800ms después del último tick real,
-// el próximo tick en vivo puede llegar solo ~200ms después del resend — dos
-// valores DISTINTOS (7 y 6), ninguno bloqueado por el guard de arriba (que
-// solo frena valores IGUALES), sonando el beep dos veces pegado en vez de
-// una vez por segundo — el "se corta fuerte, suena repetido" reportado.
+// On top of the VALUE guard above: joining mid-game triggers a
+// 'round'+'tick' resend (see _resendStateTo in spectate.js) almost
+// immediately, and the NEXT live tick arrives at its normal 1s cadence — but
+// measured from the player's previous REAL tick, not from this resend. If the
+// resend lands, say, 800ms after the last real tick, the next live tick can
+// arrive only ~200ms after the resend — two DIFFERENT values (7 and 6),
+// neither blocked by the guard above (which only stops EQUAL values),
+// playing the beep twice back-to-back instead of once per second — the
+// reported "cuts hard, sounds repeated".
 let _flagsSpecLastTickSoundAt = 0;
 window.flagsSpectatorUpdateTimer = function (timeLeft) {
   if (!_flagsSpecMode) return;
@@ -943,11 +939,10 @@ window.flagsSpectatorUpdateTimer = function (timeLeft) {
   if (timeLeft <= 10) {
     flagsTimerEl.style.color = '#ffffff';
     flagsTimerImg.src = 'images/countdownred2.png';
-    // Guard por valor (no solo por llamada): el round trae timeLeft y el
-    // tick 1x/seg puede repetir el mismo segundo — sin esto sonaría dos veces.
-    // + guard por tiempo real (ver _flagsSpecLastTickSoundAt): cubre el caso
-    // de dos valores DISTINTOS llegando pegados por el resend de unión a
-    // mitad de partida.
+    // Value guard (not just per-call): the round carries timeLeft and the 1x/s
+    // tick can repeat the same second — without this it would sound twice.
+    // + real-time guard (see _flagsSpecLastTickSoundAt): covers the case of
+    // two DIFFERENT values arriving back-to-back from the mid-game join resend.
     const _nowTick = Date.now();
     if (timeLeft > 0 && timeLeft !== _flagsSpecLastTick && (_nowTick - _flagsSpecLastTickSoundAt) > 700
         && typeof sfxTickdown !== 'undefined' && typeof sfxPlay === 'function') {
@@ -961,41 +956,41 @@ window.flagsSpectatorUpdateTimer = function (timeLeft) {
   _flagsSpecLastTick = timeLeft;
 };
 
-// score = puntaje actual del jugador (viene del broadcast de score existente).
-// dots = progreso YA acumulado del trencito al momento de conectarse — sin
-// esto, alguien que se unía a mitad de partida veía los puntitos apagados
-// hasta la PRÓXIMA respuesta del jugador real, en vez del progreso real que
-// ya llevaba acumulado (mismo fix ya aplicado en Cities/Monuments).
+// score = the player's current score (from the existing score broadcast).
+// dots = the train's ALREADY-accumulated progress at the moment of connecting
+// — without this, someone joining mid-game saw empty dots until the real
+// player's NEXT answer, instead of the real progress already made (same fix
+// already applied in Cities/Monuments).
 window.flagsSpectatorUpdateScore = function (score, dots) {
   if (!_flagsSpecMode) return;
-  // Snap directo (sin animar) — se usa para "ponerse al día" al unirse a
-  // mitad de ronda, no para una respuesta en vivo (esa pasa por
-  // flagsSpectatorResolvePick → _flagsSpecAnimateScore). Sincroniza también
-  // el estado de la animación — si no, la PRÓXIMA respuesta real intentaría
-  // animar desde el valor viejo (0) en vez de desde acá.
+  // Direct snap (no animation) — used to "catch up" on joining mid-round, not
+  // for a live answer (that goes through flagsSpectatorResolvePick →
+  // _flagsSpecAnimateScore). Also syncs the animation state — otherwise the
+  // NEXT real answer would try to animate from the old value (0) instead of
+  // from here.
   _flagsSpecTargetScore = score || 0;
   _flagsSpecDisplayedScore = score || 0;
   flagsScoreEl.textContent = (score || 0).toLocaleString();
-  // Clamp para no disparar retroactivamente la animación de "llegó a 10" en
-  // un simple catch-up — flagsSpectatorAdvanceDot ya hace snap directo
-  // (no incrementa), sirve tal cual para esto.
+  // Clamp so a simple catch-up doesn't retroactively fire the "reached 10"
+  // animation — flagsSpectatorAdvanceDot already snaps directly (doesn't
+  // increment), works as-is for this.
   if (typeof dots === 'number' && typeof window.flagsSpectatorAdvanceDot === 'function') {
     window.flagsSpectatorAdvanceDot(Math.max(0, Math.min(dots, FLAGS_DOTS_NEEDED - 1)));
   }
 };
 
-// payload = { prompt, correctSlot, options, eliminationOrder } — ya viene
-// resuelto por completo desde flags.js del jugador real (mismo seed), no hace
-// falta re-derivarlo acá; eliminationOrder es el mismo orden de desvanecido
-// progresivo que corre en su pantalla, para que se vea igual y al mismo tiempo
-// (el timing es relativo al inicio de la ronda, FLAGS_ROUND_TIME es fijo).
+// payload = { prompt, correctSlot, options, eliminationOrder } — already fully
+// resolved by the real player's flags.js (same seed), no need to re-derive it
+// here; eliminationOrder is the same progressive-fade order running on their
+// screen, so it looks the same and at the same time (timing is relative to the
+// round start, FLAGS_ROUND_TIME is fixed).
 window.flagsSpectatorShowRound = function (payload) {
   if (!_flagsSpecMode) return;
   _flagsSpecClearElimination();
-  // Recién ACÁ se revelan (flagsSpectatorEnter los deja ocultos a propósito,
-  // ver comentario largo ahí) — hay datos reales para mostrar, así que todo
-  // aparece de una vez ya completo, sin el instante de maletines vacíos/con
-  // banderas viejas que se veía antes.
+  // Only HERE are they revealed (flagsSpectatorEnter leaves them hidden on
+  // purpose, see long comment there) — there's real data to show, so it all
+  // appears at once fully complete, without the moment of empty/old-flag
+  // suitcases seen before.
   if (typeof window._hideVsWaitSpinner === 'function') window._hideVsWaitSpinner();
   flagsFindLuggage.style.display = 'block';
   flagsFlagidWrap.style.display  = 'block';
@@ -1007,12 +1002,12 @@ window.flagsSpectatorShowRound = function (payload) {
     const g = document.getElementById(id);
     if (g) g.style.display = slotCount > 3 ? '' : 'none';
   });
-  // Retomar el scroll de la cinta — mismo patrón exacto que startFlagsRound()
-  // del jugador real: hay que resetear 'animation' completo (no solo
-  // 'transition'), porque el pick de la ronda anterior deja
-  // animationPlayState:'paused' puesto — sin este reset esa pausa queda pegada
-  // y la animación 'scrolling' de la ronda siguiente nunca arranca aunque se
-  // vuelva a agregar la clase.
+  // Resume the belt scroll — exact same pattern as the real player's
+  // startFlagsRound(): the full 'animation' must be reset (not just
+  // 'transition'), because the previous round's pick leaves
+  // animationPlayState:'paused' set — without this reset that pause stays stuck
+  // and the next round's 'scrolling' animation never starts even after re-adding
+  // the class.
   flagsFindLuggage.style.transition = '';
   flagsFindLuggage.style.animation  = 'none';
   flagsFindLuggage.style.transform  = '';
@@ -1024,10 +1019,10 @@ window.flagsSpectatorShowRound = function (payload) {
   flagsMachine3.style.animationPlayState  = 'running';
   flagsMachine3b.style.animationPlayState = 'running';
   flagsFlagidLabel.textContent = (typeof tCountry === 'function') ? tCountry(payload.prompt) : payload.prompt;
-  // Ajustar tamaño si el nombre es largo — mismo mecanismo que el juego real
-  // (ver flagsShowRound más abajo en el archivo); acá faltaba del todo, así
-  // que un nombre largo (ej. "República Dominicana") se salía de la tarjeta
-  // flagid en vez de encogerse para entrar.
+  // Fit the size if the name is long — same mechanism as the real game (see
+  // flagsShowRound below); was missing here entirely, so a long name (e.g.
+  // "República Dominicana") spilled out of the flagid card instead of
+  // shrinking to fit.
   {
     const vminPx = Math.min(window.STAGE_W, window.STAGE_H) / 100;
     const maxW = 41.7 * vminPx;
@@ -1051,12 +1046,12 @@ window.flagsSpectatorShowRound = function (payload) {
     group.style.display = '';
     group.style.pointerEvents = 'none';
     group.classList.remove('flags-faded', 'luggage-enter-active');
-    // Reset completo — si ESTE maletín fue el elegido en una ronda anterior,
-    // flagsSpectatorResolvePick le dejó puesto style.animation='none' (inline)
-    // para poder animar el vuelo por transición en vez de la animación CSS de
-    // entrada. Un animation:'none' inline bloquea CUALQUIER animación por
-    // clase para siempre en ese elemento hasta que se limpie acá — por eso la
-    // entrada dejaba de funcionar solo en el slot que ya había sido clickeado.
+    // Full reset — if THIS suitcase was the one chosen in a previous round,
+    // flagsSpectatorResolvePick left style.animation='none' (inline) on it to
+    // animate the flight by transition instead of the CSS entry animation. An
+    // inline animation:'none' blocks ANY class animation forever on that
+    // element until cleared here — that's why the entry stopped working only on
+    // the slot that had already been clicked.
     group.style.animation  = '';
     group.style.opacity    = '';
     group.style.willChange = '';
@@ -1064,8 +1059,8 @@ window.flagsSpectatorShowRound = function (payload) {
     group.style.transform  = 'none';
     group.style.transition = 'none';
   });
-  // Reflow forzado antes del rAF: garantiza que el navegador registró la clase
-  // 'luggage-enter-active' removida ANTES de volver a agregarla.
+  // Forced reflow before the rAF: guarantees the browser registered the
+  // 'luggage-enter-active' class removed BEFORE re-adding it.
   void flagsLuggageWrap.offsetWidth;
   requestAnimationFrame(() => {
     if (!_flagsSpecMode) return;
@@ -1075,86 +1070,83 @@ window.flagsSpectatorShowRound = function (payload) {
     });
   });
 
-  // Eliminación progresiva — mismo patrón visual que el juego real (fadeSlot).
-  // NO se programa el setTimeout acá: si el 3-2-1 local todavía está en
-  // pantalla cuando llegan estos datos, el fade correría "de fondo" antes de
-  // que el espectador viera la ronda, desincronizado del jugador real — se
-  // guarda para que _flagsSpecRevealAfterPregame() lo programe recién cuando
-  // la ronda de verdad se revela.
+  // Progressive elimination — same visual pattern as the real game (fadeSlot).
+  // The setTimeout is NOT scheduled here: if the local 3-2-1 is still on screen
+  // when this data arrives, the fade would run "in the background" before the
+  // spectator saw the round, desynced from the real player — it's stored so
+  // _flagsSpecRevealAfterPregame() schedules it only when the round is really
+  // revealed.
   const order = payload.eliminationOrder || [];
   _flagsSpecPendingElimination = { slotCount, order, roundStartedAt: payload.roundStartedAt || Date.now() };
 
-  // Igual mecanismo que shapes.js: solo en la primera ronda tras entrar, un
-  // margen corto para confirmar si de verdad viene un pregame (llega poco
-  // después, mismo orden real de broadcasts). Si no aparece, es unión a
-  // mitad de ronda — recién ahí, con la ronda ya mostrada, arranca la
-  // música del juego (si hay pregame, la arranca su propio onDone al
-  // terminar el 3-2-1).
+  // Same mechanism as shapes.js: only on the first round after entering, a
+  // short margin to confirm a pregame is really coming (arrives shortly after,
+  // same real broadcast order). If none appears, it's a mid-round join — only
+  // then, with the round already shown, does game music start (if there's a
+  // pregame, its own onDone starts it when the 3-2-1 ends).
   if (_flagsSpecIsFirstRound) {
     _flagsSpecIsFirstRound = false;
     setTimeout(() => {
-      // Guard contra el "sigue sonando la música de juego" reportado en VS:
-      // si para cuando dispara este timer ya se salió del modo espectador
-      // (ej. el jugador que esperaba de prestado ya vio el resultado final,
-      // ver _exitWaitAsSpectator en vs.js), no hay que pisar el postgameloop
-      // que _showVsResult() ya puso sonando.
+      // Guard against the reported "game music keeps playing" in VS: if by the
+      // time this timer fires the spectator mode was already exited (e.g. the
+      // player waiting on loan already saw the final result, see
+      // _exitWaitAsSpectator in vs.js), don't overwrite the postgameloop
+      // _showVsResult() already set playing.
       if (!_flagsSpecMode) return;
       if (!_flagsSpecPregameSeen && typeof playMusic === 'function' && typeof sfxGameMusic !== 'undefined') {
         playMusic(sfxGameMusic);
       }
     }, 400);
   }
-  // El DOM ya está poblado con los datos reales de esta ronda (arriba, más
-  // allá de que los contenedores estén ocultos o no) — si el 3-2-1 local ya
-  // terminó y todavía no se reveló (llegamos acá DESPUÉS del onDone, que se
-  // encontró sin datos y esperó), revelar ahora mismo con los datos ya
-  // puestos. Si el 3-2-1 sigue corriendo, el reveal lo dispara su propio
-  // onDone cuando termine (_flagsSpecShowRoundApplied ya queda en true).
+  // The DOM is already populated with this round's real data (above, whether
+  // or not the containers are hidden) — if the local 3-2-1 already ended and
+  // wasn't revealed yet (we got here AFTER the onDone, which found no data and
+  // waited), reveal right now with the data already set. If the 3-2-1 is still
+  // running, its own onDone triggers the reveal when it ends
+  // (_flagsSpecShowRoundApplied is now true).
   _flagsSpecShowRoundApplied = true;
-  // OJO: antes esto solo revelaba la PRIMERA vez por sesión (gate
-  // `!_flagsSpecRevealed`, pensado nada más para la transición 3-2-1→ronda).
-  // El pregame (3-2-1) se transmite UNA sola vez al arrancar el modo, no
-  // antes de cada pregunta — así que con ese gate, TODAS las rondas después
-  // de la primera nunca volvían a llamar _flagsSpecRevealAfterPregame(): la
-  // máquina de identificación nunca arrancaba su scroll si esta ronda era la
-  // primera que veía el espectador (unión a mitad de partida, sin pregame de
-  // por medio) y, aun cuando sí arrancaba, ninguna ronda posterior programaba
-  // su PROPIA eliminación progresiva de opciones (quedaba pegada la de la
-  // ronda 1) — el "la máquina no se mueve / no desaparecen los maletines
-  // incorrectos al entrar a mitad de partida" reportado. Sin ningún 3-2-1
-  // corriendo ahora mismo, cada ronda nueva debe revelarse de una.
+  // NOTE: this used to only reveal the FIRST time per session (gate
+  // `!_flagsSpecRevealed`, meant only for the 3-2-1→round transition). The
+  // pregame (3-2-1) is transmitted ONCE at mode start, not before each
+  // question — so with that gate, ALL rounds after the first never called
+  // _flagsSpecRevealAfterPregame() again: the ID machine never started its
+  // scroll if this round was the first the spectator saw (mid-game join, no
+  // pregame) and, even when it did, no later round scheduled its OWN
+  // progressive option elimination (round 1's stayed stuck) — the reported
+  // "the machine doesn't move / wrong suitcases don't disappear when joining
+  // mid-game". With no 3-2-1 running right now, each new round must reveal
+  // immediately.
   if (_flagsSpecCountdownDone) {
     _flagsSpecRevealAfterPregame();
     _flagsSpecRevealed = true;
   }
 };
 
-// payload = { index, correct } — el maletín que clickeó el jugador real. Recrea
-// el mismo vuelo hacia la cinta que ve el jugador (mismo cálculo que
-// handleLuggagePick, midiendo el DOM real acá en vez de ahí).
+// payload = { index, correct } — the suitcase the real player clicked. Recreates
+// the same flight to the belt the player sees (same calc as handleLuggagePick,
+// measuring the real DOM here instead of there).
 window.flagsSpectatorResolvePick = function (payload) {
   if (!_flagsSpecMode) return;
-  // payload.score YA viene con campaignBase() sumado (ver
-  // _specReportAnswer en el jugador real) — anima hacia ese valor en vez de
-  // saltar de golpe, igual que ve el propio jugador (flagsAnimateScore()).
+  // payload.score ALREADY has campaignBase() added (see _specReportAnswer in
+  // the real player) — animate toward that value instead of jumping, like the
+  // player sees (flagsAnimateScore()).
   if (typeof payload.score === 'number') {
     _flagsSpecTargetScore = payload.score;
     _flagsSpecAnimateScore();
   }
   _flagsSpecClearElimination();
   const group = document.getElementById(flagsGroupIds[payload.index]);
-  // Todo lo de acá adentro es geometría frágil (getBoundingClientRect, DOMMatrix
-  // sobre transforms que pueden no estar seteados todavía) — si algo tira una
-  // excepción welacá, NO debe frenar lo que viene después (overlay/sonido/
-  // puntaje/trencito). Antes, una excepción acá dejaba el trencito sin
-  // actualizar hasta la SIGUIENTE respuesta correcta (se veían "dos puntos
-  // prendiéndose juntos con un click de atraso").
+  // Everything in here is fragile geometry (getBoundingClientRect, DOMMatrix
+  // over transforms that may not be set yet) — if something throws here, it
+  // must NOT block what comes after (overlay/sound/score/train). A throw here
+  // used to leave the train un-updated until the NEXT correct answer ("two
+  // dots lighting up together one click behind").
   try { if (group) {
     flagsGroupIds.forEach(id => { const g = document.getElementById(id); if (g) g.style.pointerEvents = 'none'; });
-    // CLAVE: sacar la clase de entrada ANTES de medir/animar. Su animación
-    // queda con fill-mode:forwards al terminar, y mientras la clase siga
-    // puesta esa animación le sigue "ganando" al transform inline que ponemos
-    // más abajo — por eso el maletín nunca se veía viajar hacia findluggage.
+    // KEY: remove the entry class BEFORE measuring/animating. Its animation
+    // has fill-mode:forwards on finish, and while the class stays on that
+    // animation keeps "winning" over the inline transform we set below — that's
+    // why the suitcase was never seen traveling toward findluggage.
     group.classList.remove('luggage-enter-active');
     group.style.animation  = 'none';
     group.style.transition = 'none';
@@ -1180,14 +1172,14 @@ window.flagsSpectatorResolvePick = function (payload) {
     flagsMachine2.style.animationPlayState  = 'paused';
     flagsMachine3.style.animationPlayState  = 'paused';
     flagsMachine3b.style.animationPlayState = 'paused';
-    // Sin pausar a findluggage mismo, su propia animación 'scrolling' seguía
-    // corriendo y pisaba el transform que le poníamos acá — por eso nunca se
-    // veía el maletín llegar a destino ni el "whoosh" final.
+    // Without pausing findluggage itself, its own 'scrolling' animation kept
+    // running and overwrote the transform we set here — that's why the suitcase
+    // was never seen reaching its destination nor the final "whoosh".
     flagsFindLuggage.style.animationPlayState = 'paused';
-    // Trackeado en _flagsSpecEliminationTimeouts (ya se limpia al salir y al
-    // arrancar cada ronda nueva) — sin esto, si el espectador salía o llegaba
-    // otra ronda ANTES de que pasaran estos 600ms, este callback igual corría
-    // después y pisaba animationPlayState/transform de la ronda nueva.
+    // Tracked in _flagsSpecEliminationTimeouts (cleared on exit and at the
+    // start of each new round) — without this, if the spectator exited or
+    // another round arrived BEFORE these 600ms passed, this callback still ran
+    // after and overwrote the new round's animationPlayState/transform.
     _flagsSpecEliminationTimeouts.push(setTimeout(() => {
       if (!_flagsSpecMode) return;
       flagsMachine2.style.animationPlayState  = 'running';
@@ -1211,8 +1203,8 @@ window.flagsSpectatorResolvePick = function (payload) {
     overlay.classList.add('animate');
     setTimeout(() => { overlay.classList.remove('animate'); overlay.style.display = 'none'; }, 820);
   }
-  // Igual que handleLuggagePick real: correcto suena check+acertar juntos,
-  // incorrecto solo error.
+  // Like real handleLuggagePick: correct plays check+acertar together,
+  // incorrect just error.
   if (typeof sfxPlay === 'function') {
     if (payload.correct) {
       if (typeof sfxCheck   !== 'undefined') { sfxCheck.currentTime   = 0; sfxPlay(sfxCheck); }
@@ -1221,8 +1213,8 @@ window.flagsSpectatorResolvePick = function (payload) {
       sfxError.currentTime = 0; sfxPlay(sfxError);
     }
   }
-  // "+puntos" flotante y el cartel de bonus de velocidad — mismos que ve el
-  // jugador real (viajan en el broadcast de 'answer' junto al índice elegido).
+  // Floating "+points" and the speed-bonus sign — same as the real player sees
+  // (they travel in the 'answer' broadcast along with the chosen index).
   if (payload.correct && typeof payload.points === 'number' && typeof showScorePopup === 'function') {
     showScorePopup(payload.points);
   }
@@ -1232,28 +1224,28 @@ window.flagsSpectatorResolvePick = function (payload) {
     requestAnimationFrame(() => flagsSpeedBonusText.classList.add('visible'));
     flagsSpeedBonusHideId = setTimeout(() => flagsSpeedBonusText.classList.remove('visible'), 1600);
   }
-  // Racha "X IN A ROW" — getBadgeImg(streak) devuelve un objeto Image ya
-  // precargado (no serializable por broadcast), pero como es una función pura
-  // del streak, el espectador lo resuelve local con el mismo streak que
-  // transmite el jugador — no hace falta mandar la imagen, solo el número.
+  // "X IN A ROW" streak — getBadgeImg(streak) returns a preloaded Image object
+  // (not broadcast-serializable), but since it's a pure function of the streak,
+  // the spectator resolves it locally with the same streak the player
+  // transmits — no need to send the image, only the number.
   if (payload.hasBadge && typeof getBadgeImg === 'function' && typeof showFlagsBadge === 'function') {
     const badgeImg = getBadgeImg(payload.streak || 0);
     if (badgeImg) showFlagsBadge(badgeImg, payload.inRowBonus || 0, payload.streak || 0);
   }
-  // Trencito de puntos + bonus de +5s
+  // Points train + +5s bonus
   if (payload.correct && typeof payload.dots === 'number' && typeof window.flagsSpectatorAdvanceDot === 'function') {
     window.flagsSpectatorAdvanceDot(payload.dots);
   }
 };
 
-const FLAGS_SPEED_WIN  = 2.0;   // segundos para conseguir bonus velocidad
-const FLAGS_SPEED_MULT = 1.5;   // multiplicador
+const FLAGS_SPEED_WIN  = 2.0;   // seconds to earn the speed bonus
+const FLAGS_SPEED_MULT = 1.5;   // multiplier
 
 const flagsSpeedBonusText = document.getElementById('flags-speed-bonus-text');
 let flagsSpeedBonusHideId = null;
 let flagsRoundStartTime   = null;
 
-// Grupos de banderas visualmente similares — se usan como distractores desde correcta 23
+// Visually similar flag groups — used as distractors from correct #23 onward
 const FLAG_SIMILAR_GROUPS = [
   ["Chad", "Andorra", "Rumanía", "Moldova"],
   ["Italia", "México", "Costa de Marfil", "Irlanda"],
@@ -1292,7 +1284,7 @@ const FLAG_SIMILAR_GROUPS = [
   ["Costa Rica", "Nicaragua", "Honduras"],
 ];
 
-// Construir mapa inverso: país → array de similares
+// Build the inverse map: country → array of similars
 const FLAG_SIMILAR = {};
 for (const group of FLAG_SIMILAR_GROUPS) {
   for (const country of group) {
@@ -1322,8 +1314,8 @@ function disableAllLuggageGroups() {
 }
 let flagsStreak = 0;
 let flagsEasyUnlocked = false;
-let flagsSixUnlocked = false;   // 6 maletas desde correcta 3
-let flagsMediumUnlocked = false; // pool medium desde correcta 5
+let flagsSixUnlocked = false;   // 6 suitcases from correct #3
+let flagsMediumUnlocked = false; // medium pool from correct #5
 let flagsHardUnlocked   = false;
 let flagsInsaneUnlocked = false;
 let flagsCorrectCount = 0;
@@ -1331,27 +1323,26 @@ let flagsIsFirstRound = true;
 let flagsAnswered = new Set();
 let flagsLastChosen = null;
 
-// ── RNG SEMBRADO PARA VERSUS ──────────────────────────────────────────────────
-// En versus, la selección de bandera/distractores/slots debe ser idéntica para
-// ambos jugadores. Para eso usamos un RNG dedicado (solo lo consume la selección),
-// independiente de cualquier otra llamada a Math.random (animaciones, emotes, etc.)
-// que ocurriría en distinto orden en cada cliente y desincronizaría todo.
-let flagsVsIndex = 0;          // índice de ronda compartido (mismo en ambos)
-let _flagsSeededRand = null;   // generador determinista (null ⇒ usa Math.random)
+// ── SEEDED RNG FOR VERSUS ───────────────────────────────────────────────────
+// In versus, the flag/distractor/slot selection must be identical for both
+// players. For that we use a dedicated RNG (only the selection consumes it),
+// independent of any other Math.random call (animations, emotes, etc.) that
+// would happen in a different order on each client and desync everything.
+let flagsVsIndex = 0;          // shared round index (same on both)
+let _flagsSeededRand = null;   // deterministic generator (null ⇒ uses Math.random)
 function _flagsSyncedVersus() { return window._vsActive || window._lobbyActive; }
-// Antes: `(_flagsSyncedVersus() && _flagsSeededRand) ? ... : Math.random()`.
-// window._lobbyActive/_vsActive son banderas de ESTADO que cambian en otros
-// puntos del código (fin de ronda, transición a espectar de prestado, etc.)
-// — shapes/cities/monuments NUNCA chequean un flag de estado acá,
-// solo si el generador sembrado (_xSeededRand) está seteado o no, seteado y
-// limpiado explícitamente por flagsSetSeed/flagsClearSeed. Si CUALQUIER
-// llamada a flagsRand() caía en la ventana donde el seed ya estaba puesto
-// pero _lobbyActive todavía no (o ya no) era true, esa llamada consumía
-// Math.random() en vez de avanzar el stream sembrado — desincronizando TODO
-// el RNG determinista para ese cliente desde ahí en adelante (no solo esa
-// ronda): el "a algunos les salen preguntas distintas al resto" reportado.
-// _flagsSeededRand ya es null salvo entre flagsSetSeed()/flagsClearSeed(),
-// así que este chequeo extra era redundante además de riesgoso.
+// Was: `(_flagsSyncedVersus() && _flagsSeededRand) ? ... : Math.random()`.
+// window._lobbyActive/_vsActive are STATE flags that change at other points in
+// the code (round end, transition to spectate-on-loan, etc.) — shapes/cities/
+// monuments NEVER check a state flag here, only whether the seeded generator
+// (_xSeededRand) is set or not, set and cleared explicitly by
+// flagsSetSeed/flagsClearSeed. If ANY flagsRand() call landed in the window
+// where the seed was already set but _lobbyActive wasn't yet (or no longer)
+// true, that call consumed Math.random() instead of advancing the seeded
+// stream — desyncing the ENTIRE deterministic RNG for that client from then on
+// (not just that round): the reported "some people get different questions
+// than the rest". _flagsSeededRand is already null except between
+// flagsSetSeed()/flagsClearSeed(), so this extra check was redundant and risky.
 function flagsRand() { return _flagsSeededRand ? _flagsSeededRand() : Math.random(); }
 function flagsShuffle(a) {
   for (let i = a.length - 1; i > 0; i--) {
@@ -1444,10 +1435,11 @@ function buildFlagsPracticePool(continents, difficulty) {
   return sh(pool);
 }
 
-// Ventana de respuesta por ronda, en segundos. Debe coincidir con la duración de
-// la animación #flags-findluggage.scrolling (css/style.css) que marca el wrong por demora.
+// Answer window per round, in seconds. Must match the duration of the
+// #flags-findluggage.scrolling animation (css/style.css) that marks the wrong
+// on delay.
 const FLAGS_ROUND_TIME = 8.15;
-// Eliminación progresiva de opciones erróneas (se desvanecen y quedan deseleccionables).
+// Progressive elimination of wrong options (they fade out and become unselectable).
 let flagsEliminationTimeouts = [];
 function clearFlagsElimination() {
   flagsEliminationTimeouts.forEach(clearTimeout);
@@ -1469,10 +1461,10 @@ const FLAGS_LB_WINDOW  = 5;
 const FLAGS_LB_PIN_ROW = 2;
 const FLAGS_LB_GAP     = 4;
 
-// Amigos desde la capa de datos compartida (js/friends.js -> getFriends()),
-// la misma que usan la barra de monuments y las pantallas results/final.
+// Friends from the shared data layer (js/friends.js -> getFriends()), the same
+// one the monuments bar and the results/final screens use.
 function buildFlagsFriendPlayers() {
-  // En modo lobby el leaderboard muestra a TODOS los rivales de la sala, en vivo.
+  // In lobby mode the leaderboard shows ALL the room's rivals, live.
   if (window._lobbyActive && Array.isArray(window._lobbyMembers)) {
     return window._lobbyMembers.map((m, i) => ({
       id: 'lob' + m.id,
@@ -1484,7 +1476,7 @@ function buildFlagsFriendPlayers() {
       cardCode: m.cardCode || '0001',
     }));
   }
-  // En modo versus 1v1 el leaderboard compite SOLO contra el oponente, en vivo.
+  // In 1v1 versus mode the leaderboard competes ONLY against the opponent, live.
   if (window._vsActive && window._vsOpponent) {
     const o = window._vsOpponent;
     return [{
@@ -1517,8 +1509,8 @@ let flagsLastPlayerRank = -1;
 function getFlagsLbRowHeight() {
   const panel = document.getElementById('flags-right-panel');
   if (!panel) return 84;
-  // offsetWidth (no getBoundingClientRect): el rect viene escalado por el transform
-  // del #app-stage y, al usarse como px de layout, se re-escalaría (entradas apretadas).
+  // offsetWidth (not getBoundingClientRect): the rect is scaled by the
+  // #app-stage transform and, used as layout px, would re-scale (cramped entries).
   return Math.round(panel.offsetWidth * 1.5) + FLAGS_LB_GAP;
 }
 
@@ -1529,7 +1521,7 @@ function initFlagsLeaderboard() {
   flagsLbElements = {};
   flagsLastLbScore = -1;
   flagsLastPlayerRank = -1;
-  flagsMockPlayers = buildFlagsFriendPlayers(); // refrescar con la lista real de amigos
+  flagsMockPlayers = buildFlagsFriendPlayers(); // refresh with the real friends list
 
   if (!window.practiceConfig || !window.practiceConfig.active) {
     flagsMockPlayers.forEach(p => {
@@ -1544,10 +1536,10 @@ function initFlagsLeaderboard() {
         + `<span class="lb-score">${p.score.toLocaleString()}</span>`;
       el.style.transition = 'none';
       el.style.top = '-9999px';
-      // Todas las filas traen su cardCode real ahora (mismo fix que
-      // buildFriendPlayers/initLeaderboard en js/modes/mapgame-leaderboard.js) — antes los
-      // amigos reales de la barra ingame en Gira Mundial solo se quedaban
-      // afuera de este chequeo y siempre mostraban la carta default.
+      // Every row carries its real cardCode now (same fix as
+      // buildFriendPlayers/initLeaderboard in js/modes/mapgame-leaderboard.js) —
+      // the real friends in the solo Gira Mundial ingame bar used to be left
+      // out of this check and always showed the default card.
       window.CustomizeAssets?.applyCard(el, p.cardCode || '0001');
       flagsLbElements[el.id] = el;
       lb.appendChild(el);
@@ -1578,15 +1570,15 @@ function initFlagsLeaderboard() {
   });
 }
 
-// Si la lista de amigos cambia (datos reales del servidor) mientras se juega flags,
-// reconstruir su barra. Fuera de flags se reconstruye sola al iniciar la partida.
+// If the friends list changes (real server data) while playing flags, rebuild
+// its bar. Outside flags it rebuilds itself on game start.
 if (typeof onFriendsUpdate === 'function') {
   onFriendsUpdate(() => { if (flagsRunning && !_flagsSyncedVersus()) initFlagsLeaderboard(); });
 }
 
 function flagsPositionLeaderboard(playerScore, animate) {
-  // Barra universal: el jugador compite con el puntaje acumulado de la campaña
-  // (base de modos previos + modo actual), no solo con el de flags.
+  // Universal bar: the player competes with the accumulated campaign score
+  // (previous modes' base + current mode), not just flags'.
   playerScore += ((typeof window.campaignBase === 'function') ? window.campaignBase() : 0);
   const lb   = document.getElementById('flags-leaderboard');
   const rowH = getFlagsLbRowHeight();
@@ -1597,7 +1589,7 @@ function flagsPositionLeaderboard(playerScore, animate) {
 
   const playerRank = all.findIndex(p => p.id === 'player');
 
-  // Emote automático de adelantamiento solo en modo normal (no en versus/lobby)
+  // Automatic overtaking emote only in normal mode (not versus/lobby)
   if (!_flagsSyncedVersus() && animate && flagsLastPlayerRank !== -1 && playerRank < flagsLastPlayerRank) {
     let bubbleIndex = 0;
     for (let r = flagsLastPlayerRank; r >= playerRank + 1; r--) {
@@ -1617,8 +1609,9 @@ function flagsPositionLeaderboard(playerScore, animate) {
   let windowEnd   = Math.min(all.length, windowStart + FLAGS_LB_WINDOW);
   windowStart     = Math.max(0, windowEnd - FLAGS_LB_WINDOW);
 
-  // Anclar las filas ABAJO: si hay menos filas que la ventana (p.ej. versus = 2),
-  // empujarlas hacia el fondo en vez de dejarlas flotando arriba con hueco abajo.
+  // Anchor the rows to the BOTTOM: if there are fewer rows than the window
+  // (e.g. versus = 2), push them to the bottom instead of leaving them floating
+  // at the top with a gap below.
   const visibleRows  = windowEnd - windowStart;
   const bottomOffset = Math.max(0, FLAGS_LB_WINDOW - visibleRows) * rowH;
 
@@ -1629,7 +1622,7 @@ function flagsPositionLeaderboard(playerScore, animate) {
     if (el) el.style.top = ((rank - windowStart) * rowH + bottomOffset) + 'px';
   });
 
-  // Actualizar número de posición en cada fila del leaderboard
+  // Update the position number on each leaderboard row
   all.forEach((p, rank) => {
     const el = flagsLbElements[`flags-lb-${p.id}`];
     if (!el) return;
@@ -1655,8 +1648,8 @@ function sortFlagsLeaderboard(playerScore) {
   flagsPositionLeaderboard(playerScore, true);
 }
 
-// Versus: actualizar el score del oponente en el leaderboard y reordenar con animación
-// (misma animación de adelantamiento/emotes que la barra de amigos normal).
+// Versus: update the opponent's score in the leaderboard and reorder with
+// animation (same overtaking/emote animation as the normal friends bar).
 function flagsSetVsOpponentScore(score) {
   window._vsOppScore = score;
   const opp = flagsMockPlayers.find(p => p.id === 'vsopp');
@@ -1668,16 +1661,16 @@ function flagsSetVsOpponentScore(score) {
 }
 window.flagsSetVsOpponentScore = flagsSetVsOpponentScore;
 
-// Aplica glow + vibración + emote aleatorio a la tarjeta del jugador que falló.
-// Ambas animaciones van en un solo style.animation inline; de lo contrario la cascada
-// CSS deja correr solo la última, ignorando la otra.
+// Applies glow + shake + random emote to the card of the player who missed.
+// Both animations go in a single inline style.animation; otherwise the CSS
+// cascade only runs the last one, ignoring the other.
 function _applyWrongEffects(el) {
   if (!el) return;
   el.style.animation = 'none';
   void el.offsetWidth;
   el.style.animation = 'lb-wrong-flash 0.75s ease-out, lb-shake 0.45s ease-in-out';
   setTimeout(() => { el.style.animation = ''; }, 820);
-  // Emote aleatorio de los 6 disponibles
+  // Random emote of the 6 available
   const srcs = ['images/emotes/1.png','images/emotes/2.png','images/emotes/3.png',
                  'images/emotes/4.png','images/emotes/5.png','images/emotes/6.png'];
   const bubble = document.createElement('div');
@@ -1690,20 +1683,20 @@ function _applyWrongEffects(el) {
   bubble.addEventListener('animationend', () => bubble.remove(), { once: true });
 }
 
-// Glow rojo solo en la tarjeta del rival (1v1).
+// Red glow only on the rival's card (1v1).
 window.flagsTriggerOpponentWrong = function() {
   _applyWrongEffects(flagsLbElements['flags-lb-vsopp']);
 };
 
-// Glow rojo en la tarjeta correcta para lobby: uid del que falló.
+// Red glow on the right card for lobby: uid of whoever missed.
 window.flagsTriggerLobbyWrongFor = function(uid) {
   const myId = window._sbUserId;
   const key = (!uid || uid === myId) ? 'flags-lb-player' : ('flags-lb-lob' + uid);
   _applyWrongEffects(flagsLbElements[key]);
 };
 
-// ── "Se acabó el tiempo" (timesup) — MISMO sistema que el "wrong" pero por
-// timesup (temblor + cronómetro, ver window._applyTimesUpEffect).
+// ── "Time's up" (timesup) — SAME system as "wrong" but for timesup
+// (shake + stopwatch, see window._applyTimesUpEffect).
 window.flagsTriggerOpponentTimesUp = function() {
   if (typeof window._applyTimesUpEffect === 'function') window._applyTimesUpEffect(flagsLbElements['flags-lb-vsopp']);
 };
@@ -1713,7 +1706,7 @@ window.flagsTriggerLobbyTimesUpFor = function(uid) {
   if (typeof window._applyTimesUpEffect === 'function') window._applyTimesUpEffect(flagsLbElements[key]);
 };
 
-// Lobby: refrescar el score en vivo de TODOS los rivales y reordenar con animación.
+// Lobby: live-refresh ALL rivals' scores and reorder with animation.
 function flagsSetLobbyScores(members) {
   if (!Array.isArray(members)) return;
   members.forEach(m => {
@@ -1724,10 +1717,10 @@ function flagsSetLobbyScores(members) {
       if (el) { const s = el.querySelector('.lb-score'); if (s) s.textContent = (m.score || 0).toLocaleString(); }
     }
   });
-  // Durante el espectador el leaderboard lo posiciona el renderer de
-  // espectador (_renderGroupLeaderboard) — no el normal del jugador, que
-  // pelearía por la misma posición y haría saltar las celdas (ver mismo fix
-  // en js/modes/mapgame-vs.js/citiesSetVsOpponentScore).
+  // While spectating the leaderboard is positioned by the spectator renderer
+  // (_renderGroupLeaderboard) — not the player's normal one, which would fight
+  // for the same position and make the cells jump (see same fix in
+  // js/modes/mapgame-vs.js/citiesSetVsOpponentScore).
   if (window._isSpectating) { window._refreshGroupSpectatorLeaderboard?.(); return; }
   flagsPositionLeaderboard(flagsLastLbScore >= 0 ? flagsLastLbScore : 0, true);
 }
@@ -1788,9 +1781,9 @@ function flagsAdvanceDot() {
 
     const _flagsInfNow = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
     if (!_flagsInfNow) {
-      // Ajustar flagsTimerDuration (fuente de verdad, ver startFlagsTimer), no
-      // flagsTimeLeft directo — si no, el próximo tick lo pisaría con el
-      // valor calculado contra flagsTimerStartedAt, perdiendo el bonus.
+      // Adjust flagsTimerDuration (source of truth, see startFlagsTimer), not
+      // flagsTimeLeft directly — otherwise the next tick would overwrite it
+      // with the value computed against flagsTimerStartedAt, losing the bonus.
       const elapsed = Math.floor((Date.now() - flagsTimerStartedAt) / 1000);
       const newTimeLeft = Math.min(flagsTimeLeft + FLAGS_BONUS_TIME, 99);
       flagsTimerDuration = elapsed + newTimeLeft;
@@ -1850,7 +1843,7 @@ function showFlagsBadge(badgeImg, bonus, streak, cxOverride, scaleOverride) {
   canvas.style.display = 'block';
   const ctx2 = canvas.getContext('2d');
   const CX = cxOverride !== undefined ? cxOverride : canvas.width / 2, CY = (scaleOverride !== undefined ? canvas.height * 0.44 : canvas.height / 2);
-  // Medidas en vmin (px = valor_vmin * vmin) para que escale con el viewport.
+  // Measures in vmin (px = vmin_value * vmin) so it scales with the viewport.
   const vmin = Math.min(window.STAGE_W, window.STAGE_H) / 100;
   const W = 44.5 * vmin, H = 36.6 * vmin, CW = 52.4 * vmin, CH = 44.5 * vmin;
   const IN_END = 0.2, HOLD_END = 0.60, SHRINK_DUR = 0.22, TOTAL = HOLD_END + SHRINK_DUR;
@@ -1874,8 +1867,8 @@ function showFlagsBadge(badgeImg, bonus, streak, cxOverride, scaleOverride) {
     else if (t < HOLD_END) { scale = 1 * sxMult; alpha = 1; }
     else                   { const p = (t - HOLD_END) / SHRINK_DUR; scale = (1 - p) * sxMult; alpha = 1; }
 
-    // El check ya lo muestra flags-check-overlay en cada respuesta; aquí solo
-    // dibujamos el badge + "IN A ROW" + bonus para no duplicar el check.
+    // The check is already shown by flags-check-overlay on each answer; here we
+    // only draw the badge + "IN A ROW" + bonus so as not to duplicate the check.
 
     // +bonus
     let bonusScale = 0;
@@ -1921,17 +1914,17 @@ function showFlagsBadge(badgeImg, bonus, streak, cxOverride, scaleOverride) {
   rafId = requestAnimationFrame(frame);
 }
 
-// Secuencia guionada para grabar el reel promocional: 5 rondas fijas con
-// dificultad creciente (la 4ta es "trampa" a propósito: banderas parecidas).
-// Cada ronda espera un delay guionado y luego simula el click en el slot
-// correcto — así se puede grabar en OBS sin jugar en vivo, tantas tomas
-// como haga falta, siempre con el mismo resultado.
+// Scripted sequence for recording the promo reel: 5 fixed rounds with
+// increasing difficulty (the 4th is a deliberate "trap": similar flags).
+// Each round waits a scripted delay and then simulates the click on the
+// correct slot — so it can be recorded in OBS without playing live, as many
+// takes as needed, always with the same result.
 const FLAGS_REC_SEQUENCE = [
   { flags: ['España', 'Francia', 'Alemania'],        correct: 0, delayMs: 2200 },
   { flags: ['Japón', 'Corea del Sur', 'China'],       correct: 0, delayMs: 2000 },
   { flags: ['Argentina', 'Brasil', 'Portugal'],       correct: 1, delayMs: 2400 },
-  { flags: ['Chad', 'Rumanía', 'Andorra'],            correct: 1, delayMs: 4500 }, // trampa: Chad/Rumanía casi idénticas
-  { flags: ['Mónaco', 'Indonesia', 'Polonia'],        correct: 1, delayMs: 3800 }, // trampa: Mónaco/Indonesia casi idénticas
+  { flags: ['Chad', 'Rumanía', 'Andorra'],            correct: 1, delayMs: 4500 }, // trap: Chad/Rumanía nearly identical
+  { flags: ['Mónaco', 'Indonesia', 'Polonia'],        correct: 1, delayMs: 3800 }, // trap: Mónaco/Indonesia nearly identical
 ];
 
 let flagsRecScore = 0;
@@ -1941,7 +1934,7 @@ function startFlagsRoundRecording(recIndex) {
   const round = FLAGS_REC_SEQUENCE[recIndex];
 
   if (!round) {
-    // Fin de la secuencia: pantalla de resultado final para el cierre del reel.
+    // End of the sequence: final result screen for the reel's closing shot.
     flagsFlagidLabel.textContent = `Score: ${flagsRecScore}`;
     flagsFlagidLabel.style.fontSize = '4.2cqmin';
     flagsTopGroupIds.forEach(id => {
@@ -1970,7 +1963,7 @@ function startFlagsRoundRecording(recIndex) {
     if (!group) return;
     group.style.display       = '';
     group.style.opacity       = '';
-    group.style.pointerEvents = 'none'; // guionado: sin clicks manuales
+    group.style.pointerEvents = 'none'; // scripted: no manual clicks
     group.style.cursor        = 'default';
     group.style.animation     = '';
     group.style.transition    = '';
@@ -1990,7 +1983,7 @@ function startFlagsRoundRecording(recIndex) {
     const group = document.getElementById(flagsTopGroupIds[round.correct]);
     if (!group) return;
     flagsRecScore += 100;
-    // Igual que el juego real: freeze inmediato + translate hacia findluggage
+    // Like the real game: immediate freeze + translate toward findluggage
     group.classList.remove('luggage-enter-active');
     group.style.animation = 'none';
     group.style.transition = 'none';
@@ -2032,9 +2025,9 @@ function startFlagsRound() {
   if (document.body.classList.contains('recording-mode')) {
     return startFlagsRoundRecording();
   }
-  // Versus: la dificultad/desbloqueos se rigen por el índice de ronda COMPARTIDO,
-  // no por los aciertos individuales, así ambos jugadores ven la MISMA bandera en
-  // la misma ronda aunque uno vaya ganando.
+  // Versus: difficulty/unlocks are driven by the SHARED round index, not
+  // individual correct answers, so both players see the SAME flag in the same
+  // round even if one is winning.
   if (_flagsSyncedVersus()) {
     flagsIsFirstRound   = flagsVsIndex === 0;
     flagsEasyUnlocked   = flagsVsIndex >= 1;
@@ -2055,14 +2048,14 @@ function startFlagsRound() {
   flagsFindLuggage.style.animation  = '';
   flagsFindLuggage.classList.add('scrolling');
 
-  // Si la animación termina sin que se haya seleccionado nada → wrong
+  // If the animation ends without anything selected → wrong
   const onFindLuggageEnd = () => {
     flagsFindLuggage.removeEventListener('animationend', onFindLuggageEnd);
     clearTimeout(flagsRoundFallbackTimeout);
     clearFlagsElimination();
     if (!flagsRunning) return;
-    flagsPicked = true; // bloquear clicks hasta la siguiente pregunta
-    // Simular wrong: misma lógica que click incorrecto
+    flagsPicked = true; // block clicks until the next question
+    // Simulate wrong: same logic as an incorrect click
     flagsGroupIds.forEach(gid => {
       const g = document.getElementById(gid);
       if (g) { g.style.pointerEvents = 'none'; g.style.cursor = 'default'; }
@@ -2071,11 +2064,11 @@ function startFlagsRound() {
     flagsIsFirstRound = false;
     flagsWrongCount++;
     if (typeof sfxError !== 'undefined') { sfxError.currentTime = 0; sfxPlay(sfxError); }
-    // Wrong automático por tiempo (no hubo click) — el espectador no tiene un
-    // índice de maletín para animar, solo el flash de error.
-    // + campaignBase(): el espectador no tiene forma propia de saber cuánto
-    // acumuló el jugador en modos anteriores de la campaña — sin sumarlo acá,
-    // veía el puntaje arrancar de 0 en cada modo en vez de seguir sumando.
+    // Automatic wrong by time (no click) — the spectator has no suitcase index
+    // to animate, only the error flash.
+    // + campaignBase(): the spectator has no way of its own to know how much
+    // the player accumulated in earlier campaign modes — without adding it
+    // here, it saw the score start from 0 in each mode instead of continuing.
     if (typeof window._specReportAnswer === 'function') window._specReportAnswer(false, Math.round(flagsScore + ((typeof window.campaignBase === 'function') ? window.campaignBase() : 0)), { index: -1, timeout: true });
     if (typeof window._lobbyReportAnswer === 'function' && window._lobbyActive) window._lobbyReportAnswer(false, Math.round(flagsScore));
     const overlay = document.getElementById('flags-wrong-overlay');
@@ -2114,16 +2107,15 @@ function startFlagsRound() {
     }
   };
   flagsFindLuggage.addEventListener('animationend', onFindLuggageEnd);
-  // Respaldo por reloj real (mismo patrón que _flagsTimerTick con
-  // Date.now()): esta ventana de 8.15s por pregunta depende ÚNICAMENTE del
-  // evento animationend de findluggage-scroll para avanzar — a diferencia
-  // del timer general del juego, no tenía ningún respaldo. Si ese evento no
-  // llega bien al volver de una pestaña en 2do plano (reanudación de
-  // animaciones CSS/compositor), la pregunta quedaba congelada para siempre
-  // sin ningún aviso visual (reportado: "vuelvo y el juego no responde, se
-  // ve todo normal"). Con este timeout de respaldo, si por lo que sea el
-  // evento nunca llega, se fuerza el mismo camino de "wrong por tiempo" a
-  // los pocos ms de que debería haber terminado.
+  // Real-clock fallback (same pattern as _flagsTimerTick with Date.now()):
+  // this 8.15s window per question depends ONLY on the findluggage-scroll
+  // animationend event to advance — unlike the game's general timer, it had no
+  // fallback. If that event doesn't arrive properly on return from a
+  // background tab (CSS/compositor animation resumption), the question froze
+  // forever with no visual cue (reported: "I come back and the game doesn't
+  // respond, everything looks normal"). With this fallback timeout, if the
+  // event never arrives, the same "wrong by time" path is forced a few ms
+  // after it should have finished.
   clearTimeout(flagsRoundFallbackTimeout);
   flagsRoundFallbackTimeout = setTimeout(() => {
     flagsFindLuggage.removeEventListener('animationend', onFindLuggageEnd);
@@ -2139,7 +2131,7 @@ function startFlagsRound() {
   const mediumCountries  = (COUNTRIES.medium  || []).filter(c => COUNTRY_FLAGS[c] && _practiceContFilter(c));
   const hardCountries    = (COUNTRIES.hard    || []).filter(c => COUNTRY_FLAGS[c] && _practiceContFilter(c));
   const insaneCountries  = (COUNTRIES.insane  || []).filter(c => COUNTRY_FLAGS[c] && _practiceContFilter(c));
-  // Fallback: si el continente tiene pocas banderas inicio, rellenar con easy sin filtro
+  // Fallback: if the continent has few inicio flags, fill from easy with no filter
   if (window.practiceConfig && window.practiceConfig.active && inicioCountries.length < 3) {
     const easyAll = (COUNTRIES.easy || []).filter(c => COUNTRY_FLAGS[c] && !inicioCountries.includes(c));
     inicioCountries = [...inicioCountries, ...easyAll].slice(0, Math.max(inicioCountries.length + easyAll.length, 6));
@@ -2178,7 +2170,7 @@ function startFlagsRound() {
     return wp[Math.floor(flagsRand() * wp.length)];
   }
 
-  // En versus/lobby la curva de dificultad la marca el índice de ronda compartido.
+  // In versus/lobby the difficulty curve is driven by the shared round index.
   const selCount = _flagsSyncedVersus() ? flagsVsIndex : flagsCorrectCount;
 
   let chosen;
@@ -2217,21 +2209,21 @@ function startFlagsRound() {
     let chosenPool = fullPool.filter(c => !excluded(c));
     if (!chosenPool.length) { flagsAnswered.clear(); chosenPool = fullPool.filter(c => c !== flagsLastChosen); }
     if (!chosenPool.length) chosenPool = fullPool;
-    // Fallback final: si el continente no tiene nada, usar easy global
+    // Final fallback: if the continent has nothing, use global easy
     if (!chosenPool.length) {
       chosenPool = [...(COUNTRIES.inicio || []), ...(COUNTRIES.easy || [])].filter(c => COUNTRY_FLAGS[c]);
     }
     chosen = chosenPool[Math.floor(flagsRand() * chosenPool.length)];
   }
-  if (!chosen) return; // pool completamente vacía, no iniciar ronda
+  if (!chosen) return; // pool completely empty, don't start a round
   flagsLastChosen = chosen;
-  // Versus: registrar la bandera mostrada y avanzar el índice compartido, así la
-  // lista de exclusión y la dificultad quedan idénticas en todos los clientes.
+  // Versus: record the shown flag and advance the shared index, so the
+  // exclusion list and difficulty stay identical on all clients.
   const _flagsRoundIdx = flagsVsIndex;
   if (_flagsSyncedVersus()) { flagsAnswered.add(chosen); flagsVsIndex++; }
   flagsFlagidLabel.textContent = (typeof tCountry === 'function') ? tCountry(chosen) : chosen;
-  // Ajustar tamaño si el nombre es largo. Todo en vmin para escalar con el
-  // viewport igual que la imagen de flagid (49.4cqmin); maxW = 41.7cqmin en px.
+  // Fit the size if the name is long. All in vmin to scale with the viewport
+  // like the flagid image (49.4cqmin); maxW = 41.7cqmin in px.
   const vminPx = Math.min(window.STAGE_W, window.STAGE_H) / 100;
   const maxW = 41.7 * vminPx;
   let fs = 4.2;
@@ -2278,10 +2270,10 @@ function startFlagsRound() {
   const nonsimilar = flagsShuffle(_distractorBase.filter(c => c !== chosen && !similarAvailable.includes(c)));
   flagsShuffle(similarAvailable);
   // Fill distractors with similars first, then pad with filtered pool, then pad with easy (continent-filtered in practice)
-  // Dedupe: si un país aparece dos veces en las listas de origen (ej. en más de
-  // un tier), acá se filtraba a duplicado en dos maletines distintos con la
-  // MISMA bandera — el índice de asignación (más abajo) no vuelve a chequear
-  // unicidad, así que tiene que quedar garantizada acá antes de usarse.
+  // Dedupe: if a country appears twice in the source lists (e.g. in more than
+  // one tier), it ended up duplicated in two different suitcases with the SAME
+  // flag — the assignment index (below) doesn't re-check uniqueness, so it must
+  // be guaranteed here before use.
   let distractorPool = [...new Set([...similarAvailable, ...nonsimilar])];
   if (distractorPool.length < flagsGroupIds.length - 1) {
     const fallbackBase = _inPractice
@@ -2294,9 +2286,9 @@ function startFlagsRound() {
 
   const slotCount = flagsGroupIds.length;
   const correctSlot = Math.floor(flagsRand() * slotCount);
-  // Orden de eliminación progresiva — calculado ACÁ (no más abajo) para poder
-  // incluirlo en el broadcast de ronda y que el espectador desvanezca las
-  // mismas opciones en el mismo momento que el jugador real.
+  // Progressive elimination order — computed HERE (not below) so it can be
+  // included in the round broadcast and the spectator fades the same options
+  // at the same moment as the real player.
   const wrongSlots = [];
   for (let s = 0; s < slotCount; s++) if (s !== correctSlot) wrongSlots.push(s);
   flagsShuffle(wrongSlots);
@@ -2304,13 +2296,13 @@ function startFlagsRound() {
   // Apply six-mode layout before animations so positions are correct when luggages drop
   if (flagsSixUnlocked) flagsLuggageWrap.classList.add('flags-six-mode');
 
-  // Preparar grupos y asignar banderas
+  // Prepare groups and assign flags
   const activeGroupIds = flagsSixUnlocked
     ? [...flagsTopGroupIds, ...flagsBottomGroupIds]
     : flagsTopGroupIds;
 
-  // Assign flags to slots primero — src antes de la animación para que el decode
-  // ocurra concurrente con la caída (200ms de animación es suficiente margen).
+  // Assign flags to slots first — src before the animation so the decode
+  // happens concurrent with the drop (200ms of animation is enough margin).
   const _flagsSlotCountries = [];
   flagsGroupIds.forEach((id, i) => {
     const imgId = flagsSlotImgIds[id];
@@ -2319,36 +2311,35 @@ function startFlagsRound() {
     _flagsSlotCountries[i] = country;
     if (!img) return;
     const flagUrl = COUNTRY_FLAGS[country] || '';
-    // Reintento en error de carga (ej. imagen evictada de memoria en mobile,
-    // hiccup de red): sin esto, un fallo de red dejaba el maletín con la
-    // imagen VIEJA de la ronda anterior (o en blanco) el resto de la ronda,
-    // sin ningún indicio visual de que era un país distinto al mostrado.
+    // Retry on load error (e.g. image evicted from memory on mobile, network
+    // hiccup): without this, a network failure left the suitcase with the OLD
+    // flag from the previous round (or blank) the rest of the round, with no
+    // visual cue that it was a different country than shown.
     img.onerror = () => {
       img.onerror = null;
       setTimeout(() => { if (img.src !== flagUrl) img.src = flagUrl; else { img.src = ''; img.src = flagUrl; } }, 400);
     };
     img.src = flagUrl;
     img.style.display = 'block';
-    if (img.decode) img.decode().catch(() => {}); // fire-and-forget: precalienta textura GPU
+    if (img.decode) img.decode().catch(() => {}); // fire-and-forget: prewarms the GPU texture
   });
-  // Modo espectador: anunciar la ronda (opciones + respuesta correcta) antes de
-  // que el jugador conteste, para que quien mira vea lo mismo en tiempo real.
+  // Spectator mode: announce the round (options + correct answer) before the
+  // player answers, so watchers see the same thing in realtime.
   if (typeof window._specReportRound === 'function') {
-    // roundStartedAt: reloj de pared de cuando arranca ESTA ronda — el
-    // espectador lo usa para calcular cuánto tiempo de la ventana de 8.15s
-    // ya pasó al momento de recibir/reprocesar este round (ver
-    // flagsSpectatorShowRound), y aplicar la eliminación progresiva ya
-    // avanzada en vez de arrancarla de cero. Sin esto, alguien que entra a
-    // mitad de ronda (ej. _enterWaitAsSpectator, o VS._resendStateTo
-    // reenviando este mismo payload a un espectador que se conectó tarde)
-    // veía las 6 opciones intactas aunque el jugador real ya tuviera solo 2
-    // por lo poco que quedaba de ronda (el "cuando yo veo 6, mi rival en
-    // verdad tiene 2" reportado).
+    // roundStartedAt: wall-clock time when THIS round starts — the spectator
+    // uses it to compute how much of the 8.15s window already passed at the
+    // moment of receiving/reprocessing this round (see flagsSpectatorShowRound),
+    // and apply the progressive elimination already advanced instead of from
+    // zero. Without this, someone entering mid-round (e.g. _enterWaitAsSpectator,
+    // or VS._resendStateTo resending this same payload to a late-joining
+    // spectator) saw all 6 options intact even though the real player already
+    // had only 2 for the little time left in the round (the reported "when I
+    // see 6, my rival actually has 2").
     window._specReportRound({ index: _flagsRoundIdx, mode: 'flags', prompt: chosen, correctSlot, options: _flagsSlotCountries, eliminationOrder: wrongSlots.slice(), timeLeft: flagsTimeLeft, roundStartedAt: Date.now() });
   }
 
-  // Iniciar animación en el siguiente frame: el browser commitió la remoción de
-  // luggage-enter-active en el frame anterior (no se necesita void offsetWidth).
+  // Start the animation on the next frame: the browser committed the
+  // luggage-enter-active removal in the previous frame (no void offsetWidth needed).
   activeGroupIds.forEach(id => {
     const group = document.getElementById(id);
     if (!group) return;
@@ -2365,19 +2356,19 @@ function startFlagsRound() {
     });
   });
 
-  flagsRoundStartTime = performance.now() + 200; // empieza a contar tras la animación de entrada
+  flagsRoundStartTime = performance.now() + 200; // starts counting after the entry animation
 
   let flagsPicked = false;
-  // findluggage scrollea en X. En iOS el click llega ~300ms tarde (lag de toque) y
-  // para entonces findluggage ya se corrió → el maletín caía a una X posterior. Lo
-  // congelamos en pointerdown (toque real, inmediato). Solo afecta X; la Y no cambia
-  // porque findluggage no se mueve en vertical.
+  // findluggage scrolls in X. On iOS the click arrives ~300ms late (touch lag)
+  // and by then findluggage has moved → the suitcase dropped at a later X. We
+  // freeze it on pointerdown (real, immediate touch). Only affects X; Y doesn't
+  // change because findluggage doesn't move vertically.
   let flagsTapFindRect = null;
 
-  // ── Eliminación progresiva de opciones erróneas ───────────────────────────────
-  // 6 opciones: cada 1/3 del tiempo se desvanecen 2 erróneas (0.3s) y quedan
-  //             deseleccionables, hasta dejar solo 2 (correcta + 1 errónea).
-  // 3 opciones: a la 1/2 del tiempo se desvanece 1 errónea, dejando 2.
+  // ── Progressive elimination of wrong options ─────────────────────────────────
+  // 6 options: every 1/3 of the time, 2 wrong ones fade out (0.3s) and become
+  //            unselectable, until only 2 remain (correct + 1 wrong).
+  // 3 options: at 1/2 the time, 1 wrong one fades out, leaving 2.
   clearFlagsElimination();
   const fadeSlot = (slotIdx) => {
     const g = document.getElementById(flagsGroupIds[slotIdx]);
@@ -2402,16 +2393,17 @@ function startFlagsRound() {
   flagsGroupIds.forEach((id, i) => {
     const group = document.getElementById(id);
     if (!group) return;
-    // pointerup = al SOLTAR el maletín, inmediato en iOS (sin los 300ms del click).
-    // Congela findluggage Y ejecuta la acción en el mismo evento.
+    // pointerup = on RELEASING the suitcase, immediate on iOS (without the
+    // click's 300ms). Freezes findluggage AND runs the action in the same event.
     group.onpointerup = (ev) => {
       if (!flagsRunning || flagsPicked || group.classList.contains('flags-faded')) return;
-      ev.preventDefault(); // evita que dispare click posterior en iOS
-      // En iOS el compositor anima findluggage de forma asíncrona: pausar la animación
-      // y forzar reflow no es suficiente para sincronizar la posición visual cuando el
-      // usuario responde muy rápido (el layout devuelve la X base, no la X animada).
-      // Solución: capturar la matrix exacta del compositor con getComputedStyle ANTES
-      // de tocar nada, luego fijar el transform inline → getBCR refleja la X real.
+      ev.preventDefault(); // prevents a following click on iOS
+      // On iOS the compositor animates findluggage asynchronously: pausing the
+      // animation and forcing a reflow isn't enough to sync the visual position
+      // when the user answers very fast (layout returns the base X, not the
+      // animated X). Fix: capture the compositor's exact matrix with
+      // getComputedStyle BEFORE touching anything, then set the inline transform
+      // → getBCR reflects the real X.
       const _fmat = new DOMMatrix(window.getComputedStyle(flagsFindLuggage).transform);
       flagsFindLuggage.classList.remove('scrolling');
       flagsFindLuggage.style.animation  = 'none';
@@ -2420,9 +2412,9 @@ function startFlagsRound() {
       flagsMachine2.style.animationPlayState  = 'paused';
       flagsMachine3.style.animationPlayState  = 'paused';
       flagsMachine3b.style.animationPlayState = 'paused';
-      flagsTapFindRect = flagsFindLuggage.getBoundingClientRect(); // getBCR fuerza layout — void offsetWidth innecesario
-      // Diferir el trabajo pesado al siguiente frame: el browser pinta el estado
-      // congelado inmediatamente y el main thread queda libre para el compositor.
+      flagsTapFindRect = flagsFindLuggage.getBoundingClientRect(); // getBCR forces layout — void offsetWidth unnecessary
+      // Defer the heavy work to the next frame: the browser paints the frozen
+      // state immediately and the main thread stays free for the compositor.
       requestAnimationFrame(handleLuggagePick);
     };
     function handleLuggagePick() {
@@ -2431,17 +2423,18 @@ function startFlagsRound() {
       clearFlagsElimination();
       flagsFindLuggage.removeEventListener('animationend', onFindLuggageEnd);
       // Animate selected luggage toward findluggage position
-      // Resetear a posición BASE (sin transform/transición) ANTES de medir: en iOS
-      // la animación de entrada dejaba un transform residual y medíamos corrido →
-      // el maletín quedaba descolocado "a veces". Así medimos siempre la base real.
+      // Reset to the BASE position (no transform/transition) BEFORE measuring:
+      // on iOS the entry animation left a residual transform and we measured
+      // shifted → the suitcase was misplaced "sometimes". This way we always
+      // measure the real base.
       group.classList.remove('luggage-enter-active');
       group.style.animation  = 'none';
       group.style.transition = 'none';
       group.style.transform  = 'none';
       group.style.transformOrigin = '0 0';
-      // getBCR fuerza layout y commitea el reset (sin void offsetWidth).
-      // Las medidas se calculan aquí; la transición se aplica en el siguiente rAF
-      // para que el browser haya pintado transform:none antes de arrancar la animación.
+      // getBCR forces layout and commits the reset (no void offsetWidth).
+      // Measures are computed here; the transition is applied on the next rAF so
+      // the browser has painted transform:none before the animation starts.
       const lugImg    = group.querySelector('#flags-luggage, .flags-luggage-side');
       const lugRect   = (lugImg || group).getBoundingClientRect();
       const grpRect   = group.getBoundingClientRect();
@@ -2457,7 +2450,7 @@ function startFlagsRound() {
       let dy = findCy - fit * lugCy;
       group.style.willChange = 'transform';
       group.style.transformOrigin = '0 0';
-      // Siguiente frame: transform:none ya está pintado → la transition anima limpio
+      // Next frame: transform:none is already painted → the transition animates clean
       requestAnimationFrame(() => {
         group.style.transition = 'transform 0.1s linear';
         group.style.transform  = `translate3d(${dx}px, ${dy}px, 0) scale(${fit})`;
@@ -2518,7 +2511,7 @@ function startFlagsRound() {
         flagsScore += pts + speedBonus + inRowBonus;
         flagsAnimateScore();
         sortFlagsLeaderboard(flagsScore);
-        // + campaignBase(): ver comentario en el timeout de arriba.
+        // + campaignBase(): see comment in the timeout above.
         if (typeof window._specReportAnswer === 'function') window._specReportAnswer(true, Math.round(flagsScore + ((typeof window.campaignBase === 'function') ? window.campaignBase() : 0)), { index: i, points: pts + speedBonus, speedBonus, hasBadge: !!badgeImg, inRowBonus, streak: flagsStreak, dots: flagsDots });
         if (typeof window._lobbyReportAnswer === 'function' && window._lobbyActive) window._lobbyReportAnswer(true, Math.round(flagsScore));
         if (typeof showScorePopup !== 'undefined') showScorePopup(pts + speedBonus);
@@ -2534,10 +2527,10 @@ function startFlagsRound() {
         flagsIsFirstRound = false;
         flagsWrongCount++;
         if (typeof sfxError !== 'undefined') { sfxError.currentTime = 0; sfxPlay(sfxError); }
-        // + campaignBase(): ver comentario en el timeout de arriba.
+        // + campaignBase(): see comment in the timeout above.
         if (typeof window._specReportAnswer === 'function') window._specReportAnswer(false, Math.round(flagsScore + ((typeof window.campaignBase === 'function') ? window.campaignBase() : 0)), { index: i });
         if (typeof window._lobbyReportAnswer === 'function' && window._lobbyActive) window._lobbyReportAnswer(false, Math.round(flagsScore));
-        // En 1v1: efectos en mi propia tarjeta (lobby lo maneja por broadcast self:true)
+        // In 1v1: effects on my own card (lobby handles it via broadcast self:true)
         if (window._vsActive) _applyWrongEffects(flagsLbElements['flags-lb-player']);
       }
       const overlay = document.getElementById(correct ? 'flags-check-overlay' : 'flags-wrong-overlay');
@@ -2634,13 +2627,13 @@ function hideFlagsMode() {
 
   if (window._suppressGameover) { window._suppressGameover = false; _flagsCleanupVisuals(); return; }
 
-  // ── LOBBY (grupal): ranking en vez del gameover normal ──
+  // ── LOBBY (group): ranking instead of the normal gameover ──
   if (window._lobbyActive && typeof window._lobbyHandleGameEnd === 'function') {
     _flagsCleanupVisuals();
     window._lobbyHandleGameEnd(finalScore);
     return;
   }
-  // ── VERSUS 1v1: pantalla de resultado W/L en vez del gameover normal ──
+  // ── VERSUS 1v1: W/L result screen instead of the normal gameover ──
   // Keep visual assets (machines, flag, luggage) alive as background during W/L result.
   // flagsHardReset (via quitToMenu) handles cleanup when user exits.
   if (window._vsActive && typeof window._vsHandleGameEnd === 'function') {
@@ -2650,14 +2643,14 @@ function hideFlagsMode() {
 
   _flagsCleanupVisuals();
 
-  // ── PRÁCTICA: redirigir al panel ──────────────────────────
+  // ── PRACTICE: redirect to the panel ───────────────────────
   if (window.practiceConfig && window.practiceConfig.active) {
     window.endPracticeSession(finalScore, flagsCorrectCount, flagsWrongCount);
     return;
   }
   // ──────────────────────────────────────────────────────────
 
-  // Registrar la partida single-player de banderas para stats.
+  // Log the single-player flags game for stats.
   if (window.Analytics) window.Analytics.logGame('flags', finalScore);
 
   const base = (typeof window.campaignBase === 'function') ? window.campaignBase() : 0;
@@ -2669,9 +2662,9 @@ function hideFlagsMode() {
   const newHSBanner = document.getElementById('new-highscore-banner');
   const newHSScore  = document.getElementById('new-highscore-score');
   if (finalScore > prevHighscore) {
-    // Durante una campaña en curso no se persiste todavía: se guarda como
-    // pendiente y solo se confirma en localStorage al completar la Vuelta
-    // Mundial entera (ver window._commitCampaignHighscores en js/core/campaign.js).
+    // During an in-progress campaign it isn't persisted yet: kept as pending
+    // and only committed to localStorage once the whole Gira Mundial completes
+    // (see window._commitCampaignHighscores in js/core/campaign.js).
     if (window.campaign && window.campaign.active) {
       window.campaign.pendingHS.flags = finalScore;
     } else {
@@ -2718,21 +2711,21 @@ let flagsPregameTimeout = null;
 let flagsRoundFallbackTimeout = null;
 let flagsAborted = false;
 
-// elapsedMs (opcional): cuánto del 3-2-1 ya pasó del lado del jugador REAL —
-// lo usa el espectador que se une a mitad de la cuenta (ver
-// flagsSpectatorShowPregame) para arrancar en el número/audio que
-// corresponde, en vez de siempre desde "3".
+// elapsedMs (optional): how much of the 3-2-1 already passed on the REAL
+// player's side — used by the spectator joining mid-count (see
+// flagsSpectatorShowPregame) to start at the right number/audio, instead of
+// always from "3".
 function runFlagsPregame(onDone, elapsedMs) {
   flagsAborted = false;
   flagsPregameEl.style.display = 'flex';
-  // Desbloquear el compositor de Opera al arrancar la cuenta regresiva (ver
-  // window.nudgeRepaint en js/core/ui-helpers.js).
+  // Unblock the Opera compositor when the countdown starts (see
+  // window.nudgeRepaint in js/core/ui-helpers.js).
   if (typeof window.nudgeRepaint === 'function') {
     window.nudgeRepaint();
     setTimeout(window.nudgeRepaint, 120);
   }
-  // Ubicar en qué paso (3/2/1/GO) y cuánto le queda a ESE paso corresponde
-  // arrancar, sumando los "hold" hasta encontrar dónde cae elapsedMs.
+  // Locate which step (3/2/1/GO) and how much of THAT step remains to start
+  // at, summing the "hold" values to find where elapsedMs falls.
   let step = 0;
   let firstStepRemaining = null;
   if (elapsedMs > 0) {
@@ -2751,7 +2744,7 @@ function runFlagsPregame(onDone, elapsedMs) {
   }
 
   function showStep() {
-    if (flagsAborted) return; // se abandonó la partida durante el 3-2-1
+    if (flagsAborted) return; // game abandoned during the 3-2-1
     if (step >= FLAGS_PREGAME_STEPS.length) {
       flagsPregameEl.style.display = 'none';
       onDone();
@@ -2772,7 +2765,7 @@ function runFlagsPregame(onDone, elapsedMs) {
   showStep();
 }
 
-// Detiene y resetea TODO el modo banderas (sin scoring ni gameover). Lo usa quitToMenu.
+// Stops and resets ALL of flags mode (no scoring or gameover). Used by quitToMenu.
 function flagsHardReset() {
   flagsAborted = true;
   flagsRunning = false;
@@ -2788,17 +2781,17 @@ function flagsHardReset() {
   try { clearFlagsElimination(); } catch (e) {}
   if (typeof sfxCountdown !== 'undefined') { try { sfxCountdown.pause(); sfxCountdown.currentTime = 0; } catch (e) {} }
   if (window._powerQuitOverlay) {
-    // Solo pausar animaciones; dejar la UI visible detrás del overlay
+    // Only pause animations; keep the UI visible behind the overlay
     [flagsMachine, flagsMachine2, flagsMachine3, flagsMachine3b, flagsFindLuggage].forEach(m => {
       if (m) m.style.animationPlayState = 'paused';
     });
-    // Deshabilitar maletines: sin hover ni click durante el overlay de game over
+    // Disable suitcases: no hover or click during the game-over overlay
     disableAllLuggageGroups();
     if (flagsLuggageWrap) flagsLuggageWrap.classList.add('flags-game-ended');
-    // Detener el titilo del countdown
+    // Stop the countdown blink
     if (flagsTimerImg) flagsTimerImg.style.animationPlayState = 'paused';
   } else if (!window._vsShowingResult) {
-    // Ocultar/parar máquina, equipaje, banderas, overlays y countdown
+    // Hide/stop machine, luggage, flags, overlays and countdown
     [flagsMachine, flagsMachine2, flagsMachine3, flagsMachine3b].forEach(m => {
       if (!m) return;
       m.style.display = 'none';
@@ -2826,19 +2819,17 @@ window.gameStoppers.push(flagsHardReset);
 window.flagsHardReset = flagsHardReset;
 
 // ── TIMER ─────────────────────────────────────────────────────────────────────
-// flagsTimeLeft se calcula contra flagsTimerStartedAt (Date.now()), no
-// restando 1 por tick — un setInterval throttleado en 2do plano pierde ticks
-// reales y un contador que resta 1 por tick queda atrasado respecto al
-// tiempo real; acá se autocorrige de una sola vez en cuanto vuelve a
-// tickear (o la pestaña vuelve a primer plano), en vez de arrastrar el
-// atraso.
+// flagsTimeLeft is computed against flagsTimerStartedAt (Date.now()), not by
+// subtracting 1 per tick — a background-throttled setInterval loses real ticks
+// and a counter that subtracts 1 per tick falls behind real time; here it
+// self-corrects in one step as soon as it ticks again (or the tab returns to
+// the foreground), instead of dragging the lag.
 function _flagsTimerTick() {
-  // Guarda defensiva — mismo motivo que la de _timerTick en js/modes/mapgame-play.js: si
-  // por lo que sea flagsTimerIntervalId no se limpió a tiempo (pestaña
-  // minimizada mucho rato, etc.), un tick fantasma de una ronda ya
-  // terminada podía disparar endFlagsGame() y el TIMES UP gigante encima
-  // del menú. flagsRunning ya se pone en false al terminar/salir de la
-  // ronda real.
+  // Defensive guard — same reason as _timerTick in js/modes/mapgame-play.js:
+  // if flagsTimerIntervalId somehow wasn't cleared in time (tab long
+  // minimized, etc.), a ghost tick from an already-finished round could fire
+  // endFlagsGame() and the giant TIMES UP over the menu. flagsRunning is
+  // already set false on finishing/leaving the real round.
   if (!flagsRunning) { clearInterval(flagsTimerIntervalId); return; }
   const _flagsInfinite = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
   if (_flagsInfinite) return;
@@ -2869,7 +2860,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 function startFlagsTimer() {
-  clearInterval(flagsTimerIntervalId); // defensivo: evita timer doble si se llama dos veces
+  clearInterval(flagsTimerIntervalId); // defensive: avoids a double timer if called twice
   const _flagsInfinite = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
   flagsTimeLeft = _flagsInfinite ? 0 : (window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer > 0)
     ? window.practiceConfig.timer
@@ -2905,28 +2896,28 @@ function endFlagsGame() {
   }, 1800);
 }
 
-// ── BOTÓN DE INICIO ───────────────────────────────────────────────────────────
+// ── START BUTTON ───────────────────────────────────────────────────────────
 document.getElementById('loading-flags-btn').addEventListener('click', () => {
   window._autoDismissVsInvites?.();
   if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
   if (typeof window._setPlaying === 'function') window._setPlaying(true);
   window.pendingGameMode = 'flags';
-  // Avisar a un posible espectador que entramos a las instrucciones de este
-  // modo — puede quedarse leyendo ahí lo que quiera antes de confirmar; sin
-  // este aviso, un espectador que se une durante ese rato se quedaba viendo
-  // la pantalla de "Conectando..." trabada hasta recién el 3-2-1 real.
-  // Diferido a microtask: _setPlaying(true) recién arranca SoloSpectate en SU
-  // PROPIO Promise.resolve().then() (para esperar a que _vsActive/_lobbyActive
-  // ya estén seteados) — llamando esto en el mismo tick síncrono todavía
-  // vería SoloSpectate.isActive()===false y el aviso se perdía en silencio.
-  // Encolando el nuestro DESPUÉS (mismo patrón), el de _setPlaying corre primero.
+  // Tell a possible spectator we entered this mode's instructions — they can
+  // stay reading there as long as they like before confirming; without this
+  // notice, a spectator joining during that time was stuck on "Connecting..."
+  // until the real 3-2-1. Deferred to a microtask: _setPlaying(true) only
+  // starts SoloSpectate in its OWN Promise.resolve().then() (to wait for
+  // _vsActive/_lobbyActive to be set) — calling this in the same synchronous
+  // tick would still see SoloSpectate.isActive()===false and the notice was
+  // lost silently. Queuing ours AFTER (same pattern), _setPlaying's runs first.
   Promise.resolve().then(() => {
     if (typeof window._specReportSplash === 'function') window._specReportSplash({ mode: 'flags' });
   });
-  // Resetear estado del splash con el splash AÚN oculto (evita saltear step2 y la
-  // mesa "subiendo" si veníamos de una campaña previa). Ver window.resetSplashEntry.
+  // Reset splash state while the splash is STILL hidden (avoids skipping step2
+  // and the table "rising" if we came from a previous campaign). See
+  // window.resetSplashEntry.
   window.resetSplashEntry?.();
-  // Transición visual inmediata
+  // Immediate visual transition
   document.getElementById('loading-screen').style.display = 'none';
   const splashEl = document.getElementById('splash-screen');
   splashEl.style.display = 'flex';
@@ -2936,7 +2927,7 @@ document.getElementById('loading-flags-btn').addEventListener('click', () => {
   void splashEl.offsetWidth;
   animEls.forEach(el => el.classList.add('animate-in'));
   if (typeof playMusic !== 'undefined') playMusic(sfxPregame);
-  // Setup no visual diferido
+  // Deferred non-visual setup
   requestAnimationFrame(() => {
     document.getElementById('splash-screen').classList.add('mode-flags');
     document.getElementById('splash-screen').classList.remove('mode-shapes', 'mode-monuments');
@@ -2966,7 +2957,7 @@ document.getElementById('loading-flags-btn').addEventListener('mouseenter', () =
 });
 
 
-// Reposicionar la barra de amigos de banderas al hacer zoom/redimensionar
+// Reposition the flags friends bar on zoom/resize
 window.addEventListener('resize', () => {
   const rp = document.getElementById('flags-right-panel');
   if (!rp || getComputedStyle(rp).display === 'none') return;

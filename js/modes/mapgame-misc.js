@@ -1,12 +1,10 @@
 // ============================================================================
-// modes/mapgame-misc.js — Misceláneos de los modos de mapa: confirmStep/confirmCooldown + handlers de los
-// botones 'confirm' del splash (pre-partida) y del gameover (avanzar de modo /
-// campaña / results), y las animaciones frame-by-frame de la azafata (loading,
-// splash, y la ingame restartFlightAtt).
+// modes/mapgame-misc.js — map-mode miscellany: confirmStep/confirmCooldown +
+// handlers for the 'confirm' buttons on the splash (pre-game) and gameover
+// (advance mode / campaign / results), and the frame-by-frame flight attendant
+// animations (loading, splash, and the ingame restartFlightAtt).
 //
-// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
-// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
-// Son <script> clásicos que comparten un mismo scope global.
+// Classic <script>s sharing one global scope, loaded in order in play/index.html.
 // ============================================================================
 
 let confirmStep = 0;
@@ -36,27 +34,26 @@ document.querySelector('.splash-confirm-wrap')?.addEventListener('click', () => 
     }
     const howtoWrap = document.querySelector('.splash-howtoplay-wrap');
     if (howtoWrap) howtoWrap.classList.add('slide-down');
-    // Chrome-iOS: nunca decodificar el video (ver IS_CHROME_IOS) — se queda
-    // en el poster estático que le puso swapHowtoVideo.
+    // Chrome-iOS: never decode the video (see IS_CHROME_IOS) — it stays on the
+    // static poster set by swapHowtoVideo.
     if (!IS_CHROME_IOS) {
       const howtoVideo = document.querySelector('.splash-howtoplay-video');
       if (howtoVideo) howtoVideo.play();
     }
     confirmStep = 1;
     window.waitForHowtoVideo();
-    // Avisar a un posible espectador que este primer confirm ya se apretó —
-    // sin esto, el mirror de instrucciones del espectador (ver
-    // _showSplashMirror en spectate.js) se quedaba siempre pegado en el
-    // texto/video del paso 1, aunque el jugador real ya hubiera avanzado al
-    // paso 2 (video de ayuda bajando + texto cambiado).
+    // Tell a possible spectator this first confirm was pressed — without it,
+    // the spectator's instructions mirror (see _showSplashMirror in
+    // spectate.js) stayed stuck on step 1's text/video even after the real
+    // player advanced to step 2 (help video sliding down + text changed).
     if (typeof window._specReportSplash === 'function') window._specReportSplash({ mode: window.pendingGameMode, step: 2 });
   } else {
-    // Lanzamiento normal (no versus/lobby): asegurar que el leaderboard use amigos,
-    // y que la selección de banderas vuelva a Math.random (no la semilla sincronizada).
+    // Normal launch (not versus/lobby): make the leaderboard use friends, and
+    // flag selection go back to Math.random (not the synced seed).
     window._vsActive = false;
     window._lobbyActive = false;
-    // Limpiar restos de un Versus/lobby previo para que no sobreviva una fila de
-    // rival en el leaderboard de single-player. (Ver bug barra de amigos.)
+    // Clear leftovers from a previous Versus/lobby so no rival row survives in
+    // the single-player leaderboard.
     window._vsOpponent = null;
     window._lobbyMembers = null;
     if (typeof initLeaderboard === 'function') { try { initLeaderboard(); } catch (e) {} }
@@ -84,28 +81,27 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
   wrap.classList.add('confirm-pressed');
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
 
-  // ── Encadenamiento de campaña ──
+  // ── Campaign chaining ──
   if (window.campaign && window.campaign.active) {
     const mode = window.pendingGameMode;
-    const sc = window.lastModeScore || 0; // puntaje individual de esta ronda
+    const sc = window.lastModeScore || 0; // this round's individual score
     window.campaign.scores[mode] = sc;
     window.campaign.base = (window.campaign.base || 0) + sc;
     window.campaign.idx++;
     if (window.campaign.idx < window.campaign.btns.length) {
-      // Avisar al espectador YA (antes de _fireNext, que puede demorar si el
-      // manifest todavía no terminó de precargar) que dejamos el postgame de
-      // este modo — sin esto _specReportAdvancing() nunca se llamaba desde
-      // NINGÚN lado del código (quedó definida en spectate.js pero muerta),
-      // así que el espectador se quedaba viendo el postgame VIEJO congelado
-      // hasta que -si acaso- llegaba el 'round'/'pregame' del modo siguiente.
+      // Tell the spectator NOW (before _fireNext, which can lag if the manifest
+      // hasn't finished preloading) that we left this mode's postgame — without
+      // it, _specReportAdvancing() was never called from ANYWHERE (defined in
+      // spectate.js but dead), so the spectator stayed on the OLD frozen
+      // postgame until the next mode's 'round'/'pregame' arrived, if ever.
       if (typeof window._specReportAdvancing === 'function') window._specReportAdvancing();
-      // Gameover se queda visible e intacto hasta que _fireNext está listo.
-      // En ese momento se oculta el gameover y se dispara el siguiente modo
-      // en el mismo bloque sincrónico (sin frame intermedio en blanco).
+      // Gameover stays visible and intact until _fireNext is ready. Then the
+      // gameover is hidden and the next mode fired in the same synchronous
+      // block (no blank intermediate frame).
       sfxCheck.volume = 0;
       const _nextBtn = window.campaign.btns[window.campaign.idx];
       const _fireNext = () => {
-        // Ocultar gameover + resetear splash + mostrar siguiente — todo de una.
+        // Hide gameover + reset splash + show next — all at once.
         gameoverScreen.style.display = 'none';
         confirmStep = 0;
         const howtoWrapC = document.querySelector('.splash-howtoplay-wrap');
@@ -126,8 +122,8 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
       }
     } else {
       window.campaign.active = false;
-      // Vuelta Mundial completa: recién ahora se confirman en localStorage los
-      // highscores por-modo logrados durante esta campaña.
+      // Full Gira Mundial: only now are the per-mode highscores earned during
+      // this campaign committed to localStorage.
       if (typeof window._commitCampaignHighscores === 'function') window._commitCampaignHighscores();
       if (window.Analytics && typeof window.Analytics.logCampaign === 'function') {
         window.Analytics.logCampaign(window.campaign.base || 0);
@@ -135,27 +131,26 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
       if (window.Analytics && typeof window.Analytics.logCampaignCurrency === 'function') {
         window.Analytics.logCampaignCurrency(window.campaign.base || 0);
       }
-      // Requisito para desbloquear GlobeQuiz: haber completado al menos 1 Gira
-      // Mundial alguna vez (ver gate en el click de globequiz-btn más abajo).
+      // Requirement to unlock GlobeQuiz: having completed at least 1 Gira
+      // Mundial ever (see the gate in the globequiz-btn click).
       if (window._sbUserId && window._sbProfile) {
         window._sbProfile.campaigns_completed = (window._sbProfile.campaigns_completed || 0) + 1;
         window.sbUpdateProfile(window._sbUserId, { campaigns_completed: window._sbProfile.campaigns_completed }).catch(() => {});
       }
       playMusic(null);
-      // Ocultar el gameover de monuments antes de mostrar results; si no, queda
-      // encima y bloquea el click del confirm para ver el rank.
+      // Hide the monuments gameover before showing results; otherwise it sits
+      // on top and blocks the confirm click to see the rank.
       gameoverScreen.style.display = 'none';
-      // Sin esto, un espectador mirando quedaba con el postgame de Monuments
-      // congelado para siempre — _setPlaying(false) es lo único que dispara
-      // SoloSpectate.stop(), que a su vez hace que la presencia del jugador
-      // "salga" del canal y el espectador reciba el aviso de partida
-      // terminada (vuelve solo a la pantalla de carga). El otro camino (no
-      // campaña, más abajo) sí lo llama — acá faltaba.
+      // Without this, a watching spectator stayed on the Monuments postgame
+      // frozen forever — _setPlaying(false) is the only thing that fires
+      // SoloSpectate.stop(), which makes the player's presence "leave" the
+      // channel and the spectator get the game-ended notice (returns to the
+      // loading screen). The other path (non-campaign, below) does call it —
+      // it was missing here.
       window._setPlaying(false);
-      // Recién acá se completó una Vuelta Mundial entera de verdad (las 4
-      // modalidades) — es el único punto donde vale chequear elegibilidad
-      // para el popup de Fundador (se consume al volver al menú, ver
-      // js/final.js "final-confirm-back-wrap").
+      // Only here has a full Gira Mundial (all 4 modes) actually been completed
+      // — the only point worth checking Founder-popup eligibility (consumed on
+      // return to the menu, see js/final.js "final-confirm-back-wrap").
       window._pendingFounderPopupCheck = true;
       if (typeof showResultsScreen === 'function') showResultsScreen();
     }
@@ -164,8 +159,8 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
 
   gameoverScreen.style.display = 'none';
   window._setPlaying(false);
-  // Liberar la RAM del juego recién terminado antes de volver al menú (el video se
-  // vuelve a setear más abajo con swapHowtoVideo).
+  // Free the just-finished game's RAM before returning to the menu (the video
+  // is re-set below with swapHowtoVideo).
   if (typeof window.releaseGameMemory === 'function') window.releaseGameMemory();
   if (typeof window.resetEntranceElements === 'function') window.resetEntranceElements();
   document.getElementById('loading-screen').style.display = '';
@@ -291,7 +286,7 @@ let restartFlightAtt;
   pendingTimeout = setTimeout(tick, TIMELINE[0][1]);
 })();
 
-// ── SPLASH ANIMATE-IN (una sola vez al cargar) ───────────────────────────────
+// ── SPLASH ANIMATE-IN (once on load) ────────────────────────────────────────
 (function () {
   document.querySelectorAll('#splash-screen .flightatt-splash, .splash-text2-wrap').forEach(el => {
     el.classList.add('animate-in');
@@ -299,8 +294,8 @@ let restartFlightAtt;
 })();
 
 // ── SPLASH TEXT2 RESPONSIVE ──────────────────────────────────────────────────
-// El tamaño del texto de los carteles (text2/text1) se controla en CSS con vw:
-// el globo mide 25cqw/21cqw (su width:% sobre #splash-screen, que es full viewport),
-// así que la fuente en vw (1.375cqw/1.155cqw = 0.055×ancho) queda SIEMPRE en la
-// misma proporción que el globo, sin atascarse con el zoom como el ResizeObserver.
+// The sign text size (text2/text1) is controlled in CSS with vw: the globe is
+// 25cqw/21cqw (its width:% over #splash-screen, which is full viewport), so the
+// font in vw (1.375cqw/1.155cqw = 0.055×width) always stays the same proportion
+// as the globe, without jamming on zoom like the ResizeObserver did.
 

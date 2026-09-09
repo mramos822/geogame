@@ -1,30 +1,28 @@
 // ============================================================================
-// modes/practice-panel.js — Modo Práctica (Practice Tour): window.practiceConfig, panel de configuración
-// (elegir modo / continentes / pills de timer / dificultad de monumentos),
-// showPracticePanel/hidePracticePanel/backFromConfig, buildPracticeImgRow + popup
-// de score (showPracticeScore), endPracticeSession, y el botón Start.
+// modes/practice-panel.js — Practice mode (Practice Tour): window.practiceConfig,
+// config panel (pick mode / continents / timer pills / monuments difficulty),
+// showPracticePanel/hidePracticePanel/backFromConfig, buildPracticeImgRow + score
+// popup (showPracticeScore), endPracticeSession, and the Start button.
 //
-// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
-// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
-// Son <script> clásicos que comparten un mismo scope global.
+// Classic <script>s sharing one global scope, loaded in order in play/index.html.
 // ============================================================================
 
 // ═══════════════════════════════════════════════════════════════
-// PRACTICE TOUR — Panel, config, lógica
+// PRACTICE TOUR — panel, config, logic
 // ═══════════════════════════════════════════════════════════════
 window.practiceConfig = {
   active: false,
   mode: null,        // 'game'|'flags'|'shapes'|'monuments'
   continents: new Set(['america','europa','africa','asia','oceania']),
-  timer: 60,         // segundos; 0 = infinito
-  difficulty: 'facil', // solo monumentos
+  timer: 60,         // seconds; 0 = infinite
+  difficulty: 'facil', // monuments only
 };
 
 let _hidePracticeTimer = null;
 
-// Muestra panel práctica, oculta panel 2
+// Show the practice panel, hide panel 2
 function showPracticePanel() {
-  // Cancelar timer pendiente de hidePracticePanel para evitar race condition
+  // Cancel any pending hidePracticePanel timer to avoid a race condition
   clearTimeout(_hidePracticeTimer);
   _hidePracticeTimer = null;
   document.getElementById('loading-screen')?.classList.add('table-shown');
@@ -33,13 +31,13 @@ function showPracticePanel() {
   lpg.classList.remove('panel-visible', 'table-gone');
   void lpg.offsetWidth;
   lpg.classList.add('panel-visible');
-  // Resetear a sección de modos
+  // Reset to the modes section
   document.getElementById('practice-mode-section').style.display = '';
   document.getElementById('practice-config-section').style.display = 'none';
   document.getElementById('practice-score-popup').style.display = 'none';
 }
 
-// Vuelve de práctica al panel 2
+// Return from practice to panel 2
 function hidePracticePanel() {
   const lpg = document.getElementById('loading-practice-group');
   document.getElementById('loading-screen')?.classList.remove('table-shown');
@@ -53,7 +51,7 @@ function hidePracticePanel() {
   }, 400);
 }
 
-// Muestra popup de score al terminar sesión
+// Show the score popup when the session ends
 function buildPracticeImgRow(rowId, count, imgSrc, startDelay) {
   const row = document.getElementById(rowId);
   if (!row) return;
@@ -66,13 +64,13 @@ function buildPracticeImgRow(rowId, count, imgSrc, startDelay) {
     row.appendChild(none);
     return;
   }
-  // Squeeze logic: IMG_W en cqmin; MAX_W = espacio disponible dentro del panel fijo (46cqmin − padding − label)
-  const IMG_W = 3.5;   // cqmin, coincide con .practice-score-imgs-row img
-  const BASE_GAP = 0.2; // cqmin gap normal
+  // Squeeze logic: IMG_W in cqmin; MAX_W = space available inside the fixed panel (46cqmin − padding − label)
+  const IMG_W = 3.5;   // cqmin, matches .practice-score-imgs-row img
+  const BASE_GAP = 0.2; // cqmin normal gap
   const MAX_W = 28;
-  // Squeeze cuando el ancho natural (imgs + gaps) supera MAX_W. Antes el umbral
-  // era `count > 12` fijo, pero con IMG_W=3.5 el desborde empieza en count≈8
-  // (8·3.5 = 28): entre 9 y 12 checks los PNG se salían de la tarjeta.
+  // Squeeze when the natural width (imgs + gaps) exceeds MAX_W. The threshold
+  // used to be a fixed `count > 12`, but with IMG_W=3.5 overflow starts around
+  // count≈8 (8·3.5 = 28): between 9 and 12 checks the PNGs spilled out of the card.
   const naturalW = count * IMG_W + Math.max(0, count - 1) * BASE_GAP;
   const gap = count <= 1 ? 0
             : (naturalW > MAX_W ? (MAX_W - count * IMG_W) / (count - 1) : BASE_GAP);
@@ -88,13 +86,13 @@ function buildPracticeImgRow(rowId, count, imgSrc, startDelay) {
 }
 
 window.showPracticeScore = function(score) {
-  // Mostrar panel sin animación de entrada (venimos del game over)
+  // Show the panel without an entrance animation (coming from the game over)
   document.getElementById('loading-screen')?.classList.add('table-shown');
   const lpg = document.getElementById('loading-practice-group');
   lpg.style.display = '';
   lpg.classList.remove('table-gone');
   lpg.classList.add('panel-visible');
-  // Restaurar config del modo jugado
+  // Restore the config of the mode played
   const mode = window.practiceConfig.mode;
   document.getElementById('practice-mode-section').style.display = 'none';
   const cfg = document.getElementById('practice-config-section');
@@ -132,10 +130,10 @@ window.showPracticeScore = function(score) {
   popup.style.display = 'flex';
 };
 
-// Cierra una sesión de práctica (timeout natural o quit manual) y vuelve al panel
-// de práctica con el score. Único punto de esta secuencia — antes estaba duplicada
-// casi idéntica en mapgame-play.js (x2), flags.js y shapes.js, lo que la hacía propensa
-// a que las copias se desincronizaran entre sí (ver bug mezcla panel1/panel2).
+// Close a practice session (natural timeout or manual quit) and return to the
+// practice panel with the score. The single point for this sequence — it used
+// to be duplicated almost identically in mapgame-play.js (x2), flags.js and
+// shapes.js, which made the copies prone to drifting apart.
 window.endPracticeSession = function (score, correct, wrong) {
   window.practiceConfig.active = false;
   document.body.classList.remove('practice-mode');
@@ -151,7 +149,7 @@ window.endPracticeSession = function (score, correct, wrong) {
   window.showPracticeScore(score);
 };
 
-// ── Click en es-practice button
+// ── Versus / practice buttons
 document.getElementById('loading-panel2-versus')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   if (!window._accountLoggedIn) {
@@ -170,14 +168,14 @@ document.getElementById('loading-panel2-practice')?.addEventListener('click', ()
   showPracticePanel();
 });
 
-// ── Back desde práctica: si está en config vuelve a modos, si está en modos vuelve al panel 2
+// ── Back from practice: from config → modes, from modes → panel 2
 document.getElementById('practice-back-wrap')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   const configVisible = document.getElementById('practice-config-section')?.style.display !== 'none';
   if (configVisible) { backFromConfig(); } else { hidePracticePanel(); }
 });
 
-// ── Botones de modo
+// ── Mode buttons
 const PRACTICE_MODE_LABELS = { flags: 'Suitcase Shuffle', shapes: 'Map Mayhem', game: 'City Blitz', monuments: 'Landmark Loco' };
 const PRACTICE_MODE_VIDEOS = { flags: 'images/howtoplay/howtoplay1.mp4', shapes: 'images/howtoplay/howtoplay2.mp4', game: 'images/howtoplay/howtoplay3.mp4', monuments: 'images/howtoplay/howtoplay4.mp4' };
 document.querySelectorAll('.practice-mode-item').forEach(btn => {
@@ -185,36 +183,36 @@ document.querySelectorAll('.practice-mode-item').forEach(btn => {
     sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
     const mode = btn.dataset.mode;
     window.practiceConfig.mode = mode;
-    // Ocultar "Elige un modo"
+    // Hide "Pick a mode"
     const chooseLabel = document.querySelector('.practice-choose-label');
     if (chooseLabel) chooseLabel.style.display = 'none';
-    // Mostrar config
+    // Show config
     document.getElementById('practice-mode-section').style.display = 'none';
     const cfg = document.getElementById('practice-config-section');
     cfg.style.display = '';
     cfg.classList.toggle('practice-mode-monuments', mode === 'monuments');
-    // Nombre del modo
+    // Mode name
     document.getElementById('practice-config-title').textContent = PRACTICE_MODE_LABELS[mode] || mode;
-    // Video howtoplay
+    // Howtoplay video
     const vid = document.getElementById('practice-config-video');
     if (vid) {
-      // Chrome-iOS: mismo crash de decode que en el splash real (ver
-      // IS_CHROME_IOS más arriba) — poster estático, sin load()/play().
+      // Chrome-iOS: same decode crash as the real splash (see IS_CHROME_IOS) —
+      // static poster, no load()/play().
       if (IS_CHROME_IOS) { vid.poster = PRACTICE_MODE_VIDEOS[mode].replace(/howtoplay(\d)\.mp4$/, 'howtoplay$1-poster.jpg'); }
       else { vid.src = PRACTICE_MODE_VIDEOS[mode]; vid.load(); vid.play().catch(() => {}); }
     }
-    // Mostrar continentes o dificultad según el modo
+    // Show continents or difficulty depending on the mode
     const showCont = mode !== 'monuments';
     document.getElementById('practice-continents').style.display  = showCont ? '' : 'none';
     document.getElementById('practice-difficulty').style.display  = showCont ? 'none' : '';
   });
 });
 
-// ── Continente toggle
+// ── Continent toggle
 document.querySelectorAll('.practice-continent-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    const activos = document.querySelectorAll('.practice-continent-btn.active');
-    if (btn.classList.contains('active') && activos.length <= 1) {
+    const active = document.querySelectorAll('.practice-continent-btn.active');
+    if (btn.classList.contains('active') && active.length <= 1) {
       btn.classList.add('continent-error');
       setTimeout(() => btn.classList.remove('continent-error'), 350);
       return;
@@ -228,11 +226,11 @@ document.querySelectorAll('.practice-continent-btn').forEach(btn => {
 const TIMER_IDX_TO_SEC = { 1: 30, 2: 60, 3: 120, 4: 180, 5: 0 };
 
 function updateTimerUI(idx) {
-  // imagen
+  // image
   document.querySelectorAll('.practice-time-img').forEach(img => {
     img.classList.toggle('active', parseInt(img.dataset.timeidx, 10) === idx);
   });
-  // fill del range (webkit via background gradient)
+  // range fill (webkit via background gradient)
   const range = document.getElementById('practice-timeline-range');
   if (range) {
     const pct = (idx - 1) / 4 * 100;
@@ -254,9 +252,9 @@ if (practiceRange) {
     updateTimerUI(idx);
   });
 
-  // En móvil (iOS/Android) el range dentro de un padre con transform:scale pierde
-  // la relación entre touch y posición del thumb. getBoundingClientRect devuelve
-  // coords visuales correctas, así que calculamos el valor manualmente.
+  // On mobile (iOS/Android) a range inside a parent with transform:scale loses
+  // the relation between touch and thumb position. getBoundingClientRect returns
+  // correct visual coords, so we compute the value manually.
   ['touchstart', 'touchmove'].forEach(evt => {
     practiceRange.addEventListener(evt, e => {
       e.preventDefault();
@@ -274,10 +272,10 @@ if (practiceRange) {
     }, { passive: false });
   });
 }
-// init con el default (idx 2 → 60s)
+// init with the default (idx 2 → 60s)
 updateTimerUI(2);
 
-// ── Dificultad (monuments) — radio: solo uno activo
+// ── Difficulty (monuments) — radio: only one active
 document.querySelectorAll('.practice-diff-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     if (btn.classList.contains('active')) return;
@@ -296,7 +294,7 @@ function backFromConfig() {
   if (vid) { vid.pause(); vid.src = ''; }
 }
 
-// ── OK en popup score
+// ── OK on the score popup
 document.getElementById('practice-score-btn')?.addEventListener('click', function() {
   this.classList.add('confirm-pressed');
   setTimeout(() => this.classList.remove('confirm-pressed'), 200);
@@ -313,7 +311,7 @@ document.getElementById('practice-start-btn')?.addEventListener('click', functio
   const mode = window.practiceConfig.mode;
   if (!mode) return;
 
-  // Validar continentes (solo para modos con filtro)
+  // Validate continents (only for modes with a filter)
   const continents = new Set(
     [...document.querySelectorAll('.practice-continent-btn.active')].map(b => b.dataset.continent)
   );
@@ -325,7 +323,7 @@ document.getElementById('practice-start-btn')?.addEventListener('click', functio
 
   window.practiceConfig.active      = true;
   window.practiceConfig.continents  = continents;
-  // difficulty solo aplica a monuments; los demás modos usan 'dificil' (sin restricción)
+  // difficulty only applies to monuments; other modes use 'dificil' (no restriction)
   window.practiceConfig.difficulty  = mode === 'monuments' ? (activeD ? activeD.dataset.diff : 'facil') : 'dificil';
   window._practiceStats = { correct: 0, wrong: 0, startTime: null };
   document.body.classList.add('practice-mode');

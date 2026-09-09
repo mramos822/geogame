@@ -1,13 +1,11 @@
 // ============================================================================
-// social/social-panel.js — Panel Social del loading: lista de amigos y sus estados, pestañas
-// Amigos/Solicitudes, perfil de un amigo, botones de relación (fav / agregar /
-// aceptar / eliminar / bloquear), tableros de Bloqueados y Enviadas, buscador/orden,
-// panel Añadir Amigo, notificación banner de solicitud.
-// Carga tras i18n-data.js (usa onLangChange al registrar).
+// social/social-panel.js — loading-screen Social panel: friends list and their
+// status, Friends/Requests tabs, a friend's profile, relationship buttons (fav /
+// add / accept / remove / block), Blocked and Sent boards, search/sort, Add
+// Friend panel, request banner notification.
+// Loads after i18n-data.js (registers via onLangChange).
 //
-// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
-// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
-// Son <script> clásicos que comparten un mismo scope global.
+// Classic <script>s sharing one global scope, loaded in order in play/index.html.
 // ============================================================================
 
 document.getElementById('loading-social-back-wrap')?.addEventListener('click', () => {
@@ -20,27 +18,27 @@ document.getElementById('loading-social-back-wrap')?.addEventListener('click', (
   _updateSocialBadge();
 });
 
-// ── Lista de amigos del panel social ─────────────────────────────────────────
+// ── Social panel friends list ───────────────────────────────────────────────
 
 let socialActiveTab = 'friends';
 let socialSort = localStorage.getItem('socialSort') || 'conn';
 
-// Cache de datos sociales cargado desde Supabase
+// Social data cache loaded from Supabase
 let socialData = { friends: [], requests: [], sent: [], blocked: [], blockedMe: [] };
 
-// Respaldo local (ver loadSocialData): si el pedido al servidor falla, se usa
-// lo último guardado acá en vez de dejar el panel de amigos vacío.
+// Local backup (see loadSocialData): if the server request fails, use the last
+// value stored here instead of leaving the friends panel empty.
 function _loadCachedSocialData() {
   try { return JSON.parse(localStorage.getItem('cachedSocialData') || 'null'); } catch (e) { return null; }
 }
 
-// Favoritos persistidos en localStorage por user ID
+// Favorites persisted in localStorage by user ID
 function getSocialFavs() {
   try { return new Set(JSON.parse(localStorage.getItem('socialFavs') || '[]')); } catch { return new Set(); }
 }
 function saveSocialFavs(set) { localStorage.setItem('socialFavs', JSON.stringify([...set])); }
 
-// El amigo cuyo perfil está abierto
+// The friend whose profile is open
 let currentFriendProfile = null;
 
 function relStatus(f) {
@@ -69,11 +67,11 @@ function socialStatusText(f) {
   const daysAgo  = hoursAgo / 24;
   const monthsAgo = daysAgo / 30.5;
   const yearsAgo  = daysAgo / 365;
-  // is_playing usa la misma ventana de 120s que getStatusObj (no los 20s de
-  // "online" de acá abajo) — sin esto, un jugador inactivo un rato en plena
-  // partida (sin tocar nada 20-120s) seguía con la celda titilando en verde
-  // (getStatusObj todavía lo clasifica "playing") pero el texto ya cambiaba
-  // a "Hace 1 minuto" en vez de "Jugando", pese a seguir jugando de verdad.
+  // is_playing uses the same 120s window as getStatusObj (not the 20s "online"
+  // one below) — without this, a player idle a bit mid-game (nothing for
+  // 20-120s) still had the cell blinking green (getStatusObj still classes them
+  // "playing") but the text already changed to "1 minute ago" instead of
+  // "Playing", despite still really playing.
   if (f.is_playing && secsAgo <= 120) return t('social.playing') || 'Jugando';
   if (secsAgo <= 20) return t('social.online') || 'En línea';
   let n, unit;
@@ -110,7 +108,7 @@ function _updateSocialBadge() {
     badge.style.display = 'none';
   }
 
-  // Detectar solicitudes nuevas y mostrar notificación banner (solo si panel cerrado)
+  // Detect new requests and show the banner notification (only if panel closed)
   const currentIds = new Set(socialData.requests.map(r => r.friendshipId));
   if (_knownRequestIds !== null && panelOpen === false) {
     const newReqs = socialData.requests.filter(r => !_knownRequestIds.has(r.friendshipId));
@@ -197,7 +195,7 @@ function _dismissFriendRequestNotif() {
   _freqNotifDeclineCb = null;
 }
 
-// Carga todos los datos sociales desde Supabase y re-renderiza.
+// Load all social data from Supabase and re-render.
 async function loadSocialData(showLoader = true) {
   if (!window._accountLoggedIn || !window._sbUserId) {
     socialData = { friends: [], requests: [], sent: [], blocked: [], blockedMe: [] };
@@ -213,8 +211,8 @@ async function loadSocialData(showLoader = true) {
       ? await window.withConnCheck(window.sbLoadSocialData(window._sbUserId), 6000)
       : await window.sbLoadSocialData(window._sbUserId);
     if (!_social) {
-      // Sin conexión (viñeta de error ya mostrada): caer al último dato
-      // guardado localmente en vez de dejar el panel vacío.
+      // Offline (error bubble already shown): fall back to the last locally
+      // stored data instead of leaving the panel empty.
       const cached = _loadCachedSocialData();
       if (cached) socialData = cached;
       renderSocial(); updateSocialTabCounts(); return;
@@ -222,14 +220,14 @@ async function loadSocialData(showLoader = true) {
     socialData = _social;
     try { localStorage.setItem('cachedSocialData', JSON.stringify(socialData)); } catch (e) {}
     if (typeof window.Friends !== 'undefined') {
-      // Conservar id/last_active/is_playing: los paneles de invitar usan getFriends()
-      // y necesitan el estado en vivo (conectado/jugando), igual que el panel social.
-      // OJO: hay que llevar TAMBIÉN frameCode/cardCode/cellCode/panelCode y los
-      // campos gq_* — si no, este _setCache (que corre en cada loadSocialData,
-      // bastante seguido por el poll) pisa el caché más completo que arma
-      // loadFriends() en friends.js y los deja undefined. Sin esto, la barra
-      // de amigos in-game de GlobeQuiz (buildGqFriendRows) nunca encontraba a
-      // ningún amigo con racha de hoy aunque sí la tuviera en el server.
+      // Keep id/last_active/is_playing: the invite panels use getFriends() and
+      // need live status (online/playing), like the social panel.
+      // NOTE: must ALSO carry frameCode/cardCode/cellCode/panelCode and the gq_*
+      // fields — otherwise this _setCache (which runs on every loadSocialData,
+      // fairly often via the poll) overwrites the fuller cache built by
+      // loadFriends() in friends.js and leaves them undefined. Without this, the
+      // in-game GlobeQuiz friends bar (buildGqFriendRows) never found any friend
+      // with today's streak even when they had one on the server.
       window.Friends._setCache(socialData.friends.map(f => ({
         id: f.id, name: f.name, score: f.score, avatar: f.avatar || '',
         last_active: f.last_active || null, is_playing: f.is_playing || false,
@@ -242,7 +240,7 @@ async function loadSocialData(showLoader = true) {
       })));
     }
   } catch (e) {
-    console.warn('[social] error cargando:', e.message);
+    console.warn('[social] error loading:', e.message);
   }
   renderSocial(document.getElementById('loading-social-search-input')?.value || '');
   updateSocialTabCounts();
@@ -250,7 +248,7 @@ async function loadSocialData(showLoader = true) {
   if (!document.getElementById('loading-sent-group')?.classList.contains('table-gone'))    renderSentList();
   _subscribeFriendStatuses(socialData.friends.map(f => f.id));
   _startSocialListPoll();
-  // Si el panel de detalle de amigo está abierto, sincronizar friendshipId y botones
+  // If the friend detail panel is open, sync friendshipId and buttons
   if (currentFriendProfile) {
     const all = [...socialData.friends, ...socialData.requests, ...socialData.sent, ...socialData.blocked];
     const fresh = all.find(x => x.id === currentFriendProfile.id);
@@ -260,7 +258,7 @@ async function loadSocialData(showLoader = true) {
   window._socialDataFetched = true;
 }
 
-// Pinta la pestaña activa.
+// Render the active tab.
 function renderSocial(filter = '') {
   if (socialActiveTab === 'requests') renderSocialRequests(filter);
   else renderSocialFriends(filter);
@@ -309,19 +307,18 @@ function respondRequest(friend, accepted) {
   op.then(() => loadSocialData(false)).catch(e => console.warn('[social] respondRequest:', e));
 }
 
-// Click en el ojo de un amigo "Jugando": busca su match versus activo y, si es
-// de un modo soportado (flags/shapes en v1), abre el panel de espectador. La
-// policy RLS "matches_select_friends" es la que realmente decide si puedo leer
-// esa fila — si no somos amigos aceptados, el select no devuelve nada.
-// Ninguna partida versus (flags/shapes, rondas cortas con timer propio) tiene
-// sentido seguir "active" más de esto — si el cierre normal (fin de partida /
-// abandono de un jugador) no llegó a marcarla como tal (pestaña cerrada de
-// golpe, crash, corte de red), quedaba "active" en la base PARA SIEMPRE. Como
-// openSpectatorForFriend() siempre revisa esto ANTES de ir al espectador de
-// partida individual, una fila así de vieja bloqueaba para siempre poder
-// espectar a esa persona en modo solo — se quedaba colgado intentando abrir
-// una partida versus fantasma que nadie está jugando.
-const STALE_MATCH_MS = 20 * 60 * 1000; // 20 minutos
+// Click on a "Playing" friend's eye: finds their active versus match and, if a
+// supported mode, opens the spectator panel. The RLS policy
+// "matches_select_friends" is what really decides if I can read that row — if
+// we're not accepted friends, the select returns nothing.
+// No versus game (short rounds with their own timer) should stay "active"
+// longer than this — if the normal close (game end / player abandon) never
+// marked it (tab closed abruptly, crash, network drop), it stayed "active" in
+// the DB FOREVER. Since openSpectatorForFriend() always checks this BEFORE
+// going to the solo-game spectator, such a stale row permanently blocked
+// spectating that person in solo mode — it hung trying to open a phantom
+// versus game nobody is playing.
+const STALE_MATCH_MS = 20 * 60 * 1000; // 20 minutes
 
 async function openSpectatorForFriend(f) {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
@@ -337,21 +334,21 @@ async function openSpectatorForFriend(f) {
     if (error) throw error;
     const isStale = data && (Date.now() - new Date(data.created_at).getTime()) > STALE_MATCH_MS;
     if (data && isStale) {
-      // Autolimpieza: la primera persona que se topa con esto la corrige para
-      // siempre (no hace falta arreglarla a mano en la base cada vez) — no se
-      // espera la respuesta, no debe demorar el intento de espectar.
+      // Self-cleanup: the first person to hit this fixes it permanently (no
+      // manual DB fix needed each time) — response not awaited, must not delay
+      // the spectate attempt.
       window.sb.from('matches').update({ status: 'abandoned' }).eq('id', data.id).then(() => {}, () => {});
     }
     if (data && !isStale) {
-      // Está en una partida VERSUS — los 4 modos ya tienen UI real de
-      // espectador (REAL_UI_MODES los cubre a todos desde que se integró
-      // Monuments), así que ya no hace falta filtrar por modo acá.
+      // In a VERSUS game — all 4 modes now have real spectator UI (REAL_UI_MODES
+      // covers them all since Monuments was integrated), so no need to filter by
+      // mode here.
       if (typeof window.openSpectator === 'function') window.openSpectator(data.id, f);
       return;
     }
-    // Sin match 1v1 activo — ¿está en un duelo GRUPAL (lobby de hasta 10)?
-    // Requiere la policy "lobby_members_select_friends"/"lobbies_select_friends"
-    // (ver supabase/group_spectator_mode.sql) para poder leerlo desde afuera.
+    // No active 1v1 match — are they in a GROUP duel (lobby of up to 10)?
+    // Needs the "lobby_members_select_friends"/"lobbies_select_friends" policy
+    // (see supabase/group_spectator_mode.sql) to read it from outside.
     const { data: lobbyRows } = await window.sb
       .from('lobby_members')
       .select('lobby_id, l:lobby_id(id, status, created_at)')
@@ -362,9 +359,8 @@ async function openSpectatorForFriend(f) {
       if (typeof window.openSpectatorGroup === 'function') window.openSpectatorGroup(activeLobby.id, f);
       return;
     }
-    // Sin duelo grupal tampoco pero está "Jugando" → asumimos partida
-    // individual (Gira Mundial/modo solo) y nos unimos directo a su canal
-    // 'solo-{id}'.
+    // No group duel either but "Playing" → assume a solo game (Gira
+    // Mundial/solo mode) and join their 'solo-{id}' channel directly.
     if (typeof window.openSpectatorSolo === 'function') window.openSpectatorSolo(f.id, f);
   } catch (e) {
     window.showGlobalToast('No se pudo abrir la partida.');
@@ -431,7 +427,7 @@ function renderSocialFriends(filter = '') {
     list.appendChild(row);
   });
 
-  // Bloqueados al fondo
+  // Blocked users at the bottom
   socialData.blocked
     .filter(b => b.name.toLowerCase().includes(filter.toLowerCase()))
     .forEach((b) => {
@@ -484,7 +480,7 @@ function _startFriendStatusPoll(friendId) {
   }, 10000);
 }
 
-// Abre el perfil de amigo con datos reales de Supabase.
+// Open a friend's profile with real Supabase data.
 function openFriendProfile(friend) {
   if (socialData.blockedMe.some(b => b.id === friend.id)) {
     sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
@@ -499,8 +495,8 @@ function openFriendProfile(friend) {
   currentFriendProfile = friend;
   const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
 
-  // Racha de GloboReto del amigo — no viene en los selects de la lista de
-  // amigos/rankings (son parciales), así que se pide aparte, chiquito.
+  // Friend's GloboReto streak — not in the friends-list/rankings selects
+  // (partial), so it's fetched separately, small.
   if (window.sb && friend.id) {
     window.sb.from('profiles').select('gq_streak_count,gq_streak_last_date').eq('id', friend.id).single()
       .then(({ data }) => {
@@ -643,7 +639,7 @@ function _showFriendPanelError(persistent = false) {
   if (!persistent) setTimeout(() => overlay.classList.remove('visible'), 3000);
 }
 
-// ── Botones de relación del perfil de amigo ───────────────────────────────────
+// ── Friend profile relationship buttons ─────────────────────────────────────
 function updateFriendButtons() {
   const actions  = document.getElementById('loading-friend-actions');
   const favBtn   = document.getElementById('loading-friend-fav');
@@ -684,7 +680,7 @@ function updateFriendButtons() {
   blockBtn.src = status === 'blocked' ? 'images/friendunblock.png' : 'images/friendblock.png';
 }
 
-// Popup de confirmación reutilizable (sí/no).
+// Reusable confirmation popup (yes/no).
 function showFriendConfirm(text, onYes, showClose = false, onNo = null) {
   const popup = document.getElementById('friend-confirm-popup');
   const txt   = document.getElementById('friend-confirm-text');
@@ -715,7 +711,7 @@ function refreshSocialAfterRel() {
   });
 });
 
-// Botón mejor amigo: alterna favorito.
+// Best friend button: toggles favorite.
 document.getElementById('loading-friend-fav')?.addEventListener('click', () => {
   if (!currentFriendProfile || relStatus(currentFriendProfile) !== 'friend') return;
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
@@ -726,8 +722,8 @@ document.getElementById('loading-friend-fav')?.addEventListener('click', () => {
   refreshSocialAfterRel();
 });
 
-// Aplica un cambio optimista a socialData y refresca el panel al instante,
-// luego sincroniza con el servidor en background.
+// Apply an optimistic change to socialData and refresh the panel instantly,
+// then sync with the server in the background.
 function _optimisticRelUpdate(action, fp) {
   const id = fp.id;
   const removeFromAll = () => {
@@ -755,7 +751,7 @@ function _optimisticRelUpdate(action, fp) {
   if (!document.getElementById('loading-sent-group')?.classList.contains('table-gone'))    renderSentList();
 }
 
-// Botón del medio: añadir / aceptar / cancelar / borrar amigo.
+// Middle button: add / accept / cancel / remove friend.
 document.getElementById('loading-friend-rel')?.addEventListener('click', () => {
   if (!currentFriendProfile) return;
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
@@ -766,9 +762,10 @@ document.getElementById('loading-friend-rel')?.addEventListener('click', () => {
     showFriendConfirm(t('confirm.removeFriend', { name: fp.name }), () => {
       const favs = getSocialFavs(); favs.delete(fp.id); saveSocialFavs(favs);
       _optimisticRelUpdate('remove', fp);
-      // No llamar loadSocialData en .then(): el delete y el re-fetch inmediato
-      // tienen race condition (Supabase aún no propagó el write a la capa de lectura).
-      // El optimistic update ya removió el amigo. El Realtime event confirma después.
+      // Don't call loadSocialData in .then(): the delete and an immediate
+      // re-fetch race (Supabase hasn't propagated the write to the read layer).
+      // The optimistic update already removed the friend. The Realtime event
+      // confirms later.
       window.sbDeleteFriendship(fp.friendshipId, window._sbUserId, fp.id)
         .catch(e => { console.warn('[social] removeFriend:', e); loadSocialData(false); });
     });
@@ -799,7 +796,7 @@ document.getElementById('loading-friend-rel')?.addEventListener('click', () => {
   }
 });
 
-// Botón bloquear / desbloquear.
+// Block / unblock button.
 document.getElementById('loading-friend-block')?.addEventListener('click', () => {
   if (!currentFriendProfile) return;
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
@@ -885,7 +882,7 @@ document.getElementById('loading-social-tab-requests')?.addEventListener('click'
   renderSocial(document.getElementById('loading-social-search-input')?.value || '');
 });
 
-// ── Panel Añadir Amigo ────────────────────────────────────────────────────────
+// ── Add Friend panel ────────────────────────────────────────────────────────
 document.getElementById('loading-social-invite')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   const input = document.getElementById('loading-addfriend-input');
@@ -898,9 +895,9 @@ document.getElementById('loading-social-invite')?.addEventListener('click', () =
 
 let _sendingFriendRequest = false;
 async function sendFriendRequest() {
-  // Guard real: el botón se deshabilita pero el input tiene su propio listener
-  // de Enter que llama esta función directo (sin pasar por el <button>), así
-  // que "disabled" solo no alcanza para evitar pedidos superpuestos.
+  // Real guard: the button is disabled but the input has its own Enter listener
+  // calling this directly (bypassing the <button>), so "disabled" alone doesn't
+  // prevent overlapping requests.
   if (_sendingFriendRequest) return;
   const input = document.getElementById('loading-addfriend-input');
   const fb = document.getElementById('loading-addfriend-feedback');
@@ -936,9 +933,9 @@ async function sendFriendRequest() {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   _sendingFriendRequest = true;
   const sendBtn = document.getElementById('loading-addfriend-send');
-  // Nada de texto de feedback acá: el botón ya dice "Enviando..." — mostrar lo
-  // mismo abajo (sin color definido en el CSS para este estado, salía en
-  // blanco/ilegible) era redundante y confuso.
+  // No feedback text here: the button already says "Sending..." — showing the
+  // same below (no CSS color for this state, so it came out white/illegible)
+  // was redundant and confusing.
   fb.textContent = '';
   fb.className = 'loading-addfriend-feedback';
   if (sendBtn) {
@@ -950,12 +947,12 @@ async function sendFriendRequest() {
   }
   if (input) input.disabled = true;
   try {
-    // .then(() => true): sbSendFriendRequest resuelve undefined en éxito (no
-    // retorna nada), que chocaría con el undefined que usa withConnTimeout
-    // para marcar timeout — con esto, éxito real siempre es `true`.
+    // .then(() => true): sbSendFriendRequest resolves undefined on success
+    // (returns nothing), which would collide with the undefined withConnTimeout
+    // uses to mark a timeout — with this, real success is always `true`.
     const _p = window.sbSendFriendRequest(window._sbUserId, name).then(() => true);
     const result = typeof window.withConnTimeout === 'function' ? await window.withConnTimeout(_p, 6000) : await _p;
-    if (result === undefined) return; // timeout: viñeta de error ya mostrada, no hay nada más que decir acá
+    if (result === undefined) return; // timeout: error bubble already shown, nothing more to say here
     fb.textContent = t('social.requestSent', { name });
     fb.className = 'loading-addfriend-feedback ok show';
     if (input) input.value = '';
@@ -989,7 +986,7 @@ document.getElementById('loading-addfriend-back-wrap')?.addEventListener('click'
   document.getElementById('loading-addfriend-group')?.classList.add('table-gone');
 });
 
-// ── Tablero de bloqueados ─────────────────────────────────────────────────────
+// ── Blocked board ───────────────────────────────────────────────────────────
 let blockedSort = 'az';
 function renderBlockedList() {
   const list = document.getElementById('loading-blocked-list');
@@ -1029,7 +1026,7 @@ function renderBlockedList() {
   });
 }
 
-// Bloquea/restaura los clicks de la lista de amigos.
+// Block/restore clicks on the friends list.
 function setSocialListClickable(on) {
   const list = document.getElementById('loading-social-list');
   if (list) list.style.pointerEvents = on ? '' : 'none';
@@ -1067,7 +1064,7 @@ document.getElementById('loading-blocked-sort')?.addEventListener('mouseenter', 
   sfxSelect.currentTime = 0; sfxPlay(sfxSelect);
 });
 
-// ── Tablero de solicitudes enviadas (pendientes) ──────────────────────────────
+// ── Sent (pending) requests board ───────────────────────────────────────────
 let sentSort = 'az';
 function renderSentList() {
   const list = document.getElementById('loading-sent-list');
@@ -1139,7 +1136,7 @@ document.getElementById('loading-sent-sort')?.addEventListener('mouseenter', () 
   sfxSelect.currentTime = 0; sfxPlay(sfxSelect);
 });
 
-// Al cambiar idioma, re-renderizar el contenido dinámico del panel social/perfil.
+// On language change, re-render the dynamic content of the social/profile panel.
 if (typeof onLangChange === 'function') onLangChange(() => {
   try { const sb = document.getElementById('loading-social-sort'); if (sb) sb.textContent = socialSortLabel(); } catch (e) {}
   try { updateSocialTabCounts(); } catch (e) {}

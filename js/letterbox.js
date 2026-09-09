@@ -1,17 +1,18 @@
-// ── STAGE DE ASPECTO FIJO ─────────────────────────────────────────────────────
-// Todo el juego vive dentro de #app-stage, un contenedor de TAMAÑO FIJO
-// (DESIGN_W × DESIGN_H = el viewport de referencia). Las unidades internas son
-// container units (cqmin/cqh/cqw) que se calculan contra ese tamaño fijo, así el
-// layout queda CONGELADO. Acá solo calculamos la escala para encajar el stage en
-// la ventana (contain) y lo centramos; el blanco del body rellena el resto
-// (letterbox/pillarbox real en los 4 lados).
+// ── FIXED-ASPECT STAGE ──────────────────────────────────────────────────────
+// The whole game lives inside #app-stage, a FIXED-SIZE container (DESIGN_W ×
+// DESIGN_H = the reference viewport). Internal units are container units
+// (cqmin/cqh/cqw) computed against that fixed size, so the layout is FROZEN.
+// Here we only compute the scale to fit the stage into the window (contain) and
+// center it; the body's white fills the rest (real letterbox/pillarbox on all 4
+// sides).
 (function () {
-  // Área VISIBLE = zona jugable central (70% del ancho de diseño). El fit/letterbox
-  // se calcula contra esto, así el blanco de alrededor reemplaza a las viejas barras.
+  // VISIBLE area = central playable zone (70% of the design width). The
+  // fit/letterbox is computed against this, so the surrounding white replaces
+  // the old bars.
   var VISIBLE_W = 1344; // 1920 * 0.70
   var VISIBLE_H = 911;
 
-  // Tamaño del sistema de coordenadas del CONTENIDO (para canvas, etc.).
+  // Size of the CONTENT coordinate system (for canvas, etc.).
   window.STAGE_W = 1920;
   window.STAGE_H = 911;
   window.GAME_DURATION = 60;
@@ -32,8 +33,8 @@
     stage.id = 'app-stage';
     outer.appendChild(stage);
 
-    // Mover los hijos directos de <body> al stage, salvo scripts/estilos,
-    // el aviso de pantalla y el lector temporal de resolución.
+    // Move <body>'s direct children into the stage, except scripts/styles,
+    // the screen warning and the temporary resolution readout.
     var keepOut = { 'screen-warning': 1, 'temp-res-readout': 1, 'app-stage': 1, 'app-stage-outer': 1, 'init-cover': 1, 'test-founder-popup-btn': 1 };
     var kids = Array.prototype.slice.call(document.body.childNodes);
     kids.forEach(function (n) {
@@ -45,10 +46,10 @@
       stage.appendChild(n);
     });
     document.body.appendChild(outer);
-    // Expuesto para que el contenido creado en runtime se agregue DENTRO del stage.
+    // Exposed so runtime-created content is added INSIDE the stage.
     window.appStage = stage;
 
-    // El lector temporal puede estar anidado dentro de #loading-screen → sacarlo.
+    // The temp readout may be nested inside #loading-screen → move it out.
     var tr = document.getElementById('temp-res-readout');
     if (tr) document.body.appendChild(tr);
   }
@@ -56,9 +57,9 @@
   function update() {
     if (!stage) buildStage();
     var vp = window.visualViewport;
-    // Usar el MENOR entre visualViewport e innerWidth/Height: si el chrome del
-    // navegador (barra de búsqueda de Opera/Edge) solapa el viewport, así no
-    // sobre-escalamos y el stage no se corta.
+    // Use the MIN of visualViewport and innerWidth/Height: if browser chrome
+    // (Opera/Edge search bar) overlaps the viewport, this avoids over-scaling
+    // and the stage isn't clipped.
     var w = vp ? Math.min(vp.width,  window.innerWidth)  : window.innerWidth;
     var h = vp ? Math.min(vp.height, window.innerHeight) : window.innerHeight;
     var fitW = w, fitH = h;
@@ -72,12 +73,12 @@
     var root = document.documentElement;
     root.style.setProperty('--app-fit', fit);
 
-    // Centrar contra el viewport VISIBLE, no el de layout. #app-stage-outer es
-    // position:fixed con top/left:50% (centro del viewport de layout). Cuando el
-    // chrome del navegador solapa la página (offsetTop/Left > 0, p.ej. Opera GX),
-    // el centro de layout queda parcialmente bajo el chrome y el stage "se corta"
-    // arriba. Desplazamos el centro al del área visible. En desktop sin solape el
-    // offset es 0 → sin cambios.
+    // Center against the VISIBLE viewport, not the layout one. #app-stage-outer
+    // is position:fixed with top/left:50% (layout viewport center). When
+    // browser chrome overlaps the page (offsetTop/Left > 0, e.g. Opera GX), the
+    // layout center sits partly under the chrome and the stage "clips" at the
+    // top. We shift the center to the visible area's. On desktop with no
+    // overlap the offset is 0 → no change.
     var shiftX = 0, shiftY = 0;
     if (vp && !isMobileLB) {
       shiftX = (vp.offsetLeft || 0) + vp.width  / 2 - window.innerWidth  / 2;
@@ -110,11 +111,11 @@
   window.addEventListener('orientationchange', function () { baseW = 0; baseH = 0; update(); });
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', update);
-    // El scroll del visualViewport cambia offsetTop/Left (chrome que aparece/oculta).
+    // visualViewport scroll changes offsetTop/Left (chrome showing/hiding).
     window.visualViewport.addEventListener('scroll', update);
   }
-  // Expuesto para que otras pantallas puedan forzar un re-cálculo del fit.
-  // En iOS Safari, position:fixed puede tener Y incorrecto en el primer render;
-  // llamar esto después de mostrar una pantalla fuerza la corrección.
+  // Exposed so other screens can force a fit re-computation.
+  // On iOS Safari, position:fixed can have a wrong Y on first render; calling
+  // this after showing a screen forces the correction.
   window.letterboxRefresh = update;
 })();

@@ -1,5 +1,5 @@
 const CITIES = [
-  // ── América del Sur ─────────────────────────────────────────────────────────
+  // ── South America ──────────────────────────────────────────────────────
   { name: "Buenos Aires",          country: "ARG", lat: -34.61, lon:  -58.38, diff: "facil"  },
   { name: "Rosario",               country: "ARG", lat: -32.95, lon:  -60.66, diff: "medio"  },
   { name: "Ushuaia",               country: "ARG", lat: -54.00, lon:  -68.30, diff: "medio"  },
@@ -50,7 +50,7 @@ const CITIES = [
   { name: "Georgetown",            country: "GUY", lat:   6.80, lon:  -58.16, diff: "dificil"},
   { name: "Paramaribo",            country: "SUR", lat:   5.87, lon:  -55.17, diff: "dificil"},
 
-  // ── América Central y Caribe ────────────────────────────────────────────────
+  // ── Central America & Caribbean ────────────────────────────────────────
   { name: "Ciudad de México",      country: "MEX", lat:  19.43, lon:  -99.13, diff: "inicio" },
   { name: "Guadalajara",           country: "MEX", lat:  20.67, lon: -103.35, diff: "facil"  },
   { name: "Monterrey",             country: "MEX", lat:  25.67, lon: -100.31, diff: "facil"  },
@@ -73,7 +73,7 @@ const CITIES = [
   { name: "Oranjestad",            country: "ARU", lat:  12.52, lon:  -70.03, diff: "dificil"},
   { name: "The Valley",            country: "AIA", lat:  18.22, lon:  -63.05, diff: "dificil"},
 
-  // ── América del Norte ───────────────────────────────────────────────────────
+  // ── North America ──────────────────────────────────────────────────────
   { name: "Nueva York",            country: "USA", lat:  40.71, lon:  -74.01, diff: "inicio" },
   { name: "Los Ángeles",           country: "USA", lat:  34.05, lon: -118.24, diff: "facil"  },
   { name: "Miami",                 country: "USA", lat:  25.77, lon:  -80.19, diff: "facil"  },
@@ -113,7 +113,7 @@ const CITIES = [
   { name: "Des Moines",            country: "USA", lat:  41.60, lon:  -93.61, diff: "dificil"},
   { name: "Nuuk",                  country: "GRL", lat:  64.18, lon:  -51.74, diff: "dificil"},
 
-  // ── Europa ──────────────────────────────────────────────────────────────────
+  // ── Europe ─────────────────────────────────────────────────────────────
   { name: "Londres",               country: "ENG", lat:  51.51, lon:   -0.13, diff: "inicio" },
   { name: "París",                 country: "FRA", lat:  48.85, lon:    2.35, diff: "inicio" },
   { name: "Madrid",                country: "ESP", lat:  40.42, lon:   -3.70, diff: "facil"  },
@@ -173,7 +173,7 @@ const CITIES = [
   { name: "Brno",                  country: "CZE", lat:  49.20, lon:   16.61, diff: "dificil"},
   { name: "Greenwich",             country: "ENG", lat:  51.48, lon:    0.00, diff: "dificil"},
 
-  // ── África ──────────────────────────────────────────────────────────────────
+  // ── Africa ─────────────────────────────────────────────────────────────
   { name: "El Cairo",              country: "EGY", lat:  30.06, lon:   31.25, diff: "facil"  },
 
   { name: "Lagos",                 country: "NGA", lat:   6.46, lon:    3.38, diff: "facil"  },
@@ -206,7 +206,7 @@ const CITIES = [
   { name: "Abiyán",                country: "CIV", lat:   5.35, lon:   -4.02, diff: "dificil"},
   { name: "Mamoudzou",             country: "MAY", lat: -12.78, lon:   45.23, diff: "dificil"},
 
-  // ── Medio Oriente ───────────────────────────────────────────────────────────
+  // ── Middle East ────────────────────────────────────────────────────────
   { name: "Dubai",                 country: "UAE", lat:  25.20, lon:   55.27, diff: "facil"  },
 
   { name: "Abu Dhabi",             country: "UAE", lat:  24.47, lon:   54.37, diff: "facil"  },
@@ -223,7 +223,7 @@ const CITIES = [
 
   { name: "Al-Manama",             country: "BHR", lat:  26.22, lon:   50.59, diff: "dificil"},
 
-  // ── Asia Central y del Sur ──────────────────────────────────────────────────
+  // ── Central & South Asia ───────────────────────────────────────────────
   { name: "Delhi",                 country: "IND", lat:  28.61, lon:   77.21, diff: "facil"  },
   { name: "Mumbai",                country: "IND", lat:  19.08, lon:   72.88, diff: "facil"  },
 
@@ -244,7 +244,7 @@ const CITIES = [
   { name: "Herat",                 country: "AFG", lat:  34.34, lon:   62.20, diff: "dificil"},
   { name: "Petropavl",             country: "KAZ", lat:  54.87, lon:   69.16, diff: "dificil"},
 
-  // ── Asia Oriental y Suroriental ─────────────────────────────────────────────
+  // ── East & Southeast Asia ──────────────────────────────────────────────
   { name: "Tokio",                 country: "JPN", lat:  35.68, lon:  139.69, diff: "inicio" },
   { name: "Beijing",               country: "CHN", lat:  39.91, lon:  116.39, diff: "facil"  },
   { name: "Shanghái",              country: "CHN", lat:  31.22, lon:  121.47, diff: "facil"  },
@@ -276,7 +276,7 @@ const CITIES = [
   { name: "Kota Kinabalu",         country: "MAS", lat:   5.98, lon:  116.07, diff: "dificil"},
   { name: "Ürümqi",                country: "CHN", lat:  43.82, lon:   87.60, diff: "dificil"},
 
-  // ── Oceanía ─────────────────────────────────────────────────────────────────
+  // ── Oceania ────────────────────────────────────────────────────────────
   { name: "Sídney",                country: "AUS", lat: -33.87, lon:  151.21, diff: "facil"  },
 
   { name: "Melbourne",             country: "AUS", lat: -37.81, lon:  144.96, diff: "facil"  },
@@ -295,9 +295,9 @@ const CITIES = [
   { name: "Port Moresby",          country: "PNG", lat:  -9.44, lon:  147.18, diff: "dificil"},
 ];
 
-// Desbloqueo y pesos por tramo de respuestas correctas:
-//   0     → solo inicio (5 ciudades famosas de intro, 100%)
-//   1–9   → facil 80%, medio 20%  (inicio sale del pool)
+// Unlock and weights by correct-answer tier:
+//   0     → inicio only (5 famous intro cities, 100%)
+//   1–9   → facil 80%, medio 20%  (inicio leaves the pool)
 //   10–19 → facil 55%, medio 35%, dificil 10%
 //   20+   → facil 30%, medio 40%, dificil 30%
 const CITY_UNLOCK_TIERS = [
@@ -307,7 +307,7 @@ const CITY_UNLOCK_TIERS = [
   { at: 20, weights: { facil: 0.30, medio: 0.40, dificil: 0.30 } },
 ];
 
-// ── Seeded RNG para Versus (mismas ciudades en ambos clientes) ──────────────
+// ── Seeded RNG for Versus (same cities on both clients) ────────────────
 let _citiesSeededRand = null;
 function citiesRand() { return _citiesSeededRand ? _citiesSeededRand() : Math.random(); }
 window.citiesSetSeed = function(seed) {
@@ -316,7 +316,7 @@ window.citiesSetSeed = function(seed) {
 };
 window.citiesClearSeed = function() { _citiesSeededRand = null; };
 
-// continents: Set de strings (o null para sin filtro)
+// continents: Set of strings (or null for no filter)
 function makeCityQueues(continents) {
   const shuffle = arr => {
     for (let i = arr.length - 1; i > 0; i--) {
@@ -327,13 +327,13 @@ function makeCityQueues(continents) {
   };
   const ok = c => !continents || continents.has(CITY_COUNTRY_CONTINENT[c.country]);
   const fallback = d => {
-    // Si el continente no tiene ciudades en este tier, rellenar con el siguiente tier
+    // If the continent has no cities in this tier, fill from the next tier
     let list = CITIES.filter(c => c.diff === d && ok(c));
-    if (list.length < 2) list = CITIES.filter(c => c.diff === d); // sin filtro
+    if (list.length < 2) list = CITIES.filter(c => c.diff === d); // no filter
     return shuffle(list);
   };
-  // La cola 'facil' incluye las ciudades de 'inicio' al FINAL para que no
-  // aparezcan inmediatamente después del warmup; se mezclan tras rotar todo facil.
+  // The 'facil' queue includes the 'inicio' cities at the END so they don't
+  // appear right after the warmup; they mix in after rotating through all facil.
   const facil = (() => {
     let main  = CITIES.filter(c => c.diff === 'facil'  && ok(c));
     let intro = CITIES.filter(c => c.diff === 'inicio' && ok(c));
@@ -350,12 +350,12 @@ function makeCityQueues(continents) {
 }
 
 function pickCity(queues, correctCount) {
-  // Buscar el tramo activo más alto desbloqueado
+  // Find the highest unlocked active tier
   let weights = CITY_UNLOCK_TIERS[0].weights;
   for (const tier of CITY_UNLOCK_TIERS) {
     if (correctCount >= tier.at) weights = tier.weights;
   }
-  // Selección ponderada
+  // Weighted selection
   const total = Object.values(weights).reduce((s, w) => s + w, 0);
   let r = citiesRand() * total;
   let chosen = Object.keys(weights)[0];
@@ -363,8 +363,8 @@ function pickCity(queues, correctCount) {
     r -= w;
     if (r <= 0) { chosen = name; break; }
   }
-  // La cola inicio no se recicla: una vez agotadas las 5 ciudades de warmup,
-  // caer a facil para que no repitan antes de que el jugador avance de tier.
+  // The inicio queue isn't recycled: once the 5 warmup cities are used up,
+  // fall to facil so they don't repeat before the player advances a tier.
   if (chosen === 'inicio' && queues.inicio.i >= queues.inicio.list.length) {
     chosen = 'facil';
   }

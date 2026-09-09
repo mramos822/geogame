@@ -11,8 +11,8 @@ const resultsReveal         = document.getElementById('results-reveal');
 let resultsBackStep = 0;
 
 const TOTAL_HS_KEY = 'totalHighscore';
-// La lista de amigos vive en js/friends.js (capa de datos lista para servidor).
-// Se accede con getFriends(); MOCK_FRIENDS queda como respaldo allí.
+// The friends list lives in js/friends.js (server-ready data layer). Accessed
+// via getFriends(); MOCK_FRIENDS stays there as a fallback.
 
 function buildResultsMessage(total) {
   const playerName = localStorage.getItem('playerName') || 'John';
@@ -68,12 +68,12 @@ const RESULTS_FA_TIMELINE = [
   [11,100],[12,100],[11,100],[12,100],[11,100],[12,100],[13,100],[14,100],[15,100],
   [6,100],[5,100],[4,100],[3,100],[2,100],
 ];
-// Un único <img> + swap de src: sin flash al mostrarse la pantalla.
+// A single <img> + src swap: no flash when the screen shows.
 const _resultsFaBase = 'images/characters/flightattpost/';
 const _resultsFaSrcs = Array.from({length: 15}, (_, i) => _resultsFaBase + (i + 1) + '.png');
 const resultsFaImg   = document.querySelector('.results-flightatt');
 let resultsFaTimeout = null;
-// Pre-decodificar frames 2-15 en background
+// Pre-decode frames 2-15 in the background
 _resultsFaSrcs.forEach((src, i) => {
   if (i > 0) { const m = new Image(); m.src = src; if (m.decode) m.decode().catch(() => {}); }
 });
@@ -145,10 +145,10 @@ function triggerRankUp(rank, isFinal = false) {
   }
 }
 
-// Timeouts pendientes de la animación de conteo/rank-up (aparte de countRaf/
-// rankInterval) — el botón de adelantar necesita poder cancelarlos todos de
-// una, si no el "reveal" final se dispara doble (una vez por el skip, otra
-// por el timeout original que seguía corriendo de fondo).
+// Pending timeouts of the count/rank-up animation (besides countRaf/
+// rankInterval) — the skip button needs to cancel them all at once, otherwise
+// the final "reveal" fires twice (once from the skip, once from the original
+// timeout still running in the background).
 let _resultsAnimTimeouts = [];
 function _clearResultsAnimTimers() {
   clearInterval(rankInterval);
@@ -169,8 +169,8 @@ function _revealResultsBack() {
 function showResultsSkipButton() { document.getElementById('results-skip-wrap')?.classList.add('visible'); }
 function hideResultsSkipButton() { document.getElementById('results-skip-wrap')?.classList.remove('visible'); }
 
-// Salta directo al puntaje final y al rank final, como si la animación de
-// conteo ya hubiera terminado — mismo resultado visual, sin esperar.
+// Jump straight to the final score and final rank, as if the count animation
+// had already finished — same visual result, no waiting.
 function skipResultsAnimation() {
   if (resultsScreen._skipTarget === undefined) return;
   const target = resultsScreen._skipTarget;
@@ -237,14 +237,14 @@ function startResultsLoop() {
   sfxPlay(sfxLoop).catch(e => console.error('loop play failed:', e));
 }
 
-// Arranca el loop un pelín antes de que termine el cheer (overlap suave)…
+// Start the loop a touch before the cheer ends (smooth overlap)…
 sfxCheer.addEventListener('timeupdate', () => {
   if (!loopStarted && sfxCheer.duration && sfxCheer.currentTime >= sfxCheer.duration - 0.22) {
     startResultsLoop();
   }
 });
-// …y fallback robusto: si timeupdate no disparó (en iOS es poco frecuente y a veces
-// duration es NaN), arrancar el loop al terminar el cheer.
+// …and a robust fallback: if timeupdate didn't fire (rare on iOS, and duration
+// is sometimes NaN), start the loop when the cheer ends.
 sfxCheer.addEventListener('ended', startResultsLoop);
 
 resultsConfirm?.addEventListener('click', () => {
@@ -309,7 +309,7 @@ resultsBackWrap?.addEventListener('mouseenter', playSelect);
 resultsBackWrap?.addEventListener('mouseleave', playSelect);
 
 function updateHighscores() {
-  // Si hay puntajes de la partida (campaña), usarlos; si no, los récords guardados.
+  // If there are game scores (campaign), use them; otherwise the stored records.
   const cs = (window.campaign && window.campaign.scores) ? window.campaign.scores : {};
   const hs = {
     1: (cs.flags     != null) ? cs.flags     : (parseInt(localStorage.getItem('flagsHighscore'))         || 0),
@@ -349,8 +349,8 @@ function showResultsScreen() {
   resultsScreen.classList.add('results-animating');
   updateHighscores();
 
-  // Subir scores a Supabase en background (una sola vez por partida)
-  // La deduplicación real es server-side via game_logs(user_id, session_id) UNIQUE
+  // Upload scores to Supabase in the background (once per game).
+  // Real dedup is server-side via game_logs(user_id, session_id) UNIQUE.
   if (!window._scoresUploadedThisGame && window._accountLoggedIn && window._sbUserId) {
     window._scoresUploadedThisGame = true;
     const _sid = window._gameSessionId;
@@ -367,9 +367,9 @@ function showResultsScreen() {
         .then(profile => {
           window._sbProfile = profile;
           if (typeof window.syncHsFromProfile === 'function') window.syncHsFromProfile(profile);
-          // El popup de Fundador NO se muestra acá — recién cuando vuelve al
-          // menú (ver js/final.js, click de "final-confirm-back-wrap"), que
-          // ya encuentra window._sbProfile fresco gracias a este refresh.
+          // The Founder popup is NOT shown here — only on return to the menu
+          // (see js/final.js, "final-confirm-back-wrap" click), which finds a
+          // fresh window._sbProfile thanks to this refresh.
         })
         .catch(e => console.warn('[scores] upload:', e));
     }
@@ -377,9 +377,9 @@ function showResultsScreen() {
   loopStarted = false;
   sfxLoop.pause();
   sfxLoop.currentTime = 0;
-  // Primar sfxLoop DENTRO de este gesto: iOS bloquea reproducir un 2º audio fuera de
-  // un gesto, así que lo "desbloqueamos" acá (play+pause) para que luego (al terminar
-  // el cheer) pueda sonar sin gesto.
+  // Prime sfxLoop INSIDE this gesture: iOS blocks playing a 2nd audio outside a
+  // gesture, so we "unlock" it here (play+pause) so it can later (when the cheer
+  // ends) play without a gesture.
   sfxLoop.muted = (typeof isMuted !== 'undefined' && isMuted);
   sfxPlay(sfxLoop).then(() => { if (!loopStarted) { sfxLoop.pause(); sfxLoop.currentTime = 0; } }).catch(() => {});
   sfxCheer.currentTime = 0;

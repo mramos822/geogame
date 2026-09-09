@@ -1,21 +1,21 @@
-// ── FILTRO DE MALAS PALABRAS (username / nombre de jugador) ───────────────────
-// Bloquea insultos/lenguaje explícito en inglés y español (con variantes
-// regionales) al elegir nombre de usuario o nombre de invitado. No es
-// exhaustivo ni perfecto — ningún filtro por lista lo es (siempre hay
-// falsos negativos con ofuscación creativa, y algún falso positivo posible
-// con palabras legítimas que contengan una de estas como substring) — pero
-// cubre el caso normal: alguien escribiendo la palabra directamente, con
-// mayúsculas/acentos/leetspeak simple (0->o, 1->i, 3->e, etc.) de por medio.
+// ── PROFANITY FILTER (username / player name) ────────────────────────────────
+// Blocks slurs/explicit language in English and Spanish (with regional
+// variants) when choosing a username or guest name. Not exhaustive or perfect —
+// no list-based filter is (there are always false negatives with creative
+// obfuscation, and some false positives possible with legit words containing
+// one of these as a substring) — but it covers the normal case: someone typing
+// the word directly, with uppercase/accents/simple leetspeak (0->o, 1->i, 3->e,
+// etc.) in the mix.
 //
-// API pública: window.containsBadWord(str) -> boolean
+// Public API: window.containsBadWord(str) -> boolean
 (function () {
   const WORDS = [
-    // ── Inglés ──
+    // ── English ──
     'fuck', 'shit', 'bitch', 'asshole', 'bastard', 'cunt', 'dick', 'pussy',
     'whore', 'slut', 'faggot', 'nigger', 'nigga', 'retard', 'cock', 'twat',
     'motherfucker', 'wanker', 'bollocks', 'douchebag', 'jackass', 'prick',
     'cumshot', 'blowjob', 'handjob', 'rapist',
-    // ── Español (neutro + variantes regionales AR/MX/ES/etc.) ──
+    // ── Spanish (neutral + regional variants AR/MX/ES/etc.) ──
     'puta', 'puto', 'putita', 'putito', 'mierda', 'pendejo', 'pendeja',
     'cabron', 'cabrona', 'verga', 'chingada', 'chingado', 'chingar',
     'culero', 'culera', 'maricon', 'marica', 'joto', 'panocha', 'concha',
@@ -26,19 +26,18 @@
     'putazo', 'chupapija', 'chupapito', 'negrodemierda',
   ];
 
-  // Ofuscación básica: mapea sustituciones típicas de leetspeak/símbolos a
-  // la letra que representan ANTES de tirar todo lo que no sea a-z0-9, así
-  // "p3nd3j0" o "sh1t" también matchean.
+  // Basic obfuscation: maps typical leetspeak/symbol substitutions to the
+  // letter they represent BEFORE dropping everything non-a-z0-9, so "p3nd3j0"
+  // or "sh1t" match too.
   const LEET = { '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '7': 't', '@': 'a', '$': 's', '!': 'i', '|': 'i' };
-  // Solo los caracteres especiales de regex necesitan backslash acá (\$ \| \!)
-  // — escapar también los dígitos los rompe (\0/\1/\3.. son escapes de
-  // octal/backreference dentro de una clase de caracteres, no el dígito literal).
+  // Only regex special characters need a backslash here (\$ \| \!) — escaping
+  // the digits too breaks them (\0/\1/\3.. are octal/backreference escapes
+  // inside a character class, not the literal digit).
   const LEET_RE = new RegExp('[' + Object.keys(LEET).map((k) => /[a-z0-9]/i.test(k) ? k : '\\' + k).join('') + ']', 'g');
 
-  // Marcas diacríticas combinantes (lo que separa NFD de una vocal con
-  // tilde) — mismo patrón que normalize() en globequiz.js, armado con
-  // fromCharCode en vez de un literal ̀-ͯ para evitar que el
-  // rango se guarde como caracteres Unicode crudos en el archivo.
+  // Combining diacritical marks (what NFD splits off an accented vowel) — same
+  // pattern as normalize() in globequiz.js, built with fromCharCode instead of
+  // a literal range to avoid storing raw Unicode chars in the file.
   const DIACRITICS_RE = new RegExp('[' + String.fromCharCode(0x0300) + '-' + String.fromCharCode(0x036f) + ']', 'g');
 
   function normalize(s) {

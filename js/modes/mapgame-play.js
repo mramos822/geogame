@@ -1,13 +1,11 @@
 // ============================================================================
-// modes/mapgame-play.js — Motor de juego de Ciudades y Monumentos: pools de práctica, resetState, helpers
-// de proyección/geometría, animación del cartel (slideTagIn / slideMonumentIn), dots,
-// result label, partículas, nextCity, manejo del click en el mapa, badges de racha,
-// render loop, dibujo de pins, timer, endGame, showScorePopup, redimensionado
-// responsive, pregame countdown, startGame, y el gameStopper del map-game.
+// modes/mapgame-play.js — Cities and Monuments game engine: practice pools,
+// resetState, projection/geometry helpers, sign animation (slideTagIn /
+// slideMonumentIn), dots, result label, particles, nextCity, map click handling,
+// streak badges, render loop, pin drawing, timer, endGame, showScorePopup,
+// responsive resize, pregame countdown, startGame, and the map-game gameStopper.
 //
-// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
-// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
-// Son <script> clásicos que comparten un mismo scope global.
+// Classic <script>s sharing one global scope, loaded in order in play/index.html.
 // ============================================================================
 
 function practiceGetCityPool() {
@@ -67,7 +65,7 @@ function practiceGetMonumentPool() {
   const diff = pc.difficulty;
   const allowed = diff === 'facil' ? new Set(['facil'])
                 : diff === 'medio' ? new Set(['facil', 'medio'])
-                : null; // dificil = todos
+                : null; // dificil = all
   const pool = allowed
     ? MONUMENTS.filter(m => allowed.has(MONUMENT_DIFF[m.img] || 'medio'))
     : [...MONUMENTS];
@@ -83,8 +81,8 @@ function resetState() {
   state = {
     phase: 'idle',
     timeLeft: practiceGetDuration(),
-    // timerDuration/timerStartedAt: fuente de verdad real del cronómetro (ver
-    // startTimer) — timeLeft es solo el valor derivado que se muestra.
+    // timerDuration/timerStartedAt: the timer's real source of truth (see
+    // startTimer) — timeLeft is just the derived value that's displayed.
     timerDuration: practiceGetDuration(),
     timerStartedAt: 0,
     score: 0,
@@ -109,12 +107,11 @@ function resetState() {
     badgeAnim: null,
     lastTimestamp: null,
     streak: 0,
-    // El idle-skip de render() asume que el canvas ya tiene un frame dibujado
-    // para retener tal cual — en una ronda/partida recién arrancada (sin
-    // dots/animaciones todavía) esa condición de idle se cumple DESDE EL
-    // primer frame, así que sin esta bandera el mapa nunca llegaba a
-    // dibujarse hasta el primer click (que recién ahí generaba algo
-    // "activo" que rompía el idle-skip).
+    // render()'s idle-skip assumes the canvas already has a frame drawn to keep
+    // as-is — on a just-started round/game (no dots/animations yet) the idle
+    // condition holds FROM the first frame, so without this flag the map never
+    // got drawn until the first click (which only then produced something
+    // "active" that broke the idle-skip).
     mapDrawn: false,
   };
   resetMapZoom();
@@ -208,9 +205,9 @@ function slideTagIn(cityName, countryCode) {
 
   const dispCity = (typeof tCity === 'function') ? tCity(cityName) : cityName;
   setTagText(dispCity);
-  // Pista visual: a los 5s sin responder, se revela el país. Ya NO penaliza
-  // el puntaje (ver hintMult removido del cálculo más abajo) — es solo
-  // una ayuda, no un castigo.
+  // Visual hint: after 5s with no answer, the country is revealed. It no longer
+  // penalizes the score (see hintMult removed from the calc below) — just a
+  // help, not a punishment.
   if (countryCode) {
     slideTagIn._countryTimer = setTimeout(() => {
       const countryName = (typeof getCityCountryName === 'function') ? getCityCountryName(countryCode) : countryCode;
@@ -238,9 +235,9 @@ function updateDotsUI() {
   progressDots.forEach((d, i) => d.classList.toggle('filled', i < state.dots));
 }
 
-// Extra de tiempo "+Ns" bajo el contador al completar 10 dots. Genérico para los
-// 4 modos (cities/monuments, flags, shapes). + (0.1s) y Ns (0.2s) hacen pop de
-// 0.5x→1.75x→1x; al terminar ambos, 1s quieto y luego fade out de 0.1s.
+// "+Ns" time bonus below the counter on completing 10 dots. Generic for all 4
+// modes (cities/monuments, flags, shapes). "+" (0.1s) and "Ns" (0.2s) pop
+// 0.5x→1.75x→1x; when both finish, 1s still and then a 0.1s fade out.
 function playTimeBonus(el, seconds) {
   if (!el) return;
   const num = el.querySelector('.tb-num');
@@ -250,7 +247,7 @@ function playTimeBonus(el, seconds) {
   el.classList.remove('show', 'fade');
   el.style.display = 'block';
   el.style.opacity = '1';
-  void el.offsetWidth;            // reinicia las animaciones
+  void el.offsetWidth;            // restart the animations
   el.classList.add('show');
   el._tbT1 = setTimeout(() => {
     el.classList.add('fade');
@@ -278,9 +275,9 @@ function advanceDot() {
 
     const _isInfinite = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
     if (!_isInfinite) {
-      // Ajustar timerDuration (la fuente de verdad real, ver startTimer), no
-      // timeLeft directo — si no, el próximo tick lo pisaría con el valor
-      // calculado contra timerStartedAt, perdiendo el bonus.
+      // Adjust timerDuration (the real source of truth, see startTimer), not
+      // timeLeft directly — otherwise the next tick would overwrite it with the
+      // value computed against timerStartedAt, losing the bonus.
       const elapsed = Math.floor((Date.now() - state.timerStartedAt) / 1000);
       const newTimeLeft = Math.min(state.timeLeft + BONUS_TIME, 99);
       state.timerDuration = elapsed + newTimeLeft;
@@ -349,7 +346,7 @@ function spawnStars(cx, cy) {
 
 // ── NEXT CITY ─────────────────────────────────────────────────────────────────
 function nextCity() {
-  // Si se abandonó la partida (volvió al menú), no reactivar nada
+  // If the game was abandoned (back to menu), don't reactivate anything
   if (!state || document.getElementById('loading-screen')?.style.display !== 'none') return;
   if (mapGameOver) return;
   if (window.pendingGameMode === 'monuments') {
@@ -437,7 +434,7 @@ function slideMonumentIn(monument) {
   if (monumentImgEl.decode) monumentImgEl.decode().catch(() => {});
   monumentImgEl.style.display = 'block';
 
-  // Precargar la imagen del próximo monumento en background
+  // Preload the next monument's image in the background
   if (state && state.monumentPool) {
     const nextIdx = state.poolIndex < state.monumentPool.length ? state.poolIndex : 0;
     const nextM   = state.monumentPool[nextIdx];
@@ -458,21 +455,19 @@ function slideMonumentIn(monument) {
   monumentNameEl.style.opacity = '0';
   if (slideMonumentIn._nameTimer) clearTimeout(slideMonumentIn._nameTimer);
   slideMonumentIn._nameTimer = setTimeout(() => {
-    // GUARD: este timer tiene 3.5s de delay — bien largo. Si en ese lapso el
-    // ESPECTADOR ya pasó a Cities (_citiesSpecMode), NO escribir el nombre
-    // del monumento: quedaría encima del cartel de la ciudad, pegado (el
-    // "sigue mostrando el nombre de monumentos en ciudades" reportado, que
-    // los cancels no cubrían porque el timer se agendaba de nuevo o disparaba
-    // en un hueco). Mismo problema para el JUGADOR REAL, no solo el
-    // espectador: si el último monumento de una partida (versus grupal) se
-    // ve justo antes de que la ronda/partida termine, este timer puede
-    // sobrevivir al "jugar de nuevo" — si la revancha vuelve a arrancar
-    // Ciudades dentro de esos 3.5s, escribía el nombre del monumento VIEJO
-    // encima del cartel nuevo de Ciudades apenas entraba (el "tag3.png
-    // descolocado con una identificación de monumentos de la partida
-    // anterior" reportado). startGame() (real) SÍ cancela este timer, pero
-    // solo si ya corrió para cuando este dispara — chequear el modo ACTUAL
-    // acá mismo es la garantía real, sin depender de esa carrera de timing.
+    // GUARD: this timer has a 3.5s delay — quite long. If within that window the
+    // SPECTATOR already moved to Cities (_citiesSpecMode), do NOT write the
+    // monument name: it would land on the city sign (the reported "still shows
+    // the monument name in cities", which the cancels didn't cover because the
+    // timer got rescheduled or fired in a gap). Same problem for the REAL
+    // PLAYER, not just the spectator: if the last monument of a game (group
+    // versus) shows right before the round/game ends, this timer can survive
+    // "play again" — if the rematch starts Cities again within those 3.5s, it
+    // wrote the OLD monument name onto the new Cities sign as it entered (the
+    // reported "tag3.png misplaced with a monument label from the previous
+    // game"). startGame() (real) DOES cancel this timer, but only if it already
+    // ran by the time this fires — checking the CURRENT mode right here is the
+    // real guarantee, without depending on that timing race.
     if (typeof _citiesSpecMode !== 'undefined' && _citiesSpecMode) return;
     if (window.pendingGameMode !== 'monuments') return;
     monumentNameEl.textContent = (typeof tMonument === 'function') ? tMonument(monument.name) : monument.name;
@@ -488,8 +483,8 @@ function slideMonumentIn(monument) {
 
 // ── CLICK ─────────────────────────────────────────────────────────────────────
 canvas.addEventListener('click', (e) => {
-  // El 'click' dispara igual al soltar tras arrastrar el mapa (con zoom) —
-  // si el gesto fue un drag real, no cuenta como intento de adivinar.
+  // 'click' fires anyway on release after dragging the map (with zoom) — if the
+  // gesture was a real drag, it doesn't count as a guess.
   if (_mapJustDragged) { _mapJustDragged = false; return; }
   if (mapGameOver || !state || state.phase !== 'waiting') return;
   state.phase = 'animating';
@@ -505,13 +500,12 @@ canvas.addEventListener('click', (e) => {
   const scaleY  = canvas.height / rect.height;
   const screenClickX = (e.clientX - rect.left) * scaleX;
   const screenClickY = (e.clientY - rect.top) * scaleY;
-  // El click llega en píxeles de PANTALLA (afectados por el zoom del mapa);
-  // se convierte a coordenadas de MUNDO acá mismo así todo lo que sigue
-  // (distancia/grade, dot guardado, spectator sync, cálculo de km) sigue
-  // funcionando en el mismo sistema de siempre, sin tocar nada más abajo.
-  // Esto también es lo que hace que el zoom dé más precisión: la misma
-  // tolerancia de PERFECT_PX/GOOD_PX/FAIR_PX en mundo cubre menos pantalla
-  // (y por lo tanto menos margen de error de mouse) cuanto más zoom.
+  // The click arrives in SCREEN pixels (affected by the map zoom); it's
+  // converted to WORLD coordinates right here so everything that follows
+  // (distance/grade, stored dot, spectator sync, km calc) keeps working in the
+  // usual system, without touching anything below. This is also what makes zoom
+  // more precise: the same PERFECT_PX/GOOD_PX/FAIR_PX tolerance in world space
+  // covers less screen (and so less mouse error margin) the more zoom.
   const clickWorld = screenToWorld(screenClickX, screenClickY);
   const clickX = clickWorld.x;
   const clickY = clickWorld.y;
@@ -526,18 +520,18 @@ canvas.addEventListener('click', (e) => {
   let base, bonusAmt, totalGained, badgeColor, inRowBonus;
 
   if (window.pendingGameMode === 'game') {
-    // ── Cities: multiplicador M + badge de racha "IN A ROW" ──
-    const M = getCitiesM(correctCount); // M usa correctCount (total correcto) — leer ANTES de incrementar
+    // ── Cities: M multiplier + "IN A ROW" streak badge ──
+    const M = getCitiesM(correctCount); // M uses correctCount (total correct) — read BEFORE incrementing
     base     = CITIES_SCORE_MAP[grade];
     const elapsed = (Date.now() - shownAt) / 1000;
     const _citiesPracticeInf = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
     const gotBonus = !_citiesPracticeInf && base > 0 && elapsed < SPEED_BONUS_WIN;
     bonusAmt      = gotBonus ? Math.round(base * (CITIES_SPEED_MULT - 1)) : 0;
-    // Racha CONSECUTIVA (state.streak) para el badge "IN A ROW" — se resetea
-    // en wayoff, igual que Monuments. Antes Cities no la rastreaba y el badge
-    // nunca salía (los hitos 3/5/10/… quedaban invisibles, reportado — en
-    // versus Y en práctica). correctCount (total correcto, para el
-    // multiplicador M) mantiene su propia cuenta aparte.
+    // CONSECUTIVE streak (state.streak) for the "IN A ROW" badge — resets on
+    // wayoff, like Monuments. Cities didn't track it before and the badge never
+    // showed (the 3/5/10/… milestones were invisible, reported — in versus AND
+    // practice). correctCount (total correct, for the M multiplier) keeps its
+    // own separate count.
     if (grade === 'wayoff') {
       state.streak = 0;
     } else {
@@ -548,11 +542,11 @@ canvas.addEventListener('click', (e) => {
     inRowBonus    = getInRowBonus(state.streak);
     totalGained   = Math.round((base + bonusAmt) * M) + inRowBonus;
   } else {
-    // ── Monuments: mismo mecanismo que Cities (M + bonus binario de velocidad),
-    // reverse-engineered de video: perfect/good dan siempre el mismo puntaje,
-    // fair queda en la proporción good/perfect del sistema viejo (2/3). Ver
+    // ── Monuments: same mechanism as Cities (M + binary speed bonus),
+    // reverse-engineered from video: perfect/good always give the same score,
+    // fair sits at the old system's good/perfect ratio (2/3). See
     // MONUMENTS_M_TABLE.
-    const M = getMonumentsM(correctCount); // leer ANTES de incrementar, igual que Cities
+    const M = getMonumentsM(correctCount); // read BEFORE incrementing, like Cities
     base     = MONUMENTS_SCORE_MAP[grade];
     const elapsed = (Date.now() - shownAt) / 1000;
     const _monPracticeInf = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
@@ -566,8 +560,8 @@ canvas.addEventListener('click', (e) => {
     }
     badgeColor  = getBadgeImg(state.streak);
     inRowBonus  = getInRowBonus(state.streak);
-    // Math.floor (no round): con M=1.5/2.5/7.5 el producto cae justo en .5 y el
-    // video de referencia mostraba el valor de abajo (67, no 68), no el de arriba.
+    // Math.floor (not round): with M=1.5/2.5/7.5 the product lands exactly on .5
+    // and the reference video showed the lower value (67, not 68).
     totalGained = Math.floor((base + bonusAmt) * M) + inRowBonus;
   }
 
@@ -577,11 +571,11 @@ canvas.addEventListener('click', (e) => {
     if (window._lobbyActive && typeof window._lobbyReportAnswer === 'function') window._lobbyReportAnswer(grade !== 'wayoff', Math.round(state.score));
     if (grade === 'wayoff' && (window._vsActive || window._lobbyActive) && typeof window._lbWrongEffect === 'function') window._lbWrongEffect('player');
   }
-  // Popup de "+puntaje": SOLO lo ganado por el acierto (base·bonus·M), SIN el
-  // inRowBonus — el bonus de racha va aparte, en el badge "IN A ROW".
+  // "+score" popup: ONLY what the hit earned (base·bonus·M), WITHOUT the
+  // inRowBonus — the streak bonus goes separately, in the "IN A ROW" badge.
   if (window.pendingGameMode === 'game' || window.pendingGameMode === 'monuments') {
-    const _acierto = totalGained - inRowBonus;
-    if (_acierto > 0) showScorePopup(_acierto);
+    const _hitPoints = totalGained - inRowBonus;
+    if (_hitPoints > 0) showScorePopup(_hitPoints);
   }
   if (bonusAmt > 0) {
     clearTimeout(speedBonusHideId);
@@ -591,11 +585,10 @@ canvas.addEventListener('click', (e) => {
     speedBonusHideId = setTimeout(() => speedBonusText.classList.remove('visible'), 1600);
   }
 
-  // fontSize se calcula UNA vez acá (no en cada frame del render loop, donde
-  // antes corría measureText() en un while por cada dot visible en pantalla,
-  // 60 veces por segundo durante los 4s que dura la etiqueta — bastante costo
-  // de canvas repetido sin necesidad, ya que el resultado es siempre el mismo
-  // para el mismo nombre).
+  // fontSize is computed ONCE here (not every render-loop frame, where it used
+  // to run measureText() in a while per visible dot, 60 times a second for the
+  // 4s the label lasts — a lot of needless repeated canvas cost, since the
+  // result is always the same for the same name).
   const _dotLabel = (window.pendingGameMode === 'monuments')
     ? ((typeof tMonument === 'function') ? tMonument(state.currentCity.name) : state.currentCity.name)
     : ((typeof tCity === 'function') ? tCity(state.currentCity.name) : state.currentCity.name);
@@ -620,7 +613,7 @@ canvas.addEventListener('click', (e) => {
   if (grade !== 'wayoff') {
     advanceDot();
     if (window.pendingGameMode === 'monuments') {
-      // En práctica: solo marcar como visto si fue PERFECT; si no, vuelve al pool
+      // In practice: only mark as seen if it was PERFECT; otherwise it goes back to the pool
       if (!isPractice || grade === 'perfect') {
         state.monumentsSeen.add(state.currentCity.name);
       }
@@ -635,11 +628,11 @@ canvas.addEventListener('click', (e) => {
       }
     }
   } else if (isPractice && window.pendingGameMode === 'monuments') {
-    // wayoff en práctica: no eliminar del pool tampoco
+    // wayoff in practice: don't remove from the pool either
   }
 
-  // En práctica con ciudades: marcar como completada según regiones seleccionadas
-  // >1 región → perfecto O bien la sacan del pool; 1 región → solo perfecto
+  // Practice cities: mark as completed based on selected regions.
+  // >1 region → perfect OR good removes it from the pool; 1 region → perfect only
   if (isPractice && window.pendingGameMode === 'game') {
     const multiRegion = window.practiceConfig && window.practiceConfig.continents && window.practiceConfig.continents.size > 1;
     const qualifies = grade === 'perfect' || (multiRegion && grade === 'good');
@@ -652,27 +645,27 @@ canvas.addEventListener('click', (e) => {
   const correctLL = { lat: state.currentCity.lat, lon: state.currentCity.lon };
   const distKm = haversineKm(clickLL.lat, clickLL.lon, correctLL.lat, correctLL.lon);
   if ((window.pendingGameMode === 'game' || window.pendingGameMode === 'monuments') && typeof window._specReportAnswer === 'function') {
-    // clickX/clickY/correct.x/correct.y son coordenadas de canvas (DISPLAY_W/H),
-    // portables 1:1 al canvas del espectador porque usa la misma calibración.
-    // totalGained/bonusAmt viajan para que el espectador pueda mostrar el
-    // popup de "+puntos" y el cartel de bonus de velocidad igual que el
-    // jugador real — sin esto no había forma de saber cuánto mostrar.
-    // + campaignBase(): el espectador no tiene forma propia de saber cuánto
-    // acumuló el jugador en modos anteriores de la campaña — sin sumarlo
-    // acá, veía el puntaje arrancar de 0 en Ciudades en vez de seguir
-    // sumando desde Banderas/Siluetas.
-    // streak/inRowBonus: ahora en Monuments Y Cities (ambos rastrean racha
-    // consecutiva para el badge "IN A ROW") — van como NÚMERO, no la imagen ya
-    // resuelta (badgeColor es un elemento <img> del jugador real, no
-    // serializable); el espectador reconstruye la imagen llamando getBadgeImg(streak) él
-    // mismo, es una función pura del streak.
-    // dots: el "trencito" de +5s (advanceDot) es la MISMA función reusada del
-    // lado espectador, pero sus dots LOCALES se cuentan desde que se unió —
-    // si entró a mitad de partida, su trencito llenaba/vaciaba en momentos
-    // distintos a los del jugador real. state.dots (post-increment, YA pasó
-    // por advanceDot() arriba) viaja acá para que el espectador pueda
-    // pisar su valor local con el real antes de llamar a su propio
-    // advanceDot() (ver citiesSpectatorResolvePick/monumentsSpectatorResolvePick).
+    // clickX/clickY/correct.x/correct.y are canvas coordinates (DISPLAY_W/H),
+    // portable 1:1 to the spectator's canvas because it uses the same calibration.
+    // totalGained/bonusAmt travel so the spectator can show the "+points" popup
+    // and the speed-bonus sign like the real player — without them there was no
+    // way to know how much to show.
+    // + campaignBase(): the spectator has no way of its own to know how much the
+    // player accumulated in earlier campaign modes — without adding it here, it
+    // saw the score start from 0 in Cities instead of continuing from
+    // Flags/Shapes.
+    // streak/inRowBonus: now in Monuments AND Cities (both track a consecutive
+    // streak for the "IN A ROW" badge) — sent as a NUMBER, not the resolved
+    // image (badgeColor is the real player's <img> element, not serializable);
+    // the spectator rebuilds the image by calling getBadgeImg(streak) itself, a
+    // pure function of the streak.
+    // dots: the +5s "train" (advanceDot) is the SAME function reused on the
+    // spectator side, but its LOCAL dots count from when it joined — if it
+    // joined mid-game, its train filled/emptied at different moments than the
+    // real player's. state.dots (post-increment, ALREADY through advanceDot()
+    // above) travels here so the spectator can overwrite its local value with
+    // the real one before calling its own advanceDot() (see
+    // citiesSpectatorResolvePick/monumentsSpectatorResolvePick).
     window._specReportAnswer(grade !== 'wayoff', Math.round(state.score + (window.campaignBase ? window.campaignBase() : 0)), {
       grade, clickX, clickY, correctX: correct.x, correctY: correct.y, distKm,
       cityName: state.currentCity.name, totalGained, bonusAmt,
@@ -702,8 +695,8 @@ canvas.addEventListener('click', (e) => {
                         spawnStars(correct.x, correct.y);
                         if (!isRecordingMonuments) {
                           setTimeout(() => {
-                            // showResultLabel posiciona un <div> DOM superpuesto al canvas
-                            // (no dibuja en el ctx), así que necesita coordenadas de PANTALLA.
+                            // showResultLabel positions a DOM <div> over the canvas
+                            // (doesn't draw in ctx), so it needs SCREEN coordinates.
                             const rlPos = worldToScreen(correct.x, correct.y);
                             showResultLabel(rlPos.x, rlPos.y, grade, base, bonusAmt);
                             if (badgeColor) {
@@ -752,42 +745,38 @@ function getBadgeImg(streak) {
 }
 
 // ── RENDER ───────────────────────────────────────────────────────────────────
-// render() real, renombrada — la versión pública de más abajo la envuelve en
-// try/catch. Motivo: si el usuario cambia de pestaña y vuelve, el navegador
-// PAUSA requestAnimationFrame por completo mientras está oculta (los
-// setTimeout/setInterval del juego NO se pausan, solo se throttlean) — al
-// volver, el próximo frame de render() puede recibir un dt gigante (todo el
-// tiempo que estuvo la pestaña oculta de un salto). Si eso disparaba una
-// excepción en CUALQUIER punto de esta función (antes de llegar a su propio
-// requestAnimationFrame(render) del final), el loop entero moría en
-// silencio: el mapa quedaba visualmente congelado y con state.phase pegado
-// en lo que sea que valía en ese momento — si no era 'waiting', el canvas
-// dejaba de reaccionar a los clicks para siempre, exactamente el bug
-// reportado ("cambio de pestaña y vuelvo, y el mapa no reacciona a clicks").
+// The real render(), renamed — the public version below wraps it in try/catch.
+// Reason: if the user switches tabs and comes back, the browser fully PAUSES
+// requestAnimationFrame while hidden (the game's setTimeout/setInterval are NOT
+// paused, only throttled) — on return, render()'s next frame can get a huge dt
+// (all the hidden time in one jump). If that threw at ANY point in this function
+// (before reaching its own requestAnimationFrame(render) at the end), the whole
+// loop died silently: the map froze visually with state.phase stuck at whatever
+// it was — if not 'waiting', the canvas stopped reacting to clicks forever,
+// exactly the reported bug ("switch tabs and come back, and the map doesn't
+// react to clicks").
 function _renderFrame(timestamp) {
   if (!state) return;
 
-  // Clamp defensivo: aunque no haga falta para evitar el crash de más arriba
-  // (el catch de abajo ya lo cubre), un dt de varios minutos de un salto
-  // igual podía disparar animaciones/tweens a velocidades absurdas por UN
-  // frame. 0.25s alcanza y sobra para cualquier frame real a 4fps+.
+  // Defensive clamp: even though it's not needed to avoid the crash above (the
+  // catch below covers it), a dt of several minutes in one jump could still run
+  // animations/tweens at absurd speeds for ONE frame. 0.25s is plenty for any
+  // real frame at 4fps+.
   let dt = state.lastTimestamp ? (timestamp - state.lastTimestamp) / 1000 : 0;
   if (dt > 0.25) dt = 0.25;
   state.lastTimestamp = timestamp;
 
-  // Nada animándose → no hace falta limpiar ni redibujar el mapa de fondo
-  // completo (drawImage de la imagen entera) 60 veces por segundo sin parar;
-  // el canvas ya retiene el último frame dibujado tal cual quedó. Antes esto
-  // corría SIEMPRE, incluso con el jugador parado mirando el mapa sin hacer
-  // nada — el gasto continuo de CPU/GPU era la causa más probable del lag
-  // persistente, sobre todo en hardware más modesto.
-  // Un dot NO permanente sigue "activo" mientras siga en el array, sin
-  // importar la edad exacta — el filtro que lo saca (más abajo) vive DENTRO
-  // del bloque que este idle-check saltea, así que si cortáramos por edad
-  // exacta (age<4) un dot podía quedar con opacidad ~0 pero nunca EXACTAMENTE
-  // 0, sin que el filtro llegue a sacarlo nunca — un "zombie" acumulándose en
-  // el array para siempre. Los permanentes sí cortan por edad (age<4): una vez
-  // asentada su bandera/label ya no cambian más, quedan estáticos.
+  // Nothing animating → no need to clear or redraw the full background map
+  // (drawImage of the whole image) 60 times a second nonstop; the canvas
+  // already retains the last frame as drawn. This used to run ALWAYS, even with
+  // the player idle staring at the map — the continuous CPU/GPU cost was the
+  // most likely cause of the persistent lag, especially on modest hardware.
+  // A NON-permanent dot stays "active" as long as it's in the array, regardless
+  // of exact age — the filter that removes it (below) lives INSIDE the block
+  // this idle-check skips, so cutting by exact age (age<4) could leave a dot at
+  // opacity ~0 but never EXACTLY 0, with the filter never removing it — a
+  // "zombie" piling up in the array forever. Permanent ones do cut by age
+  // (age<4): once their flag/label settles they don't change, they're static.
   const anyActiveDot = state.placedDots.some(dot =>
     !dot.permanent || (Date.now() - dot.labelBorn) / 1000 < 4
   );
@@ -801,9 +790,9 @@ function _renderFrame(timestamp) {
 
   ctx.clearRect(0, 0, DISPLAY_W, DISPLAY_H);
   const activeMap = window.pendingGameMode === 'monuments' ? imgMap2 : imgMap;
-  // Zoom del mapa: recorta una porción más chica de la imagen fuente cuanto
-  // más zoom (mapCamera.zoom), estirada al canvas completo — así solo el
-  // fondo se agranda, sin tocar el tamaño de nada que se dibuje encima.
+  // Map zoom: crops a smaller portion of the source image the more zoom
+  // (mapCamera.zoom), stretched to the full canvas — so only the background
+  // enlarges, without touching the size of anything drawn on top.
   {
     const vw   = DISPLAY_W / mapCamera.zoom;
     const vh   = DISPLAY_H / mapCamera.zoom;
@@ -822,20 +811,18 @@ function _renderFrame(timestamp) {
     const diff = state.score - state.displayedScore;
     state.displayedScore = Math.min(state.score, state.displayedScore + Math.max(1, Math.round(diff * 8 * dt)));
     scoreValueEl.textContent = (state.displayedScore + (window.campaignBase ? window.campaignBase() : 0)).toLocaleString();
-    // sortLeaderboard() usa positionLeaderboard(), que reposiciona
-    // lbElements['lb-player'] con la lógica de leaderboard NORMAL
-    // multi-fila — ni existe durante el espectador de Cities (la tarjeta la
-    // arma citiesSpectatorSetPlayerCard() a mano). Mismo bug que el fix del
-    // resize: pisaba la altura de 1 fila y la tarjeta se veía saltar arriba
-    // cada vez que el puntaje del espectado subía. Ver
-    // citiesSpectatorReposition() más arriba.
+    // sortLeaderboard() uses positionLeaderboard(), which repositions
+    // lbElements['lb-player'] with the NORMAL multi-row leaderboard logic — it
+    // doesn't even exist during the Cities spectator (the card is built by hand
+    // by citiesSpectatorSetPlayerCard()). Same bug as the resize fix: it
+    // overwrote the 1-row height and the card visibly jumped up every time the
+    // spectated player's score rose. See citiesSpectatorReposition() above.
     if (window._isSpectating) {
-      // Grupal (N filas, ver GroupSpectate/_renderGroupLeaderboard en
-      // spectate.js) es un caso DISTINTO del 1v1 (citiesSpectatorReposition,
-      // 2 filas fijas) — llamando siempre a la de 1v1, la cartilla grupal
-      // nunca se volvía a posicionar cuando el puntaje del espectado subía,
-      // quedando con alturas viejas (el "se rompe la posición de la
-      // tablilla" reportado).
+      // Group (N rows, see GroupSpectate/_renderGroupLeaderboard in spectate.js)
+      // is a DIFFERENT case from 1v1 (citiesSpectatorReposition, 2 fixed rows) —
+      // always calling the 1v1 one, the group card was never repositioned when
+      // the spectated score rose, keeping old heights (the reported "the card
+      // position breaks").
       if (typeof window._isGroupSpectating === 'function' && window._isGroupSpectating()) {
         window._refreshGroupSpectatorLeaderboard?.();
       } else if (typeof window.citiesSpectatorReposition === 'function') {
@@ -850,9 +837,9 @@ function _renderFrame(timestamp) {
     const age = (Date.now() - dot.labelBorn) / 1000;
     dot.labelOpacity = age < 3 ? 1 : Math.max(0, 1 - (age - 3));
 
-    // dot.x/y son coordenadas de MUNDO (mismas que latLonToCanvas); se
-    // dibujan en su posición de PANTALLA (sigue el zoom del mapa) pero con
-    // tamaño fijo — el punto/nombre/banderín no se agrandan con el mapa.
+    // dot.x/y are WORLD coordinates (same as latLonToCanvas); drawn at their
+    // SCREEN position (follows the map zoom) but at fixed size — the
+    // dot/name/flag don't enlarge with the map.
     const { x: sx, y: sy } = worldToScreen(dot.x, dot.y);
 
     const dotAlpha = dot.permanent ? 1 : dot.labelOpacity;
@@ -884,8 +871,8 @@ function _renderFrame(timestamp) {
     if (age < 4) {
       ctx.globalAlpha = dot.labelOpacity;
 
-      // fontSize ya viene calculado desde que se creó el dot (ver placedDots.push) —
-      // antes esto corría measureText() en un while todos los frames.
+      // fontSize is already computed from when the dot was created (see
+      // placedDots.push) — this used to run measureText() in a while every frame.
       ctx.font = `bold ${dot.fontSize || 11}px Georgia`;
 
       ctx.textAlign = 'center';
@@ -947,16 +934,16 @@ if (state.sunburst) {
   }
 }
 
-// ── DIBUJO PINS ──────────────────────────
+// ── PIN DRAWING ──────────────────────────
   function drawPin(pinState, img, tip, xDir) {
     const p = pinState;
     const d    = 220 * (1 - p.progress);
     const sc   = 10 - 9 * p.progress;
     const curW = PIN_W * sc;
     const curH = PIN_H * sc;
-    // p.x/p.y son coordenadas de MUNDO — se posicionan en pantalla (sigue el
-    // zoom), pero "d" (altura del arco de tiro) y el tamaño del pin (curW/curH)
-    // son offsets de animación en píxeles de pantalla fijos, sin escalar.
+    // p.x/p.y are WORLD coordinates — positioned on screen (follows the zoom),
+    // but "d" (throw arc height) and the pin size (curW/curH) are animation
+    // offsets in fixed screen pixels, unscaled.
     const pScreen = worldToScreen(p.x, p.y);
     const tipX = pScreen.x + xDir * d;
     const tipY = pScreen.y - d;
@@ -996,14 +983,14 @@ if (state.sunburst) {
     ctx.globalAlpha = 1;
   }
 
-  // ── Línea animada entre pin del jugador y pin correcto (crece dash a dash) ───
+  // ── Animated line between the player's pin and the correct pin (grows dash by dash) ───
   if (state.pin1Anim && state.pin1Anim.progress >= 1 && state.pin1Anim.grade === 'wayoff') {
     const p1 = state.pin1Anim;
     const p2 = state.pin2Anim;
     if (!p1.fading) p1.lineProgress = Math.min(1, p1.lineProgress + dt / 0.45);
     const lp = p1.lineProgress;
-    // p1.x/y, p2.x/y y p1.targetX/Y son coordenadas de MUNDO — la línea y su
-    // label se dibujan en pantalla (siguen el zoom) con grosor/font fijos.
+    // p1.x/y, p2.x/y and p1.targetX/Y are WORLD coordinates — the line and its
+    // label draw on screen (follow the zoom) with fixed thickness/font.
     const p1Screen = worldToScreen(p1.x, p1.y);
     const destWorldX = p2 ? p2.x : p1.targetX;
     const destWorldY = p2 ? p2.y : p1.targetY;
@@ -1017,7 +1004,7 @@ if (state.sunburst) {
       ctx.save();
       ctx.globalAlpha = lineAlpha;
       ctx.lineCap = 'round';
-      // borde blanco
+      // white outline
       ctx.beginPath();
       ctx.moveTo(p1Screen.x, p1Screen.y);
       ctx.lineTo(toX, toY);
@@ -1026,7 +1013,7 @@ if (state.sunburst) {
       ctx.setLineDash([DASH, GAP]);
       ctx.lineDashOffset = offset;
       ctx.stroke();
-      // línea negra encima
+      // black line on top
       ctx.beginPath();
       ctx.moveTo(p1Screen.x, p1Screen.y);
       ctx.lineTo(toX, toY);
@@ -1047,7 +1034,7 @@ if (state.sunburst) {
         const midX = (p1Screen.x + destScreen.x) / 2;
         const midY = (p1Screen.y + destScreen.y) / 2;
         let angle = Math.atan2(destScreen.y - p1Screen.y, destScreen.x - p1Screen.x);
-        // Mantener el texto siempre legible (nunca boca abajo)
+        // Keep the text always readable (never upside down)
         if (angle > Math.PI / 2 || angle < -Math.PI / 2) angle += Math.PI;
         const fs = Math.round(DISPLAY_W * 0.014);
         ctx.save();
@@ -1114,8 +1101,8 @@ if (state.sunburst) {
     ctx.globalAlpha = 1;
   }
 
-  // Limpiar el overlay del badge solo si hay algo dibujado (o lo hubo el frame
-  // anterior, para borrarlo), en vez de un clearRect full en cada frame.
+  // Clear the badge overlay only if something's drawn (or was last frame, to
+  // erase it), instead of a full clearRect every frame.
   if (state.badgeAnim || render._badgeDirty) {
     badgeOverlayCtx.clearRect(0, 0, DISPLAY_W, DISPLAY_H);
   }
@@ -1139,8 +1126,8 @@ if (state.sunburst) {
         alpha = 1; scale = 1 - p;
       }
 
-      // Escala proporcional a DISPLAY_W (clamp a 1): en desktop queda igual, en
-      // pantallas chicas (iOS) el check/IN A ROW dejan de salir gigantes.
+      // Scale proportional to DISPLAY_W (clamp to 1): same on desktop, and on
+      // small screens (iOS) the check/IN A ROW stop coming out huge.
       const BADGE_K = Math.min(1, DISPLAY_W / 1190);
       const W = 405 * BADGE_K, H = 333 * BADGE_K;
       const CW = 477 * BADGE_K, CH = 405 * BADGE_K;
@@ -1202,12 +1189,11 @@ if (state.sunburst) {
   animFrameId = requestAnimationFrame(render);
 }
 
-// Wrapper público — ver comentario largo arriba de _renderFrame(). Si algo
-// dentro tira una excepción (dt gigante al volver de una pestaña oculta,
-// asset todavía no listo, lo que sea), el catch reprograma el próximo frame
-// igual: el loop de animación NUNCA muere del todo, así state.phase siempre
-// tiene la chance de volver a 'waiting' y el canvas nunca se queda sordo a
-// los clicks de forma permanente.
+// Public wrapper — see the long comment above _renderFrame(). If anything
+// inside throws (huge dt on return from a hidden tab, asset not ready yet,
+// whatever), the catch reschedules the next frame anyway: the animation loop
+// NEVER fully dies, so state.phase always has the chance to return to 'waiting'
+// and the canvas never goes permanently deaf to clicks.
 function render(timestamp) {
   try {
     _renderFrame(timestamp);
@@ -1217,42 +1203,38 @@ function render(timestamp) {
   }
 }
 
-// Evita el salto de dt gigante desde el origen (no solo mitigarlo en el catch
-// de arriba) — al volver de una pestaña oculta, requestAnimationFrame estuvo
-// pausado todo ese tiempo; el próximo frame real que llegue va a tener un
-// timestamp muy adelantado respecto al último guardado. Sin esto, ESE primer
-// frame post-regreso computaba un dt de varios segundos/minutos de un salto.
+// Prevent the huge dt jump at the source (not just mitigate it in the catch
+// above) — on return from a hidden tab, requestAnimationFrame was paused all
+// that time; the next real frame will have a timestamp far ahead of the last
+// saved one. Without this, THAT first frame back computed a dt of several
+// seconds/minutes in one jump.
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible' || !state) return;
   state.lastTimestamp = null;
-  // Recalcular el cronómetro YA (no esperar al próximo tick del interval,
-  // que puede tardar hasta 1s más) — así el número se autocorrige al
-  // instante de volver, en vez de mostrar el valor viejo un momento.
+  // Recompute the timer NOW (don't wait for the next interval tick, which can
+  // take up to 1s more) — so the number self-corrects the instant you return,
+  // instead of showing the old value for a moment.
   if (timerIntervalId) _timerTick();
 });
 
 // ── TIMER ─────────────────────────────────────────────────────────────────────
-// timeLeft se calcula contra timerStartedAt (Date.now()), no restando 1 por
-// tick — si el navegador throttlea el setInterval de una pestaña en 2do
-// plano (le puede bajar la frecuencia a 1 tick cada varios segundos, o
-// menos), un contador que resta 1 por tick pierde ticks reales y queda
-// atrasado respecto al tiempo real; acá, en cuanto el interval vuelve a
-// tickear (o la pestaña vuelve a primer plano), se autocorrige de una sola
-// vez al valor real en vez de arrastrar el atraso (reportado: en salas
-// grupales, un jugador con la pestaña minimizada le llegaba tarde su propio
-// TIMES UP comparado con el resto).
+// timeLeft is computed against timerStartedAt (Date.now()), not by subtracting
+// 1 per tick — if the browser throttles a background tab's setInterval (can drop
+// to 1 tick every several seconds, or less), a counter that subtracts 1 per tick
+// loses real ticks and falls behind real time; here, as soon as the interval
+// ticks again (or the tab returns to the foreground), it self-corrects in one
+// step to the real value instead of dragging the lag (reported: in group rooms,
+// a player with a minimized tab got their own TIMES UP late vs. the rest).
 function _timerTick() {
   if (!state) return;
-  // Guarda por fase (no solo "!state"): quitToMenu() reemplaza state por uno
-  // nuevo en 'idle' (resetState), no lo anula — así que este chequeo NO
-  // frenaba un tick perdido de la ronda anterior si por lo que sea
-  // timerIntervalId no se llegó a limpiar a tiempo (ej. una pestaña
-  // minimizada mucho rato, donde el navegador puede tardar en aplicar el
-  // clearInterval real). Sin esto, ese tick fantasma podía llegar a
-  // state.timeLeft<=0 y llamar a endGame(), mostrando el TIMES UP gigante
-  // encima del menú (reportado: "salgo un rato minimizado y vuelvo con un
-  // times up gigante"). Con la guarda, cualquier tick que dispare estando
-  // en 'idle' se autoelimina en vez de actuar.
+  // Phase guard (not just "!state"): quitToMenu() replaces state with a fresh
+  // 'idle' one (resetState), doesn't null it — so this check did NOT stop a
+  // stray tick from the previous round if timerIntervalId somehow wasn't
+  // cleared in time (e.g. a long-minimized tab, where the browser can be slow
+  // to apply the real clearInterval). Without this, that ghost tick could reach
+  // state.timeLeft<=0 and call endGame(), showing the giant TIMES UP over the
+  // menu (reported: "I minimize for a while and come back to a giant times up").
+  // With the guard, any tick firing while in 'idle' self-removes instead of acting.
   if (state.phase === 'idle') { clearInterval(timerIntervalId); timerIntervalId = null; return; }
   const _practiceInfinite = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
   if (_practiceInfinite) return;
@@ -1325,32 +1307,32 @@ function endGame() {
       const cwHide = document.getElementById('countdown-widget');
       if (cwHide) cwHide.style.display = 'none';
 
-      // ── VERSUS: redirigir al resultado W/L ───────────────
+      // ── VERSUS: redirect to the W/L result ───────────────
       if (window._vsActive && (window.pendingGameMode === 'game' || window.pendingGameMode === 'monuments') && typeof window._vsHandleGameEnd === 'function') {
         window._vsHandleGameEnd(state.score);
         return;
       }
-      // ── LOBBY: reportar fin de modo al sistema grupal ─────
+      // ── LOBBY: report mode end to the group system ───────
       if (window._lobbyActive && (window.pendingGameMode === 'game' || window.pendingGameMode === 'monuments') && typeof window._lobbyHandleGameEnd === 'function') {
         window._lobbyHandleGameEnd(state.score);
         return;
       }
-      // ── PRÁCTICA: redirigir al panel de práctica ──────────
+      // ── PRACTICE: redirect to the practice panel ─────────
       if (window.practiceConfig && window.practiceConfig.active) {
         window.endPracticeSession(state.score, correctCount, wrongCount);
         return;
       }
       // ─────────────────────────────────────────────────────
-      // Registrar la partida single-player para stats (cities/monuments).
+      // Log the single-player game for stats (cities/monuments).
       if (window.Analytics) {
         window.Analytics.logGame(window.pendingGameMode === 'monuments' ? 'monuments' : 'cities', state.score);
       }
       window.lastModeScore = state.score;
       finalScoreEl.textContent = (state.score + (window.campaignBase ? window.campaignBase() : 0)).toLocaleString();
-      // Durante una campaña en curso no se persiste el highscore todavía: se
-      // muestra el banner como preview, pero el guardado real (localStorage +
-      // var en memoria) se difiere a window._commitCampaignHighscores(),
-      // llamado solo cuando se termina la Vuelta Mundial entera.
+      // During an in-progress campaign the highscore isn't persisted yet: the
+      // banner shows as a preview, but the real save (localStorage + in-memory
+      // var) is deferred to window._commitCampaignHighscores(), called only
+      // when the whole Gira Mundial finishes.
       const _inCampaign = !!(window.campaign && window.campaign.active);
       let isNewHighscore = false;
       let _bannerScore = 0;
@@ -1409,36 +1391,36 @@ function endGame() {
       const checksEndTime = (checksTotal > 0 ? (checksTotal - 1) * 0.1 + 0.2 : 0) + 0.4;
       buildWrongsRow(checksEndTime);
       playMusic(sfxPostgame);
-      // Revelar confirm solo cuando los assets del siguiente modo estén en caché.
+      // Reveal confirm only once the next mode's assets are cached.
       if (window.campaign && window.campaign.active && window.pendingGameMode === 'game' && typeof window.preloadNextModeAssets === 'function') {
         window.preloadNextModeAssets('monuments').then(window.showGameoverConfirm);
       } else {
-        // Modo libre o último modo (monuments): no hay preload, confirmar después de un breve delay.
+        // Free mode or last mode (monuments): no preload, confirm after a brief delay.
         setTimeout(window.showGameoverConfirm, 800);
       }
     }, 1000);
   }, 400 + 1200);
 }
 
-// ── ESCALADO RESPONSIVE ───────────────────────────────────────────────────────
+// ── RESPONSIVE SCALING ──────────────────────────────────────────────────────
 function redimensionarJuego() {
   if (!gameWrapper || gameWrapper.style.display === 'none') return;
 
-  const anchoVentana = window.STAGE_W;
-  const altoVentana = window.STAGE_H;
+  const winW = window.STAGE_W;
+  const winH = window.STAGE_H;
 
-  // Márgenes proporcionales (sin px fijos ni saltos por breakpoint) para que la
-  // escala sea 100% proporcional al viewport y no "zoomee" de más al hacer zoom.
-  const margenHorizontal = anchoVentana * 0.35;
-  const margenVertical = altoVentana * 0.08;
+  // Proportional margins (no fixed px or breakpoint jumps) so the scale is 100%
+  // proportional to the viewport and doesn't "zoom" too much on zoom.
+  const marginH = winW * 0.35;
+  const marginV = winH * 0.08;
 
-  const escalaW = (anchoVentana - margenHorizontal) / DISPLAY_W;
-  const escalaH = (altoVentana - margenVertical) / DISPLAY_H;
+  const scaleW = (winW - marginH) / DISPLAY_W;
+  const scaleH = (winH - marginV) / DISPLAY_H;
 
-  let escalaFinal = Math.min(escalaW, escalaH);
-  escalaFinal = escalaFinal * 0.92;
+  let finalScale = Math.min(scaleW, scaleH);
+  finalScale = finalScale * 0.92;
 
-  gameWrapper.style.transform = `translate(-50%, -50%) scale(${escalaFinal})`;
+  gameWrapper.style.transform = `translate(-50%, -50%) scale(${finalScale})`;
   gameWrapper.style.transformOrigin = 'center center';
 }
 
@@ -1453,24 +1435,23 @@ function showScorePopup(amount) {
 
 window.addEventListener('resize', redimensionarJuego);
 
-// Reposicionar la barra de amigos al hacer zoom/redimensionar (los top se calculan
-// en px desde el alto real, así que hay que recalcularlos para que la separación
-// no cambie).
+// Reposition the friends bar on zoom/resize (the tops are computed in px from
+// the real height, so they must be recomputed so the spacing doesn't change).
 window.addEventListener('resize', () => {
   const rp = document.getElementById('right-panel');
   if (!rp || getComputedStyle(rp).display === 'none') return;
-  // positionLeaderboard() es la lógica del leaderboard NORMAL multi-fila
-  // (lee lbElements['lb-player'], que ni existe durante el espectador de
-  // Cities — esa tarjeta la arma citiesSpectatorSetPlayerCard() a mano, en el
-  // MISMO #right-panel/#leaderboard compartido). Sin este guard, cualquier
-  // resize/zoom mientras se espectaba pisaba la altura de 1 fila que puso
-  // citiesSpectatorSetPlayerCard con la altura "ventana de varias filas" del
-  // leaderboard normal, dejando la tarjeta pegada arriba en vez de abajo (el
-  // panel está anclado por `bottom`, así que una altura de más corre el
-  // origen hacia arriba) — el "sale arriba en vez de abajo" reportado.
+  // positionLeaderboard() is the NORMAL multi-row leaderboard logic (reads
+  // lbElements['lb-player'], which doesn't exist during the Cities spectator —
+  // that card is built by hand by citiesSpectatorSetPlayerCard(), in the SAME
+  // shared #right-panel/#leaderboard). Without this guard, any resize/zoom while
+  // spectating overwrote the 1-row height set by citiesSpectatorSetPlayerCard
+  // with the normal leaderboard's "multi-row window" height, leaving the card
+  // pinned to the top instead of the bottom (the panel is anchored by `bottom`,
+  // so extra height shifts the origin up) — the reported "shows up top instead
+  // of bottom".
   if (window._isSpectating) {
-    // Mismo motivo que en el render loop de arriba — grupal (N filas) es
-    // distinto de 1v1 (2 filas fijas).
+    // Same reason as in the render loop above — group (N rows) is different
+    // from 1v1 (2 fixed rows).
     if (typeof window._isGroupSpectating === 'function' && window._isGroupSpectating()) {
       window._refreshGroupSpectatorLeaderboard?.();
     } else if (typeof window.citiesSpectatorReposition === 'function') {
@@ -1497,16 +1478,16 @@ const PREGAME_STEPS = [
 
 let pregameTimeout = null;
 let pregameAborted = false;
-// elapsedMs (opcional): cuánto del 3-2-1 ya pasó del lado del jugador REAL —
-// lo usa el espectador de cities que se une a mitad de la cuenta (ver
-// citiesSpectatorShowPregame) para arrancar en el número que corresponde, en
-// vez de siempre desde "3". Mismo patrón que runFlagsPregame/runShapesPregame.
+// elapsedMs (optional): how much of the 3-2-1 already passed on the REAL
+// player's side — used by the cities spectator that joins mid-count (see
+// citiesSpectatorShowPregame) to start at the right number instead of always
+// from "3". Same pattern as runFlagsPregame/runShapesPregame.
 function runPregameCountdown(onDone, elapsedMs) {
   pregameAborted = false;
   pregameCountdownEl.style.display = 'flex';
-  // Desbloquear el compositor de Opera al arrancar la cuenta regresiva (ver
-  // window.nudgeRepaint). Se repite tras un instante por si el stall ocurre
-  // después del primer commit (canvas resize / primer frame del juego).
+  // Unblock the Opera compositor when the countdown starts (see
+  // window.nudgeRepaint). Repeated a moment later in case the stall happens
+  // after the first commit (canvas resize / first game frame).
   if (typeof window.nudgeRepaint === 'function') {
     window.nudgeRepaint();
     setTimeout(window.nudgeRepaint, 120);
@@ -1527,7 +1508,7 @@ function runPregameCountdown(onDone, elapsedMs) {
   sfxCountdown.play().catch(() => {});
 
   function showStep() {
-    if (pregameAborted) return; // se abandonó durante el 3-2-1
+    if (pregameAborted) return; // abandoned during the 3-2-1
     if (step >= PREGAME_STEPS.length) {
       pregameCountdownEl.style.display = 'none';
       onDone();
@@ -1552,8 +1533,9 @@ function runPregameCountdown(onDone, elapsedMs) {
 function startGame() {
   loadBadges();
   loadGameSFX();
-  // Pre-autorizar sfxCountdown en mobile mientras estamos en el contexto del gesto del usuario,
-  // antes del canvas resize (que puede tardar y expirar la ventana de gesto).
+  // Pre-authorize sfxCountdown on mobile while still in the user-gesture
+  // context, before the canvas resize (which can take long and expire the
+  // gesture window).
   if (IS_MOBILE && sfxCountdown) {
     const _pa = sfxPlay(sfxCountdown);
     if (_pa) _pa.catch(() => {});
@@ -1564,7 +1546,7 @@ function startGame() {
   clearInterval(timerIntervalId); timerIntervalId = null;
   if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
   canvas.style.pointerEvents = '';
-  // Restaurar tamaño del canvas si fue liberado en iOS al final de la ronda anterior.
+  // Restore the canvas size if it was freed on iOS at the end of the previous round.
   if (canvas.width < DISPLAY_W) {
     canvas.width = DISPLAY_W; canvas.height = DISPLAY_H;
   }
@@ -1643,18 +1625,17 @@ function startGame() {
   if ((window.pendingGameMode === 'game' || window.pendingGameMode === 'monuments') && typeof window._specReportPregame === 'function') {
     const _specDur = (window.practiceConfig && window.practiceConfig.active) ? practiceGetDuration() : GAME_DURATION;
     const _specInf = window.practiceConfig && window.practiceConfig.active && _specDur === 0;
-    // mode dinámico (no hardcodeado a 'game') es IMPRESCINDIBLE acá — a
-    // diferencia de shapes (donde 'round' llega antes que 'pregame' y ya
-    // actualiza _mode del lado espectador) y de flags (que siempre es el
-    // primer modo de la campaña, así que el default 'flags' de _mode ya le
-    // pega), Cities/Monuments nunca son el primer modo Y su 'pregame' llega
-    // ANTES que su 'round' — sin este campo, _mode en spectate.js quedaba
-    // pegado en el modo ANTERIOR de la campaña, montando la UI equivocada
-    // durante todo el 3-2-1. window.pendingGameMode ya vale 'game' o
-    // 'monuments' acá (lo fija el botón de entrada de cada uno) así que
-    // sirve directo, sin mapear.
-    // campaignBaseAtStart: el jugador real muestra este número desde el
-    // arranque del 3-2-1 — el espectador no tiene forma propia de saberlo.
+    // A dynamic mode (not hardcoded to 'game') is ESSENTIAL here — unlike shapes
+    // (where 'round' arrives before 'pregame' and already updates the
+    // spectator's _mode) and flags (always the campaign's first mode, so _mode's
+    // 'flags' default is already right), Cities/Monuments are never the first
+    // mode AND their 'pregame' arrives BEFORE their 'round' — without this
+    // field, _mode in spectate.js stayed stuck on the PREVIOUS campaign mode,
+    // mounting the wrong UI through the whole 3-2-1. window.pendingGameMode is
+    // already 'game' or 'monuments' here (set by each mode's entry button) so it
+    // works directly, no mapping.
+    // campaignBaseAtStart: the real player shows this number from the start of
+    // the 3-2-1 — the spectator has no way of its own to know it.
     window._specReportPregame({
       mode: window.pendingGameMode, duration: _specInf ? '∞' : _specDur, infinite: _specInf, startedAt: Date.now(),
       campaignBaseAtStart: window.campaignBase ? window.campaignBase() : 0,
@@ -1672,9 +1653,9 @@ function startGame() {
 
 btnStart.addEventListener('click', () => { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); startGame(); });
 
-// ── gameStopper del map-game (teardown de timers/canvas/overlays al cambiar
-//    de modo o abandonar) — movido acá al desmantelar monuments.js ──────────
-// Cada modo registra aquí cómo detener sus loops (timers/animaciones)
+// ── map-game gameStopper (teardown of timers/canvas/overlays on mode switch
+//    or abandon) ──────────────────────────────────────────────────────────
+// Each mode registers here how to stop its loops (timers/animations)
 window.gameStoppers = window.gameStoppers || [];
 window.gameStoppers.push(() => {
   try { pregameAborted = true; clearTimeout(pregameTimeout); pregameTimeout = null; } catch (e) {}
@@ -1682,34 +1663,34 @@ window.gameStoppers.push(() => {
   try { clearInterval(timerIntervalId); timerIntervalId = null; } catch (e) {}
   try { if (animFrameId) cancelAnimationFrame(animFrameId); animFrameId = null; } catch (e) {}
   if (window._powerQuitOverlay) {
-    // Bloquear canvas durante el overlay de game over de práctica
+    // Block the canvas during the practice game-over overlay
     try { mapGameOver = true; } catch (e) {}
     try { if (state) state.phase = 'idle'; } catch (e) {}
     try { if (canvas) canvas.style.pointerEvents = 'none'; } catch (e) {}
-    // Detener el titilo del countdown
+    // Stop the countdown blink
     try { if (countdownImg) countdownImg.style.animationPlayState = 'paused'; } catch (e) {}
   } else {
-    // Sin este else, un endGame() legítimo (timeLeft llegó a 0 de verdad,
-    // recalculado al volver de una pestaña en 2do plano, ver visibilitychange
-    // más abajo) deja canvas.style.pointerEvents='none' puesto — startGame()
-    // lo restaura recién al arrancar una ronda nueva, así que si quedaba algo
-    // a medio camino (secuencia de TIMES UP interrumpida por el propio quit)
-    // el canvas quedaba sordo a los clicks para siempre sin ningún indicio
-    // visual (reportado: "vuelvo de otra pestaña y no puedo clickear nada,
-    // se ve todo normal"). mapGameOver también se reseteaba solo en startGame().
+    // Without this else, a legit endGame() (timeLeft really reached 0,
+    // recomputed on return from a background tab, see visibilitychange below)
+    // leaves canvas.style.pointerEvents='none' set — startGame() only restores
+    // it when a new round starts, so if something was left mid-way (TIMES UP
+    // sequence interrupted by the quit itself) the canvas went deaf to clicks
+    // forever with no visual cue (reported: "I come back from another tab and
+    // can't click anything, everything looks normal"). mapGameOver was also
+    // only reset in startGame().
     try { mapGameOver = false; } catch (e) {}
     try { if (canvas) canvas.style.pointerEvents = ''; } catch (e) {}
   }
   try { if (typeof pregameCountdownEl !== 'undefined' && pregameCountdownEl) pregameCountdownEl.style.display = 'none'; } catch (e) {}
   try { if (typeof timeupOverlay !== 'undefined' && timeupOverlay) { timeupOverlay.style.display = 'none'; timeupOverlay.classList.remove('timeup-in','timeup-out'); } } catch (e) {}
-  // Ocultar el contenedor del juego de Cities/Monuments (#game-wrapper: canvas,
-  // mapa, cartel de ciudad, nombre de monumento, etc.) — el gameStopper solo
-  // paraba timers, no ocultaba los assets; al encadenar a OTRO modo (ej.
-  // cities→siluetas) esos assets quedaban pegados de fondo (reportado). No se
-  // toca si _vsShowingResult (assets a propósito visibles bajo la tabla de
-  // resultados, igual que respetan los *HardReset) ni si _powerQuitOverlay
-  // (el mapa tiene que seguir de fondo durante el game over de práctica al
-  // salir con power; recién se oculta en quitToMenu() al volver al menú).
+  // Hide the Cities/Monuments game container (#game-wrapper: canvas, map, city
+  // sign, monument name, etc.) — the gameStopper only stopped timers, didn't
+  // hide the assets; chaining to ANOTHER mode (e.g. cities→shapes) left those
+  // assets stuck in the background (reported). Not touched if _vsShowingResult
+  // (assets deliberately visible under the results table, as the *HardReset
+  // ones respect) or _powerQuitOverlay (the map must stay in the background
+  // during the practice game-over on power-quit; only hidden in quitToMenu() on
+  // return to the menu).
   try {
     if (!window._vsShowingResult && !window._powerQuitOverlay) {
       const gw = document.getElementById('game-wrapper');

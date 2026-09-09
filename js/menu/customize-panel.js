@@ -1,20 +1,18 @@
 // ============================================================================
-// menu/customize-panel.js — Panel de Personalización del loading (marco de foto / tarjeta del leaderboard /
-// recuadro del tablero / celda de fila): tabs + grilla de opciones + vista previa
-// en vivo, persistencia en profiles vía sbUpdateProfile. Expone window._applyFounderFrame.
+// menu/customize-panel.js — loading-screen Customize panel (photo frame /
+// leaderboard card / board panel / row cell): tabs + options grid + live
+// preview, persisted to profiles via sbUpdateProfile. Exposes
+// window._applyFounderFrame.
 //
-// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
-// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
-// Son <script> clásicos que comparten un mismo scope global.
+// Classic <script>s sharing one global scope, loaded in order in play/index.html.
 // ============================================================================
 
-// ── Panel de personalización (items por código, preparado para la tienda) ─────
-// 3 slots independientes (cada uno su propia columna en profiles, ver
-// migración customize_item_codes): marco de foto, tarjeta del leaderboard
-// in-game, y el "recuadro" (skin del tablero, antes siempre howtoplaytable.png).
-// Cada valor es un código de archivo — images/customize/<categoria>/<code>.png.
-// Un solo panel con tabs arriba a la derecha + grilla de opciones, y a la
-// izquierda una vista previa fija que se actualiza en vivo.
+// ── Customize panel (items by code, shop-ready) ──────────────────────────────
+// 4 independent slots (each its own profiles column, see migration
+// customize_item_codes): photo frame, in-game leaderboard card, the board skin
+// (was always howtoplaytable.png), and the row cell. Each value is a file code —
+// images/customize/<category>/<code>.png. One panel with tabs top-right + an
+// options grid, and a fixed live-updating preview on the left.
 (function () {
   const CATS = {
     photo:       { field: 'frame_code' },
@@ -22,9 +20,8 @@
     table:       { field: 'panel_code' },
     cell:        { field: 'cell_code' },
   };
-  // Catálogo de ítems disponibles por categoría. Hoy solo existe el default
-  // ('0001', gratis para todos); a futuro se suma acá cada código nuevo a
-  // medida que haya arte + se sume la tienda (founderOnly, price, etc.).
+  // Catalog of available items per category. Add each new code here as art
+  // lands and the shop grows (founderOnly, price, etc.).
   const CATALOG = {
     photo:       [{ code: '0001', founderOnly: false }, { code: '0002', founderOnly: true }],
     leaderboard: [{ code: '0001', founderOnly: false }, { code: '0002', founderOnly: true }],
@@ -33,20 +30,19 @@
   };
   let _activeCat = 'photo';
 
-  // Aplica los 3 ítems elegidos en los lugares donde se ven en vivo: la foto
-  // del panel de perfil, la fila propia del leaderboard in-game (#lb-player
-  // se recrea cada partida — ver initLeaderboard acá mismo — y #flags-lb-player,
-  // que flags.js maneja aparte porque Banderas no reusa #lb-player) y el
-  // tablero del panel de perfil. También refresca la vista previa del panel
-  // de personalización si está abierto.
+  // Apply the chosen items where they show live: the profile-panel photo, the
+  // player's own in-game leaderboard row (#lb-player is recreated each game —
+  // see initLeaderboard — and #flags-lb-player, handled separately in flags.js
+  // because Flags doesn't reuse #lb-player) and the profile-panel board. Also
+  // refreshes the Customize panel preview if it's open.
   function _applyFounderFrame() {
     const p = window._sbProfile;
     const CA = window.CustomizeAssets;
     if (!CA) return;
-    // Respaldo local: si hay perfil de verdad, se guarda el último código
-    // conocido; si no lo hay (sin conexión, todavía no cargó), se usa lo
-    // último guardado — y si tampoco hay nada guardado, CustomizeAssets ya
-    // cae a '0001' (el default) para que nunca quede vacío/roto.
+    // Local backup: with a real profile, store the last known code; without one
+    // (offline, not loaded yet), use the last stored value — and if nothing is
+    // stored, CustomizeAssets falls back to '0001' (default) so it's never
+    // empty/broken.
     let frameCode, cardCode, panelCode, cellCode;
     if (p) {
       frameCode = p.frame_code || '0001';
@@ -66,10 +62,9 @@
       cellCode  = localStorage.getItem('cust_cell_code')  || '0001';
     }
 
-    // El marco (frame) es solo para LA FOTO GRANDE del perfil — la ficha del
-    // leaderboard in-game lleva la foto plana, sin marco (ver también
-    // _swatchPreview/_refreshLeftPreview, mismo criterio para las vistas
-    // previas del panel de Personalizar).
+    // The frame is only for the profile's LARGE photo — the in-game leaderboard
+    // card uses the flat photo, no frame (see also
+    // _swatchPreview/_refreshLeftPreview, same rule for the Customize previews).
     CA.applyFrame(document.getElementById('loading-profile-pic-wrap'), frameCode);
     CA.applyCard(document.getElementById('lb-player'), cardCode);
     CA.applyCard(document.getElementById('flags-lb-player'), cardCode);
@@ -81,10 +76,9 @@
   }
   window._applyFounderFrame = _applyFounderFrame;
 
-  // Extrae el color dominante de un PNG de panel (promedio de píxeles
-  // opacos, muestreado en baja resolución) para tematizar las tabs y la
-  // grilla de opciones de Personalización acorde al panel equipado.
-  // Cacheado por URL porque cada panel no cambia en runtime.
+  // Extract the dominant color of a panel PNG (average of opaque pixels,
+  // sampled at low resolution) to theme the Customize tabs and options grid to
+  // match the equipped panel. Cached by URL since panels don't change at runtime.
   const _panelColorCache = {};
   function _extractPanelColor(url) {
     if (_panelColorCache[url] !== undefined) return Promise.resolve(_panelColorCache[url]);
@@ -105,7 +99,7 @@
             r += data[i]; g += data[i + 1]; b += data[i + 2]; n++;
           }
           if (n > 0) rgb = [Math.round(r / n), Math.round(g / n), Math.round(b / n)];
-        } catch (e) { /* canvas tainted (file://) -> sin tema, se usa el fallback CSS */ }
+        } catch (e) { /* canvas tainted (file://) -> no theme, CSS fallback is used */ }
         _panelColorCache[url] = rgb;
         resolve(rgb);
       };
@@ -123,7 +117,7 @@
     if (!CA || !right) return;
     const token = ++_panelThemeToken;
     const rgb = await _extractPanelColor(CA.panelUrl(panelCode));
-    if (token !== _panelThemeToken) return; // llegó una llamada más nueva mientras cargaba
+    if (token !== _panelThemeToken) return; // a newer call arrived while loading
     if (!rgb) {
       ['--panel-border', '--panel-tab-bg', '--panel-tab-hover-bg', '--panel-tab-active-bg', '--panel-grid-bg', '--panel-tab-text']
         .forEach(v => right.style.removeProperty(v));
@@ -159,37 +153,34 @@
     if (lbImg) lbImg.src = photo;
     const lbName = document.getElementById('customize-preview-lb-name');
     if (lbName) lbName.textContent = name;
-    // El marco (frame) es solo para LA FOTO GRANDE del perfil — la ficha del
-    // leaderboard/card lleva la foto plana, sin marco, aunque tenga uno
-    // equipado.
+    // The frame is only for the profile's LARGE photo — the leaderboard/card
+    // uses the flat photo, no frame, even if one is equipped.
     CA?.applyCard(document.getElementById('customize-preview-lb-card'), cardCode);
   }
 
-  // Miniatura representativa de un código, para las tarjetas de la grilla.
-  // La de "leaderboard" reusa las clases reales del juego (.lb-entry.lb-player,
-  // .lb-avatar, .lb-name, .lb-score) para que sea la ficha de verdad, no una
-  // inventada — mismo truco que .customize-lb-preview: se resetea position a
-  // relative acá adentro porque .lb-entry es absolute para la animación in-game.
+  // Representative thumbnail of a code, for the grid tiles. The "leaderboard"
+  // one reuses the real game classes (.lb-entry.lb-player, .lb-avatar, .lb-name,
+  // .lb-score) so it's the actual card, not a fake — same trick as
+  // .customize-lb-preview: position is reset to relative here because .lb-entry
+  // is absolute for the in-game animation.
   function _swatchPreview(cat, code) {
     const CA = window.CustomizeAssets;
     const photo = localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png';
     const name  = localStorage.getItem('playerName') || 'John';
     if (cat === 'photo') {
       const frameInset = window.CUSTOMIZE_FRAME_INSET[code] || '-14.5%';
-      // Tamaño fijo en cqmin, NO en % — el swatch tiene padding-bottom (deja
-      // lugar al label) así que su ancho y alto de contenido ya no son
-      // iguales; un width/height en % de esa caja da un óvalo en vez de
-      // círculo. cqmin es relativo al contenedor de arriba (mismo para
-      // ambas dimensiones), así que siempre da un cuadrado real.
+      // Fixed size in cqmin, NOT % — the swatch has padding-bottom (room for
+      // the label) so its content width and height aren't equal; a %
+      // width/height on that box gives an oval, not a circle. cqmin is relative
+      // to the outer container (same for both dimensions), always a real square.
       return `<div class="customize-preview-avatar-wrap cust-frame-wrap" style="width:7.5cqmin;height:7.5cqmin;--cust-frame:url('${CA.frameUrl(code)}');--cust-frame-inset:${frameInset}">`
         + `<img src="${photo}"></div>`;
     }
     if (cat === 'leaderboard') {
-      // transform:scale (no width%) para que el texto se achique proporcional
-      // con el resto de la ficha — igual que se ve en el juego, no una copia
-      // aplastada con la misma tipografía de tamaño real metida en una caja chica.
-      // Foto PLANA, sin marco — el marco es solo de la foto grande de perfil,
-      // no de la ficha del leaderboard/card.
+      // transform:scale (not width%) so the text shrinks proportionally with
+      // the rest of the card — as seen in-game, not a squashed copy with
+      // full-size type crammed into a small box. FLAT photo, no frame — the
+      // frame is only for the large profile photo, not the leaderboard/card.
       return `<div class="customize-swatch-lb-scale">`
         + `<div class="lb-entry lb-player${window.CUSTOMIZE_CARD_LIGHT_TEXT?.has(code) ? ' card-light-text' : ''}" style="position:relative;top:auto;left:auto;width:12cqmin;transition:none;--cust-card:url('${CA.cardUrl(code)}')">`
         + `<div class="lb-avatar"><img class="lb-avatar-img" src="${photo}"></div>`
@@ -197,10 +188,10 @@
         + `</div></div>`;
     }
     if (cat === 'cell') {
-      // Mini maqueta de la fila COMPLETA de Rankings/Amigos (avatar+nombre),
-      // no solo el circulito — la celda es toda la tarjeta. Tamaño FIJO
-      // (no depende del largo del nombre): mismo ancho/alto para las dos
-      // tarjetas de la grilla, con el nombre recortado si no entra.
+      // Mini mockup of the WHOLE Rankings/Friends row (avatar+name), not just
+      // the circle — the cell is the entire card. FIXED size (not dependent on
+      // name length): same width/height for both grid tiles, name clipped if it
+      // doesn't fit.
       return `<div style="width:90%;height:5.4cqmin;box-sizing:border-box;display:flex;align-items:center;gap:0.8cqmin;padding:0 1cqmin;border-radius:0.8cqmin;overflow:hidden;`
         + `background-image:url('${CA.cellUrl(code)}');background-size:100% 100%;background-repeat:no-repeat;">`
         + `<img src="${photo}" style="width:4.2cqmin;height:4.2cqmin;border-radius:50%;object-fit:cover;border:0.3cqmin solid #8b6a00;flex:none;">`
@@ -218,21 +209,20 @@
     const grid = document.getElementById('customize-grid');
     if (!grid) return;
     const p = window._sbProfile;
-    // No alcanza con is_founder: el paquete queda oculto hasta que confirma
-    // el popup de bienvenida (founder_popup_seen, ver showFounderWelcomePopup)
-    // — ese click solo DESBLOQUEA, no equipa nada solo; recién ahí puede
-    // elegir ponérselo o no acá como cualquier otro ítem.
+    // is_founder alone isn't enough: the pack stays hidden until the welcome
+    // popup is confirmed (founder_popup_seen, see showFounderWelcomePopup) —
+    // that click only UNLOCKS, it doesn't equip anything; only then can they
+    // choose to wear it here like any other item.
     const isFounder = !!(p && p.is_founder && p.founder_popup_seen);
     const field = CATS[cat].field;
     const currentCode = p?.[field] || '0001';
     grid.innerHTML = '';
 
     CATALOG[cat].forEach(item => {
-      // Fundador es un caso especial: no es "conseguible" (nadie lo suma
-      // después de las primeras 100 cuentas), así que a quien no lo tiene ni
-      // se le muestra — no tiene sentido mostrar bloqueado algo que jamás va
-      // a poder desbloquear. Los ítems de logro/tienda sí se muestran
-      // bloqueados (con 🔒) para generar incentivo a conseguirlos.
+      // Founder is a special case: not obtainable (nobody earns it after the
+      // first 100 accounts), so it isn't even shown to those who don't have it
+      // — no point showing something locked that can never be unlocked.
+      // Achievement/shop items ARE shown locked (with 🔒) to create incentive.
       if (item.founderOnly && !isFounder) return;
       const locked   = item.locked && !item.unlocked;
       const selected = currentCode === item.code;
@@ -251,9 +241,9 @@
     if (!window._sbProfile || !window._sbUserId) return;
     const field = CATS[cat].field;
     const prev = window._sbProfile[field];
-    if (prev === code) return; // ya está seleccionado
+    if (prev === code) return; // already selected
     sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
-    window._sbProfile[field] = code; // optimista
+    window._sbProfile[field] = code; // optimistic
     _applyFounderFrame();
     _renderGrid(cat);
     try {
@@ -294,10 +284,9 @@
     document.getElementById('loading-customize-group')?.classList.add('table-gone');
   });
 
-  // Las etiquetas de la grilla ("Sin personalizar"/"Marco de Fundador") se
-  // arman en JS con t(), no son data-i18n estático — el refresco genérico de
-  // idioma no las toca. Si el panel está abierto al cambiar de idioma, hay
-  // que re-renderizar la tab activa a mano.
+  // The grid labels are built in JS with t(), not static data-i18n — the
+  // generic language refresh doesn't touch them. If the panel is open on a
+  // language switch, re-render the active tab manually.
   if (typeof onLangChange === 'function') {
     onLangChange(() => {
       const group = document.getElementById('loading-customize-group');

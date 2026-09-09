@@ -1,12 +1,10 @@
 // ============================================================================
-// menu/loading-boot.js — Preloader del loading screen: barra de progreso, precarga de assets vía
-// window.ASSET_MANIFEST (saltada en mobile), disparo de las animaciones de
-// entrada al terminar, y el bloque anti-titileo (decode anticipado de <img>).
-// DEBE cargar DESPUÉS de manifest.js.
+// menu/loading-boot.js — loading-screen preloader: progress bar, asset preload
+// via window.ASSET_MANIFEST (skipped on mobile), firing the entrance animations
+// when done, and the anti-flicker block (early <img> decode).
+// MUST load AFTER manifest.js.
 //
-// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
-// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
-// Son <script> clásicos que comparten un mismo scope global.
+// Classic <script>s sharing one global scope, loaded in order in play/index.html.
 // ============================================================================
 
 // ── LOADING SCREEN ───────────────────────────────────────────────────────────
@@ -66,18 +64,17 @@
     planet.style.animation = `planet-spin 25s linear -${(randomDeg / 360) * 25}s infinite`;
   }
 
-  // Lista COMPLETA de assets: usa el manifest auto-generado (todos los archivos de
-  // images/ y sfx/). Si por algo falta, cae a la lista mínima embebida.
+  // FULL asset list: uses the auto-generated manifest (every file under images/
+  // and sfx/). Falls back to the minimal embedded list if it's missing.
   const M = window.ASSET_MANIFEST || {};
-  // En mobile reducir concurrencia y saltear decode() para no picar memoria.
+  // On mobile, lower concurrency and skip decode() to avoid spiking memory.
   const isMobile = navigator.maxTouchPoints > 1;
-  // En MOBILE no precargar imágenes en absoluto. El preloader creaba un new Image()
-  // por cada una de las ~880 imágenes del manifest y las retenía en
-  // window.__preloadedImages → cientos de MB de bitmaps clavados en RAM desde el
-  // arranque, dejando iOS al borde del límite y reiniciando la pestaña en las
-  // transiciones de campaña. Las imágenes se cargan y decodifican on-demand cuando
-  // se muestran, y el navegador las libera cuando ya no se usan. En desktop sí se
-  // precargan (hay RAM de sobra y acelera el primer render).
+  // On MOBILE don't preload images at all. The preloader created a new Image()
+  // per manifest image (~880) and held them in window.__preloadedImages →
+  // hundreds of MB of bitmaps pinned in RAM from startup, leaving iOS near the
+  // limit and reloading the tab on campaign transitions. Images load and decode
+  // on-demand when shown, and the browser frees them when unused. Desktop does
+  // preload (plenty of RAM, speeds up first render).
   const imgList   = isMobile ? [] : ((M.images && M.images.length) ? M.images : IMAGES);
   const audioList = (M.audio  && M.audio.length)  ? M.audio  : AUDIO;
   const videoList = M.video || [];
@@ -109,8 +106,8 @@
     return Promise.all(runners);
   }
 
-  // En mobile saltear el preload de video como blob — los videos se cachean igual
-  // via fetch liviano y se decodifican on-demand sin acumular blobs en memoria.
+  // On mobile skip preloading video as a blob — videos still get cached via a
+  // light fetch and decode on-demand without piling up blobs in memory.
   const effectiveVideoList = isMobile ? [] : videoList;
   const total = imgList.length + audioList.length + effectiveVideoList.length + 2;
   let done = 0;
@@ -163,11 +160,11 @@
         if (typeof window.gqRefreshMenuStreakBadge === 'function') window.gqRefreshMenuStreakBadge();
         const resultsBtn = document.getElementById('loading-results-btn');
         if (resultsBtn) resultsBtn.style.display = 'block';
-        // Arrancar menuloop; si autoplay bloqueado, esperar primer gesto
+        // Start menuloop; if autoplay is blocked, wait for the first gesture
         window.startMenuMusic();
       }
 
-      // Esperar a que name-prompt y account-modal estén cerrados antes de animar
+      // Wait for name-prompt and account-modal to be closed before animating
       const namePrompt   = document.getElementById('name-prompt');
       const accountModal = document.getElementById('account-modal');
       const nameBlocking    = namePrompt   && namePrompt.classList.contains('visible');
@@ -212,24 +209,23 @@
 
 })();
 
-// ── OPTIMIZACIÓN ANTI-TITILEO ────────────────────────────────────────────────
-// El preloader decodifica copias Image() (para tener el recurso en caché), pero
-// los <img> reales del DOM se decodifican recién al mostrarse → titilan. Acá los
-// decodificamos de antemano y marcamos como decoding="sync" las imágenes cuyo
-// src se intercambia entre modos, para que al cambiar de juego no muestren un
-// frame en blanco.
+// ── ANTI-FLICKER OPTIMIZATION ────────────────────────────────────────────────
+// The preloader decodes Image() copies (to cache the resource), but the real DOM
+// <img>s only decode when shown → they flicker. Here we decode them ahead of
+// time and set decoding="sync" on images whose src is swapped between modes, so
+// switching games doesn't show a blank frame.
 window.addEventListener('load', () => {
-  // Warming: decodificar todos los <img> ya presentes en el DOM.
-  // En mobile NO hacerlo: forzaría decodificar a la vez los fondos de los 4 modos
-  // (cada uno un bitmap grande) y al estar en el DOM quedarían retenidos → suma a
-  // la presión de RAM que crashea iOS. En mobile se decodifican on-demand.
+  // Warming: decode every <img> already in the DOM.
+  // Don't on mobile: it would decode all 4 modes' backgrounds at once (each a
+  // big bitmap), retained while in the DOM → adds to the RAM pressure that
+  // crashes iOS. Mobile decodes on-demand.
   const _isMobileWarm = navigator.maxTouchPoints > 1;
   if (!_isMobileWarm) {
     document.querySelectorAll('img').forEach(img => {
       if (img.decode) img.decode().catch(() => {});
     });
   }
-  // Imágenes que cambian de src al pasar de modo: decodificación síncrona.
+  // Images that change src on mode switch: synchronous decoding.
   document.querySelectorAll(
     '.game-bg-city, .game-bg-check3, .game-bg-wrong3, .game-bg-men, ' +
     '.game-bg-girl, .game-bg-women, #pregame-countdown-img, #flags-pregame-countdown-img'

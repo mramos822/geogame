@@ -1,15 +1,13 @@
 // ============================================================================
-// profile/profile-account.js — Modal de cuenta (login / registro / recuperación / cambio de
-// usuario-contraseña-correo / logout), primer ingreso (name-prompt), cambio de foto
-// de perfil, popups de bienvenida (normal y Fundador), _onSessionReady (sync al
-// restaurar sesión) y _updateProfileBtnLabel.
+// profile/profile-account.js — account modal (login / register / recovery /
+// change username-password-email / logout), first run (name-prompt), profile
+// photo change, welcome popups (normal and Founder), _onSessionReady (sync on
+// session restore) and _updateProfileBtnLabel.
 //
-// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
-// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
-// Son <script> clásicos que comparten un mismo scope global.
+// Classic <script>s sharing one global scope, loaded in order in play/index.html.
 // ============================================================================
 
-// ── MODAL CUENTA ─────────────────────────────────────────────────────────────
+// ── ACCOUNT MODAL ────────────────────────────────────────────────────────────
 (function () {
   const btn   = document.getElementById('profile-account-btn');
   const modal = document.getElementById('account-modal');
@@ -86,15 +84,15 @@
   }
   function closeModal() { modal.classList.remove('open'); }
 
-  // Expuesto para que el name-prompt abra el modal directamente en login o register
+  // Exposed so the name-prompt can open the modal straight to login or register
   window.openAccountModal = function (startView) {
     if (startView === 'login')    { showView(viewLogin);    modal.classList.add('open'); return; }
     if (startView === 'register') { showView(viewRegister); modal.classList.add('open'); return; }
     openModal();
   };
 
-  // Expuesto para que sb.js abra la vista de "nueva contraseña" tras una recuperación
-  // (evento PASSWORD_RECOVERY), reusando el pipeline real de showView (animación, X oculta, etc.)
+  // Exposed so sb.js can open the "new password" view after a recovery
+  // (PASSWORD_RECOVERY event), reusing the real showView pipeline (animation, hidden X, etc.)
   window._openRecoveryChangePassView = function () {
     ['chpass-current','chpass-new','chpass-confirm'].forEach(id => {
       const el = document.getElementById(id); if (el) { el.value = ''; el.classList.remove('input-error'); }
@@ -207,7 +205,7 @@
       if (error) throw error;
       localStorage.setItem('_pendingPasswordReset', '1');
       _forgotEmail = null;
-      // El listener de PASSWORD_RECOVERY en sb.js abre la vista de nueva contraseña.
+      // The PASSWORD_RECOVERY listener in sb.js opens the new-password view.
     } catch(e) {
       showView(viewForgotCode);
       if (errEl) errEl.textContent = t('account.errCodeInvalid') || 'Código inválido o expirado.';
@@ -223,7 +221,7 @@
       await window.sbResetPassword(_forgotEmail);
       const errEl = document.getElementById('forgot-err-code');
       if (errEl) { errEl.classList.add('account-error-ok'); errEl.textContent = t('account.codeResent') || 'Código reenviado.'; }
-    } catch(e) { /* silencioso: no bloquea el flujo */ }
+    } catch(e) { /* silent: doesn't block the flow */ }
     if (resendBtn) resendBtn.classList.add('disabled');
     setTimeout(() => {
       _forgotResendCooldown = false;
@@ -236,11 +234,11 @@
   document.getElementById('login-welcome-ok')?.addEventListener('click', () => {
     sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
     closeModal();
-    // Login manual (no restauración de sesión al recargar, esa pasa por
-    // _onSessionReady): si la cuenta ya calificaba de antes (founder con al
-    // menos 1 Vuelta Mundial COMPLETA jugada — campaigns_completed, GlobeQuiz
-    // no cuenta), se la mostramos apenas cierra este modal y pisa el menú —
-    // mismo criterio que _onSessionReady.
+    // Manual login (not session restore on reload, that goes through
+    // _onSessionReady): if the account already qualified before (founder with at
+    // least 1 COMPLETE Gira Mundial — campaigns_completed, GlobeQuiz doesn't
+    // count), show it as soon as this modal closes onto the menu — same rule as
+    // _onSessionReady.
     const p = window._sbProfile;
     if (p && p.is_founder && !p.founder_popup_seen && (p.campaigns_completed || 0) > 0) {
       setTimeout(() => { if (typeof window.showFounderWelcomePopup === 'function') window.showFounderWelcomePopup(); }, 500);
@@ -283,7 +281,7 @@
       showView(viewLoading);
       (typeof window.withConnTimeout === 'function' ? window.withConnTimeout(window.sbLogin(uVal, pVal), 6000) : window.sbLogin(uVal, pVal))
         .then(async data => {
-          if (!data) { showView(viewLogin); return; } // timeout: ya se mostró la viñeta de error de conexión
+          if (!data) { showView(viewLogin); return; } // timeout: connection-error bubble already shown
           window._accountLoggedIn = true;
           window._sbUserId = data.user.id;
           document.body.classList.add('account-logged');
@@ -297,23 +295,23 @@
               localStorage.setItem('profilePhoto', profile.avatar_url);
               applyStoredProfilePic();
             }
-            syncHsFromProfile(profile);   // hs locales ← max(local, supabase)
-            clearLocalScores();           // solo avgs/playcount → 0
+            syncHsFromProfile(profile);   // local hs ← max(local, supabase)
+            clearLocalScores();           // only avgs/playcount → 0
             if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
             if (typeof window.gqRefreshMenuStreakBadge === 'function') window.gqRefreshMenuStreakBadge();
             _ensureCountryCode(profile);
             if (typeof _updateProfileBtnLabel === 'function') _updateProfileBtnLabel();
             if (typeof loadFriends === 'function') loadFriends();
             if (typeof window.sbUpdateLastActive === 'function') window.sbUpdateLastActive(data.user.id).catch(() => {});
-            // Escuchar invitaciones versus en tiempo real
-            // Session guard DESACTIVADO (ver mismo comentario en sb.js) — la
-            // cuenta debe poder usarse en varios dispositivos a la vez.
+            // Listen for versus invites in realtime.
+            // Session guard DISABLED (see same note in sb.js) — the account
+            // must work on several devices at once.
             if (typeof window._vsStartListening === 'function') window._vsStartListening();
             if (window.LB && typeof window.LB.listenForInvites === 'function') {
               window.LB.listenForInvites(p => { if (typeof window.showLobbyIncomingInvite === 'function') window.showLobbyIncomingInvite(p); });
             }
             setTimeout(() => { if (typeof window.refreshVersusBell === 'function') window.refreshVersusBell(); }, 600);
-            // Heartbeat: actualiza last_active cada 45s mientras el usuario esté logueado
+            // Heartbeat: refresh last_active every 45s while logged in
             clearInterval(window._presenceHeartbeat);
             window._presenceHeartbeat = setInterval(() => {
               if (window._sbUserId && typeof window.sbUpdateLastActive === 'function')
@@ -346,15 +344,13 @@
     }
   });
 
-  // Contraseña == usuario + variación trivial (ej. "mateo" / "Mateo01") no
-  // debería pasar de "débil" nunca, por más que sume puntos de largo/dígitos/
-  // mayúsculas — el username es de por sí público (aparece en Rankings,
-  // Amigos, etc.), así que agregarle un sufijo simple no suma seguridad
-  // real. Basta con que la contraseña CONTENGA el usuario completo
-  // (normalizando mayúsculas) para considerarla insegura; variaciones que no
-  // incluyan el usuario entero (anagramas, palabras distintas, etc.) no caen
-  // en esta regla. Usuario de 1-2 caracteres no cuenta (demasiado corto para
-  // que "contenerlo" signifique algo).
+  // Password == username + trivial variation (e.g. "mateo" / "Mateo01") should
+  // never rate above "weak", no matter how many length/digit/uppercase points
+  // it scores — the username is public anyway (Rankings, Friends, etc.), so a
+  // simple suffix adds no real security. It's enough that the password CONTAINS
+  // the full username (case-normalized) to count as insecure; variations that
+  // don't include the whole username (anagrams, different words, etc.) don't
+  // trip this rule. A 1-2 char username doesn't count (too short to matter).
   function _passContainsUsername(pass, username) {
     if (!pass || !username || username.length < 3) return false;
     return pass.toLowerCase().includes(username.toLowerCase());
@@ -373,7 +369,7 @@
     if (/[A-Z]/.test(v) && /[a-z]/.test(v)) score++;
     if (/[0-9]/.test(v)) score++;
     if (/[^a-zA-Z0-9]/.test(v)) score++;
-    // Penalizar contraseñas comunes, repeticiones y secuencias
+    // Penalize common passwords, repeats and sequences
     const commonPasswords = ['123456','1234567','12345678','123456789','password','contraseña','111111','000000','qwerty','abc123','654321','987654','112233','123123','aaaaaa','888888','666666','999999','pass123'];
     const isCommon    = commonPasswords.includes(v.toLowerCase());
     const isRepeating = /^(.)\1+$/.test(v);
@@ -385,16 +381,16 @@
     else if (score <= 3) { fill.style.width = '66%';  fill.style.background = '#f39c12'; label.style.color = '#c87800'; label.textContent = t('account.passMedium'); }
     else                 { fill.style.width = '100%'; fill.style.background = '#2bd14b'; label.style.color = '#1a7a30'; label.textContent = t('account.passStrong'); }
   });
-  // Si el usuario termina de escribir el username DESPUÉS de la contraseña,
-  // el meter quedó calculado con el username viejo (vacío) — reevaluar la
-  // contraseña también cuando cambia el usuario.
+  // If the username is typed AFTER the password, the meter was computed with
+  // the old (empty) username — re-evaluate the password when the username
+  // changes too.
   document.getElementById('reg-username')?.addEventListener('input', () => {
     document.getElementById('reg-pass')?.dispatchEvent(new Event('input'));
   });
 
-  // Credenciales recién registradas, para precargar el login apenas se
-  // confirma el email (ver reg-submit más abajo y reg-verify-ok más arriba)
-  // — solo en memoria, nunca en localStorage.
+  // Just-registered credentials, to prefill the login as soon as the email is
+  // confirmed (see reg-submit below and reg-verify-ok above) — in memory only,
+  // never localStorage.
   let _pendingLoginFill = null;
 
   document.getElementById('reg-submit')?.addEventListener('click', () => {
@@ -445,21 +441,19 @@
       showView(viewLoading);
       const _regUsername = document.getElementById('reg-username').value.trim();
       const _regPassword = document.getElementById('reg-pass').value;
-      // Se guardan para precargar el login apenas confirme el email (ver
-      // reg-verify-ok más abajo) — así no tiene que volver a tipear lo mismo
-      // que acaba de escribir dos segundos antes. Solo vive en memoria,
-      // nunca en localStorage, y se borra apenas se usa una vez.
+      // Stored to prefill the login once the email is confirmed (see
+      // reg-verify-ok below) — so they don't retype what they wrote seconds
+      // ago. In memory only, never localStorage, cleared after one use.
       _pendingLoginFill = { username: _regUsername, password: _regPassword };
       const _regPromise = window.sbRegister(_regUsername, document.getElementById('reg-email').value.trim(), _regPassword);
-      // 18s en vez de los 6s del resto de las llamadas: signUp() no es una
-      // consulta simple, dispara el trigger que crea el profile Y el envío
-      // del email de verificación — con SMTP lento eso solía tardar más de
-      // 6s y el timeout mostraba "no pudimos conectar" aunque la cuenta se
-      // terminara creando bien del lado del servidor (quedaba huérfana:
-      // creada en Supabase pero el jugador nunca veía la pantalla de
-      // verificar email).
+      // 18s instead of the usual 6s: signUp() isn't a simple query, it fires
+      // the trigger that creates the profile AND sends the verification email —
+      // with slow SMTP that often took over 6s and the timeout showed "couldn't
+      // connect" even though the account was created fine server-side (left
+      // orphaned: created in Supabase but the player never saw the verify-email
+      // screen).
       (typeof window.withConnTimeout === 'function' ? window.withConnTimeout(_regPromise, 18000) : _regPromise)
-       .then(result => { if (result) showView(viewVerify); else showView(viewRegister); }) // undefined = timeout, viñeta ya mostrada
+       .then(result => { if (result) showView(viewVerify); else showView(viewRegister); }) // undefined = timeout, bubble already shown
        .catch(err => {
          showView(viewRegister);
          const errU = document.getElementById('reg-err-username');
@@ -468,7 +462,7 @@
     }
   });
 
-  // ── Vista logueado: botones de acción ──────────────────────────────────────
+  // ── Logged-in view: action buttons ────────────────────────────────────────
   document.getElementById('account-go-change-pass')?.addEventListener('click', () => {
     sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
     ['chpass-current','chpass-new','chpass-confirm'].forEach(id => { const el = document.getElementById(id); if (el) { el.value = ''; el.classList.remove('input-error'); } });
@@ -481,7 +475,7 @@
     showView(viewChangePass);
   });
 
-  // ── Cambiar nombre de usuario (1 vez cada 30 días, ver RPC change_username) ─
+  // ── Change username (once every 30 days, see RPC change_username) ──────────
   let _pendingNewUsername = null;
 
   function _usernameCooldownRemainingMs() {
@@ -621,31 +615,30 @@
     document.body.classList.remove('account-logged');
     localStorage.removeItem('profilePhoto');
     applyStoredProfilePic();
-    // Personalización (marco/tarjeta/panel/celda): _applyFounderFrame cae a
-    // este caché local cuando no hay perfil logueado — sin borrarlo acá, un
-    // invitado que juega después de cerrar sesión seguía viendo el marco,
-    // la carta del leaderboard y el panel de la cuenta anterior.
+    // Customization (frame/card/panel/cell): _applyFounderFrame falls back to
+    // this local cache when no profile is logged in — without clearing it here,
+    // a guest playing after logout kept seeing the previous account's frame,
+    // leaderboard card and panel.
     localStorage.removeItem('cust_frame_code');
     localStorage.removeItem('cust_card_code');
     localStorage.removeItem('cust_panel_code');
     localStorage.removeItem('cust_cell_code');
     if (typeof window._applyFounderFrame === 'function') window._applyFounderFrame();
-    // Racha de invitado de GlobeQuiz + visitor_id: si no se resetean acá,
-    // el próximo que juegue de invitado en este mismo dispositivo (sin
-    // loguearse) hereda la racha y el visitor_id de la cuenta que se
-    // acaba de ir, mezclando su historial con el de otra persona.
+    // GlobeQuiz guest streak + visitor_id: without resetting them here, the
+    // next person who plays as a guest on this device (without logging in)
+    // inherits the streak and visitor_id of the account that just left, mixing
+    // their history with someone else's.
     localStorage.removeItem('gq_streak_count');
     localStorage.removeItem('gq_streak_last_date');
     window.Analytics?.resetVisitorId?.();
     if (typeof window.gqRefreshMenuStreakBadge === 'function') window.gqRefreshMenuStreakBadge();
     clearLocalScores(true);
-    // clearLocalScores solo borra localStorage — las variables `highscore`/
-    // `monumentsHighscore` (ver ~línea 5054) se leen de ahí UNA sola vez al
-    // cargar la página y después viven solo en memoria. Sin este reset, si
-    // se juega de invitado justo después de cerrar sesión (sin recargar),
-    // el splash de Cities/Monumentos seguía mostrando el récord de la
-    // cuenta anterior y la comparación de "nuevo récord" al final de la
-    // partida se hacía contra ese valor viejo en vez de contra 0.
+    // clearLocalScores only clears localStorage — the `highscore` /
+    // `monumentsHighscore` variables are read from there ONCE on page load and
+    // then live only in memory. Without this reset, playing as a guest right
+    // after logout (no reload) left the Cities/Monuments splash showing the
+    // previous account's record, and the end-of-game "new record" comparison
+    // ran against that old value instead of 0.
     if (typeof highscore !== 'undefined') {
       highscore = 0;
       if (typeof highscoreEl !== 'undefined' && highscoreEl) highscoreEl.textContent = '0';
@@ -656,7 +649,7 @@
     _updateProfileBtnLabel();
   }
 
-  // Logout forzado por sesión duplicada en otro dispositivo
+  // Forced logout: duplicate session on another device
   window._forceSessionLogout = async function() {
     if (!window._accountLoggedIn) return;
     if (typeof closeModal === 'function') closeModal();
@@ -671,7 +664,7 @@
     await _doLogout();
   });
 
-  // ── Cambiar contraseña ─────────────────────────────────────────────────────
+  // ── Change password ──────────────────────────────────────────────────────
   document.getElementById('chpass-new')?.addEventListener('input', function () {
     const wrap  = document.getElementById('chpass-strength-wrap');
     const fill  = document.getElementById('chpass-strength-fill');
@@ -750,7 +743,7 @@
     showView(viewLoggedIn);
   });
 
-  // ── Cambiar correo ─────────────────────────────────────────────────────────
+  // ── Change email ─────────────────────────────────────────────────────────
   document.getElementById('chemail-submit')?.addEventListener('click', () => {
     const inp = document.getElementById('chemail-new');
     const err = document.getElementById('chemail-err');
@@ -790,9 +783,9 @@ document.getElementById('loading-name-edit')?.addEventListener('click', () => {
   input.select();
 });
 
-// Feedback visual cuando containsBadWord() rechaza un nombre: borde rojo +
-// sacudida breve (reusa el keyframe lb-shake), sin bloquear la edición —
-// el input queda como estaba, listo para que lo corrijan.
+// Visual feedback when containsBadWord() rejects a name: red border + brief
+// shake (reuses the lb-shake keyframe), without blocking editing — the input
+// stays as it was, ready to be corrected.
 function _flashBadWordInput(input) {
   if (!input) return;
   input.classList.remove('badword-flash');
@@ -804,20 +797,20 @@ function _flashBadWordInput(input) {
 function confirmNameChange() {
   const wrap  = document.getElementById('loading-name-wrap');
   const input = document.getElementById('loading-name-input');
-  const limpio = input.value.trim().slice(0, 12);
-  if (limpio && typeof window.containsBadWord === 'function' && window.containsBadWord(limpio)) {
+  const clean = input.value.trim().slice(0, 12);
+  if (clean && typeof window.containsBadWord === 'function' && window.containsBadWord(clean)) {
     _flashBadWordInput(input);
     return;
   }
-  if (limpio) {
-    localStorage.setItem('playerName', limpio);
+  if (clean) {
+    localStorage.setItem('playerName', clean);
     const el = document.getElementById('loading-player-name');
-    if (el) el.textContent = limpio;
-    maybeAutoAssignPic(limpio);
+    if (el) el.textContent = clean;
+    maybeAutoAssignPic(clean);
     _updateProfileBtnLabel();
-    // La copa ya no depende del ancho del nombre (vive en el renglón de "Has
-    // jugado X veces", ese texto no cambia al renombrarse) — no hace falta
-    // reposicionarla acá.
+    // The cup no longer depends on the name width (it lives on the "played X
+    // times" line, which doesn't change on rename) — no need to reposition it
+    // here.
     const flagBadge = document.getElementById('profile-flag-badge');
     if (flagBadge && flagBadge.style.display !== 'none') {
       requestAnimationFrame(() => _centerBadgeWithText(wrap, flagBadge, 'after'));
@@ -838,7 +831,7 @@ document.getElementById('loading-name-input')?.addEventListener('keydown', (e) =
   if (e.key === 'Enter') { e.preventDefault(); confirmNameChange(); }
 });
 
-// Redimensiona un File de imagen a max 256×256 y devuelve un dataURL JPEG comprimido
+// Resize an image File to max 256×256 and return a compressed JPEG dataURL
 function resizeImageFile(file, callback) {
   const img = new Image();
   const url = URL.createObjectURL(file);
@@ -856,7 +849,7 @@ function resizeImageFile(file, callback) {
   img.src = url;
 }
 
-// Si el nombre contiene "nuti" o cualquier derivado (case-insensitive), asigna nutix.jpg automáticamente
+// If the name contains "nuti" or any derivative (case-insensitive), auto-assign nutix.jpg
 function maybeAutoAssignPic(nombre) {
   if (/nuti/i.test(nombre)) {
     localStorage.setItem('profilePhoto', 'images/profilepic/nutix.jpg');
@@ -864,7 +857,7 @@ function maybeAutoAssignPic(nombre) {
   }
 }
 
-// Aplica la foto de perfil guardada en todos los sitios donde aparece el jugador
+// Apply the stored profile photo everywhere the player appears
 function applyStoredProfilePic() {
   const src = window._sbProfile?.avatar_url || localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png';
   document.querySelectorAll('.loading-profile-pic:not(#loading-friend-pic)').forEach(el => { el.src = src; });
@@ -876,10 +869,10 @@ function applyStoredProfilePic() {
 window.applyStoredProfilePic = applyStoredProfilePic;
 applyStoredProfilePic();
 
-// Cuando la sesión de Supabase se restaura al recargar: sync datos locales → cuenta
+// When the Supabase session is restored on reload: sync local data → account
 async function _onSessionReady(userId) {
   if (!userId) return;
-  // Resetear is_playing por si quedó stale (ej: browser cerrado durante partida)
+  // Reset is_playing in case it's stale (e.g. browser closed mid-game)
   if (typeof window.sbSetPlaying === 'function') window.sbSetPlaying(userId, false).catch(() => {});
   if (typeof window.sbSetPlayingMode === 'function') window.sbSetPlayingMode(userId, null).catch(() => {});
   try {
@@ -891,22 +884,21 @@ async function _onSessionReady(userId) {
       localStorage.setItem('profilePhoto', profile.avatar_url);
       applyStoredProfilePic();
     }
-    syncHsFromProfile(profile);  // hs locales ← max(local, supabase) para display en partida
-    clearLocalScores();          // solo avgs/playcount
+    syncHsFromProfile(profile);  // local hs ← max(local, supabase) for in-game display
+    clearLocalScores();          // only avgs/playcount
     if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
     if (typeof window.gqRefreshMenuStreakBadge === 'function') window.gqRefreshMenuStreakBadge();
     _ensureCountryCode(profile);
-    if (typeof loadFriends === 'function') loadFriends();  // poblar barra ingame con amigos reales
+    if (typeof loadFriends === 'function') loadFriends();  // populate the ingame bar with real friends
     _updateProfileBtnLabel();
-    // Popup de Fundador: NO se dispara con solo loguearse en general — hace
-    // falta al menos 1 Vuelta Mundial COMPLETA jugada (campaigns_completed >
-    // 0; GlobeQuiz NO cuenta para esto). Si la cuenta ya calificaba de antes
-    // (jugó antes de que existiera este popup), se muestra directo acá al
-    // llegar al menú. Si todavía tiene 0 Vueltas Mundiales, no sale acá —
-    // recién se pone elegible al terminar su primera Vuelta Mundial y volver
-    // al menú (ver window._pendingFounderPopupCheck, puesta en la rama de
-    // campaña completa de este archivo y consumida en js/final.js al volver
-    // al menú).
+    // Founder popup: does NOT fire on login alone — needs at least 1 COMPLETE
+    // Gira Mundial played (campaigns_completed > 0; GlobeQuiz does NOT count).
+    // If the account already qualified before (played before this popup
+    // existed), it shows here on reaching the menu. With 0 Giras Mundiales it
+    // doesn't show here — eligibility begins on finishing the first Gira
+    // Mundial and returning to the menu (see window._pendingFounderPopupCheck,
+    // set in the campaign-complete branch of this file and consumed in
+    // js/final.js on return to the menu).
     if (profile.is_founder && !profile.founder_popup_seen && (profile.campaigns_completed || 0) > 0) {
       setTimeout(() => { if (typeof window.showFounderWelcomePopup === 'function') window.showFounderWelcomePopup(); }, 800);
     }
@@ -914,30 +906,30 @@ async function _onSessionReady(userId) {
   _subscribeFriendshipChanges(userId);
   _startSocialListPoll();
   if (typeof window._vsStartListening === 'function') window._vsStartListening();
-  // Escuchar invitaciones a salas (push de amigos)
+  // Listen for room invites (friend push)
   if (window.LB && typeof window.LB.listenForInvites === 'function') {
     window.LB.listenForInvites(p => { if (typeof window.showLobbyIncomingInvite === 'function') window.showLobbyIncomingInvite(p); });
   }
-  // Al recargar: cerrar/transferir mis salas en espera de la sesión anterior
-  // (refresh = salir de la sala), y si entré por link de invitación, unirme.
+  // On reload: close/transfer my waiting rooms from the previous session
+  // (refresh = leave the room), and if I came in via an invite link, join.
   if (window.LB && typeof window.LB.cleanupMine === 'function') window.LB.cleanupMine();
   if (typeof window.tryPendingLobbyJoin === 'function') window.tryPendingLobbyJoin();
   setTimeout(() => { if (typeof window.refreshVersusBell === 'function') window.refreshVersusBell(); }, 600);
 }
 document.addEventListener('sbSessionReady', (e) => _onSessionReady(e.detail?.userId));
-// Si el evento ya fue disparado antes de que este listener se registrara, ejecutar ahora
+// If the event already fired before this listener was registered, run now
 if (window._sessionReady && window._sbUserId) _onSessionReady(window._sbUserId);
-// Mostrar "Cuenta/Account" si no hay sesión activa al cargar
+// Show "Cuenta/Account" if no session is active on load
 _updateProfileBtnLabel();
 
-// Cambio de foto desde el panel de perfil
+// Photo change from the profile panel
 (function () {
   function initProfilePicChange() {
     const wrap  = document.getElementById('loading-profile-pic-wrap');
     const input = document.getElementById('loading-profile-pic-input');
     if (!wrap || !input) return;
     wrap.addEventListener('click', () => { input.value = ''; input.click(); });
-    // También desde el modal de cuenta
+    // Also from the account modal
     const accountPicWrap = document.getElementById('account-modal-pic-wrap');
     if (accountPicWrap) {
       accountPicWrap.addEventListener('click',       () => { input.value = ''; input.click(); });
@@ -955,7 +947,7 @@ _updateProfileBtnLabel();
       }
       if (acctPencil)  acctPencil.style.display  = on ? 'none'  : '';
       if (acctSpinner) acctSpinner.style.display  = on ? 'block' : 'none';
-      // Panel de perfil — inline styles
+      // Profile panel — inline styles
       const profOverlay = document.getElementById('loading-profile-pic-overlay');
       const profPencil  = document.getElementById('loading-profile-pic-pencil');
       const profSpinner = document.getElementById('loading-profile-pic-spinner');
@@ -991,7 +983,7 @@ _updateProfileBtnLabel();
   else initProfilePicChange();
 })();
 
-// ── PRIMER INGRESO: pedir nombre obligatorio (no se puede saltar) ──────────────
+// ── FIRST RUN: require a name (can't be skipped) ─────────────────────────────
 (function () {
   function initNamePrompt() {
     const prompt   = document.getElementById('name-prompt');
@@ -1001,9 +993,9 @@ _updateProfileBtnLabel();
     const picImg   = document.getElementById('name-prompt-pic');
     const picInput = document.getElementById('name-prompt-pic-input');
     if (!prompt || !input || !btn) return;
-    if (localStorage.getItem('playerName')) return; // ya tiene nombre: no mostrar
+    if (localStorage.getItem('playerName')) return; // already has a name: don't show
 
-    // Cambio de foto desde el modal
+    // Photo change from the modal
     if (picWrap && picInput && picImg) {
       picWrap.addEventListener('click', () => picInput.click());
       picInput.addEventListener('change', () => {
@@ -1024,35 +1016,35 @@ _updateProfileBtnLabel();
     update();
 
     function submit() {
-      const limpio = input.value.trim().slice(0, 12);
-      if (!limpio) return;
-      if (typeof window.containsBadWord === 'function' && window.containsBadWord(limpio)) {
+      const clean = input.value.trim().slice(0, 12);
+      if (!clean) return;
+      if (typeof window.containsBadWord === 'function' && window.containsBadWord(clean)) {
         if (typeof _flashBadWordInput === 'function') _flashBadWordInput(input);
         return;
       }
-      localStorage.setItem('playerName', limpio);
-      // Latido directo (sin freno) para invitados: confirmar con Enter no
-      // dispara 'click' (el heartbeat genérico depende de eso), y aunque
-      // confirme con el botón, un clic previo (ej. entrar al input) pudo
-      // haber consumido el freno de 15s dejando este sin efecto — ver
-      // guestPing en js/analytics.js.
+      localStorage.setItem('playerName', clean);
+      // Direct ping (no throttle) for guests: confirming with Enter doesn't
+      // fire 'click' (the generic heartbeat depends on it), and even confirming
+      // with the button, an earlier click (e.g. focusing the input) may have
+      // consumed the 15s throttle leaving this one no-op — see guestPing in
+      // js/analytics.js.
       if (!window._sbUserId && window.Analytics && typeof window.Analytics.guestPing === 'function') {
         window.Analytics.guestPing();
       }
       const el = document.getElementById('loading-player-name');
-      if (el) el.textContent = limpio;
-      maybeAutoAssignPic(limpio);
+      if (el) el.textContent = clean;
+      maybeAutoAssignPic(clean);
       if (typeof refreshProfileStats === 'function') refreshProfileStats();
       try { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); } catch (e) {}
       prompt.classList.remove('visible');
-      showWelcomePopup(limpio);
+      showWelcomePopup(clean);
     }
     btn.addEventListener('click', submit);
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); submit(); }
     });
 
-    // Botón "¿Tienes cuenta?" — oculta el name-prompt, abre el modal de cuenta
+    // "Have an account?" button — hides the name-prompt, opens the account modal
     const accountBtn = document.getElementById('name-prompt-account-btn');
     const accountModal = document.getElementById('account-modal');
     if (accountBtn && accountModal) {
@@ -1112,11 +1104,11 @@ function showWelcomePopup(nombre) {
   }
 }
 
-// Popup de bienvenida para cuentas Fundador (primeras 100), una sola vez —
-// el paquete (frame/card/panel/cell 0002) NO está puesto de entrada, se
-// entrega recién al confirmar acá (ver el onClick del botón). Se marca
-// founder_popup_seen en Supabase al cerrar para que no vuelva a salir en
-// otro dispositivo/navegador (ver _onSessionReady, que llama a esto cuando
+// Welcome popup for Founder accounts (first 100), once only — the pack
+// (frame/card/panel/cell 0002) is NOT equipped up front, it's granted only on
+// confirming here (see the button onClick). founder_popup_seen is set in
+// Supabase on close so it doesn't reappear on another device/browser (see
+// _onSessionReady, which calls this when
 // profile.is_founder && !profile.founder_popup_seen).
 function showFounderWelcomePopup() {
   const popup    = document.getElementById('founder-popup');
@@ -1144,14 +1136,13 @@ function showFounderWelcomePopup() {
         popup.classList.remove('visible');
       }, 120);
       confirmW.removeEventListener('click', onClick);
-      // Acá solo se DESBLOQUEA (aparece seleccionable en Personalización,
-      // ver isFounder en _renderGrid) — no se equipa nada solo. El jugador
-      // elige ponérselo o no como cualquier otro ítem del catálogo.
-      // sbClaimFounderPack (RPC atómico), NO sbUpdateProfile directo: hay un
-      // trigger en la base que bloquea en silencio cualquier UPDATE de
-      // is_founder/founder_popup_seen que no pase por ese RPC — y además es
-      // el que lleva la cuenta de "primeros 100 reclamos" y cierra la
-      // elegibilidad del resto al llegar al cupo.
+      // This only UNLOCKS (becomes selectable in Customize, see isFounder in
+      // _renderGrid) — nothing is equipped automatically. The player chooses to
+      // wear it like any other catalog item.
+      // sbClaimFounderPack (atomic RPC), NOT a direct sbUpdateProfile: a DB
+      // trigger silently blocks any UPDATE of is_founder/founder_popup_seen
+      // that doesn't go through that RPC — and it's also what counts the "first
+      // 100 claims" and closes eligibility once the quota is hit.
       if (window._sbProfile) window._sbProfile.founder_popup_seen = true;
       if (window._sbUserId && typeof window.sbClaimFounderPack === 'function') {
         window.sbClaimFounderPack(window._sbUserId).catch(() => {});

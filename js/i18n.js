@@ -1,23 +1,23 @@
 // ── i18n (ES / EN) ────────────────────────────────────────────────────────────
-// Sistema simple de traducción. Uso:
-//   t('key')                      -> string en el idioma actual (fallback a ES, luego a la key)
-//   data-i18n="key"               -> en HTML estático: textContent se traduce
-//   data-i18n-ph="key"            -> traduce el placeholder de un input
-//   onLangChange(cb)              -> re-render de texto que se arma en JS
-//   setLanguage('en'|'es')        -> cambia idioma, persiste y re-aplica
-// Este archivo se carga ANTES que el resto, así t() ya está disponible.
+// Simple translation system. Usage:
+//   t('key')                      -> string in the current language (fallback to ES, then the key)
+//   data-i18n="key"               -> in static HTML: textContent is translated
+//   data-i18n-ph="key"            -> translates an input placeholder
+//   onLangChange(cb)              -> re-render text that is built in JS
+//   setLanguage('en'|'es')        -> changes language, persists and re-applies
+// This file loads BEFORE the rest, so t() is already available.
 
 const I18N = {
   es: {
-    // Modos
+    // Modes
     'mode.shapes': 'Países', 'mode.cities': 'Ciudades', 'mode.flags': 'Banderas', 'mode.monuments': 'Monumentos',
     'mode.flags.title': 'Suitcase Shuffle', 'mode.shapes.title': 'Map Mayhem',
     'mode.cities.title': 'City Blitz', 'mode.monuments.title': 'Landmark Loco',
-    // Comunes
+    // Common
     'common.average': 'Promedio', 'common.highscore': 'Highscore', 'common.bestscore': 'Mejor puntaje',
     'common.play': 'Jugar', 'common.total': 'Puntuación total', 'common.city': 'Ciudad',
     'common.speedBonus': '¡Bonus velocidad!', 'common.continue': 'Continuar',
-    // Primer ingreso (nombre)
+    // First run (name)
     'panel2.welcome1': '¡Bienvenido/a a myGeoChallenge!', 'panel2.welcome2': '¿Qué modo quieres jugar?',
     'panel2.globequizGreet1': '¡Cada día, un país nuevo!', 'panel2.globequizGreet2': '¿Te animas a encontrarlo?',
     'panel2.globequizTitle': 'GloboReto',
@@ -91,11 +91,11 @@ const I18N = {
     'social.unitYear': 'año',   'social.unitYears': 'años',
     'social.lastSeen2h': 'Última vez hace 2h', 'social.lastSeenYesterday': 'Última vez ayer', 'social.lastSeen5h': 'Última vez hace 5h',
     'sort.conn': 'Conexión', 'sort.scoreDesc': 'Puntaje ↓', 'sort.scoreAsc': 'Puntaje ↑', 'sort.nameAsc': 'Nombre A-Z', 'sort.nameDesc': 'Nombre Z-A',
-    // Perfil (propio y de amigo)
+    // Profile (own and friend)
     'profile.playedTimes.one': '¡Has jugado {n} vez!', 'profile.playedTimes.other': '¡Has jugado {n} veces!',
     'profile.friendPlayed.one': '¡Ha jugado {n} vez!', 'profile.friendPlayed.other': '¡Ha jugado {n} veces!',
     'profile.none': 'None',
-    // Confirmaciones de relación
+    // Relationship confirmations
     'confirm.removeFriend': '¿Seguro que quieres eliminar a {name} de tus amigos?',
     'confirm.acceptRequest': '¿Aceptar la solicitud de amistad de {name}?',
     'confirm.cancelSent': '¿Cancelar tu solicitud de amistad a {name}?',
@@ -103,9 +103,9 @@ const I18N = {
     // Splash / gameover / results
     'splash.timeUp': '¡Tiempo!', 'results.finalScore': 'Puntaje final', 'results.newRecord': '¡Nuevo récord!',
     'final.worldTour': 'Gira mundial',
-    // Etiquetas de resultado (cities/monuments)
+    // Result labels (cities/monuments)
     'grade.perfect': 'Perfecto', 'grade.good': 'Bien', 'grade.fair': 'Regular', 'grade.wayoff': 'Muy lejos',
-    // Diálogos del splash por modo (paso 1 y paso 2)
+    // Per-mode splash dialogs (step 1 and step 2)
     'splash.cities.1': '¡Veamos a qué ciudad va cada uno! Aquí es donde tú entras a formar parte.',
     'splash.cities.2': 'Coloca un pin en el mapa donde creas que cada ciudad se ubica. ¡Haz click en el botón VERDE cuando estes listo!',
     'splash.flags.1': '¡Eh, Tú! ¿Crees que podrías echarme una mano ordenando el equipaje de los turistas?',
@@ -118,7 +118,7 @@ const I18N = {
     'splash.practice.flags.1': '¡Modo práctica! Identifica banderas del mundo y entrena tu memoria sin competencia.',
     'splash.practice.shapes.1': '¡Modo práctica! Reconoce países por su silueta y aprende a tu propio ritmo.',
     'splash.practice.monuments.1': '¡Modo práctica! Ubica monumentos famosos en el mapa y desafía tu memoria.',
-    // Mensajes de gameover por modo
+    // Per-mode gameover messages
     'gameover.cities': '¡Buen intento! ¡Todos llegaron a sus ciudades de destino!',
     'gameover.monuments': '¡Buen trabajo! ¡Lo conseguimos!',
     'gameover.flags': '¡Buen trabajo! ¡Llevemos a los turistas a la puerta de embarque!',
@@ -143,7 +143,7 @@ const I18N = {
     'vs.syncLoading': 'Cargando…',
     'vs.syncAlmost': 'Casi listo…',
     'vs.syncReady': '¡Listo!',
-    // Mensajes (chat directo entre amigos)
+    // Messages (direct chat between friends)
     'chat.title': 'Mensajes',
     'chat.placeholder': 'Escribe un mensaje...',
     'chat.send': 'Enviar',
@@ -211,14 +211,14 @@ const I18N = {
     'results.notBestMsg': 'No está mal, {name}. ¡Pero no es tu mejor puntaje! {record} es el puntaje a superar, que te deja en el puesto {pos} entre tus amigos{friendMsg}.',
     'results.friendAbove': ', justo detrás de {name}', 'results.friendBelow': ', justo delante de {name}',
     'results.skip': 'Adelantar »',
-    // Popup de invitado (post Gira Mundial)
+    // Guest popup (post Gira Mundial)
     'guestPopup.title': '¡Buena partida, {name}!',
     'guestPopup.msg': 'Como invitado no apareces en el ranking, ¡pero con esta puntuación quedarías en el puesto #{pos} de {total} jugadores!',
     'guestPopup.register': 'Registrarme',
     'guestPopup.haveAccount': 'Ya tengo una cuenta',
     'guestPopup.dontShowAgain': 'No mostrar este mensaje de nuevo',
     'guestPopup.connectionError': 'No pudimos conectarnos a los servidores. Por favor, inténtalo de nuevo más tarde.',
-    // Personalización (marco de fundador)
+    // Customization (founder frame)
     'customize.title': 'Personalización',
     'customize.btnLabel': 'Personalizar',
     'customize.catPhoto': 'Marcos',
@@ -234,7 +234,7 @@ const I18N = {
     'founderPopup.itemCard': 'Viñeta',
     'founderPopup.itemPanel': 'Panel',
     'founderPopup.itemCell': 'Celda',
-    // Cuenta
+    // Account
     'nav.account': 'Cuenta',
     'account.title': 'Mi Cuenta', 'account.desc': 'Conecta tu cuenta para guardar tu progreso y competir con amigos online.',
     'account.login': 'Iniciar sesión', 'account.register': 'Crear cuenta',
@@ -278,7 +278,7 @@ const I18N = {
     'account.emailChangedTitle': '¡Correo actualizado!', 'account.emailChangedDesc': 'Tu correo fue confirmado. Ya puedes iniciar sesión.', 'account.emailChangedBtn': 'Iniciar sesión',
     // Quit popup
     'quit.text': '¿Quieres terminar la partida y volver al menú principal?',
-    // Modo espectador
+    // Spectator mode
     'spectator.loading': 'Cargando partida...',
     'spectator.returning': 'Volviendo al menú...',
     'spectator.reconnecting': 'Reconectando...',
@@ -292,7 +292,7 @@ const I18N = {
     'spectator.watchingMatch': 'Mirando partida',
     'spectator.defaultPlayer': 'El jugador',
     'vs.waitingForOthers': 'Esperando a los otros jugadores...',
-    // Aviso de pantalla
+    // Screen warning
     'screen.tooSmall': 'La pantalla no es suficiente para mostrar el juego.',
     'screen.resize': 'Redimensiona la ventana para una experiencia óptima.',
     'screen.tooWide': 'La pantalla es demasiado ancha. Redimensiona la ventana verticalmente.',
@@ -578,11 +578,10 @@ const I18N = {
   },
 };
 
-// Sin idioma guardado todavía (primera visita): usar el idioma del
-// navegador/SO en vez de un default fijo — es instantáneo (a diferencia de
-// geolocalizar por IP, que necesitaría esperar un fetch antes de poder
-// pintar la UI) y en la práctica es una señal más confiable de en qué
-// idioma prefiere jugar alguien que el país donde está físicamente.
+// No saved language yet (first visit): use the browser/OS language instead of
+// a fixed default — it's instant (unlike IP geolocation, which would need to
+// await a fetch before painting the UI) and in practice is a more reliable
+// signal of what language someone prefers to play in than where they physically are.
 function _defaultLangByLocale() {
   try {
     const langs = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || ''];
@@ -598,7 +597,7 @@ function t(key, vars) {
   if (vars) for (const k in vars) s = s.replace(new RegExp('\\{' + k + '\\}', 'g'), vars[k]);
   return s;
 }
-// Plural helper: t.plural('profile.playedTimes', n) → usa .one / .other
+// Plural helper: t.plural('profile.playedTimes', n) → uses .one / .other
 function tn(baseKey, n, vars) {
   return t(baseKey + (n === 1 ? '.one' : '.other'), Object.assign({ n }, vars));
 }
@@ -610,7 +609,7 @@ function applyI18n(root) {
   root = root || document;
   root.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.getAttribute('data-i18n')); });
   root.querySelectorAll('[data-i18n-ph]').forEach(el => { el.setAttribute('placeholder', t(el.getAttribute('data-i18n-ph'))); });
-  // Botones con imagen por idioma: images/buttons/es-*.png ↔ en-*.png
+  // Per-language image buttons: images/buttons/es-*.png ↔ en-*.png
   root.querySelectorAll('img[src*="/buttons/es-"], img[src*="/buttons/en-"]').forEach(img => {
     img.src = img.src.replace(/\/buttons\/(?:es|en)-/, '/buttons/' + currentLang + '-');
   });
@@ -643,7 +642,7 @@ onLangChange(_syncLangButtons);
 document.addEventListener('DOMContentLoaded', () => {
   document.documentElement.setAttribute('lang', currentLang);
 
-  // Inicializar todos los selectores de idioma (loading screen + modal de nombre)
+  // Initialize all language selectors (loading screen + name modal)
   const langWraps = [
     { wrap: document.getElementById('loading-lang'),      toggle: document.getElementById('loading-lang-toggle') },
     { wrap: document.getElementById('name-prompt-lang'),  toggle: document.getElementById('name-prompt-lang-toggle') },
@@ -664,7 +663,7 @@ document.addEventListener('DOMContentLoaded', () => {
       langWraps.forEach(({ wrap }) => { if (wrap) wrap.classList.remove('open'); });
     });
   });
-  // Cerrar desplegables al hacer click afuera
+  // Close dropdowns on outside click
   document.addEventListener('click', (e) => {
     langWraps.forEach(({ wrap }) => {
       if (wrap && !wrap.contains(e.target)) wrap.classList.remove('open');

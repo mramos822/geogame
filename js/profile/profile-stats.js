@@ -1,17 +1,15 @@
 // ============================================================================
-// profile/profile-stats.js — Sincronización de stats local <-> Supabase y pintado del panel de perfil del
-// loading (nombre, veces jugadas, promedios, highscores, rango, copa de puesto
-// global, bandera del país, badge de supporter, record de versus).
-// Dependencias externas (getRank de ranks.js, getGlobalRankForId/_cupForRank de
-// menu/rankings-panel.js, COUNTRY_CODE_TO_FLAG, i18n) se usan sólo en runtime.
+// profile/profile-stats.js — local <-> Supabase stats sync and painting of the
+// loading-screen profile panel (name, plays, averages, highscores, rank, global
+// rank cup, country flag, supporter badge, versus record).
+// External deps (getRank from ranks.js, getGlobalRankForId/_cupForRank from
+// menu/rankings-panel.js, COUNTRY_CODE_TO_FLAG, i18n) are used only at runtime.
 //
-// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
-// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
-// Son <script> clásicos que comparten un mismo scope global.
+// Classic <script>s sharing one global scope, loaded in order in play/index.html.
 // ============================================================================
 
-// Sincroniza los datos locales (scores/averages/plays) a la cuenta de Supabase al iniciar sesión.
-// Es idempotente: si ya estaban sincronizados (local=0 tras el último logout), no hace nada.
+// Sync local data (scores/averages/plays) to the Supabase account on login.
+// Idempotent: if already synced (local=0 after last logout), does nothing.
 async function syncLocalDataToAccount(userId) {
   try {
     const profile = await window.sbGetProfile(userId);
@@ -40,8 +38,8 @@ async function syncLocalDataToAccount(userId) {
   } catch(e) { console.warn('[sync] error:', e.message); }
 }
 
-// Copia los hs de Supabase a localStorage (toma el máximo) para que el display
-// en partida muestre el récord correcto sin necesidad de llegar al final.
+// Copy the hs from Supabase to localStorage (takes the max) so the in-game
+// display shows the correct record without having to reach the end.
 function syncHsFromProfile(profile) {
   const map = {
     flagsHighscore:          profile.hs_flags     || 0,
@@ -58,12 +56,11 @@ function syncHsFromProfile(profile) {
 
 window.syncHsFromProfile = syncHsFromProfile;
 
-// Fuente de verdad para los trofeos 🏆 de cada modo en la pantalla principal:
-// con cuenta logueada usa el perfil de Supabase (server truth), igual que
-// refreshProfileStats — si no, cae a localStorage. Antes estos badges leían
-// localStorage siempre, sin importar la sesión: un reset de stats en la base
-// (o jugar highscore nuevo en otro dispositivo) no se reflejaba acá hasta
-// que se jugaba localmente de nuevo.
+// Source of truth for each mode's 🏆 on the main screen: when logged in, uses
+// the Supabase profile (server truth), like refreshProfileStats — otherwise
+// falls back to localStorage. These badges used to always read localStorage
+// regardless of session: a stats reset in the DB (or a new highscore on another
+// device) wasn't reflected here until playing locally again.
 function _loadingHsValues() {
   const p = window._sbProfile;
   if (p && window._accountLoggedIn) {
@@ -78,43 +75,42 @@ function _loadingHsValues() {
 }
 window._loadingHsValues = _loadingHsValues;
 
-// Ruta de la bandera del país (código ISO2) para el circulito de perfil.
+// Country flag path (ISO2 code) for the profile circle.
 function flagUrlForCountryCode(cc) {
   const file = cc && window.COUNTRY_CODE_TO_FLAG ? window.COUNTRY_CODE_TO_FLAG[cc.toUpperCase()] : null;
   return file ? `images/flags/${file}.png` : null;
 }
 window.flagUrlForCountryCode = flagUrlForCountryCode;
 
-// La copa (izquierda del "Has jugado X veces") y la bandera (derecha del
-// nombre) viven fuera de esos textos, como elementos absolutos aparte, para
-// no tener que tocar el flex interno del name-wrap. Pero eso significa que
-// si solo se pega el badge al costado del texto YA centrado (left:50%), el
-// conjunto [badge+texto] queda descentrado — el texto sigue en el medio y el
-// badge cuelga para un lado. Acá se centra el PAR como si fuera un solo
-// bloque: se corre el texto la mitad del ancho del badge (+gap) hacia el
-// lado contrario, y el badge se pega justo al lado de esa nueva posición.
-const BADGE_TEXT_GAP = 40; // px, separación entre el badge y el texto
+// The cup (left of "played X times") and the flag (right of the name) live
+// outside those texts, as separate absolute elements, to avoid touching the
+// name-wrap's inner flex. But that means pinning the badge next to an
+// already-centered text (left:50%) leaves the [badge+text] pair off-center —
+// the text stays centered and the badge hangs to one side. Here the PAIR is
+// centered as one block: the text is shifted half the badge width (+gap) the
+// other way, and the badge is pinned right next to that new position.
+const BADGE_TEXT_GAP = 40; // px, gap between badge and text
 function _centerBadgeWithText(textEl, badgeEl, side) {
   if (!textEl || !badgeEl) return;
   const parent = badgeEl.offsetParent;
   if (!parent) return;
 
-  // Centro NATURAL del texto: el que le da su propio CSS sin ningún corrimiento
-  // nuestro (no siempre es el 50% del panel — el name-wrap del amigo, por
-  // ejemplo, se centra un poco más a la izquierda que el propio para quedar
-  // entre el back y la foto). Se limpia el left inline y se mide en vivo, así
-  // esto funciona sea cual sea ese centro sin tener que hardcodearlo acá.
+  // NATURAL center of the text: the one its own CSS gives it without any shift
+  // of ours (not always 50% of the panel — the friend's name-wrap, for example,
+  // centers a bit further left than one's own to sit between the back button
+  // and the photo). Clear the inline left and measure live, so this works
+  // whatever that center is without hardcoding it here.
   textEl.style.left = '';
   if (badgeEl.style.display === 'none') return;
 
-  // getBoundingClientRect() da coordenadas de PANTALLA (post transform/zoom del
-  // #app-stage, ver letterbox.js), pero `left` inline se mide en el espacio
-  // LOCAL sin escalar del stage (1920×911, contra el que se calculan las cq).
-  // Sin dividir por --app-fit, esta cuenta solo daba bien con la ventana al
-  // tamaño de referencia exacto y se desalineaba (nombre/bandera/copa
-  // "reaccionando" al resize/zoom) en cualquier otro tamaño. offsetWidth/
-  // offsetHeight ya están en local (los transforms no afectan al layout), así
-  // que esos no se tocan — solo los deltas que salen de getBoundingClientRect().
+  // getBoundingClientRect() gives SCREEN coordinates (after the #app-stage
+  // transform/zoom, see letterbox.js), but inline `left` is measured in the
+  // stage's unscaled LOCAL space (1920×911, against which cq is computed).
+  // Without dividing by --app-fit, this math was only right at the exact
+  // reference window size and misaligned (name/flag/cup "reacting" to
+  // resize/zoom) at any other size. offsetWidth/offsetHeight are already local
+  // (transforms don't affect layout), so those aren't touched — only the deltas
+  // from getBoundingClientRect().
   const fit = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--app-fit')) || 1;
 
   const parentRect      = parent.getBoundingClientRect();
@@ -125,26 +121,26 @@ function _centerBadgeWithText(textEl, badgeEl, side) {
   const shift   = (badgeW + BADGE_TEXT_GAP) / 2;
 
   let textCenterX, badgeLeftPx;
-  if (side === 'before') { // badge a la izquierda del texto (la copa)
+  if (side === 'before') { // badge left of the text (the cup)
     textCenterX = naturalCenterX + shift;
     const textLeftEdge = textCenterX - textW / 2;
-    badgeLeftPx = textLeftEdge - BADGE_TEXT_GAP; // badge usa translate(-100%,-50%): left = su borde derecho
-  } else { // side === 'after' — badge a la derecha del texto (la bandera)
+    badgeLeftPx = textLeftEdge - BADGE_TEXT_GAP; // badge uses translate(-100%,-50%): left = its right edge
+  } else { // side === 'after' — badge right of the text (the flag)
     textCenterX = naturalCenterX - shift;
     const textRightEdge = textCenterX + textW / 2;
-    badgeLeftPx = textRightEdge + BADGE_TEXT_GAP; // badge usa translate(0,-50%): left = su borde izquierdo
+    badgeLeftPx = textRightEdge + BADGE_TEXT_GAP; // badge uses translate(0,-50%): left = its left edge
   }
-  // El transform:translate(-50%,...) que ya trae el CSS del texto termina de
-  // centrarlo sobre este punto (mismo mecanismo que su 'left:50%' original).
+  // The transform:translate(-50%,...) already in the text's CSS finishes
+  // centering it on this point (same mechanism as its original 'left:50%').
   textEl.style.left = textCenterX + 'px';
   badgeEl.style.left = badgeLeftPx + 'px';
-  const textRect = textEl.getBoundingClientRect(); // ya en su posición final (pantalla)
+  const textRect = textEl.getBoundingClientRect(); // now at its final position (screen)
   badgeEl.style.top = (textRect.top - parentRect.top) / fit + textEl.offsetHeight / 2 + 'px';
 }
 window._centerBadgeWithText = _centerBadgeWithText;
 
 function _repositionVisibleRankBadges() {
-  // La copa vive en el renglón de "Has jugado X veces" (no en el del nombre).
+  // The cup lives on the "played X times" line (not the name line).
   const ownBadge = document.getElementById('profile-rank-badge');
   const ownPlayCount = document.getElementById('loading-play-count');
   if (ownBadge && ownPlayCount) _centerBadgeWithText(ownPlayCount, ownBadge, 'before');
@@ -161,9 +157,9 @@ function _repositionVisibleRankBadges() {
 }
 window.addEventListener('resize', () => requestAnimationFrame(_repositionVisibleRankBadges));
 
-// Si la cuenta todavía no tiene guardado el país donde fue creada (cuentas
-// viejas, previas a este feature), lo detecta por IP en este login y lo
-// guarda como si fuera el de creación (backfill silencioso, ver memoria).
+// If the account has no stored creation country (old accounts predating this
+// feature), detect it by IP on this login and store it as the creation one
+// (silent backfill).
 async function _ensureCountryCode(profile) {
   if (!profile || !profile.id || profile.country_code) return;
   try {
@@ -183,18 +179,18 @@ async function _ensureCountryCode(profile) {
 }
 window._ensureCountryCode = _ensureCountryCode;
 
-// Limpia los scores locales al cerrar sesión (quedan en cero para el perfil guest).
+// Clear local scores on logout (reset to zero for the guest profile).
 function clearLocalScores(full = false) {
   const keys = ['playCount','avgSum_flags','avgSum_shapes','avgSum_game','avgSum_monuments',
                  'avgCount_flags','avgCount_shapes','avgCount_game','avgCount_monuments'];
-  // Solo en logout completo se borran también los hs (vuelven a 0 en modo guest)
+  // Only a full logout also clears the hs (back to 0 in guest mode)
   if (full) keys.push('geochallenge_highscore','flagsHighscore','shapesHighscore','monumentsHighscore','totalHighscore');
   keys.forEach(k => localStorage.removeItem(k));
 }
 
-// Actualiza el panel de perfil (nombre, veces jugadas, promedios, highscores,
-// rango). Se llama al cargar y cada vez que se vuelve al loading screen, para
-// que refleje los datos de la última partida (Supabase si está logueado, local si no).
+// Update the profile panel (name, plays, averages, highscores, rank). Called on
+// load and every time we return to the loading screen, so it reflects the last
+// game's data (Supabase if logged in, local otherwise).
 window.refreshProfileStats = function () {
   const p = window._sbProfile;
   let flagsHs, shapesHs, playHs, monumentsHs, plays, avgs;
@@ -230,7 +226,7 @@ window.refreshProfileStats = function () {
   if (badgeEl) badgeEl.style.display = (p && p.is_supporter) ? '' : 'none';
   const elPlays = document.getElementById('loading-play-count');
   if (elPlays) elPlays.textContent = tn('profile.playedTimes', plays);
-  // Record de versus (solo con cuenta; oculto si nunca jugó versus)
+  // Versus record (account only; hidden if never played versus)
   const vsEl = document.getElementById('loading-vs-record');
   if (vsEl) {
     const w = (p && window._accountLoggedIn) ? (p.vs_wins || 0) : 0;
@@ -272,7 +268,7 @@ window.refreshProfileStats = function () {
     }
   }
 
-  // Copa + puesto global (solo cuentas registradas: los invitados no están en rankings).
+  // Cup + global rank (registered accounts only: guests aren't in rankings).
   const rankBadge = document.getElementById('profile-rank-badge');
   if (rankBadge) {
     if (p && window._accountLoggedIn && p.id && typeof window.getGlobalRankForId === 'function') {
@@ -291,7 +287,7 @@ window.refreshProfileStats = function () {
     }
   }
 
-  // Bandera del país de creación de la cuenta.
+  // Flag of the account's creation country.
   const flagBadge = document.getElementById('profile-flag-badge');
   if (flagBadge) {
     const flagUrl = (p && window._accountLoggedIn) ? window.flagUrlForCountryCode?.(p.country_code) : null;

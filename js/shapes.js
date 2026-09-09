@@ -1,13 +1,11 @@
-// Hoja de estilos con el layout del countdown/trencito y las animaciones de
-// entrada/salida de los tags — se inyecta UNA vez, la primera vez que hace
-// falta (showCountryShape real o el espectador, lo que llegue primero).
-// Extraída a función compartida para que ambos usen EXACTAMENTE el mismo CSS
-// — antes el espectador no la inyectaba nunca (si esa pestaña no había
-// jugado una partida real de siluetas todavía), y sin ella .shape-tag-enter
-// no tenía ninguna animación asociada (los tags quedaban pegados fuera de
-// pantalla, translateX(300%), porque nada disparaba 'animationend' para
-// traerlos a su posición) y #shapes-progress-dots no tenía su layout flex
-// horizontal (los puntos caían en bloque, uno debajo del otro).
+// Stylesheet with the countdown/train layout and the tag enter/exit
+// animations — injected ONCE, the first time it's needed (real showCountryShape
+// or the spectator, whichever comes first). Extracted to a shared function so
+// both use EXACTLY the same CSS — the spectator never injected it (if that tab
+// hadn't played a real shapes game yet), and without it .shape-tag-enter had no
+// associated animation (tags stayed pinned off-screen, translateX(300%),
+// because nothing fired 'animationend' to bring them into place) and
+// #shapes-progress-dots had no horizontal flex layout (dots stacked in a block).
 function ensureShapeTagStyle() {
   if (document.getElementById('shape-tag-style')) return;
   const st = document.createElement('style');
@@ -56,8 +54,8 @@ if (typeof isMuted !== 'undefined' && isMuted) sfxLevel2.volume = 0;
 let shapesStreak = 0;
 let shapesRoundStartTime = null;
 let shapesTimeLeft = window.GAME_DURATION;
-// Fuente de verdad real del cronómetro (ver el setInterval de shapesTimeLeft
-// más abajo) — shapesTimeLeft es solo el valor derivado que se muestra.
+// The timer's real source of truth (see the shapesTimeLeft setInterval below)
+// — shapesTimeLeft is just the derived value that's displayed.
 let shapesTimerDuration  = window.GAME_DURATION;
 let shapesTimerStartedAt = 0;
 let shapesTimerIntervalId = null;
@@ -94,7 +92,7 @@ let shapesPracticePool = [];
 let shapesPracticeRemaining = [];
 let shapesPracticeCurrent = null;
 
-// ── Seeded RNG para Versus (mismas preguntas en ambos clientes) ──────────────
+// ── Seeded RNG for Versus (same questions on both clients) ──────────────────
 let _shapesSeededRand = null;
 function shapesRand() { return _shapesSeededRand ? _shapesSeededRand() : Math.random(); }
 window.shapesSetSeed = function(seed) {
@@ -104,55 +102,52 @@ window.shapesSetSeed = function(seed) {
 window.shapesClearSeed = function() { _shapesSeededRand = null; };
 
 // ═════════════════════════════════════════════════════════════════════════════
-// MODO ESPECTADOR — mismo patrón que flags.js: reusa la pantalla REAL del
-// juego en modo solo-lectura (nada de panel simplificado), con broadcasts
-// efímeros (round/answer/tick/timesup/pregame/postgame) que ya usa el resto
-// del sistema (js/spectate.js, js/vs.js). A diferencia de banderas, acá los
-// elementos del round (silueta/tags/tablero) son DOM dinámico creado/destruido
-// por ronda (showCountryShape) — el espectador replica esa misma construcción
-// en vez de mostrar/ocultar slots fijos.
+// SPECTATOR MODE — same pattern as flags.js: reuses the REAL game screen in
+// read-only mode (no simplified panel), with ephemeral broadcasts
+// (round/answer/tick/timesup/pregame/postgame) the rest of the system already
+// uses (js/spectate.js, js/vs.js). Unlike flags, here the round elements
+// (silhouette/tags/board) are dynamic DOM created/destroyed per round
+// (showCountryShape) — the spectator replicates that same construction instead
+// of showing/hiding fixed slots.
 // ═════════════════════════════════════════════════════════════════════════════
 let _shapesSpecMode = false;
 let _shapesSpecTagEls = [];
 let _shapesSpecSvg = null, _shapesSpecBoard = null, _shapesSpecImg = null, _shapesSpecClip = null;
 let _shapesSpecTimesUpTimeout1 = null, _shapesSpecTimesUpTimeout2 = null;
 let _shapesSpecLastTick = null;
-// Mismo motivo que _flagsSpecLastTickSoundAt en flags.js: el guard por valor
-// de arriba no alcanza si el resend de unión a mitad de partida y el próximo
-// tick en vivo llegan pegados con valores DISTINTOS — este guard por tiempo
-// real cubre ese caso.
+// Same reason as _flagsSpecLastTickSoundAt in flags.js: the value guard above
+// isn't enough if the mid-game join resend and the next live tick arrive
+// back-to-back with DIFFERENT values — this real-time guard covers that case.
 let _shapesSpecLastTickSoundAt = 0;
-let _shapesSpecCorrectSlot = null; // el correctSlot ya viaja en el 'round' — resolvePick lo usa de acá, no del payload de 'answer' (que no lo manda)
-// Marca la ronda (por su elemento <img> de silueta) que llegó a resolverse
-// (payload 'answer') ANTES de que sus tags terminaran de revelarse — caso
-// típico: espectador se une a mitad de ronda justo cuando el espectado ya
-// está por acertar. Sin esto, revealTags() igual mostraba los tags (ronda ya
-// vieja) y el swing-out-remove de resolvePick, programado para 500-700ms
-// después, terminaba borrando TODA la ronda (tags recién aparecidos +
-// silueta) de golpe — visible como un flash raro / "tag2 duplicado".
+let _shapesSpecCorrectSlot = null; // correctSlot travels in the 'round' — resolvePick uses it from here, not the 'answer' payload (which doesn't send it)
+// Marks the round (by its silhouette <img> element) that got resolved
+// ('answer' payload) BEFORE its tags finished revealing — typical case: a
+// spectator joins mid-round just as the spectated player is about to answer.
+// Without this, revealTags() still showed the tags (already-old round) and
+// resolvePick's swing-out-remove, scheduled 500-700ms later, ended up deleting
+// the WHOLE round (freshly appeared tags + silhouette) at once — visible as a
+// weird flash / "duplicate tag2".
 let _shapesSpecAnsweredImg = null;
-let _shapesSpecIsFirstRound = true; // primera ronda tras entrar: tags esperan a que termine el 3-2-1, igual que showShapesMode() con su startDelay
-let _shapesSpecPregameSeen = false; // se pone true en cuanto llega el broadcast de pregame (sincrónico, no espera a que termine la cuenta)
-// Gate contra el mismo race que ya se arregló en flags.js: revealTags() NO
-// puede programarse con una espera ADIVINADA (PREGAME_DURATION - 400) desde
-// que llegan los datos de la ronda — si el espectador se une tarde al 3-2-1
-// (el clamp de elapsedMs lo acorta a ~400ms para él), el conteo visual
-// termina rápido pero esa espera adivinada seguía corriendo casi 3 segundos
-// más, dejando el tablero/silueta sin aparecer todo ese rato (el "se demora
-// 2s en ver el tablero" reportado). _shapesSpecCountdownDone arranca en true
-// (unión a mitad de ronda, sin 3-2-1 de por medio) — shapesSpectatorShowPregame
-// lo pone en false al arrancar y en true en su onDone REAL, momento en el
-// que recién ahí se consume _shapesSpecPendingReveal si estaba esperando.
+let _shapesSpecIsFirstRound = true; // first round after entering: tags wait for the 3-2-1 to end, like showShapesMode() with its startDelay
+let _shapesSpecPregameSeen = false; // set true as soon as the pregame broadcast arrives (synchronous, doesn't wait for the count to end)
+// Gate against the same race already fixed in flags.js: revealTags() must NOT
+// be scheduled with a GUESSED wait (PREGAME_DURATION - 400) from when the round
+// data arrives — if the spectator joins the 3-2-1 late (the elapsedMs clamp
+// shortens it to ~400ms for them), the visual count ends fast but that guessed
+// wait kept running almost 3 more seconds, leaving the board/silhouette absent
+// all that time (the reported "board takes 2s to appear"). _shapesSpecCountdownDone
+// starts true (mid-round join, no 3-2-1) — shapesSpectatorShowPregame sets it
+// false on start and true in its REAL onDone, the only point where
+// _shapesSpecPendingReveal is consumed if it was waiting.
 let _shapesSpecCountdownDone = true;
 let _shapesSpecPendingReveal = null;
-let _shapesSpecDots = 0; // último valor de dots conocido en vivo (ver mismo fix aplicado en flags.js: el reset del trencito relee esto, no un closure viejo)
+let _shapesSpecDots = 0; // last live dots value (see same fix in flags.js: the train reset re-reads this, not a stale closure)
 
-// Animación de subida del marcador — mismo mecanismo que shapesAnimateScore()
-// (jugador real): interpola _shapesSpecDisplayedScore hacia
-// _shapesSpecTargetScore en vez de saltar de golpe. _shapesSpecTargetScore YA
-// viene con campaignBase() sumado desde el broadcaster (ver
-// _specReportAnswer/_specReportPregame en el jugador real) — acá no hace
-// falta sumarlo de nuevo.
+// Scoreboard count-up animation — same mechanism as shapesAnimateScore() (real
+// player): interpolates _shapesSpecDisplayedScore toward _shapesSpecTargetScore
+// instead of jumping. _shapesSpecTargetScore ALREADY has campaignBase() added
+// by the broadcaster (see _specReportAnswer/_specReportPregame in the real
+// player) — no need to add it again here.
 let _shapesSpecTargetScore    = 0;
 let _shapesSpecDisplayedScore = 0;
 let _shapesSpecScoreRafId     = null;
@@ -182,19 +177,18 @@ window.shapesSpectatorEnter = function () {
   if (typeof loadGameSFX === 'function') loadGameSFX();
   if (typeof loadBadges  === 'function') loadBadges();
   ensureShapeTagStyle();
-  // Por si esta pestaña ya jugó/espectó otra cosa antes: limpiar cualquier
-  // resto de ronda de siluetas o de otro modo que haya quedado colgado.
+  // In case this tab already played/spectated something else: clear any
+  // leftover shapes round or other-mode remnant.
   document.querySelectorAll('.shapes-tag').forEach(t => t.remove());
   document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
   document.querySelectorAll('.shapes-stage-el').forEach(el => { try { el.remove(); } catch (e) {} });
   document.getElementById('shapes-countdown-widget')?.remove();
-  // findluggage/machine/flagid son elementos SUELTOS de banderas (hermanos de
-  // #flags-wrapper, no hijos suyo) — si esta pestaña jugó/espectó una
-  // partida real de banderas antes, flagsSpectatorExit() los oculta, pero si
-  // NUNCA se pasó por ahí (la partida real de banderas del jugador espectado
-  // terminó y encadenó directo a siluetas sin que este cliente hubiera
-  // entrado antes a flagsSpectatorEnter/Exit en ESTA sesión) podían quedar
-  // visibles pisando la silueta. Limpieza defensiva.
+  // findluggage/machine/flagid are LOOSE flags elements (siblings of
+  // #flags-wrapper, not its children) — if this tab played/spectated a real
+  // flags game before, flagsSpectatorExit() hides them, but if it NEVER went
+  // through there (the spectated player's real flags game ended and chained
+  // straight to shapes without this client entering flagsSpectatorEnter/Exit in
+  // THIS session) they could stay visible over the silhouette. Defensive cleanup.
   const flFindLuggage = document.getElementById('flags-findluggage');
   if (flFindLuggage) {
     flFindLuggage.style.display = 'none';
@@ -221,9 +215,9 @@ window.shapesSpectatorEnter = function () {
 
   const scoreDisplay = document.getElementById('score-display');
   if (scoreDisplay) scoreDisplay.style.display = 'block';
-  // Placeholder hasta que llegue el primer dato real (pregame con
-  // campaignBaseAtStart, o un answer si es unión a mitad de ronda) —
-  // shapesSpectatorShowPregame/shapesSpectatorResolvePick lo corrigen.
+  // Placeholder until the first real data arrives (pregame with
+  // campaignBaseAtStart, or an answer if it's a mid-round join) —
+  // shapesSpectatorShowPregame/shapesSpectatorResolvePick correct it.
   _shapesSpecTargetScore = 0;
   _shapesSpecDisplayedScore = 0;
   const scoreEl = document.getElementById('score-value');
@@ -235,29 +229,28 @@ window.shapesSpectatorEnter = function () {
   const lb = document.getElementById('leaderboard');
   if (lb) lb.innerHTML = '';
 
-  // OJO: acá NO se arranca sfxGameMusic — Enter() corre mientras todavía se
-  // está mostrando la pantalla de carga del espectador, antes de saber si lo
-  // que sigue es un pregame (que debe sonar en silencio hasta el GO) o una
-  // ronda ya en curso. Se arranca recién en shapesSpectatorShowRound, en el
-  // punto exacto donde se confirma que no viene ningún pregame (unión a
-  // mitad de ronda) — "entrás a donde corresponde", no antes.
+  // NOTE: sfxGameMusic is NOT started here — Enter() runs while the spectator
+  // loading screen is still showing, before knowing whether what follows is a
+  // pregame (which must be silent until GO) or a round already in progress. It
+  // starts only in shapesSpectatorShowRound, at the exact point where no
+  // pregame is confirmed (mid-round join) — "you enter where you should", not
+  // before.
   if (typeof window.refreshIngamePower === 'function') window.refreshIngamePower();
 };
 
-// switchingMode=true: la campaña del espectado encadenó a OTRO modo — ver
-// comentario largo en flagsSpectatorExit (mismo mecanismo acá).
+// switchingMode=true: the spectated player's campaign chained to ANOTHER mode
+// — see long comment in flagsSpectatorExit (same mechanism here).
 window.shapesSpectatorExit = function (switchingMode) {
   _shapesSpecMode = false;
   if (!switchingMode) window._isSpectating = false;
-  // Ver comentario largo en flagsSpectatorExit.
+  // See long comment in flagsSpectatorExit.
   document.getElementById('shapes-spec-lb-entry')?.remove();
   document.getElementById('shapes-spec-lb-opp')?.remove();
-  // Igual que el quit REAL de shapes: sin esto, el showStep() del 3-2-1
-  // seguía corriendo solo en segundo plano (nunca se abortaba), y
-  // eventualmente llegaba a su onDone() — que arranca sfxGameMusic —
-  // PISANDO la música de menú que closeSpectator() ya había puesto momentos
-  // antes. También el beep del countdown (sfxCountdown) seguía sonando de
-  // fondo porque nada lo pausaba.
+  // Like the REAL shapes quit: without this, the 3-2-1's showStep() kept
+  // running in the background (never aborted), and eventually reached its
+  // onDone() — which starts sfxGameMusic — OVERWRITING the menu music
+  // closeSpectator() had just set. The countdown beep (sfxCountdown) also kept
+  // playing because nothing paused it.
   shapesAborted = true;
   clearTimeout(shapesPregameTimeout); shapesPregameTimeout = null;
   if (typeof sfxCountdown !== 'undefined') { try { sfxCountdown.pause(); sfxCountdown.currentTime = 0; } catch (e) {} }
@@ -266,15 +259,15 @@ window.shapesSpectatorExit = function (switchingMode) {
   window.shapesSpectatorHidePostgame();
   const pc = document.getElementById('pregame-countdown');
   if (pc) pc.style.display = 'none';
-  // window._vsShowingResult (ver _exitWaitAsSpectator en vs.js, y el mismo
-  // guard en flagsSpectatorExit): este exit no es un espectador EXTERNO
-  // cerrando su sesión — es EL PROPIO JUGADOR a punto de ver SU PROPIO
-  // resultado del duelo, siguiendo al rival de prestado en siluetas cuando
-  // le llegó su propio TIME'S UP. A diferencia de banderas (que solo oculta
-  // con display:none), acá el board/tags de siluetas se BORRABAN del DOM de
-  // verdad (.remove()) — sin este guard, el overlay de resultado aparecía
-  // sobre un fondo vacío en vez de la silueta congelada detrás (el "se
-  // quitan los assets del juego de siluetas" reportado).
+  // window._vsShowingResult (see _exitWaitAsSpectator in vs.js, and the same
+  // guard in flagsSpectatorExit): this exit isn't an EXTERNAL spectator closing
+  // their session — it's THE PLAYER themselves about to see THEIR OWN duel
+  // result, watching the rival on loan in shapes when their own TIME'S UP hit.
+  // Unlike flags (which only hides with display:none), here the shapes
+  // board/tags were actually REMOVED from the DOM (.remove()) — without this
+  // guard, the result overlay appeared over an empty background instead of the
+  // frozen silhouette behind (the reported "the shapes game assets get
+  // removed").
   if (!window._vsShowingResult) {
     document.querySelectorAll('.shapes-tag').forEach(t => t.remove());
     document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
@@ -306,48 +299,48 @@ window.shapesSpectatorExit = function (switchingMode) {
   if (typeof window.refreshIngamePower === 'function') window.refreshIngamePower();
 };
 
-// Cuenta 3-2-1: reusa runShapesPregame (100% la misma animación/sonido que el
-// jugador real) — igual patrón que flags.js con runFlagsPregame.
+// 3-2-1 count: reuses runShapesPregame (100% the same animation/sound as the
+// real player) — same pattern as flags.js with runFlagsPregame.
 window.shapesSpectatorShowPregame = function (payload) {
   if (!_shapesSpecMode) return;
-  // Sincrónico, apenas llega el broadcast — lo usa el timer de "fallback" de
-  // shapesSpectatorShowRound para decidir si de verdad hay un 3-2-1 en curso
-  // o si nadie va a mandar un pregame (unión a mitad de ronda).
+  // Synchronous, as soon as the broadcast arrives — used by
+  // shapesSpectatorShowRound's "fallback" timer to decide whether a 3-2-1 is
+  // really running or nobody will send a pregame (mid-round join).
   _shapesSpecPregameSeen = true;
   _shapesSpecCountdownDone = false;
   window.shapesSpectatorHidePostgame();
-  // El widget ya existe para este punto (lo crea shapesSpectatorShowRound, que
-  // llega ANTES que este pregame en el orden real de broadcasts) — reflejar acá
-  // la duración total, para no dejarlo en blanco hasta el primer 'tick'. Se
-  // deja VISIBLE (igual que flags: countdown2.png con el "60" pausado) durante
-  // el 3-2-1 — antes se ocultaba con visibility:hidden acá, inconsistente con
-  // flags (que sí lo muestra pausado) y era el "no sale el countdown en el
-  // 3-2-1-GO" reportado.
+  // The widget already exists by this point (created by
+  // shapesSpectatorShowRound, which arrives BEFORE this pregame in the real
+  // broadcast order) — reflect the total duration here, so it's not blank until
+  // the first 'tick'. Left VISIBLE (like flags: countdown2.png with a paused
+  // "60") during the 3-2-1 — it used to be hidden with visibility:hidden here,
+  // inconsistent with flags (which shows it paused) and the reason for the
+  // reported "countdown doesn't show during the 3-2-1-GO".
   const tEl = document.getElementById('shapes-timer-number');
   if (tEl && payload) {
     tEl.classList.toggle('timer-number-infinity', !!payload.infinite);
     tEl.textContent = payload.infinite ? '∞' : (payload.duration != null ? payload.duration : '');
   }
   if (typeof playMusic === 'function') playMusic(null);
-  // El jugador real ya muestra su puntaje acumulado de campaña desde el
-  // arranque del 3-2-1 (no arranca en 0 salvo que sea el primer modo) — acá
-  // sin animación, es el estado base antes de la primera respuesta.
+  // The real player already shows their accumulated campaign score from the
+  // start of the 3-2-1 (doesn't start at 0 unless it's the first mode) — here
+  // without animation, the base state before the first answer.
   if (payload && typeof payload.campaignBaseAtStart === 'number') {
     _shapesSpecTargetScore = payload.campaignBaseAtStart;
     _shapesSpecDisplayedScore = payload.campaignBaseAtStart;
     const scoreEl = document.getElementById('score-value');
     if (scoreEl) scoreEl.textContent = payload.campaignBaseAtStart.toLocaleString();
   }
-  // Si el espectador se unió a mitad del 3-2-1 (p.ej. el jugador real ya va
-  // por el "1"), payload.startedAt permite calcular cuánto ya pasó y arrancar
-  // ahí mismo (número Y audio), en vez de mostrar siempre "3" desde cero.
+  // If the spectator joined mid 3-2-1 (e.g. the real player is already on "1"),
+  // payload.startedAt lets us compute how much passed and start right there
+  // (number AND audio), instead of always showing "3" from zero.
   let elapsedMs = (payload && typeof payload.startedAt === 'number') ? (Date.now() - payload.startedAt) : 0;
-  // Salvaguarda contra desfasaje de reloj entre la máquina del jugador real y
-  // la de este cliente (Date.now() no está garantizado sincronizado entre
-  // dos computadoras distintas) o contra el resend tardío empujando el
-  // cálculo más allá de la duración total del 3-2-1 — sin este clamp, un
-  // elapsedMs inflado hacía que runShapesPregame saltara DIRECTO a onDone
-  // sin mostrar nada del conteo (el "no sale el 3-2-1-GO" reportado).
+  // Safeguard against clock skew between the real player's machine and this
+  // client's (Date.now() isn't guaranteed synced between two different
+  // computers) or against a late resend pushing the calc past the total 3-2-1
+  // duration — without this clamp, an inflated elapsedMs made runShapesPregame
+  // jump STRAIGHT to onDone showing none of the count (the reported
+  // "3-2-1-GO doesn't show").
   const _pregameTotalMs = (typeof SHAPES_PREGAME_STEPS !== 'undefined')
     ? SHAPES_PREGAME_STEPS.reduce((s, x) => s + x.hold, 0) : 3350;
   if (elapsedMs > _pregameTotalMs - 400) elapsedMs = Math.max(0, _pregameTotalMs - 400);
@@ -358,11 +351,11 @@ window.shapesSpectatorShowPregame = function (payload) {
     if (tImg) tImg.style.animationPlayState = 'running';
     if (typeof playMusic === 'function' && typeof sfxGameMusic !== 'undefined') playMusic(sfxGameMusic);
     _shapesSpecIsFirstRound = false;
-    // El 3-2-1 REAL (local, ya corregido por elapsedMs) recién termina acá —
-    // acá es el único momento correcto para revelar tablero/silueta/tags, no
-    // una espera adivinada. Si shapesSpectatorShowRound() ya llegó y dejó
-    // preparado el reveal (caso normal), se dispara YA; si todavía no llegó
-    // (latencia), se marca el gate y showRound() revela apenas llegue.
+    // The REAL 3-2-1 (local, already corrected by elapsedMs) only ends here —
+    // this is the only correct moment to reveal board/silhouette/tags, not a
+    // guessed wait. If shapesSpectatorShowRound() already arrived and prepared
+    // the reveal (normal case), it fires NOW; if it hasn't arrived yet
+    // (latency), the gate is marked and showRound() reveals as soon as it does.
     _shapesSpecCountdownDone = true;
     if (_shapesSpecPendingReveal) {
       const fn = _shapesSpecPendingReveal;
@@ -373,32 +366,31 @@ window.shapesSpectatorShowPregame = function (payload) {
 };
 
 // payload = { index, mode:'shapes', prompt (=country), correctSlot, options, timeLeft }
-// Replica la construcción de showCountryShape() (tablero+silueta+4 tags) en
-// modo solo-lectura: sin listeners de click reales, opciones ya resueltas por
-// el broadcast en vez de generadas con RNG local.
+// Replicates showCountryShape()'s construction (board+silhouette+4 tags) in
+// read-only mode: no real click listeners, options already resolved by the
+// broadcast instead of generated with local RNG.
 window.shapesSpectatorShowRound = function (payload) {
   if (!_shapesSpecMode) return;
-  // Ver comentario largo en #vs-wait-spinner (css/style.css).
+  // See long comment in #vs-wait-spinner (css/style.css).
   if (typeof window._hideVsWaitSpinner === 'function') window._hideVsWaitSpinner();
-  // Sin esto, si esta pestaña nunca jugó una partida real de siluetas, la
-  // animación de entrada de los tags y el layout horizontal del trencito no
-  // existían — ver comentario largo en ensureShapeTagStyle().
+  // Without this, if this tab never played a real shapes game, the tag entry
+  // animation and the train's horizontal layout didn't exist — see long comment
+  // in ensureShapeTagStyle().
   ensureShapeTagStyle();
-  // Limpiar la ronda anterior — mismo cleanup que hace el juego real antes de
-  // arrancar la siguiente (tagEls.forEach(remove) + svg/img/clip.remove()).
-  // OJO: el tablero (countryboard.png) NO se remueve/recrea acá — es la MISMA
-  // imagen estática en TODAS las rondas (solo cambia la silueta encima), así
-  // que destruirlo y reponerlo en cada cambio de ronda le hacía perder el
-  // pintado un instante (~0.1s) hasta que el <img> nuevo terminaba de
-  // decodificar — el "desaparece y aparece" reportado. Se crea una sola vez
-  // (más abajo) y se reusa entre rondas.
+  // Clear the previous round — same cleanup the real game does before starting
+  // the next (tagEls.forEach(remove) + svg/img/clip.remove()). NOTE: the board
+  // (countryboard.png) is NOT removed/recreated here — it's the SAME static
+  // image in ALL rounds (only the silhouette on top changes), so destroying and
+  // replacing it each round made it lose its paint for an instant (~0.1s) until
+  // the new <img> finished decoding — the reported "disappears and reappears".
+  // Created once (below) and reused between rounds.
   _shapesSpecTagEls.forEach(t => t.remove());
   _shapesSpecTagEls = [];
   if (_shapesSpecSvg)   _shapesSpecSvg.remove();
   if (_shapesSpecImg)   _shapesSpecImg.remove();
   if (_shapesSpecClip)  _shapesSpecClip.remove();
   document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
-  _shapesSpecAnsweredImg = null; // ronda nueva: cualquier marca "ya resuelta" de la ronda anterior ya no aplica
+  _shapesSpecAnsweredImg = null; // new round: any "already resolved" mark from the previous round no longer applies
 
   const country = payload.prompt;
   const options = payload.options || [];
@@ -441,8 +433,8 @@ window.shapesSpectatorShowRound = function (payload) {
     (window.appStage || document.body).appendChild(cw);
   }
   positionShapesCountdown();
-  // Reflejar los puntos ya rellenados (por si el espectador se unió a mitad
-  // de racha) — mismo valor que se venía transmitiendo en las respuestas.
+  // Reflect the already-filled dots (in case the spectator joined mid-streak)
+  // — same value that was being transmitted in the answers.
   document.getElementById('shapes-progress-dots')?.querySelectorAll('.dot')
     .forEach((d, i) => d.classList.toggle('filled', i < _shapesSpecDots));
 
@@ -462,9 +454,9 @@ window.shapesSpectatorShowRound = function (payload) {
   (window.appStage || document.body).appendChild(svgEl);
   _shapesSpecSvg = svgEl;
 
-  // Reusar el tablero entre rondas (ver comentario largo más arriba) — solo
-  // se crea si todavía no existe o si algo externo lo sacó del DOM
-  // (postgame/exit lo remueven junto al resto vía .shapes-stage-el).
+  // Reuse the board between rounds (see long comment above) — only created if
+  // it doesn't exist yet or something external removed it from the DOM
+  // (postgame/exit remove it with the rest via .shapes-stage-el).
   if (!_shapesSpecBoard || !_shapesSpecBoard.isConnected) {
     const board = document.createElement('img');
     board.className = 'shapes-stage-el';
@@ -478,10 +470,10 @@ window.shapesSpectatorShowRound = function (payload) {
   const img = document.createElement('img');
   img.className = 'shapes-stage-el';
   img.src = 'images/countries/' + country + '1.' + ext1;
-  // display:none hasta que se revela junto con el flash/tags (ver
-  // revealTags() más abajo) — IGUAL que showCountryShape() real. Sin esto el
-  // espectador veía el país ya resuelto (spoiler) desde el arranque del
-  // 3-2-1, cuando el jugador real todavía tiene el tablero en blanco.
+  // display:none until revealed with the flash/tags (see revealTags() below) —
+  // SAME as real showCountryShape(). Without this the spectator saw the country
+  // already revealed (spoiler) from the start of the 3-2-1, when the real
+  // player still has a blank board.
   img.style.cssText = 'position:absolute;top:52%;left:36.3%;transform:translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01);width:59.4cqmin;height:59.4cqmin;z-index:103;transition:transform 3s linear;display:none;';
   img.draggable = false;
   (window.appStage || document.body).appendChild(img);
@@ -489,13 +481,13 @@ window.shapesSpectatorShowRound = function (payload) {
 
   const clip = document.createElement('div');
   clip.className = 'shapes-stage-el';
-  // overflow:hidden de respaldo: img2 adentro mide 118.8cqmin (el doble de
-  // este contenedor) a propósito, para que el clip-path (silueta SVG) la
-  // recorte a la forma final. En Firefox/Gecko (Zen Browser incluido) un
-  // clip-path referenciado por url() a veces no se aplica sobre un <div>
-  // con hijos transformados — sin el overflow acá, img2 se ve completa sin
-  // recortar (gigante, no "fitea" en el marco). Con el overflow, en el peor
-  // caso queda un recorte cuadrado en vez de la silueta, pero nunca gigante.
+  // fallback overflow:hidden: img2 inside is 118.8cqmin (twice this container)
+  // on purpose, so the clip-path (SVG silhouette) crops it to the final shape.
+  // In Firefox/Gecko (Zen Browser included) a url()-referenced clip-path
+  // sometimes doesn't apply to a <div> with transformed children — without the
+  // overflow here, img2 shows uncropped (huge, doesn't "fit" the frame). With
+  // the overflow, worst case it's a square crop instead of the silhouette, but
+  // never huge.
   clip.style.cssText = 'position:absolute;top:52%;left:36.3%;transform:translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01);width:59.4cqmin;height:59.4cqmin;clip-path:url(#' + clipId + ');overflow:hidden;z-index:102;opacity:0;transition:opacity 2s ease;display:none;';
   (window.appStage || document.body).appendChild(clip);
   _shapesSpecClip = clip;
@@ -505,10 +497,9 @@ window.shapesSpectatorShowRound = function (payload) {
   img2.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)' + (country === 'Rusia' ? ' scale(0.5)' : '') + ';width:118.8cqmin;height:118.8cqmin;transition:transform 3s linear;';
   img2.draggable = false;
   clip.appendChild(img2);
-  // El fade del clip y el achicado a los 6s se programan DENTRO de
-  // revealTags() (relativos al momento real de revelación, no desde que
-  // arranca la ronda) — mismo criterio que showCountryShape() real con
-  // "3000+startDelay"/"6000+startDelay".
+  // The clip fade and the shrink at 6s are scheduled INSIDE revealTags()
+  // (relative to the real reveal moment, not from when the round starts) —
+  // same rule as real showCountryShape() with "3000+startDelay"/"6000+startDelay".
 
   const tagConfigs = [
     { top: '18%', right: '27%', rot: '-5deg' },
@@ -517,9 +508,9 @@ window.shapesSpectatorShowRound = function (payload) {
     { top: '76%', right: '26%', rot: '3deg'  },
   ];
 
-  // Primera ronda tras entrar: los tags esperan a que termine el 3-2-1 (igual
-  // que el startDelay=PREGAME_DURATION del jugador real); rondas siguientes
-  // aparecen ya (startDelay=0), como showCountryShape() sin pregame de por medio.
+  // First round after entering: tags wait for the 3-2-1 to end (like the real
+  // player's startDelay=PREGAME_DURATION); later rounds appear immediately
+  // (startDelay=0), like showCountryShape() with no pregame.
   const PREGAME_DURATION = (typeof SHAPES_PREGAME_STEPS !== 'undefined')
     ? SHAPES_PREGAME_STEPS.reduce((s, x) => s + x.hold, 0) : 0;
 
@@ -527,12 +518,12 @@ window.shapesSpectatorShowRound = function (payload) {
   function revealTags() {
     if (tagsRevealed) return;
     tagsRevealed = true;
-    if (!_shapesSpecMode || _shapesSpecImg !== img) return; // ronda ya cambió
+    if (!_shapesSpecMode || _shapesSpecImg !== img) return; // round already changed
     if (_shapesSpecAnsweredImg === img) {
-      // El espectado ya contestó esta pregunta antes de que llegáramos a
-      // revelarla (unión a mitad de ronda + acierto casi simultáneo) — no
-      // tiene sentido mostrar tags de una ronda ya resuelta que nadie va a
-      // ver "en vivo"; se limpia directo y se espera la ronda siguiente.
+      // The spectated player already answered this before we got to reveal it
+      // (mid-round join + near-simultaneous answer) — no point showing tags of
+      // an already-resolved round nobody will see "live"; clear it and wait for
+      // the next round.
       if (_shapesSpecSvg)   { _shapesSpecSvg.remove();   if (_shapesSpecSvg === svgEl) _shapesSpecSvg = null; }
       if (_shapesSpecBoard) { _shapesSpecBoard.remove(); if (_shapesSpecBoard === board) _shapesSpecBoard = null; }
       if (_shapesSpecImg)   { _shapesSpecImg.remove();   if (_shapesSpecImg === img) _shapesSpecImg = null; }
@@ -540,8 +531,8 @@ window.shapesSpectatorShowRound = function (payload) {
       return;
     }
 
-    // Recién ACÁ (junto con el flash/tags, no antes) se revela el país —
-    // igual momento exacto que showCountryShape() real.
+    // Only HERE (with the flash/tags, not before) is the country revealed —
+    // the same exact moment as real showCountryShape().
     img.style.display  = '';
     clip.style.display = '';
     setTimeout(() => { if (_shapesSpecMode && _shapesSpecClip === clip) clip.style.opacity = '1'; }, 3000);
@@ -571,9 +562,9 @@ window.shapesSpectatorShowRound = function (payload) {
     tagConfigs.forEach((cfg, i) => {
       const base = `scaleX(1.05) scaleY(0.95) rotate(${cfg.rot})`;
       const tag = document.createElement('div');
-      // pointer-events:none (además del que ya pone luggage-game-ended en
-      // banderas): el espectador es solo-lectura, no hay click que resolver
-      // acá — la resolución llega entera por broadcast (shapesSpectatorResolvePick).
+      // pointer-events:none (on top of luggage-game-ended in flags): the
+      // spectator is read-only, there's no click to resolve here — the whole
+      // resolution arrives by broadcast (shapesSpectatorResolvePick).
       tag.style.cssText = `position:absolute;top:${cfg.top};right:${cfg.right};width:40.4cqmin;z-index:110;pointer-events:none;transform:translateX(300%) scaleX(1.05) scaleY(0.95) rotate(${cfg.rot});transform-origin:center center;transition:transform 0.15s ease;--tag-rot:${cfg.rot};`;
       tag.classList.add('shape-tag-enter', 'shapes-tag');
       tag.style.animationDelay = `${i * 80}ms`;
@@ -610,49 +601,45 @@ window.shapesSpectatorShowRound = function (payload) {
   }
 
   if (_shapesSpecIsFirstRound) {
-    // Se consume ACÁ, no en el onDone del pregame — si no, cuando el
-    // fallback de abajo terminaba revelando sin haber visto un pregame (unión
-    // a mitad de ronda), esta bandera se quedaba en true para siempre y CADA
-    // ronda siguiente volvía a pagar el margen de 400ms de este bloque.
+    // Consumed HERE, not in the pregame's onDone — otherwise, when the fallback
+    // below ended up revealing without having seen a pregame (mid-round join),
+    // this flag stayed true forever and EVERY later round paid this block's
+    // 400ms margin again.
     _shapesSpecIsFirstRound = false;
-    // Margen corto para confirmar que de verdad viene un pregame (en el orden
-    // real de broadcasts llega poco después de esta misma ronda) — si no
-    // aparece ningún 'pregame' en ese margen, es que el espectador se unió a
-    // mitad de una ronda ya en curso (sin cuenta regresiva de por medio).
-    // OJO: si SÍ viene pregame, acá NO se programa ningún timer adivinado —
-    // se deja _shapesSpecPendingReveal preparado y es el onDone REAL de
-    // shapesSpectatorShowPregame (ver ahí) el que llama a revealTags(),
-    // sincronizado con el 3-2-1 de verdad. Antes acá se armaba un
-    // setTimeout(revealTags, PREGAME_DURATION - 400) fijo, medido desde que
-    // llegaban estos datos — si el espectador se unía tarde al 3-2-1 (con
-    // elapsedMs recortado por el clamp), el conteo visual terminaba en
-    // ~400ms pero este timer seguía esperando casi los 3.4s completos,
-    // dejando el tablero sin aparecer todo ese rato (el "se demora 2s"
-    // reportado).
+    // Short margin to confirm a pregame is really coming (in the real broadcast
+    // order it arrives shortly after this round) — if no 'pregame' appears in
+    // that margin, the spectator joined mid-round (no countdown).
+    // NOTE: if a pregame DOES come, no guessed timer is scheduled here —
+    // _shapesSpecPendingReveal is prepared and it's shapesSpectatorShowPregame's
+    // REAL onDone (see there) that calls revealTags(), synced with the actual
+    // 3-2-1. This used to schedule a fixed setTimeout(revealTags,
+    // PREGAME_DURATION - 400) measured from when this data arrived — if the
+    // spectator joined the 3-2-1 late (with elapsedMs clamped), the visual
+    // count ended in ~400ms but this timer kept waiting almost the full 3.4s,
+    // leaving the board absent all that time (the reported "takes 2s").
     _shapesSpecPendingReveal = revealTags;
     setTimeout(() => {
-      // Guard contra el "sigue sonando la música de juego" reportado en VS —
-      // ver mismo comentario en citiesSpectatorShowRound/flagsSpectatorShowRound.
+      // Guard against the reported "game music keeps playing" in VS — see the
+      // same comment in citiesSpectatorShowRound/flagsSpectatorShowRound.
       if (!_shapesSpecMode) return;
       if (!_shapesSpecPregameSeen) {
-        // Confirmado: no viene ningún pregame (unión a mitad de ronda ya en
-        // curso) — recién ACÁ, mostrando ya la ronda real, arranca la
-        // música del juego (si hubiera pregame, la arranca su propio onDone).
+        // Confirmed: no pregame coming (join mid-round already in progress) —
+        // only HERE, with the real round already shown, does game music start
+        // (if there were a pregame, its own onDone starts it).
         _shapesSpecCountdownDone = true;
         if (typeof playMusic === 'function' && typeof sfxGameMusic !== 'undefined') playMusic(sfxGameMusic);
         if (_shapesSpecPendingReveal === revealTags) { _shapesSpecPendingReveal = null; revealTags(); }
       }
     }, 400);
   } else if (_shapesSpecCountdownDone) {
-    // Rondas siguientes sin 3-2-1 de por medio (siguiente pregunta normal de
-    // la misma partida) — revelar ya, como antes.
+    // Later rounds with no 3-2-1 (next normal question of the same game) —
+    // reveal immediately, as before.
     setTimeout(revealTags, 0);
   } else {
-    // Llegó la ronda MIENTRAS el 3-2-1 real todavía está corriendo (el
-    // espectador se unió tarde y el countdown local, más rápido por el
-    // clamp, todavía no terminó) — no revelar ahora: queda pendiente, el
-    // onDone de shapesSpectatorShowPregame la revela cuando el conteo
-    // termine de verdad.
+    // The round arrived WHILE the real 3-2-1 is still running (spectator joined
+    // late and the local countdown, faster due to the clamp, hasn't ended) —
+    // don't reveal now: it stays pending, shapesSpectatorShowPregame's onDone
+    // reveals it when the count actually ends.
     _shapesSpecPendingReveal = revealTags;
   }
 };
@@ -660,15 +647,15 @@ window.shapesSpectatorShowRound = function (payload) {
 // payload = { index, correct, points, speedBonus, hasBadge, inRowBonus, streak, dots }
 window.shapesSpectatorResolvePick = function (payload) {
   if (!_shapesSpecMode) return;
-  // payload.score YA viene con campaignBase() sumado (ver
-  // _specReportAnswer en el jugador real) — anima hacia ese valor en vez de
-  // saltar de golpe, igual que ve el propio jugador (shapesAnimateScore()).
+  // payload.score ALREADY has campaignBase() added (see _specReportAnswer in
+  // the real player) — animate toward that value instead of jumping, like the
+  // player sees (shapesAnimateScore()).
   if (typeof payload.score === 'number') {
     _shapesSpecTargetScore = payload.score;
     _shapesSpecAnimateScore();
   }
-  // El 'answer' no manda correctSlot (solo el índice elegido) — se usa el que
-  // ya llegó con el 'round' de esta misma pregunta.
+  // The 'answer' doesn't send correctSlot (only the chosen index) — use the
+  // one that arrived with this question's 'round'.
   const tag = _shapesSpecTagEls[payload.index];
   const correctTag = _shapesSpecTagEls[_shapesSpecCorrectSlot];
   if (tag) {
@@ -696,8 +683,8 @@ window.shapesSpectatorResolvePick = function (payload) {
     setTimeout(() => { overlay.classList.remove('animate', 'shapes-pos'); overlay.style.display = 'none'; overlay.style.zIndex = ''; }, 820);
   }
 
-  // Ojo: a diferencia de banderas (que suena check+acertar juntos), siluetas
-  // solo reproduce UN sonido para correcto (sfxAcertar) — sin sfxCheck.
+  // Note: unlike flags (which plays check+acertar together), shapes plays only
+  // ONE sound for correct (sfxAcertar) — no sfxCheck.
   if (typeof sfxPlay === 'function') {
     if (payload.correct) {
       if (typeof sfxAcertar !== 'undefined') { sfxAcertar.currentTime = 0; sfxPlay(sfxAcertar); }
@@ -733,24 +720,24 @@ window.shapesSpectatorResolvePick = function (payload) {
   }
 
   if (_shapesSpecTagEls.length === 0) {
-    // Llegó la respuesta ANTES de que esta ronda terminara de revelarse
-    // (unión a mitad de ronda + acierto casi simultáneo del espectado) — no
-    // hay tags que animar todavía. Marcar la ronda como "ya resuelta" para
-    // que revealTags() (que puede seguir pendiente) la limpie directo en vez
-    // de mostrarla, en lugar de programar acá un swing-out sobre tags que
-    // todavía no existen (eso era lo que terminaba borrando de golpe la
-    // ronda recién aparecida — el "tag2 duplicado/raro" reportado).
+    // The answer arrived BEFORE this round finished revealing (mid-round join +
+    // near-simultaneous answer by the spectated player) — no tags to animate
+    // yet. Mark the round "already resolved" so revealTags() (which may still
+    // be pending) clears it directly instead of showing it, rather than
+    // scheduling a swing-out on tags that don't exist yet (which is what ended
+    // up deleting the freshly appeared round — the reported "weird/duplicate
+    // tag2").
     _shapesSpecAnsweredImg = _shapesSpecImg;
     return;
   }
 
-  // Mismo timing que el click real: swing-out a los 500ms, remove a los 700ms.
+  // Same timing as the real click: swing-out at 500ms, remove at 700ms.
   const roundImg = _shapesSpecImg;
   setTimeout(() => {
     if (!_shapesSpecMode) return;
     _shapesSpecTagEls.forEach(t => { t.style.transform = getComputedStyle(t).transform; t.classList.add('shape-tag-exit'); });
     setTimeout(() => {
-      if (!_shapesSpecMode || _shapesSpecImg !== roundImg) return; // ya llegó la ronda siguiente, no pisar
+      if (!_shapesSpecMode || _shapesSpecImg !== roundImg) return; // next round already arrived, don't overwrite
       _shapesSpecTagEls.forEach(t => t.remove());
       _shapesSpecTagEls = [];
       if (_shapesSpecSvg)   { _shapesSpecSvg.remove();   _shapesSpecSvg = null; }
@@ -770,8 +757,8 @@ window.shapesSpectatorAdvanceDot = function (dots) {
   if (dots >= 10 && !container.classList.contains('train-animation')) {
     container.classList.add('train-animation');
     if (typeof playTimeBonus === 'function') playTimeBonus(document.getElementById('shapes-time-bonus'), 5);
-    // Mismo flash verde que hace el jugador real en el número del cronómetro
-    // al ganar el bonus de +tiempo — faltaba acá del todo.
+    // Same green flash the real player does on the timer number when earning
+    // the +time bonus — was missing here entirely.
     const tEl = document.getElementById('shapes-timer-number');
     const origColor = tEl ? tEl.style.color : '';
     if (tEl) tEl.style.color = '#00ff88';
@@ -783,9 +770,9 @@ window.shapesSpectatorAdvanceDot = function (dots) {
         container.classList.remove('train-animation', 'dots-fade-out');
         const finalDots = Math.max(0, _shapesSpecDots - 10);
         container.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('filled', i < finalDots));
-        // _shapesSpecLastTick: último timeLeft real conocido (ver
-        // shapesSpectatorUpdateTimer) — decide si vuelve a blanco (últimos
-        // 10s) o al color original, igual que el jugador real.
+        // _shapesSpecLastTick: last known real timeLeft (see
+        // shapesSpectatorUpdateTimer) — decides whether it goes back to white
+        // (last 10s) or the original color, like the real player.
         if (tEl) {
           if (_shapesSpecLastTick != null && _shapesSpecLastTick > 0 && _shapesSpecLastTick <= 10) {
             tEl.style.color = '#ffffff';
@@ -822,34 +809,34 @@ window.shapesSpectatorUpdateTimer = function (timeLeft) {
   _shapesSpecLastTick = timeLeft;
 };
 
-// dots = progreso YA acumulado del trencito al momento de conectarse — mismo
-// fix ya aplicado en flags/cities: sin esto, alguien que se unía a
-// mitad de partida veía los puntitos apagados hasta la PRÓXIMA respuesta del
-// jugador real, en vez del progreso real que ya llevaba acumulado.
+// dots = the train's ALREADY-accumulated progress at the moment of connecting
+// — same fix already applied in flags/cities: without this, someone joining
+// mid-game saw empty dots until the real player's NEXT answer, instead of the
+// real progress already made.
 window.shapesSpectatorUpdateScore = function (score, dots) {
   if (!_shapesSpecMode) return;
-  // Snap directo (sin animar) — se usa para "ponerse al día" al unirse a
-  // mitad de ronda, no para una respuesta en vivo (esa pasa por
-  // shapesSpectatorResolvePick → _shapesSpecAnimateScore). Sincroniza
-  // también el estado de la animación — si no, la PRÓXIMA respuesta real
-  // intentaría animar desde el valor viejo (0) en vez de desde acá.
+  // Direct snap (no animation) — used to "catch up" on joining mid-round, not
+  // for a live answer (that goes through shapesSpectatorResolvePick →
+  // _shapesSpecAnimateScore). Also syncs the animation state — otherwise the
+  // NEXT real answer would try to animate from the old value (0) instead of
+  // from here.
   _shapesSpecTargetScore = score || 0;
   _shapesSpecDisplayedScore = score || 0;
   const el = document.getElementById('score-value');
   if (el) el.textContent = (score || 0).toLocaleString();
-  // Clamp para no disparar retroactivamente la animación de "llegó a 10" en
-  // un simple catch-up — shapesSpectatorAdvanceDot ya hace snap directo
-  // (no incrementa), sirve tal cual para esto.
+  // Clamp so a simple catch-up doesn't retroactively fire the "reached 10"
+  // animation — shapesSpectatorAdvanceDot already snaps directly (doesn't
+  // increment), works as-is for this.
   if (typeof dots === 'number' && typeof window.shapesSpectatorAdvanceDot === 'function') {
     window.shapesSpectatorAdvanceDot(Math.max(0, Math.min(dots, 9)));
   }
 };
 
-// Tarjeta única en el leaderboard genérico (compartido con cities/monuments)
-// con el jugador REAL espectado — igual truco que flagsSpectatorSetPlayerCard:
-// el leaderboard normal (positionLeaderboard) mete tu propio perfil como "vos",
-// que acá sería incorrecto, así que se arma una fila a mano.
-// oppName/oppAvatar/oppScore: ver comentario largo en citiesSpectatorSetPlayerCard.
+// Single card in the generic leaderboard (shared with cities/monuments) for
+// the spectated REAL player — same trick as flagsSpectatorSetPlayerCard: the
+// normal leaderboard (positionLeaderboard) inserts your own profile as "you",
+// which would be wrong here, so a row is built by hand.
+// oppName/oppAvatar/oppScore: see long comment in citiesSpectatorSetPlayerCard.
 window.shapesSpectatorSetPlayerCard = function (name, avatar, score, oppName, oppAvatar, oppScore, cardCode, oppCardCode) {
   if (!_shapesSpecMode) return;
   const lb = document.getElementById('leaderboard');
@@ -857,10 +844,9 @@ window.shapesSpectatorSetPlayerCard = function (name, avatar, score, oppName, op
   const rowH = (typeof getLbRowHeight === 'function') ? getLbRowHeight() : 60;
   const gap  = (typeof LB_GAP !== 'undefined') ? LB_GAP : 4;
   const showOpp = !!oppName;
-  // TOP_MARGIN: ver comentario largo en citiesSpectatorSetPlayerCard —
-  // #leaderboard (compartido con cities/monuments) tiene clip-path:inset(0
-  // -300px) que recorta el emote-bubble de wrongEffect si la fila de arriba
-  // está en top:0.
+  // TOP_MARGIN: see long comment in citiesSpectatorSetPlayerCard — #leaderboard
+  // (shared with cities/monuments) has clip-path:inset(0 -300px) that clips the
+  // wrongEffect emote-bubble if the top row is at top:0.
   const TOP_MARGIN = Math.round(rowH * 0.4);
   lb.style.height = (showOpp ? rowH * 2 + gap + TOP_MARGIN : rowH + TOP_MARGIN) + 'px';
   let el = document.getElementById('shapes-spec-lb-entry');
@@ -900,16 +886,16 @@ window.shapesSpectatorSetPlayerCard = function (name, avatar, score, oppName, op
     const oppAvatarEl = document.getElementById('shapes-spec-lb-opp-avatar');
     if (oppAvatarEl && oppAvatar) oppAvatarEl.src = oppAvatar;
     document.getElementById('shapes-spec-lb-opp-score').textContent = (oppScore || 0).toLocaleString();
-    // Reordenar según puesto — ver comentario largo en citiesSpectatorSetPlayerCard.
+    // Reorder by rank — see long comment in citiesSpectatorSetPlayerCard.
     const friendOnTop = (score || 0) >= (oppScore || 0);
     el.style.top    = (TOP_MARGIN + (friendOnTop ? 0 : rowH + gap)) + 'px';
     oppEl.style.top = (TOP_MARGIN + (friendOnTop ? rowH + gap : 0)) + 'px';
-    // Número de puesto (1°/2°) — ver comentario largo en flagsSpectatorSetPlayerCard.
+    // Rank number (1st/2nd) — see long comment in flagsSpectatorSetPlayerCard.
     const elRankEl  = el.querySelector('.lb-rank');
     const oppRankEl = oppEl.querySelector('.lb-rank');
-    // .lb-rank tiene display:none por defecto en el CSS (solo se muestra vía
-    // clase "vs-active" en el leaderboard real) — se fuerza acá con display
-    // inline, ver comentario largo en flagsSpectatorSetPlayerCard.
+    // .lb-rank is display:none by default in CSS (only shown via the
+    // "vs-active" class on the real leaderboard) — forced here with inline
+    // display, see long comment in flagsSpectatorSetPlayerCard.
     if (elRankEl)  { elRankEl.textContent  = friendOnTop ? '1' : '2'; elRankEl.className  = 'lb-rank ' + (friendOnTop ? 'rank-1' : 'rank-2'); elRankEl.style.display  = 'block'; }
     if (oppRankEl) { oppRankEl.textContent = friendOnTop ? '2' : '1'; oppRankEl.className = 'lb-rank ' + (friendOnTop ? 'rank-2' : 'rank-1'); oppRankEl.style.display = 'block'; }
   } else if (oppEl) {
@@ -926,15 +912,15 @@ window.shapesSpectatorWrongEffect = function (target) {
   el.style.animation = 'none'; void el.offsetWidth;
   el.style.animation = 'lb-wrong-flash 0.75s ease-out, lb-shake 0.45s ease-in-out';
   setTimeout(() => { el.style.animation = ''; }, 820);
-  // z-index elevado mientras dura el emote — ver comentario largo en citiesSpectatorWrongEffect (js/modes/cities-spectate.js).
+  // Raised z-index for the emote's duration — see long comment in citiesSpectatorWrongEffect (js/modes/cities-spectate.js).
   const prevZ = el.style.zIndex;
   el.style.zIndex = '50';
   setTimeout(() => { el.style.zIndex = prevZ; }, 1800);
   if (typeof spawnEmoteBubble === 'function') spawnEmoteBubble(el);
 };
 
-// "Se acabó el tiempo" en la cartilla del espectador 1v1 (shapes) — mismo
-// mecanismo que shapesSpectatorWrongEffect pero con el cronómetro.
+// "Time's up" on the 1v1 spectator card (shapes) — same mechanism as
+// shapesSpectatorWrongEffect but with the stopwatch.
 window.shapesSpectatorTimesUpEffect = function (target) {
   if (!_shapesSpecMode) return;
   const el = document.getElementById(target === 'opponent' ? 'shapes-spec-lb-opp' : 'shapes-spec-lb-entry');
@@ -952,15 +938,14 @@ window.shapesSpectatorShowTimesUp = function () {
   if (typeof sfxTimesUp !== 'undefined' && typeof sfxPlay === 'function') { sfxTimesUp.currentTime = 0; sfxPlay(sfxTimesUp); }
   const tImg = document.getElementById('shapes-timer-img');
   if (tImg) tImg.style.animationPlayState = 'paused';
-  // Antes esto borraba la silueta (.shapes-clip-overlay) DE UNA, ni bien
-  // llegaba el TIME'S UP — en versus, este momento es apenas ~700ms-2s antes
-  // de que aparezca el resultado del duelo (ver revealAt/_vsHandleGameEnd en
-  // vs.js), así que el jugador que está esperando (viendo al rival de
-  // prestado) veía el tablero quedarse vacío ANTES de que llegara el overlay
-  // de resultado, en vez de la silueta congelada detrás (el "se quitan los
-  // assets al salir times up" reportado). Si sigue el camino solo/campaña
-  // (no versus), shapesSpectatorShowPostgame() la borra igual momentos
-  // después — no hace falta adelantarlo acá.
+  // This used to delete the silhouette (.shapes-clip-overlay) IMMEDIATELY as
+  // soon as the TIME'S UP arrived — in versus, this moment is only ~700ms-2s
+  // before the duel result appears (see revealAt/_vsHandleGameEnd in vs.js), so
+  // the waiting player (watching the rival on loan) saw the board go empty
+  // BEFORE the result overlay arrived, instead of the frozen silhouette behind
+  // (the reported "assets get removed on times up"). On the solo/campaign path
+  // (not versus), shapesSpectatorShowPostgame() deletes it moments later anyway
+  // — no need to do it early here.
   const timeupEl = document.getElementById('timeup-overlay');
   if (!timeupEl) return;
   timeupEl.style.zIndex = '300';
@@ -980,26 +965,26 @@ window.shapesSpectatorShowTimesUp = function () {
   }, 1800);
 };
 
-// Pantalla de resultados (solo el camino solo/campaña — versus tiene su propia
-// pantalla W/L, fuera de este alcance, igual que en banderas). Solo-lectura:
-// pointer-events:none + confirm1/confirm2 ocultos.
+// Results screen (solo/campaign path only — versus has its own W/L screen, out
+// of scope, like in flags). Read-only: pointer-events:none + confirm1/confirm2
+// hidden.
 window.shapesSpectatorShowPostgame = function (payload) {
   if (!_shapesSpecMode) return;
   const gameoverScreen = document.getElementById('gameover-screen');
   if (!gameoverScreen) return;
   document.querySelectorAll('.shapes-tag').forEach(t => t.remove());
   document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
-  // Mismo _shapesCleanupVisuals() que hace hideShapesMode() real antes de
-  // mostrar resultados — sin esto la silueta/tablero de la última ronda
-  // quedaban asomando detrás de la pantalla de resultados.
+  // Same _shapesCleanupVisuals() the real hideShapesMode() does before showing
+  // results — without this the last round's silhouette/board peeked behind the
+  // results screen.
   document.querySelectorAll('.shapes-stage-el').forEach(el => { try { el.remove(); } catch (e) {} });
   document.getElementById('shapes-countdown-widget')?.remove();
   _shapesSpecTagEls = [];
   _shapesSpecSvg = _shapesSpecBoard = _shapesSpecImg = _shapesSpecClip = null;
   const rightPanel = document.getElementById('right-panel');
   if (rightPanel) rightPanel.style.display = 'none';
-  // Igual que hideShapesMode() real: el marcador no tiene sentido en la
-  // pantalla de resultados — sin esto quedaba pegado, visible de fondo.
+  // Like real hideShapesMode(): the scoreboard makes no sense on the results
+  // screen — without this it stayed stuck, visible in the background.
   const scoreDisplay = document.getElementById('score-display');
   if (scoreDisplay) scoreDisplay.style.display = 'none';
 
@@ -1010,9 +995,9 @@ window.shapesSpectatorShowPostgame = function (payload) {
   const confirmWrap = document.querySelector('.gameover-confirm-wrap');
   if (confirmWrap) confirmWrap.style.display = 'none';
 
-  // Mismo swap de sprites que hace el click en #loading-shapes-btn del
-  // jugador real — elementos compartidos entre modos, sin esto quedan con lo
-  // último que puso otro modo (ver mismo bug ya resuelto en flags.js).
+  // Same sprite swap the real player's #loading-shapes-btn click does —
+  // elements shared between modes, without this they keep what another mode
+  // last set (see the same bug already fixed in flags.js).
   document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men5.png');
   document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men6.png');
   document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl5.png');
@@ -1050,12 +1035,12 @@ window.shapesSpectatorHidePostgame = function () {
   if (confirmWrap) confirmWrap.style.display = '';
 };
 
-// ── Lobby hooks (grupo) ───────────────────────────────────────────────────────
+// ── Lobby hooks (group) ────────────────────────────────────────────────────
 window.shapesSetLobbyScores = function(members) {
   if (!Array.isArray(members) || typeof window._lbUpdateEntry !== 'function') return;
   members.forEach(m => window._lbUpdateEntry('lob' + m.id, m.score || 0));
-  // Ver mismo fix en js/modes/mapgame-vs.js/citiesSetVsOpponentScore — durante el
-  // espectador el leaderboard lo posiciona el renderer de espectador.
+  // See same fix in js/modes/mapgame-vs.js/citiesSetVsOpponentScore — while
+  // spectating the leaderboard is positioned by the spectator renderer.
   if (window._isSpectating) { window._refreshGroupSpectatorLeaderboard?.(); return; }
   if (typeof positionLeaderboard === 'function') positionLeaderboard(shapesScore, true);
 };
@@ -1064,7 +1049,7 @@ window.shapesSetLobbyWrongFor = function(uid) {
   const key = (!uid || uid === myId) ? 'player' : ('lob' + uid);
   if (typeof window._lbWrongEffect === 'function') window._lbWrongEffect(key);
 };
-// "Se acabó el tiempo" (timesup) — mismo #leaderboard que monuments, reusa _lbTimesUpEffect.
+// "Time's up" (timesup) — same #leaderboard as monuments, reuses _lbTimesUpEffect.
 window.shapesSetLobbyTimesUpFor = function(uid) {
   const myId = window._sbUserId;
   const key = (!uid || uid === myId) ? 'player' : ('lob' + uid);
@@ -1088,7 +1073,7 @@ window.shapesSetVsDisconnected = function(disconnected) {
 window.shapesSetVsOpponentScore = function(score) {
   window._vsOppScore = score;
   if (typeof window._lbUpdateEntry === 'function') window._lbUpdateEntry('vsopp', score);
-  // Ver mismo fix en js/modes/mapgame-vs.js/citiesSetVsOpponentScore.
+  // See same fix in js/modes/mapgame-vs.js/citiesSetVsOpponentScore.
   if (window._isSpectating) { window._refreshGroupSpectatorLeaderboard?.(); return; }
   if (typeof positionLeaderboard === 'function') positionLeaderboard(shapesScore, true);
 };
@@ -1139,9 +1124,9 @@ function buildShapesPracticePool(continents, difficulty) {
 function positionShapesCountdown() {
   const cwEl = document.getElementById('shapes-countdown-widget');
   if (!cwEl) return;
-  // Overlay fijo en vmin, igual que #countdown-widget (monuments/flags). Escala
-  // con el viewport y no se mueve/agranda con el zoom como cuando se anclaba al
-  // game-wrapper escalado.
+  // Fixed overlay in vmin, like #countdown-widget (monuments/flags). Scales
+  // with the viewport and doesn't move/grow on zoom like when it was anchored
+  // to the scaled game-wrapper.
   cwEl.style.position      = 'absolute';
   cwEl.style.top           = '2.8cqmin';
   cwEl.style.right         = '57.5cqmin';
@@ -1170,7 +1155,7 @@ function shapesAnimateScore() {
 }
 
 function showCountryShape(country, ext1, ext2, startDelay) {
-  if (shapesAborted) return; // se abandonó la partida
+  if (shapesAborted) return; // game was abandoned
   ext1 = ext1 || 'png';
   ext2 = ext2 || 'jpg';
   startDelay = startDelay || 0;
@@ -1256,13 +1241,13 @@ function showCountryShape(country, ext1, ext2, startDelay) {
 
   const clip = document.createElement('div');
   clip.className = 'shapes-stage-el';
-  // overflow:hidden de respaldo: img2 adentro mide 118.8cqmin (el doble de
-  // este contenedor) a propósito, para que el clip-path (silueta SVG) la
-  // recorte a la forma final. En Firefox/Gecko (Zen Browser incluido) un
-  // clip-path referenciado por url() a veces no se aplica sobre un <div>
-  // con hijos transformados — sin el overflow acá, img2 se ve completa sin
-  // recortar (gigante, no "fitea" en el marco). Con el overflow, en el peor
-  // caso queda un recorte cuadrado en vez de la silueta, pero nunca gigante.
+  // fallback overflow:hidden: img2 inside is 118.8cqmin (twice this container)
+  // on purpose, so the clip-path (SVG silhouette) crops it to the final shape.
+  // In Firefox/Gecko (Zen Browser included) a url()-referenced clip-path
+  // sometimes doesn't apply to a <div> with transformed children — without the
+  // overflow here, img2 shows uncropped (huge, doesn't "fit" the frame). With
+  // the overflow, worst case it's a square crop instead of the silhouette, but
+  // never huge.
   clip.style.cssText = 'position:absolute;top:52%;left:36.3%;transform:translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01);width:59.4cqmin;height:59.4cqmin;clip-path:url(#' + clipId + ');overflow:hidden;z-index:102;opacity:0;transition:opacity 2s ease;display:none;';
   (window.appStage || document.body).appendChild(clip);
 
@@ -1327,8 +1312,8 @@ function showCountryShape(country, ext1, ext2, startDelay) {
     options.splice(correctIdx, 0, correctLabel);
   }
 
-  // Modo espectador: anunciar la ronda (opciones + respuesta correcta) antes de
-  // que el jugador conteste, para que quien mira vea lo mismo en tiempo real.
+  // Spectator mode: announce the round (options + correct answer) before the
+  // player answers, so watchers see the same thing in realtime.
   if (typeof window._specReportRound === 'function') {
     window._specReportRound({ index: shapesCorrectCount, mode: 'shapes', prompt: country, correctSlot: correctIdx, options: options.slice(), timeLeft: shapesTimeLeft });
   }
@@ -1351,7 +1336,7 @@ function showCountryShape(country, ext1, ext2, startDelay) {
   const tagEls = [];
 
   shapesTagsTimeout = setTimeout(() => {
-  if (shapesAborted) return; // se abandonó durante el 3-2-1
+  if (shapesAborted) return; // abandoned during the 3-2-1
 
   const whiteBg = document.createElement('div');
   whiteBg.className = 'shapes-clip-overlay';
@@ -1468,13 +1453,13 @@ function showCountryShape(country, ext1, ext2, startDelay) {
         if (typeof window._lobbyReportAnswer === 'function' && window._lobbyActive) window._lobbyReportAnswer(true, Math.round(shapesScore));
         const _shapesIsInf = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
         if (!_shapesIsInf) shapesDots++;
-        // Reportado DESPUÉS de incrementar shapesDots (igual que flagsAdvanceDot()
-        // en flags.js) — así el espectador recibe el trencito ya actualizado, no
-        // el valor de un paso atrás.
-        // + campaignBase(): el espectador no tiene forma propia de saber
-        // cuánto acumuló el jugador en modos anteriores de la campaña — sin
-        // sumarlo acá, veía el puntaje arrancar de 0 en Siluetas en vez de
-        // seguir sumando desde Banderas.
+        // Reported AFTER incrementing shapesDots (like flagsAdvanceDot() in
+        // flags.js) — so the spectator gets the already-updated train, not the
+        // value one step behind.
+        // + campaignBase(): the spectator has no way of its own to know how
+        // much the player accumulated in earlier campaign modes — without
+        // adding it here, it saw the score start from 0 in Shapes instead of
+        // continuing from Flags.
         if (typeof window._specReportAnswer === 'function') {
           window._specReportAnswer(true, Math.round(shapesScore + ((typeof window.campaignBase === 'function') ? window.campaignBase() : 0)), {
             index: i, points: pts + speedBonus, speedBonus, hasBadge: !!badgeImg,
@@ -1488,10 +1473,10 @@ function showCountryShape(country, ext1, ext2, startDelay) {
             dotsContainer.classList.add('train-animation');
             const _shapesInfNow = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
             if (!_shapesInfNow) {
-              // Ajustar shapesTimerDuration (fuente de verdad, ver
-              // _shapesTimerTick), no shapesTimeLeft directo — si no, el
-              // próximo tick lo pisaría con el valor calculado contra
-              // shapesTimerStartedAt, perdiendo el bonus.
+              // Adjust shapesTimerDuration (source of truth, see
+              // _shapesTimerTick), not shapesTimeLeft directly — otherwise the
+              // next tick would overwrite it with the value computed against
+              // shapesTimerStartedAt, losing the bonus.
               const elapsed = Math.floor((Date.now() - shapesTimerStartedAt) / 1000);
               const newTimeLeft = Math.min(shapesTimeLeft + 5, 99);
               shapesTimerDuration = elapsed + newTimeLeft;
@@ -1539,7 +1524,7 @@ function showCountryShape(country, ext1, ext2, startDelay) {
         shapesWrongAnswerCount++;
         shapesStreak = 0;
         if (sfxError) { sfxError.currentTime = 0; sfxPlay(sfxError); }
-        // + campaignBase(): ver comentario en la rama correcta de arriba.
+        // + campaignBase(): see comment in the correct branch above.
         if (typeof window._specReportAnswer === 'function') window._specReportAnswer(false, Math.round(shapesScore + ((typeof window.campaignBase === 'function') ? window.campaignBase() : 0)), { index: i });
         if (typeof window._lobbyReportAnswer === 'function' && window._lobbyActive) window._lobbyReportAnswer(false, Math.round(shapesScore));
         if ((window._vsActive || window._lobbyActive) && typeof window._lbWrongEffect === 'function') window._lbWrongEffect('player');
@@ -1621,9 +1606,9 @@ function showCountryShape(country, ext1, ext2, startDelay) {
       }, 500);
       clearTimeout(animTimeout);
       clearTimeout(clipFadeTimeout);
-      // Cortar la transición SIN pinear el transform como matriz px (rompía el
-      // vmin: el translate(-50%,-50%) se volvía px fijos). Se conserva el
-      // style.transform actual, que está en %.
+      // Stop the transition WITHOUT pinning the transform as a px matrix (broke
+      // vmin: translate(-50%,-50%) became fixed px). Keep the current
+      // style.transform, which is in %.
       const frozenOpacity = getComputedStyle(clip).opacity;
       img.style.transition  = 'none';
       img2.style.transition = 'none';
@@ -1635,8 +1620,8 @@ function showCountryShape(country, ext1, ext2, startDelay) {
     tag.appendChild(tagLabel);
     (window.appStage || document.body).appendChild(tag);
 
-    // Ajuste de nombres largos en vmin (no px) para que escale con el viewport
-    // igual que el tag (40.4cqmin) y no se encoja distinto según el zoom.
+    // Long-name fitting in vmin (not px) so it scales with the viewport like
+    // the tag (40.4cqmin) and doesn't shrink differently by zoom.
     const tagVminPx = Math.min(window.STAGE_W, window.STAGE_H) / 100;
     const tagMaxW = 31.8 * tagVminPx;
     let fs = 3.7;
@@ -1836,7 +1821,7 @@ const SHAPE_COUNTRIES = [
 ];
 
 // ── Pool system ──────────────────────────────────────────────────────────────
-// Unlock thresholds: 1 correct → fácil | 10 → medio (3 batches) | 30 → difícil
+// Unlock thresholds: 1 correct → facil | 10 → medio (3 batches) | 30 → dificil
 
 const SHAPES_POOL_INICIO = new Set([
   'Italia','Japon','EstadosUnidos','ReinoUnido','Mexico','Canada','China',
@@ -1897,7 +1882,7 @@ function getActiveShapesPool() {
   if (window.practiceConfig && window.practiceConfig.active && window.practiceConfig.mode === 'shapes') {
     const conts = window.practiceConfig.continents;
     const byContinent = c => conts.has(SHAPE_COUNTRY_CONTINENT[c.name]);
-    // Construir pool filtrado por continente con fallback progresivo por nivel
+    // Build a continent-filtered pool with progressive per-tier fallback
     const inicioFiltered = SHAPE_COUNTRIES.filter(c => SHAPES_POOL_INICIO.has(c.name) && byContinent(c));
     const facil          = SHAPE_COUNTRIES.filter(c => SHAPES_POOL_FACIL.includes(c.name) && byContinent(c));
     const medio          = SHAPE_COUNTRIES.filter(c => SHAPES_POOL_MEDIO.includes(c.name) && byContinent(c));
@@ -1919,10 +1904,10 @@ function getActiveShapesPool() {
       const extra = dificil.filter(c => !filled.includes(c));
       filled = [...filled, ...extra.slice(0, need)];
     }
-    // Pool completo filtrado para el juego (inicio + niveles desbloqueados)
+    // Full filtered pool for the game (inicio + unlocked tiers)
     const fullFiltered = pool.filter(byContinent);
     pool = fullFiltered.length ? fullFiltered : [...filled, ...facil, ...medio];
-    // Garantizar que los de inicio (+ fallback) siempre están en el pool
+    // Ensure the inicio ones (+ fallback) are always in the pool
     filled.forEach(c => { if (!pool.includes(c)) pool.push(c); });
   }
   return pool;
@@ -1940,24 +1925,24 @@ let shapesPregameTimeout = null;
 let shapesAborted = false;
 let shapesEndTimeout1 = null, shapesEndTimeout2 = null;
 let shapesTagsTimeout = null;
-// elapsedMs (opcional): cuánto del 3-2-1 ya pasó del lado del jugador REAL —
-// lo usa el espectador que se une a mitad de la cuenta (ver
-// shapesSpectatorShowPregame) para arrancar en el número/audio que
-// corresponde, en vez de siempre desde "3".
+// elapsedMs (optional): how much of the 3-2-1 already passed on the REAL
+// player's side — used by the spectator joining mid-count (see
+// shapesSpectatorShowPregame) to start at the right number/audio, instead of
+// always from "3".
 function runShapesPregame(onDone, elapsedMs) {
   shapesAborted = false;
   const el  = document.getElementById('pregame-countdown');
   const img = document.getElementById('pregame-countdown-img');
   if (!el || !img) { console.warn('[spec] runShapesPregame: missing el/img, skipping straight to onDone'); onDone(); return; }
   el.style.display = 'flex';
-  // Desbloquear el compositor de Opera al arrancar la cuenta regresiva (ver
-  // window.nudgeRepaint en js/core/ui-helpers.js).
+  // Unblock the Opera compositor when the countdown starts (see
+  // window.nudgeRepaint in js/core/ui-helpers.js).
   if (typeof window.nudgeRepaint === 'function') {
     window.nudgeRepaint();
     setTimeout(window.nudgeRepaint, 120);
   }
-  // Ubicar en qué paso (3/2/1/GO) y cuánto le queda a ESE paso corresponde
-  // arrancar, sumando los "hold" hasta encontrar dónde cae elapsedMs.
+  // Locate which step (3/2/1/GO) and how much of THAT step remains to start
+  // at, summing the "hold" values to find where elapsedMs falls.
   let step = 0;
   let firstStepRemaining = null;
   if (elapsedMs > 0) {
@@ -1977,7 +1962,7 @@ function runShapesPregame(onDone, elapsedMs) {
     sfxPlay(sfxCountdown);
   }
   function showStep() {
-    if (shapesAborted) return; // se abandonó durante el 3-2-1
+    if (shapesAborted) return; // abandoned during the 3-2-1
     if (step >= SHAPES_PREGAME_STEPS.length) { el.style.display = 'none'; onDone(); return; }
     const { src, hold, size } = SHAPES_PREGAME_STEPS[step++];
     const thisHold = firstStepRemaining != null ? firstStepRemaining : hold;
@@ -1993,17 +1978,17 @@ function runShapesPregame(onDone, elapsedMs) {
   showStep();
 }
 
-// Detiene y resetea TODO el modo siluetas (sin scoring ni gameover). Lo usa quitToMenu.
+// Stops and resets ALL of shapes mode (no scoring or gameover). Used by quitToMenu.
 function shapesHardReset() {
   shapesAborted = true;
-  // Sin esto, un tick de _shapesTimerTick que ya estaba en cola cuando se
-  // llamó clearInterval() de abajo (tab en background mucho tiempo, el
-  // browser lo tenía throttled/encolado) pasaba el guard "!shapesRunning" de
-  // _shapesTimerTick igual y disparaba el TIMES UP de verdad ya vueltos al
-  // menú — y como shapesAborted queda en true hasta la próxima ronda, los
-  // setTimeout que esconden el overlay (ver más abajo en el timer real)
-  // también se abortaban solos, dejando el overlay bloqueando toda la
-  // página para siempre (ver flagsHardReset, mismo patrón ahí).
+  // Without this, a _shapesTimerTick tick already queued when clearInterval()
+  // below was called (tab long in the background, browser had it
+  // throttled/queued) passed _shapesTimerTick's "!shapesRunning" guard anyway
+  // and fired the real TIMES UP after returning to the menu — and since
+  // shapesAborted stays true until the next round, the setTimeouts that hide
+  // the overlay (see the real timer below) also aborted themselves, leaving
+  // the overlay blocking the whole page forever (see flagsHardReset, same
+  // pattern).
   shapesRunning = false;
   const _cwImgReset = document.getElementById('shapes-timer-img');
   if (_cwImgReset) _cwImgReset.style.animationPlayState = 'paused';
@@ -2012,7 +1997,7 @@ function shapesHardReset() {
   clearTimeout(shapesTagsTimeout); shapesTagsTimeout = null;
   clearInterval(shapesTimerIntervalId);
   if (window._powerQuitOverlay) {
-    // Bloquear interacciones durante el overlay de game over; los tags quedan visibles
+    // Block interactions during the game-over overlay; the tags stay visible
     shapesGameOver = true;
     shapesBlockInput();
   } else {
@@ -2024,7 +2009,7 @@ function shapesHardReset() {
   clearTimeout(shapesSpeedBonusHideId);
   if (typeof sfxCountdown !== 'undefined') { try { sfxCountdown.pause(); sfxCountdown.currentTime = 0; } catch (e) {} }
   if (!window._powerQuitOverlay && !window._vsShowingResult) {
-    // Quitar silueta/tag/board en curso y el countdown widget
+    // Remove the in-progress silhouette/tag/board and the countdown widget
     document.querySelectorAll('.shapes-tag').forEach(t => t.remove());
     document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
     document.querySelectorAll('.shapes-stage-el').forEach(el => { try { el.remove(); } catch (e) {} });
@@ -2071,16 +2056,16 @@ function shapesPracticePickNext(exc) {
 }
 
 // ── TIMER ─────────────────────────────────────────────────────────────────────
-// shapesTimeLeft se calcula contra shapesTimerStartedAt (Date.now()), no
-// restando 1 por tick — un setInterval throttleado en 2do plano pierde ticks
-// reales y un contador que resta 1 por tick queda atrasado respecto al
-// tiempo real; acá se autocorrige de una sola vez en cuanto vuelve a
-// tickear (o la pestaña vuelve a primer plano), en vez de arrastrar el atraso.
+// shapesTimeLeft is computed against shapesTimerStartedAt (Date.now()), not by
+// subtracting 1 per tick — a background-throttled setInterval loses real ticks
+// and a counter that subtracts 1 per tick falls behind real time; here it
+// self-corrects in one step as soon as it ticks again (or the tab returns to
+// the foreground), instead of dragging the lag.
 function _shapesTimerTick() {
-  // Guarda defensiva — mismo motivo que _timerTick (js/modes/mapgame-play.js) y
-  // _flagsTimerTick (flags.js): un tick fantasma de una ronda ya terminada,
-  // si el interval no se limpió a tiempo, podía mostrar el TIMES UP gigante
-  // encima del menú.
+  // Defensive guard — same reason as _timerTick (js/modes/mapgame-play.js) and
+  // _flagsTimerTick (flags.js): a ghost tick from an already-finished round, if
+  // the interval wasn't cleared in time, could show the giant TIMES UP over the
+  // menu.
   if (!shapesRunning) { clearInterval(shapesTimerIntervalId); return; }
   const _shapesInfinite = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
   if (_shapesInfinite) return;
@@ -2107,9 +2092,9 @@ function _shapesTimerTick() {
     document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
     clearTimeout(shapesCurrentAnimTimeout);
     clearTimeout(shapesCurrentClipFadeTimeout);
-    // Cortar la transición sin pinear el transform como matriz px (eso
-    // convertía el translate(-50%,-50%) en px fijos y rompía el vmin al
-    // zoomear). Dejamos el style.transform actual, que ya está en %.
+    // Stop the transition without pinning the transform as a px matrix (that
+    // turned translate(-50%,-50%) into fixed px and broke vmin on zoom). Keep
+    // the current style.transform, already in %.
     if (shapesCurrentImg)  { shapesCurrentImg.style.transition  = 'none'; }
     if (shapesCurrentImg2) { shapesCurrentImg2.style.transition = 'none'; }
     if (shapesCurrentClip) { const f = getComputedStyle(shapesCurrentClip).opacity;   shapesCurrentClip.style.transition = 'none'; shapesCurrentClip.style.opacity   = f; }
@@ -2145,7 +2130,7 @@ document.addEventListener('visibilitychange', () => {
 
 // ── SHOW / HIDE SHAPES MODE ───────────────────────────────────────────────────
 function showShapesMode() {
-  shapesAborted = false; // nueva sesión: habilitar de nuevo
+  shapesAborted = false; // new session: re-enable
   shapesUnblockInput();
   if (typeof loadGameSFX !== 'undefined') loadGameSFX();
   if (typeof playMusic   !== 'undefined') playMusic(null);
@@ -2163,12 +2148,12 @@ function showShapesMode() {
 
   document.querySelectorAll('.game-bg-city').forEach(el => { el.src = 'images/bg/level2complete.png'; });
   shapesScore = 0; shapesDisplayedScore = 0; shapesStreak = 0; shapesDots = 0;
-  // Marcador inicial = puntaje ACUMULADO de modos previos (campaignBase) —
-  // igual que monuments/cities/banderas al arrancar. Sin esto, shapesAnimateScore
-  // (que solo corre cuando HAY ganancia) dejaba el marcador en 0/stale hasta la
-  // primera respuesta, así que al pasar de un modo anterior a Siluetas el
-  // puntaje se "reiniciaba" visualmente hasta que el jugador acertaba algo
-  // (reportado, banderas→siluetas).
+  // Initial scoreboard = ACCUMULATED score from previous modes (campaignBase)
+  // — like monuments/cities/flags on start. Without this, shapesAnimateScore
+  // (which only runs when there IS a gain) left the scoreboard at 0/stale until
+  // the first answer, so moving from a previous mode to Shapes made the score
+  // visually "reset" until the player got something right (reported,
+  // flags→shapes).
   {
     const _shScoreEl = document.getElementById('score-value');
     if (_shScoreEl) _shScoreEl.textContent = ((typeof window.campaignBase === 'function') ? window.campaignBase() : 0).toLocaleString();
@@ -2218,25 +2203,25 @@ function showShapesMode() {
     c = initSrc[Math.floor(shapesRand() * initSrc.length)];
   }
   showCountryShape(c.name, c.ext1, c.ext2, PREGAME_DURATION);
-  // El widget del cronómetro queda VISIBLE (pausado, con el "60" ya puesto
-  // desde que showCountryShape lo creó) durante el 3-2-1-GO — igual que hace
-  // flags con su propio widget (countdown2.png). Antes se ocultaba acá con
-  // visibility:hidden, inconsistente con flags y el motivo de que "no
-  // aparezca" nada del cronómetro hasta que arrancaba la ronda.
+  // The timer widget stays VISIBLE (paused, with "60" already set since
+  // showCountryShape created it) during the 3-2-1-GO — like flags with its own
+  // widget (countdown2.png). It used to be hidden here with visibility:hidden,
+  // inconsistent with flags and the reason nothing of the timer "appeared"
+  // until the round started.
 
   if (typeof window._specReportPregame === 'function') {
     const _specInf = window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer === 0;
     const _specDur = _specInf ? '∞' : (window.practiceConfig && window.practiceConfig.active && window.practiceConfig.timer > 0)
       ? window.practiceConfig.timer : window.GAME_DURATION;
-    // startedAt: para que un espectador que se une a mitad del 3-2-1 pueda
-    // calcular cuánto ya pasó y arrancar en el número correcto (no siempre
-    // en "3") — ver runShapesPregame(onDone, elapsedMs) más abajo.
-    // mode:'shapes' por las dudas — acá el 'round' YA llega antes que este
-    // 'pregame' y actualiza _mode del lado espectador, pero declararlo acá
-    // también hace que no dependa de ese orden para ser correcto (ver el
-    // mismo campo agregado en flags/cities).
-    // campaignBaseAtStart: el jugador real muestra este número desde el
-    // arranque del 3-2-1 — el espectador no tiene forma propia de saberlo.
+    // startedAt: so a spectator joining mid 3-2-1 can compute how much passed
+    // and start at the right number (not always "3") — see
+    // runShapesPregame(onDone, elapsedMs) below.
+    // mode:'shapes' just in case — here the 'round' ALREADY arrives before this
+    // 'pregame' and updates the spectator's _mode, but declaring it here also
+    // makes it correct regardless of that order (see the same field added in
+    // flags/cities).
+    // campaignBaseAtStart: the real player shows this number from the start of
+    // the 3-2-1 — the spectator has no way of its own to know it.
     window._specReportPregame({
       mode: 'shapes', duration: _specDur, infinite: _specInf, startedAt: Date.now(),
       campaignBaseAtStart: (typeof window.campaignBase === 'function') ? window.campaignBase() : 0,
@@ -2255,7 +2240,7 @@ function showShapesMode() {
     if (_shapesInfinite && tElInit) { tElInit.textContent = '∞'; tElInit.classList.add('timer-number-infinity'); }
     const _tImgInit = document.getElementById('shapes-timer-img');
     if (_tImgInit) _tImgInit.style.animationPlayState = 'running';
-    // Revelar el cronómetro justo cuando empieza el juego
+    // Reveal the timer right when the game starts
     const _cwPost = document.getElementById('shapes-countdown-widget');
     if (_cwPost) _cwPost.style.visibility = '';
 
@@ -2275,7 +2260,7 @@ function _shapesCleanupVisuals() {
 
 function hideShapesMode() {
   shapesUnblockInput();
-  // Quitar elementos interactivos inmediatamente (no se deben poder clickear)
+  // Remove interactive elements immediately (must not be clickable)
   document.querySelectorAll('.shapes-tag').forEach(t => t.remove());
   document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
 
@@ -2299,8 +2284,8 @@ function hideShapesMode() {
     return;
   }
 
-  // ── VERSUS: mantener los PNG de fondo hasta que el usuario salga al panel ──
-  // shapesHardReset (vía quitToMenu) limpia .shapes-stage-el cuando corresponde.
+  // ── VERSUS: keep the background PNGs until the user exits to the panel ──
+  // shapesHardReset (via quitToMenu) clears .shapes-stage-el when appropriate.
   if (window._vsActive && typeof window._vsHandleGameEnd === 'function') {
     document.getElementById('shapes-countdown-widget')?.remove();
     shapesCurrentImg = shapesCurrentImg2 = shapesCurrentClip = null;
@@ -2309,7 +2294,7 @@ function hideShapesMode() {
     return;
   }
 
-  // ── LOBBY: reportar resultado al sistema de sala ──────────
+  // ── LOBBY: report the result to the room system ─────────
   if (window._lobbyActive && typeof window._lobbyHandleGameEnd === 'function') {
     _shapesCleanupVisuals();
     window._lobbyHandleGameEnd(finalScore);
@@ -2318,14 +2303,14 @@ function hideShapesMode() {
 
   _shapesCleanupVisuals();
 
-  // ── PRÁCTICA: redirigir al panel ──────────────────────────
+  // ── PRACTICE: redirect to the panel ───────────────────────
   if (window.practiceConfig && window.practiceConfig.active) {
     window.endPracticeSession(finalScore, shapesCorrectCount, shapesWrongAnswerCount);
     return;
   }
   // ──────────────────────────────────────────────────────────
 
-  // Registrar la partida single-player de figuras para stats.
+  // Log the single-player shapes game for stats.
   if (window.Analytics) window.Analytics.logGame('shapes', finalScore);
 
   const baseShapes = (typeof window.campaignBase === 'function') ? window.campaignBase() : 0;
@@ -2336,9 +2321,9 @@ function hideShapesMode() {
   const newHSBanner = document.getElementById('new-highscore-banner');
   const newHSScore  = document.getElementById('new-highscore-score');
   if (finalScore > prevHS) {
-    // Durante una campaña en curso no se persiste todavía: se guarda como
-    // pendiente y solo se confirma en localStorage al completar la Vuelta
-    // Mundial entera (ver window._commitCampaignHighscores en js/core/campaign.js).
+    // During an in-progress campaign it isn't persisted yet: kept as pending
+    // and only committed to localStorage once the whole Gira Mundial completes
+    // (see window._commitCampaignHighscores in js/core/campaign.js).
     if (window.campaign && window.campaign.active) {
       window.campaign.pendingHS.shapes = finalScore;
     } else {
@@ -2374,7 +2359,7 @@ function hideShapesMode() {
   const checksEndTime = (shapesCorrectCount > 0 ? (shapesCorrectCount - 1) * 0.1 + 0.2 : 0) + 0.4;
   if (typeof buildWrongsRow   !== 'undefined') buildWrongsRow(checksEndTime);
   if (typeof playMusic        !== 'undefined') playMusic(sfxPostgame);
-  // En campaña, precargar assets del modo siguiente (cities) mientras el usuario lee su score
+  // In a campaign, preload the next mode's assets (cities) while the user reads their score
   if (window.campaign && window.campaign.active && typeof window.preloadNextModeAssets === 'function') {
     window.preloadNextModeAssets('game').then(() => window.showGameoverConfirm?.());
   } else {
@@ -2389,9 +2374,9 @@ document.getElementById('loading-shapes-btn').addEventListener('click', () => {
   if (typeof window._setPlaying === 'function') window._setPlaying(true);
   if (typeof loadGameSFX !== 'undefined') loadGameSFX();
   window.pendingGameMode = 'shapes';
-  // Avisar a un posible espectador que entramos a las instrucciones de este
-  // modo — ver comentario largo (con la explicación del defer a microtask)
-  // en el mismo punto de flags.js.
+  // Tell a possible spectator we entered this mode's instructions — see the
+  // long comment (with the microtask-defer rationale) at the same point in
+  // flags.js.
   Promise.resolve().then(() => {
     if (typeof window._specReportSplash === 'function') window._specReportSplash({ mode: 'shapes' });
   });
@@ -2433,7 +2418,7 @@ document.getElementById('loading-shapes-btn').addEventListener('mouseenter', () 
   if (typeof sfxSelect !== 'undefined') { sfxSelect.currentTime = 0; sfxPlay(sfxSelect); }
 });
 
-// ── MODO MONUMENTOS (placeholder) ────────────────────────────────────────────
+// ── MONUMENTS MODE (placeholder) ───────────────────────────────────────────
 document.getElementById('loading-mode4-btn').addEventListener('mouseenter', () => {
   if (typeof sfxSelect !== 'undefined') { sfxSelect.currentTime = 0; sfxPlay(sfxSelect); }
 });
@@ -2444,23 +2429,24 @@ document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   if (typeof window._setPlaying === 'function') window._setPlaying(true);
   if (typeof loadGameSFX !== 'undefined') loadGameSFX();
   window.pendingGameMode = 'monuments';
-  // Avisar a un posible espectador que entramos a las instrucciones de este
-  // modo — ver comentario largo (con la explicación del defer a microtask)
-  // en el mismo punto de flags.js.
+  // Tell a possible spectator we entered this mode's instructions — see the
+  // long comment (with the microtask-defer rationale) at the same point in
+  // flags.js.
   Promise.resolve().then(() => {
     if (typeof window._specReportSplash === 'function') window._specReportSplash({ mode: 'monuments' });
   });
   window.resetSplashEntry?.();
   document.getElementById('loading-screen').style.display = 'none';
-  // Liberar la RAM del modo anterior (cities) ANTES de cargar los assets pesados de
-  // monuments (2 fondos a pantalla completa + flicker). monuments es el modo más
-  // pesado y es el último de la campaña, así que el pico de memoria pega justo acá.
-  // releaseGameMemory suelta el canvas previo, flags-badge-canvas, el video y los
-  // bitmaps de personajes/fondos que monuments no reutiliza; las líneas de abajo
-  // re-asignan solo lo que monuments necesita. monuments.startGame restaura el canvas.
+  // Free the previous mode's (cities) RAM BEFORE loading monuments' heavy
+  // assets (2 full-screen backgrounds + flicker). monuments is the heaviest
+  // mode and the last of the campaign, so the memory peak hits right here.
+  // releaseGameMemory releases the previous canvas, flags-badge-canvas, the
+  // video and the character/background bitmaps monuments doesn't reuse; the
+  // lines below re-assign only what monuments needs. monuments.startGame
+  // restores the canvas.
   if (typeof window.releaseGameMemory === 'function') window.releaseGameMemory();
-  // Actualizar modo y backgrounds ANTES de mostrar el splash para evitar el frame
-  // en blanco que se veía al transicionar desde cities en campaña.
+  // Update mode and backgrounds BEFORE showing the splash to avoid the blank
+  // frame seen when transitioning from cities in a campaign.
   document.getElementById('splash-screen').classList.remove('mode-flags', 'mode-shapes');
   document.getElementById('splash-screen').classList.add('mode-monuments');
   document.getElementById('gameover-screen').classList.remove('mode-flags', 'mode-shapes');
@@ -2470,7 +2456,7 @@ document.getElementById('loading-mode4-btn').addEventListener('click', () => {
   document.querySelectorAll('.game-bg-girl2').forEach(el => el.src = 'images/characters/girl2.png');
   document.querySelectorAll('.game-bg-women1').forEach(el => el.src = 'images/characters/women1.png');
   document.querySelectorAll('.game-bg-women2').forEach(el => el.src = 'images/characters/women1.png');
-  // Liberar level3complete.png (class distinta: .game-bg-city) antes de decodificar los de monuments.
+  // Release level3complete.png (different class: .game-bg-city) before decoding the monuments ones.
   document.querySelectorAll('.game-bg-city').forEach(el => { el.src = ''; });
   document.querySelectorAll('.game-bg-city-monuments').forEach(el => el.src = 'images/bg/level4complete.png');
   document.querySelectorAll('.game-bg-city-monuments2').forEach(el => el.src = 'images/bg/level4complete2.png');

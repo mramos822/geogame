@@ -1,15 +1,15 @@
-// practice-data.js — Datos de continente y dificultad para modo práctica
+// practice-data.js — continent and difficulty data for practice mode
 
-// Código de país (3 letras de cities.js) → continente
+// Country code (3 letters from cities.js) → continent
 const CITY_COUNTRY_CONTINENT = {
-  // América
+  // Americas
   'ARG':'america','BRA':'america','CHI':'america','PER':'america','COL':'america',
   'VEN':'america','ECU':'america','PAR':'america','URU':'america','BOL':'america',
   'GUY':'america','SUR':'america','MEX':'america','CUB':'america','PAN':'america',
   'DOM':'america','HAI':'america','JAM':'america','CRC':'america','GUA':'america',
   'HON':'america','ESA':'america','NCA':'america','BAH':'america','BRB':'america',
   'TRI':'america','USA':'america','CAN':'america','GRL':'america','PRI':'america',
-  // Europa
+  // Europe
   'ENG':'europa','FRA':'europa','ESP':'europa','POR':'europa','ITA':'europa',
   'GER':'europa','NED':'europa','RUS':'europa','TUR':'europa','GRE':'europa',
   'BEL':'europa','AUT':'europa','SWE':'europa','NOR':'europa','DEN':'europa',
@@ -19,7 +19,7 @@ const CITY_COUNTRY_CONTINENT = {
   'CYP':'europa','LVA':'europa','LTU':'europa','SVN':'europa','HRV':'europa',
   'ALB':'europa','MDA':'europa','MKD':'europa','MNE':'europa','LUX':'europa',
   'MLT':'europa','AND':'europa','SMR':'europa','LIE':'europa','GIB':'europa',
-  // África
+  // Africa
   'EGY':'africa','NGA':'africa','RSA':'africa','MAR':'africa','KEN':'africa',
   'ALG':'africa','TUN':'africa','LBA':'africa','SEN':'africa','ETH':'africa',
   'SOM':'africa','COD':'africa','GHA':'africa','TAN':'africa','ANG':'africa',
@@ -28,7 +28,7 @@ const CITY_COUNTRY_CONTINENT = {
   'GNB':'africa','GMB':'africa','SLE':'africa','LBR':'africa','GIN':'africa',
   'TGO':'africa','BEN':'africa','RWA':'africa','BDI':'africa','SSD':'africa',
   'DJI':'africa','ERI':'africa','SWZ':'africa','LSO':'africa','BWA':'africa',
-  // Asia (incluye Medio Oriente)
+  // Asia (includes Middle East)
   'UAE':'asia','KSA':'asia','IRQ':'asia','IRN':'asia','ISR':'asia','LIB':'asia',
   'QAT':'asia','KUW':'asia','JOR':'asia','OMA':'asia','SYR':'asia','YEM':'asia',
   'IND':'asia','PAK':'asia','BAN':'asia','AFG':'asia','NEP':'asia','SRI':'asia',
@@ -37,11 +37,11 @@ const CITY_COUNTRY_CONTINENT = {
   'SIN':'asia','PRK':'asia','TPE':'asia','VIE':'asia','INA':'asia',
   'MAS':'asia','PHI':'asia','MYA':'asia','CAM':'asia','MGL':'asia','LAO':'asia',
   'GEO':'asia','ARM':'asia','AZE':'asia',
-  // Oceanía
+  // Oceania
   'AUS':'oceania','NZL':'oceania','PNG':'oceania','FIJ':'oceania',
 };
 
-// Nombre de país (en countries.js, flags) → continente
+// Country name (in countries.js, flags) → continent
 const FLAG_COUNTRY_CONTINENT = {
   // inicio
   'Estados Unidos':'america','Reino Unido':'europa','Canadá':'america',
@@ -102,7 +102,7 @@ const FLAG_COUNTRY_CONTINENT = {
   'Nueva Caledonia':'oceania','Bahamas':'america','Barbados':'america',
 };
 
-// Nombre interno shape (campo `name` en SHAPE_COUNTRIES) → continente
+// Internal shape name (`name` field in SHAPE_COUNTRIES) → continent
 const SHAPE_COUNTRY_CONTINENT = {
   'China':'asia','Italia':'europa','Chile':'america','Japon':'asia',
   'Australia':'oceania','EstadosUnidos':'america','Brasil':'america',
@@ -166,9 +166,9 @@ const SHAPE_COUNTRY_CONTINENT = {
   'Guayana':'america',
 };
 
-// Dificultad de monumentos (campo img como key)
+// Monument difficulty (img field as key)
 const MONUMENT_DIFF = {
-  // ── FÁCIL: iconos que reconoce cualquier persona de LATAM/España de primera ──
+  // ── EASY: icons anyone from LatAm/Spain recognizes instantly ──
   '1.jpg':'facil',   // Torre Eiffel
   '2.jpg':'facil',   // Estatua de la Libertad
   '4.jpg':'facil',   // Ópera de Sídney
@@ -195,7 +195,7 @@ const MONUMENT_DIFF = {
   '85.jpg':'facil',  // Gran Muralla China
   '86.jpg':'facil',  // Burj Khalifa
   '89.jpg':'facil',  // Big Ben
-  // ── MEDIO: famosos pero requieren algo de conocimiento geográfico ─────────────
+  // ── MEDIUM: famous but require some geographic knowledge ─────────────────────
   '3.jpg':'medio',   // National Mall
   '5.jpg':'medio',   // Templo del Cielo
   '8.jpg':'medio',   // Pabellón de Oro (Kioto)
@@ -239,7 +239,7 @@ const MONUMENT_DIFF = {
   '83.jpg':'medio',  // Hagia Sophia
   '84.jpg':'medio',  // Borobudur
   '90.jpg':'medio',  // Teotihuacán
-  // ── DIFÍCIL: lugares específicos o menos reconocibles ────────────────────────
+  // ── HARD: specific or less recognizable places ─────────────────────────────
   '16.jpg':'dificil',// Molino de Lisse (Holanda)
   '30.jpg':'dificil',// Melrose Abbey (Escocia)
   '34.jpg':'dificil',// Fisherman's Wharf (San Francisco)
@@ -263,7 +263,7 @@ const MONUMENT_DIFF = {
   '88.jpg':'dificil',// Huascarán (Perú)
 };
 
-// Código de país (3 letras) → nombre completo, usado en tag de ciudad
+// Country code (3 letters) → full name, used in the city tag
 const CITY_COUNTRY_NAMES = {
   es: {
     'AFG':'Afganistán','AIA':'Anguila','ALG':'Argelia','AND':'Andorra',

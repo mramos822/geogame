@@ -1,20 +1,19 @@
 // ============================================================================
-// modes/mapgame-leaderboard.js — Barra de amigos/rivales ingame de los modos de mapa: mockPlayers,
-// getTotalHighscore, highscorePlayer, emotes (spawnEmoteBubble), initLeaderboard
-// (+ expone window._lbUpdateEntry/_lbWrongEffect), positionLeaderboard, sortLeaderboard.
-// DEBE cargar DESPUÉS de friends.js (getFriends/onFriendsUpdate/loadFriends) y de
+// modes/mapgame-leaderboard.js — ingame friends/rivals bar for the map modes:
+// mockPlayers, getTotalHighscore, highscorePlayer, emotes (spawnEmoteBubble),
+// initLeaderboard (+ exposes window._lbUpdateEntry/_lbWrongEffect),
+// positionLeaderboard, sortLeaderboard.
+// MUST load AFTER friends.js (getFriends/onFriendsUpdate/loadFriends) and
 // mapgame-vs.js (buildFriendPlayers).
 //
-// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
-// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
-// Son <script> clásicos que comparten un mismo scope global.
+// Classic <script>s sharing one global scope, loaded in order in play/index.html.
 // ============================================================================
 
 let mockPlayers = buildFriendPlayers();
 
-// Highscore global = mejor total de campaña (suma de los 4 modos), guardado por
-// results.js en localStorage 'totalHighscore'. La barra es universal, así que la
-// entrada ★ best usa ese total, no el highscore de un modo individual.
+// Global highscore = best campaign total (sum of the 4 modes), stored by
+// results.js in localStorage 'totalHighscore'. The bar is universal, so the
+// ★ best entry uses that total, not an individual mode's highscore.
 function getTotalHighscore() {
   if (window._sbProfile && window._accountLoggedIn) {
     const p = window._sbProfile;
@@ -56,26 +55,25 @@ let lastPlayerRank = -1;
 function getLbRowHeight() {
   const panel = document.getElementById('right-panel');
   if (!panel) return 84;
-  // offsetWidth (no getBoundingClientRect): el rect viene escalado por el transform
-  // del #app-stage y, al usarse como px de layout, se re-escalaría (entradas apretadas).
+  // offsetWidth (not getBoundingClientRect): the rect is scaled by the
+  // #app-stage transform and, used as layout px, would re-scale (cramped entries).
   return Math.round(panel.offsetWidth * 1.5) + LB_GAP;
 }
 
 function initLeaderboard() {
-  // #leaderboard es compartido con el espectador de siluetas/etc. — sin este
-  // guard, cualquier actualización de la lista de amigos (onFriendsUpdate,
-  // que dispara seguido mientras se espeta a un amigo cuyo score/estado
-  // cambia en vivo) pisaba la tarjeta armada por
-  // shapesSpectatorSetPlayerCard/flagsSpectatorSetPlayerCard con esta
-  // reconstrucción genérica — que SIEMPRE agrega una tarjeta "Tú" con el
-  // perfil del espectador. Ese era el "sale mi cartilla" reportado.
+  // #leaderboard is shared with the shapes/etc. spectator — without this guard,
+  // any friends-list update (onFriendsUpdate, which fires often while spectating
+  // a friend whose score/status changes live) overwrote the card built by
+  // shapesSpectatorSetPlayerCard/flagsSpectatorSetPlayerCard with this generic
+  // rebuild — which ALWAYS adds a "You" card with the spectator's profile. That
+  // was the reported "my card shows up".
   if (window._isSpectating) return;
   const lb = document.getElementById('leaderboard');
   lb.innerHTML = '';
   lb.classList.toggle('vs-active', !!(window._vsActive || window._lobbyActive));
   lbElements = {};
-  mockPlayers = buildFriendPlayers(); // refrescar; en VS devuelve solo al rival
-  highscorePlayer.score = getTotalHighscore(); // ★ best = highscore global de campaña
+  mockPlayers = buildFriendPlayers(); // refresh; in VS returns rival only
+  highscorePlayer.score = getTotalHighscore(); // ★ best = global campaign highscore
 
   if (!window.practiceConfig || !window.practiceConfig.active) {
     mockPlayers.forEach(p => {
@@ -88,12 +86,11 @@ function initLeaderboard() {
       el.innerHTML = `<span class="lb-rank rank-other"></span>` + avatarHTML + `<span class="lb-name">${p.name}</span>` + `<span class="lb-score">${p.score.toLocaleString()}</span>`;
       el.style.transition = 'none';
       el.style.top = '-9999px';
-      // Todas las filas traen su cardCode real ahora (ver buildFriendPlayers:
-      // rival de VS 1v1, cada rival de lobby grupal, Y los amigos reales de
-      // la barra ingame en Gira Mundial solo — antes esto último se
-      // quedaba afuera, con la carta default sin importar qué tuviera
-      // equipado de verdad cada amigo). applyCard ya cae a '0001' si no hay
-      // cardCode, así que aplicarlo siempre es seguro.
+      // Every row carries its real cardCode now (see buildFriendPlayers: 1v1 VS
+      // rival, each group-lobby rival, AND the real friends in the ingame bar in
+      // solo Gira Mundial — the last used to be left out, with the default card
+      // regardless of what each friend actually had equipped). applyCard falls
+      // back to '0001' if there's no cardCode, so applying it always is safe.
       window.CustomizeAssets?.applyCard(el, p.cardCode || '0001');
       lbElements[el.id] = el;
       lb.appendChild(el);
@@ -150,8 +147,8 @@ function initLeaderboard() {
 }
 
 function positionLeaderboard(playerScore, animate) {
-  // La barra es universal para toda la campaña: el jugador compite con el puntaje
-  // acumulado (base de modos previos + modo actual), no con el de cada juego.
+  // The bar is universal across the whole campaign: the player competes with the
+  // accumulated score (previous modes' base + current mode), not each game's.
   playerScore += (window.campaignBase ? window.campaignBase() : 0);
   const lb   = document.getElementById('leaderboard');
   const rowH = getLbRowHeight();
@@ -194,11 +191,11 @@ function positionLeaderboard(playerScore, animate) {
     if (el) el.style.top = ((rank - windowStart) * rowH + bottomOffset) + 'px';
   });
 
-  // Número de posición en cada fila (1°/2°/…) — mismo mecanismo que
-  // flagsPositionLeaderboard. Faltaba acá, así que en versus/lobby de
-  // cities/monuments/shapes (todos usan #leaderboard) el número de puesto en
-  // vivo no aparecía; solo funcionaba en banderas (reportado). El CSS
-  // #leaderboard.vs-active .lb-rank lo hace visible en versus.
+  // Position number on each row (1st/2nd/…) — same mechanism as
+  // flagsPositionLeaderboard. It was missing here, so in cities/monuments/shapes
+  // versus/lobby (all use #leaderboard) the live rank number didn't show; it
+  // only worked in flags (reported). The CSS #leaderboard.vs-active .lb-rank
+  // makes it visible in versus.
   all.forEach((p, rank) => {
     const el = lbElements[`lb-${p.id}`];
     if (!el) return;
@@ -226,16 +223,15 @@ function sortLeaderboard(playerScore) {
 }
 
 initLeaderboard();
-// Cuando la capa de datos refresque la lista (p.ej. al llegar amigos reales del
-// servidor vía loadFriends), reconstruir la barra automáticamente.
-// Guard: durante una Vuelta Mundial en curso, un evento de red (status/score
-// de un amigo cambiando en tiempo real) puede llegar en CUALQUIER momento,
-// incluso justo en medio de una transición entre modos — y esta reconstrucción
-// tira TODA la barra y la vuelve a armar (imágenes/tarjetas Founder incluidas),
-// sumando trabajo de golpe justo donde ya hay más carga por el cambio de modo.
-// No hace falta precisión en vivo ahí: cada modo ya llama a initLeaderboard()
-// por su cuenta al arrancar, así que alcanza con saltear el rebuild reactivo
-// mientras la campaña está activa y dejar que el próximo modo la refresque.
+// When the data layer refreshes the list (e.g. real friends arriving from the
+// server via loadFriends), rebuild the bar automatically.
+// Guard: during an in-progress Gira Mundial, a network event (a friend's
+// status/score changing live) can arrive at ANY time, even mid mode-transition
+// — and this rebuild tears down the WHOLE bar and rebuilds it (images/Founder
+// cards included), piling on work right where the mode switch already adds
+// load. Live precision isn't needed there: each mode calls initLeaderboard()
+// itself on start, so it's enough to skip the reactive rebuild while the
+// campaign is active and let the next mode refresh it.
 if (typeof onFriendsUpdate === 'function') onFriendsUpdate(() => {
   if (window.campaign && window.campaign.active) return;
   initLeaderboard();

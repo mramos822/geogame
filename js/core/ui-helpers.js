@@ -1,16 +1,14 @@
 // ============================================================================
-// core/ui-helpers.js — Helpers de UI reutilizables desde cualquier pantalla: confirms de splash y
-// gameover, video de howtoplay (swapHowtoVideo), resetSplashEntry, hideIngameHud,
-// nudgeRepaint (workaround de Opera), showGlobalToast.
-// Usa IS_MOBILE / IS_CHROME_IOS (core/audio.js) y confirmStep (modes/mapgame-misc.js,
-// leído sólo en runtime bajo try/catch).
+// core/ui-helpers.js — UI helpers reusable from any screen: splash/gameover
+// confirms, howtoplay video (swapHowtoVideo), resetSplashEntry, hideIngameHud,
+// nudgeRepaint (Opera workaround), showGlobalToast.
+// Uses IS_MOBILE / IS_CHROME_IOS (core/audio.js) and confirmStep
+// (modes/mapgame-misc.js, read at runtime under try/catch).
 //
-// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
-// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
-// Son <script> clásicos que comparten un mismo scope global.
+// Classic <script>s sharing one global scope, loaded in order in play/index.html.
 // ============================================================================
 
-// Muestra/oculta el confirm del gameover (se revela tras cargar assets del siguiente modo).
+// Show/hide the gameover confirm (revealed after next mode's assets load).
 window.showGameoverConfirm = function () {
   const w = document.querySelector('.gameover-confirm-wrap');
   if (w) w.classList.add('confirm-ready');
@@ -20,7 +18,7 @@ window.hideGameoverConfirm = function () {
   if (w) w.classList.remove('confirm-ready');
 };
 
-// Muestra/oculta el confirm del splash pre-game.
+// Show/hide the pre-game splash confirm.
 window.showSplashConfirm = function () {
   const w = document.querySelector('.splash-confirm-wrap');
   if (w) w.classList.add('confirm-ready');
@@ -30,30 +28,28 @@ window.hideSplashConfirm = function () {
   if (w) w.classList.remove('confirm-ready');
 };
 
-// Oculta el splash confirm y lo revela cuando el video de howtoplay puede reproducirse.
+// Hide the splash confirm, reveal it once the howtoplay video can play.
 window.waitForHowtoVideo = function () {
   window.hideSplashConfirm();
   const v = document.querySelector('.splash-howtoplay-video');
-  // Chrome-iOS nunca reproduce el video (poster estático, ver IS_CHROME_IOS)
-  // así que no tiene sentido esperar eventos de carga que no van a llegar.
+  // Chrome-iOS never plays the video (static poster), so don't wait for load
+  // events that will never fire.
   if (!v || v.readyState >= 3 || IS_CHROME_IOS) { window.showSplashConfirm(); return; }
   let done = false;
   const reveal = () => { if (!done) { done = true; window.showSplashConfirm(); } };
   v.addEventListener('canplaythrough', reveal, { once: true });
   v.addEventListener('loadeddata',     reveal, { once: true });
   v.addEventListener('error',          reveal, { once: true });
-  setTimeout(reveal, 5000); // fallback de seguridad
+  setTimeout(reveal, 5000); // safety fallback
 };
 
-// Cambia el video de howtoplay. En mobile RECREA el elemento entero (no
-// reusa el mismo <video> con src+load) — el crash-log de una sesión real
-// (18 pasos, ver project_ios_crash_investigation) mostró que el swap
-// flags→shapes es LITERALMENTE lo último que corre antes del crash de iOS:
-// WebKit no libera de forma confiable el decoder/IOSurface del video
-// anterior al pisarle el src mientras sigue montado. Esto ya se había
-// confirmado y arreglado así en la investigación original (1.64) para
-// justo esta transición temprana; se había revertido a swap simple en el
-// cleanup de 1.71 asumiendo que ya no hacía falta — hace falta.
+// Swap the howtoplay video. On mobile, RECREATE the whole element (don't reuse
+// the same <video> with src+load): a real crash log showed the flags→shapes
+// swap is literally the last thing to run before the iOS crash — WebKit doesn't
+// reliably free the previous video's decoder/IOSurface when its src is
+// overwritten while still mounted. Confirmed and fixed this way in the original
+// 1.64 investigation; reverted to a simple swap in the 1.71 cleanup assuming it
+// was no longer needed — it is. See project_ios_crash_investigation.
 window.swapHowtoVideo = function (newSrc) {
   const old = document.querySelector('.splash-howtoplay-video');
   if (!old) return;
@@ -71,41 +67,39 @@ window.swapHowtoVideo = function (newSrc) {
     fresh.muted = true;
     fresh.setAttribute('playsinline', '');
     fresh.setAttribute('preload', 'none');
-    // Chrome-iOS (ver IS_CHROME_IOS más arriba): nunca se llama .play() sobre
-    // este elemento (ver confirm handler), así que sin poster quedaría en
-    // blanco — un frame estático del tutorial en vez del video animado.
+    // Chrome-iOS never calls .play() on this element, so without a poster it
+    // would render blank instead of the animated tutorial.
     if (IS_CHROME_IOS) fresh.poster = newSrc.replace(/howtoplay(\d)\.mp4$/, 'howtoplay$1-poster.jpg');
     old.replaceWith(fresh);
     fresh.src = newSrc;
-    // NO fresh.load() acá — el crash-log mostró que sigue crasheando en el
-    // mismo punto aun recreando el elemento, así que además de recrearlo se
-    // difiere el decode: con preload="none" el navegador no baja/decodifica
-    // nada hasta que se pide reproducir de verdad. Eso pasa recién en el
-    // segundo tap del splash (confirmStep 0→1, más abajo en este archivo,
-    // `howtoVideo.play()`) — un momento bien separado del burst síncrono de
-    // la transición de modo, no en el medio de él.
+    // No fresh.load() here — the crash log showed it still crashes at the same
+    // point even when recreating the element, so also defer the decode: with
+    // preload="none" nothing is downloaded/decoded until playback is actually
+    // requested, which happens on the second splash tap (confirmStep 0→1,
+    // howtoVideo.play() below) — well separated from the synchronous mode
+    // transition burst.
   } catch (e) {}
 };
 
-// Resetea el estado del splash al ENTRAR a un modo (antes de mostrarlo). Necesario
-// porque al terminar una campaña (results/final) confirmStep queda en 1 y la mesa del
-// howtoplay en slide-down; sin esto, la siguiente partida saltea el step2 (confirm va
-// directo a jugar) y la mesa "sube" visiblemente. Se llama con el splash aún oculto
-// (display:none), así quitar slide-down no dispara la animación de transición.
+// Reset splash state when ENTERING a mode (before showing it). Needed because
+// after a campaign (results/final) confirmStep is left at 1 and the howtoplay
+// table slide-down; without this the next game skips step2 and the table
+// visibly "rises". Called while the splash is still display:none so removing
+// slide-down doesn't trigger the transition animation.
 window.resetSplashEntry = function () {
   try { confirmStep = 0; } catch (e) {}
   const w = document.querySelector('.splash-howtoplay-wrap');
   if (w) w.classList.remove('slide-down');
   const l = document.querySelector('.splash-text2-label');
   if (l) l.classList.remove('step2');
-  // Ocultar cualquier HUD ingame que haya quedado visible de una partida previa
-  // (sobre todo el panel de amigos/leaderboard tras un Versus o lobby): si no se
-  // oculta acá, se filtra encima del splash/pre y no desaparece. Ver bug barra de amigos.
+  // Hide any ingame HUD left visible from a previous game (mainly the
+  // friends/leaderboard panel after a Versus or lobby); otherwise it bleeds
+  // over the splash/pre and never disappears.
   if (typeof window.hideIngameHud === 'function') window.hideIngameHud();
 };
 
-// Oculta TODO el HUD de juego (puntaje, countdown, panel de amigos/leaderboard de
-// ambos sets de modos). Reutilizable desde la entrada al splash y los teardown de VS.
+// Hide ALL game HUD (score, countdown, friends/leaderboard panel for both mode
+// sets). Reused from splash entry and VS teardowns.
 window.hideIngameHud = function () {
   ['right-panel','flags-right-panel','score-display','flags-score-display',
    'countdown-widget','flags-countdown-widget','shapes-countdown-widget',
@@ -115,24 +109,23 @@ window.hideIngameHud = function () {
   });
 };
 
-// Fuerza al compositor a presentar un frame nuevo del stage escalado. En Opera
-// (Chromium) la pantalla puede CONGELARSE al iniciar la cuenta regresiva: el hilo
-// principal sigue vivo pero el compositor deja de presentar hasta que el usuario
-// mueve la ventana. Re-aplicar el transform con un translateZ(0) (idéntico
-// visualmente) commitea una nueva capa GPU y desbloquea el render, sin tener que
-// mover la ventana. Inofensivo en Chrome/Edge/Firefox.
+// Force the compositor to present a fresh frame of the scaled stage. In Opera
+// (Chromium) the screen can FREEZE when the countdown starts: the main thread
+// stays alive but the compositor stops presenting until the user moves the
+// window. Re-applying the transform with a visually identical translateZ(0)
+// commits a new GPU layer and unblocks rendering. Harmless in Chrome/Edge/Firefox.
 window.nudgeRepaint = function () {
   const root = document.documentElement;
-  // Toggla --app-nudge (translateZ imperceptible en el transform del stage):
-  // commitea una capa GPU nueva y desbloquea el render congelado de Opera, sin
-  // pisar el centrado/escala que maneja letterbox.js.
+  // Toggle --app-nudge (imperceptible translateZ in the stage transform):
+  // commits a new GPU layer and unblocks Opera's frozen render without
+  // touching the centering/scale managed by letterbox.js.
   root.style.setProperty('--app-nudge', '0.01px');
   requestAnimationFrame(() => {
     requestAnimationFrame(() => { root.style.setProperty('--app-nudge', '0px'); });
   });
 };
 
-// Toast global: visible desde cualquier pantalla (position:fixed en body)
+// Global toast: visible from any screen (position:fixed on body).
 window.showGlobalToast = function(msg) {
   const item = document.createElement('div');
   item.className = 'global-toast-item';

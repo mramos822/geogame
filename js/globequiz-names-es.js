@@ -1,8 +1,8 @@
-// ── GLOBEQUIZ: nombres en español + abreviaciones ──────────────────────────
-// Traducción ES de los 242 nombres del dataset (Natural Earth 50m), y
-// abreviaciones/alias comunes (USA, UK, EEUU, etc.) que resuelven al nombre
-// canónico en inglés (la clave real de countryByName). Todo client-side,
-// sin depender de ningún servicio externo.
+// ── GLOBEQUIZ: Spanish names + abbreviations ────────────────────────────────
+// ES translation of the dataset's 242 names (Natural Earth 50m), and common
+// abbreviations/aliases (USA, UK, EEUU, etc.) that resolve to the canonical
+// English name (the real key of countryByName). All client-side, no external
+// service.
 window.GQ_NAMES_ES = {
   'Afghanistan': 'Afganistán',
   'Albania': 'Albania',
@@ -224,9 +224,9 @@ window.GQ_NAMES_ES = {
   'eSwatini': 'Esuatini',
 };
 
-// Alias/abreviaciones -> nombre canónico EN (la clave real del dataset).
-// Se normalizan igual que cualquier guess (sin acentos, minúsculas) antes de
-// comparar, así que las claves de acá van "limpias" ya en minúscula sin tilde.
+// Aliases/abbreviations -> canonical EN name (the dataset's real key).
+// Normalized like any guess (no accents, lowercase) before comparing, so the
+// keys here are already "clean" lowercase with no accents.
 window.GQ_ABBREVIATIONS = {
   'usa': 'United States of America',
   'us': 'United States of America',

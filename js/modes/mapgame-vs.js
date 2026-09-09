@@ -1,21 +1,19 @@
 // ============================================================================
-// modes/mapgame-vs.js — Capa VS/lobby de los modos de mapa: buildFriendPlayers (arma la barra de
-// rivales), hooks de VS 1v1 y de lobby grupal (score del rival, wrong/timesup,
-// desconexión), citiesHardReset/monumentsHardReset, y el RNG sembrado de
-// Monumentos (monumentsSetSeed).
+// modes/mapgame-vs.js — VS/lobby layer for the map modes: buildFriendPlayers
+// (builds the rivals bar), 1v1 VS and group lobby hooks (rival score,
+// wrong/timesup, disconnect), citiesHardReset/monumentsHardReset, and the
+// Monuments seeded RNG (monumentsSetSeed).
 //
-// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
-// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
-// Son <script> clásicos que comparten un mismo scope global.
+// Classic <script>s sharing one global scope, loaded in order in play/index.html.
 // ============================================================================
 
 const LB_COLORS = ['#e74c3c','#e67e22','#f1c40f','#2ecc71','#1abc9c',
                     '#3498db','#9b59b6','#e91e63','#00bcd4','#8bc34a'];
-// La barra de amigos ingame se construye desde la capa de datos compartida
-// (js/friends.js -> getFriends()), la misma que usan las pantallas results/final.
-// friends.js se carga antes que este archivo, así getFriends() ya tiene datos.
+// The ingame friends bar is built from the shared data layer (js/friends.js ->
+// getFriends()), the same one the results/final screens use. friends.js loads
+// before this file, so getFriends() already has data.
 function buildFriendPlayers() {
-  // En lobby grupal: todos los rivales de la sala
+  // Group lobby: all the room's rivals
   if (window._lobbyActive && Array.isArray(window._lobbyMembers)) {
     return window._lobbyMembers.map(m => ({
       id: 'lob' + m.id,
@@ -27,7 +25,7 @@ function buildFriendPlayers() {
       cardCode: m.cardCode || '0001',
     }));
   }
-  // En VS 1v1 (shapes): solo el rival
+  // 1v1 VS (shapes): rival only
   if (window._vsActive && window._vsOpponent) {
     const o = window._vsOpponent;
     return [{
@@ -52,7 +50,7 @@ function buildFriendPlayers() {
   }));
 }
 
-// ── Hooks VS para modo Cities ─────────────────────────────────────────────────
+// ── VS hooks for Cities mode ────────────────────────────────────────────────
 window.citiesSetVsDisconnected = function(disconnected) {
   const el = typeof lbElements !== 'undefined' ? lbElements['lb-vsopp'] : null;
   if (!el) return;
@@ -61,12 +59,12 @@ window.citiesSetVsDisconnected = function(disconnected) {
 window.citiesSetVsOpponentScore = function(score) {
   window._vsOppScore = score;
   if (typeof window._lbUpdateEntry === 'function') window._lbUpdateEntry('vsopp', score);
-  // Durante el espectador, el leaderboard lo posiciona el renderer de
-  // espectador (_renderGroupLeaderboard / citiesSpectatorReposition), NO el
-  // positionLeaderboard normal anclado ABAJO — llamarlo acá lo hacía pelear
-  // con el de grupo (anclado arriba) y las celdas saltaban de posición (el
-  // "se buguea la posición de las celdas al pasar de jugador a espectador"
-  // reportado). Ver también el render loop y el resize, ya guardados.
+  // While spectating, the leaderboard is positioned by the spectator renderer
+  // (_renderGroupLeaderboard / citiesSpectatorReposition), NOT the normal
+  // bottom-anchored positionLeaderboard — calling it here made it fight the
+  // group one (top-anchored) and cells jumped position (the reported "cell
+  // positions bug out when switching from player to spectator"). See also the
+  // render loop and the resize handler.
   if (window._isSpectating) { window._refreshGroupSpectatorLeaderboard?.(); return; }
   if (typeof positionLeaderboard === 'function' && state) positionLeaderboard(state.score, true);
 };
@@ -76,7 +74,7 @@ window.citiesTriggerOpponentWrong = function() {
 window.monumentsSetVsOpponentScore = function(score) {
   window._vsOppScore = score;
   if (typeof window._lbUpdateEntry === 'function') window._lbUpdateEntry('vsopp', score);
-  // Ver comentario en citiesSetVsOpponentScore — mismo motivo.
+  // See comment in citiesSetVsOpponentScore — same reason.
   if (window._isSpectating) { window._refreshGroupSpectatorLeaderboard?.(); return; }
   if (typeof positionLeaderboard === 'function' && state) positionLeaderboard(state.score, true);
 };
@@ -84,9 +82,9 @@ window.monumentsTriggerOpponentWrong = function() {
   if (typeof window._lbWrongEffect === 'function') window._lbWrongEffect('vsopp');
 };
 
-// ── "Se acabó el tiempo" (timesup) — MISMO sistema que el "wrong", pero
-// disparado cuando a un jugador se le termina el tiempo (temblor + cronómetro,
-// ver window._applyTimesUpEffect). Cities y Monuments comparten #leaderboard.
+// ── "Time's up" (timesup) — SAME system as "wrong", but triggered when a
+// player runs out of time (shake + stopwatch, see window._applyTimesUpEffect).
+// Cities and Monuments share #leaderboard.
 window._lbTimesUpEffect = function(id) {
   if (typeof window._applyTimesUpEffect === 'function' && typeof lbElements !== 'undefined') window._applyTimesUpEffect(lbElements['lb-' + id]);
 };
@@ -99,11 +97,11 @@ window.citiesTriggerOpponentTimesUp = window.monumentsTriggerOpponentTimesUp = f
   window._lbTimesUpEffect('vsopp');
 };
 
-// ── Hooks Lobby para modo Cities ──────────────────────────────────────────────
+// ── Lobby hooks for Cities mode ─────────────────────────────────────────────
 window.citiesSetLobbyScores = function(members) {
   if (!Array.isArray(members) || typeof window._lbUpdateEntry !== 'function') return;
   members.forEach(m => window._lbUpdateEntry('lob' + m.id, m.score || 0));
-  // Ver comentario en citiesSetVsOpponentScore — mismo motivo.
+  // See comment in citiesSetVsOpponentScore — same reason.
   if (window._isSpectating) { window._refreshGroupSpectatorLeaderboard?.(); return; }
   if (typeof positionLeaderboard === 'function' && state) positionLeaderboard(state.score, true);
 };
@@ -129,7 +127,7 @@ window.citiesHardReset = function() {
   if (_tuo) { _tuo.style.display = 'none'; _tuo.classList.remove('timeup-in','timeup-out'); }
 };
 
-// ── Monuments lobby hooks (idéntico al patrón de cities) ─────────────────────
+// ── Monuments lobby hooks (identical to the cities pattern) ──────────────────
 let _monumentsSeededRand = null;
 function monumentsRand() { return _monumentsSeededRand ? _monumentsSeededRand() : Math.random(); }
 window.monumentsSetSeed = function(seed) {
@@ -153,7 +151,7 @@ window.monumentsHardReset = function() {
 window.monumentsSetLobbyScores = function(members) {
   if (!Array.isArray(members) || typeof window._lbUpdateEntry !== 'function') return;
   members.forEach(m => window._lbUpdateEntry('lob' + m.id, m.score || 0));
-  // Ver comentario en citiesSetVsOpponentScore — mismo motivo.
+  // See comment in citiesSetVsOpponentScore — same reason.
   if (window._isSpectating) { window._refreshGroupSpectatorLeaderboard?.(); return; }
   if (typeof positionLeaderboard === 'function' && state) positionLeaderboard(state.score, true);
 };

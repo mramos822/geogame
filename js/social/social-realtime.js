@@ -1,16 +1,14 @@
 // ============================================================================
-// social/social-realtime.js — Canales de Supabase Realtime para amigos (estados online/jugando, cambios de
-// friendship) + polls de respaldo (5s) + badge de solicitudes + parcheo en vivo de
-// filas del panel social.
+// social/social-realtime.js — Supabase Realtime channels for friends
+// (online/playing status, friendship changes) + backup polls (5s) + requests
+// badge + live patching of social-panel rows.
 //
-// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
-// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
-// Son <script> clásicos que comparten un mismo scope global.
+// Classic <script>s sharing one global scope, loaded in order in play/index.html.
 // ============================================================================
 
 let _friendRealtimeChannel = null;
 let _friendshipsChannel    = null;
-let _knownRequestIds       = null; // null = primera carga, no mostrar notif
+let _knownRequestIds       = null; // null = first load, don't show notif
 let _socialReloadTimer     = null;
 function _debouncedLoadSocial() {
   clearTimeout(_socialReloadTimer);
@@ -32,7 +30,7 @@ function _patchFriendStatusInDOM(friendId) {
       if (statusEl && prevCls !== st.cls) {
         statusEl.innerHTML = `<span class="dot ${st.cls}"></span>${socialStatusText(f)}`;
       } else if (statusEl) {
-        // Solo actualizar el texto, sin tocar el dot (no reinicia la animación)
+        // Only update the text, don't touch the dot (doesn't restart the animation)
         const textNode = statusEl.lastChild;
         const newText = socialStatusText(f);
         if (textNode && textNode.nodeType === Node.TEXT_NODE) textNode.textContent = newText;
@@ -47,11 +45,10 @@ function _patchFriendStatusInDOM(friendId) {
     if (rankName && rk) rankName.textContent = rk.name;
     const rankImg = row.querySelector('.loading-social-emote');
     if (rankImg && rk) rankImg.src = rk.img;
-    // Ojo de espectar: agregar/quitar en vivo si cambia is_playing/is_practicing
-    // mientras la fila ya está en pantalla (si no, quedaba desactualizado hasta
-    // el próximo renderSocialFriends() completo). Vive DENTRO de
-    // .loading-social-score (a la izquierda de points.png, ver CSS) en vez
-    // de al lado del nombre.
+    // Spectate eye: add/remove live when is_playing/is_practicing changes while
+    // the row is already on screen (otherwise it stayed stale until the next
+    // full renderSocialFriends()). Lives INSIDE .loading-social-score (left of
+    // points.png, see CSS) rather than next to the name.
     const scoreBox = row.querySelector('.loading-social-score');
     if (scoreBox) {
       const shouldShowEye = st.cls === 'playing' && !f.is_practicing;
@@ -71,7 +68,7 @@ function _patchFriendStatusInDOM(friendId) {
       }
     }
   });
-  // Si el panel de detalle de ese amigo está abierto, actualizarlo también
+  // If that friend's detail panel is open, update it too
   if (currentFriendProfile?.id === friendId) {
     currentFriendProfile.last_active = f.last_active;
     currentFriendProfile.is_playing  = f.is_playing;
@@ -82,7 +79,7 @@ function _patchFriendStatusInDOM(friendId) {
 let _lastSubscribedFriendIds = '';
 function _subscribeFriendStatuses(friendIds) {
   const key = [...friendIds].sort().join(',');
-  if (_friendRealtimeChannel && key === _lastSubscribedFriendIds) return; // sin cambios
+  if (_friendRealtimeChannel && key === _lastSubscribedFriendIds) return; // no change
   if (_friendRealtimeChannel) { window.sb.removeChannel(_friendRealtimeChannel); _friendRealtimeChannel = null; }
   _lastSubscribedFriendIds = key;
   if (!friendIds.length) return;
@@ -98,15 +95,15 @@ function _subscribeFriendStatuses(friendIds) {
       f.last_active   = updated.last_active;
       f.is_playing    = updated.is_playing;
       f.is_practicing = updated.is_practicing;
-      // gq_streak_last_date/gq_today_time_ms: así, si un amigo termina su
-      // GlobeQuiz de hoy MIENTRAS ya tenés el panel social abierto (o el
-      // realtime ya suscrito), su carta puede aparecer en tu próxima partida
-      // sin esperar a un loadSocialData completo.
+      // gq_streak_last_date/gq_today_time_ms: so if a friend finishes today's
+      // GlobeQuiz WHILE the social panel is already open (or realtime already
+      // subscribed), their card can show in your next game without waiting for a
+      // full loadSocialData.
       f.gqStreakCount    = updated.gq_streak_count || 0;
       f.gqStreakLastDate = updated.gq_streak_last_date || null;
       f.gqTodayTimeMs    = (typeof updated.gq_today_time_ms === 'number') ? updated.gq_today_time_ms : null;
-      // Sincronizar caché de friends.js (usada por el panel de invitar del lobby
-      // y por la barra de amigos in-game de GlobeQuiz, ver buildGqFriendRows)
+      // Sync the friends.js cache (used by the lobby invite panel and the
+      // in-game GlobeQuiz friends bar, see buildGqFriendRows)
       if (typeof getFriends === 'function') {
         const fc = getFriends().find(x => x.id === updated.id);
         if (fc) {
@@ -114,9 +111,9 @@ function _subscribeFriendStatuses(friendIds) {
           fc.gqStreakCount = f.gqStreakCount; fc.gqStreakLastDate = f.gqStreakLastDate; fc.gqTodayTimeMs = f.gqTodayTimeMs;
         }
       }
-      // Refrescar en vivo el panel de amigos de la sala si está abierto
+      // Live-refresh the room's friends panel if open
       window._refreshLobbyInviteList?.();
-      // Actualizar avatar si cambió
+      // Update avatar if it changed
       if (updated.avatar_url && updated.avatar_url !== f.avatar) {
         f.avatar = updated.avatar_url;
         if (currentFriendProfile?.id === updated.id) {
@@ -124,11 +121,11 @@ function _subscribeFriendStatuses(friendIds) {
           const pic = document.getElementById('loading-friend-pic');
           if (pic) pic.src = updated.avatar_url;
         }
-        // Parchear avatar en paneles de solicitudes/enviadas/bloqueados
+        // Patch avatar in the requests/sent/blocked panels
         document.querySelectorAll(`.loading-social-row[data-friend-id="${updated.id}"] .loading-social-avatar`)
           .forEach(el => { el.src = updated.avatar_url; });
       }
-      // Actualizar play_count si cambió
+      // Update play_count if it changed
       if (updated.play_count != null && updated.play_count !== f.play_count) {
         f.play_count = updated.play_count;
         if (currentFriendProfile?.id === updated.id) {
@@ -137,15 +134,14 @@ function _subscribeFriendStatuses(friendIds) {
           if (pcEl) pcEl.textContent = tn('profile.friendPlayed', f.play_count);
         }
       }
-      // Actualizar score si cambió (amigo terminó partida)
-      // hs_total (columna) nunca queda seteada server-side para algunas
-      // cuentas (queda en 0 aunque hs_flags/hs_shapes/hs_cities/hs_monuments
-      // sí tengan puntaje real) — mismo fallback que toEntry() (sb.js) y el
-      // helper de más abajo en este archivo (línea ~1868, Math.max). Sin
-      // este fallback ACÁ, cualquier UPDATE de perfil del amigo (is_playing,
-      // avatar, lo que sea — no hace falta que cambie el score) pisaba el
-      // valor correcto con 0 hasta el próximo refetch completo — el "los
-      // datos van cambiando entre 0 y el detalle actual" reportado.
+      // Update score if it changed (friend finished a game).
+      // The hs_total column is never set server-side for some accounts (stays 0
+      // even when hs_flags/hs_shapes/hs_cities/hs_monuments have real scores) —
+      // same fallback as toEntry() (sb.js) and the helper below (Math.max).
+      // Without this fallback HERE, any friend profile UPDATE (is_playing,
+      // avatar, anything — score need not change) overwrote the correct value
+      // with 0 until the next full refetch — the reported "data flipping
+      // between 0 and the current detail".
       const newScore = updated.hs_total || ((updated.hs_flags||0)+(updated.hs_shapes||0)+(updated.hs_cities||0)+(updated.hs_monuments||0));
       if (newScore !== f.score) {
         f.score       = newScore;
@@ -153,7 +149,7 @@ function _subscribeFriendStatuses(friendIds) {
         f.hs_shapes   = updated.hs_shapes   || 0;
         f.hs_cities   = updated.hs_cities   || 0;
         f.hs_monuments= updated.hs_monuments|| 0;
-        // Si el panel de detalle está abierto para este amigo, actualizar stats
+        // If this friend's detail panel is open, update stats
         if (currentFriendProfile?.id === updated.id) {
           currentFriendProfile.score        = f.score;
           currentFriendProfile.hs_flags     = f.hs_flags;
@@ -177,7 +173,7 @@ function _subscribeFriendStatuses(friendIds) {
           if (rankLabel && rk) rankLabel.textContent = rk.name;
         }
       }
-      // Si el sort es por conexión, re-renderizar la lista para re-ordenar en tiempo real
+      // If sorting by connection, re-render the list to re-order in realtime
       if (socialSort === 'conn') {
         const panelOpen = !document.getElementById('loading-social-group')?.classList.contains('table-gone');
         const friendDetailOpen = !document.getElementById('loading-friend-group')?.classList.contains('table-gone');
@@ -187,7 +183,7 @@ function _subscribeFriendStatuses(friendIds) {
       } else {
         _patchFriendStatusInDOM(updated.id);
       }
-      // Si el panel de detalle está abierto para este amigo, actualizar status
+      // If this friend's detail panel is open, update status
       if (currentFriendProfile?.id === updated.id) {
         currentFriendProfile.last_active = updated.last_active;
         currentFriendProfile.is_playing  = updated.is_playing;
@@ -198,19 +194,19 @@ function _subscribeFriendStatuses(friendIds) {
 }
 
 function _subscribeFriendshipChanges(userId) {
-  if (_friendshipsChannel) return; // ya suscrito — no recrear
+  if (_friendshipsChannel) return; // already subscribed — don't recreate
   if (!userId) return;
   _friendshipsChannel = window.sb
     .channel('friendship-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, () => {
-      // Supabase no garantiza el payload completo sin REPLICA IDENTITY FULL,
-      // así que recargamos siempre que llegue cualquier evento de la tabla.
+      // Supabase doesn't guarantee the full payload without REPLICA IDENTITY
+      // FULL, so we reload on any event from the table.
       _debouncedLoadSocial();
     })
     .subscribe();
 }
 
-// Chequeo ligero del badge cuando el panel está cerrado (solo cuenta pendientes).
+// Light badge check when the panel is closed (only counts pending).
 async function _checkRequestsBadge() {
   if (!window._accountLoggedIn || !window._sbUserId) return;
   const panelOpen = !document.getElementById('loading-social-group')?.classList.contains('table-gone');
@@ -221,26 +217,26 @@ async function _checkRequestsBadge() {
     const ids = (data || []).map(r => r.id);
     const badge = document.getElementById('social-notif-badge');
     if (badge) badge.style.display = ids.length > 0 ? 'flex' : 'none';
-    // Si el Realtime de `friendships` se pierde por latencia/red (ej. rival en
-    // Singapur), este poll de 5s era el único que se enteraba de una solicitud
-    // nueva con el panel cerrado — pero solo pintaba el badge, nunca la
-    // notificación banner. Si aparece un id que no estaba en _knownRequestIds,
-    // hacemos el load completo, que sí arma la notif (_updateSocialBadge).
+    // If `friendships` Realtime is lost to latency/network (e.g. rival in
+    // Singapore), this 5s poll was the only thing noticing a new request with
+    // the panel closed — but it only painted the badge, never the banner notif.
+    // If an id appears that wasn't in _knownRequestIds, do the full load, which
+    // does build the notif (_updateSocialBadge).
     if (_knownRequestIds !== null && ids.some(id => !_knownRequestIds.has(id))) {
       loadSocialData(false);
     }
   } catch (e) {}
 }
 
-// Poll: re-renderiza si panel abierto; actualiza badge si cerrado.
+// Poll: re-render if panel open; update badge if closed.
 function _startSocialListPoll() {
   clearInterval(_socialListPollInterval);
   _socialListPollInterval = setInterval(() => {
     const panelOpen = !document.getElementById('loading-social-group')?.classList.contains('table-gone');
     if (!panelOpen) { _checkRequestsBadge(); return; }
     const friendDetailOpen = !document.getElementById('loading-friend-group')?.classList.contains('table-gone');
-    // Resync completo cada 5s: captura cambios de friendships que Realtime perdió
-    // y re-ordena la lista si el sort es por conexión.
+    // Full resync every 5s: catches friendship changes Realtime missed and
+    // re-orders the list if sorting by connection.
     loadSocialData(false);
   }, 5000);
 }

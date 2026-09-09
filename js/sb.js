@@ -1,74 +1,72 @@
-// ── SUPABASE CLIENT (global, sin ES modules) ──────────────────────────────────
+// ── SUPABASE CLIENT (global, no ES modules) ─────────────────────────────────
 const _SB_URL  = 'https://xituwurshmaqsnnnrdhx.supabase.co';
 const _SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhpdHV3dXJzaG1hcXNubm5yZGh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyMjU0OTUsImV4cCI6MjA5NjgwMTQ5NX0.jlT6O8dkuYXc8F3fOK_QXgH4Sqw6dAbhi2EIkvcS7Mk';
 
 const sb = supabase.createClient(_SB_URL, _SB_ANON);
 window.sb = sb;
 
-// ── PERSONALIZACIÓN (items por código, preparado para la futura tienda) ───────
-// images/customize/{frames,cards,panels,emotes,cells}/<code>.png — '0001' es
-// el default gratis para todos. frame_code/card_code/panel_code/cell_code
-// viven en profiles (ver migraciones customize_item_codes y
-// customize_cell_code). Un solo lugar para construir las URLs y aplicar el
-// marco/tarjeta/celda, para no repetir el patrón en cada archivo.
-// frame = anillo de la foto (tanto la FOTO GRANDE del perfil propio como el
-// circulito de cada fila en Rankings/Amigos). cell = el fondo de TODA LA FILA
-// (.loading-social-row) donde aparece en Rankings/Amigos — no solo el
-// circulito del avatar, toda la tarjeta con nombre/puntaje/etc.
-// NOTA: _abs() devuelve una URL absoluta completa (protocolo+host+path),
-// resuelta contra document.baseURI (que ya incluye el <base href="../">) —
-// NO una ruta relativa ni una con "/" inicial a secas. Es necesario porque
-// estos códigos se usan de dos formas distintas: (a) como <img src>, que
-// respeta <base>, y (b) dentro de var(--cust-frame) consumida por
-// background-image en css/style.css, donde un url() relativo se resuelve
-// contra la ubicación DE LA HOJA DE ESTILOS (css/), ignorando <base> —
-// terminaba pidiendo css/images/... (404, marco invisible). Una ruta con "/"
-// inicial a secas arregla (b) pero rompe (a) si el sitio no está servido
-// justo en la raíz del dominio (deploys en subcarpeta). Una URL absoluta ya
-// resuelta en JS sirve para ambos casos sin asumir dónde vive el dominio.
-// Cuánto tiene que sobresalir la caja del ::after del marco respecto al wrap
-// (ver .cust-frame-wrap::after en style.css) para que el borde INTERNO del
-// aro de cada PNG quede al ras del borde de la foto, sin pisarla ni flotar
-// de más adentro. Cada código tiene su propia proporción de aro dentro del
-// canvas (medida con muestreo radial, no a ojo — ver images/customize/frames/):
-//   0001.png (129×129): aro simple parejo, radio interno 50 de 64.5 de
-//     semi-lienzo (~77.5%) → inset -14.5%.
-//   0002.png (152×148, Founder): radio interno ~47.5 de 74 (~64.2%) →
-//     mínimo -27.9%, subido a -30% a pedido (un toque más grande).
-// Si se agrega un frame code nuevo, medirle el radio interno del aro de la
-// misma forma y sumar su entrada acá — no reusar un valor de otro asset.
+// ── CUSTOMIZATION (items by code, ready for the future shop) ─────────────────
+// images/customize/{frames,cards,panels,emotes,cells}/<code>.png — '0001' is
+// the free default for everyone. frame_code/card_code/panel_code/cell_code live
+// in profiles (see migrations customize_item_codes and customize_cell_code).
+// One place to build the URLs and apply the frame/card/cell, so the pattern
+// isn't repeated in every file.
+// frame = the photo ring (both the profile's LARGE PHOTO and the circle in each
+// Rankings/Friends row). cell = the background of the WHOLE ROW
+// (.loading-social-row) where it appears in Rankings/Friends — not just the
+// avatar circle, the whole card with name/score/etc.
+// NOTE: _abs() returns a full absolute URL (protocol+host+path), resolved
+// against document.baseURI (which already includes <base href="../">) — NOT a
+// relative path nor a bare leading-"/" one. Needed because these codes are used
+// two ways: (a) as <img src>, which respects <base>, and (b) inside
+// var(--cust-frame) consumed by background-image in css/style.css, where a
+// relative url() resolves against the STYLESHEET's location (css/), ignoring
+// <base> — it ended up requesting css/images/... (404, invisible frame). A bare
+// leading-"/" path fixes (b) but breaks (a) if the site isn't served at the
+// domain root (subfolder deploys). A pre-resolved absolute URL in JS works for
+// both without assuming where the domain lives.
+// How far the frame's ::after box must overhang the wrap (see
+// .cust-frame-wrap::after in style.css) so the INNER edge of each PNG's ring
+// sits flush with the photo edge, without covering it or floating too far in.
+// Each code has its own ring ratio within the canvas (measured by radial
+// sampling, not by eye — see images/customize/frames/):
+//   0001.png (129×129): simple even ring, inner radius 50 of 64.5 half-canvas
+//     (~77.5%) → inset -14.5%.
+//   0002.png (152×148, Founder): inner radius ~47.5 of 74 (~64.2%) → minimum
+//     -27.9%, bumped to -30% on request (a touch bigger).
+// If a new frame code is added, measure its ring inner radius the same way and
+// add its entry here — don't reuse another asset's value.
 window.CUSTOMIZE_FRAME_INSET = {
   '0001': '-14.5%',
   '0002': '-30%',
 };
 
-// Cells (images/customize/cells/<code>.png) en "modo oscuro": fondo lo
-// bastante oscuro u "ocupado" (textura, degradé) como para que el texto de
-// posición/nombre en su color normal (marrón #8b6a00/#4a3b00) se pierda —
-// para esas, el nombre pasa a blanco con contorno del color que tendría
-// normalmente (ver .cell-light-text en style.css y _swatchPreview en
-// js/menu/customize-panel.js). '0001' (fondo claro/beige) no es modo oscuro. Si se agrega
-// un cell code nuevo de fondo oscuro, sumarlo acá — no hace falta tocar CSS
-// ni el JS de cada renderer, todos leen de esta lista.
+// Cells (images/customize/cells/<code>.png) in "dark mode": a background dark
+// or "busy" enough (texture, gradient) that the position/name text in its
+// normal color (brown #8b6a00/#4a3b00) gets lost — for those, the name turns
+// white with an outline in the color it would normally be (see .cell-light-text
+// in style.css and _swatchPreview in js/menu/customize-panel.js). '0001'
+// (light/beige background) is not dark mode. If a new dark-background cell code
+// is added, add it here — no CSS or per-renderer JS change needed, they all
+// read from this list.
 window.CUSTOMIZE_CELL_LIGHT_TEXT = new Set(['0002', '0009']);
 
-// Mismo "modo oscuro" pero para cards (images/customize/cards/<code>.png,
-// la ficha del leaderboard in-game): cuando el fondo de la carta es oscuro,
-// el nombre/puntaje pasan a blanco con contorno del color que tendrían
-// normalmente (ver .card-light-text en style.css). applyCard() abajo agrega
-// la clase sola, así que los 3 lugares que llaman a applyCard (#lb-player,
-// #flags-lb-player, #customize-preview-lb-card) la reciben gratis; el único
-// lugar que NO pasa por applyCard es el swatch de la grilla
-// (_swatchPreview 'leaderboard' en js/modes/mapgame-leaderboard.js, arma el HTML a mano), que
-// chequea este mismo set directamente.
+// Same "dark mode" but for cards (images/customize/cards/<code>.png, the
+// in-game leaderboard card): when the card background is dark, the name/score
+// turn white with an outline in the color they would normally be (see
+// .card-light-text in style.css). applyCard() below adds the class itself, so
+// the 3 places that call applyCard (#lb-player, #flags-lb-player,
+// #customize-preview-lb-card) get it for free; the only place that does NOT go
+// through applyCard is the grid swatch (_swatchPreview 'leaderboard' in
+// js/modes/mapgame-leaderboard.js, builds the HTML by hand), which checks this
+// same set directly.
 window.CUSTOMIZE_CARD_LIGHT_TEXT = new Set(['0002']);
 
-// Cells que tienen una variante "-green" propia (images/customize/cells/
-// <code>-green.png) para el estado "jugando" — cuando existe, se usa esa
-// imagen tal cual en vez del tinte animado genérico (::before + mix-blend
-// en style.css, ver .status-playing). Cualquier código NO listado acá sigue
-// funcionando con el tinte de siempre — no hace falta pintar una variante
-// para cada cell nueva, es opcional.
+// Cells that have their own "-green" variant (images/customize/cells/
+// <code>-green.png) for the "playing" state — when it exists, that image is
+// used as-is instead of the generic animated tint (::before + mix-blend in
+// style.css, see .status-playing). Any code NOT listed here still works with
+// the usual tint — a variant per new cell is optional.
 window.CUSTOMIZE_CELL_GREEN_VARIANTS = new Set(['0002']);
 
 window.CustomizeAssets = {
@@ -78,21 +76,21 @@ window.CustomizeAssets = {
   panelUrl(code) { return this._abs(`images/customize/panels/${code || '0001'}.png`); },
   emoteUrl(code) { return this._abs(`images/customize/emotes/${code || '0001'}.png`); },
   cellUrl(code)  { return this._abs(`images/customize/cells/${code || '0001'}.png`); },
-  // URL de celda a usar cuando la fila está "jugando": la variante -green
-  // dedicada si existe para ese código, si no la celda normal de siempre
-  // (con el tinte CSS haciéndose cargo, ver applyCellForStatus más abajo).
+  // Cell URL to use when the row is "playing": the dedicated -green variant if
+  // it exists for that code, otherwise the usual normal cell (with the CSS tint
+  // taking over, see applyCellForStatus below).
   cellUrlPlaying(code) {
     return window.CUSTOMIZE_CELL_GREEN_VARIANTS.has(code)
       ? this._abs(`images/customize/cells/${code}-green.png`)
       : this.cellUrl(code);
   },
-  // Setea --cust-cell (arte normal, siempre) y --cust-cell-green (variante
-  // -green, solo tiene sentido si existe para ese código) + la clase
-  // cell-green-asset que le dice a style.css si hay que titilar ENTRE las
-  // dos (ver @keyframes cell-green-blink) en vez del tinte genérico. Un
-  // solo lugar para esta decisión — evita repetirla en cada sitio que
-  // renderiza una fila (renderRankings, loadSocialData render,
-  // _patchFriendStatusInDOM, etc., ver js/social/social-realtime.js).
+  // Sets --cust-cell (normal art, always) and --cust-cell-green (-green
+  // variant, only meaningful if it exists for that code) + the
+  // cell-green-asset class that tells style.css whether to blink BETWEEN the
+  // two (see @keyframes cell-green-blink) instead of the generic tint. One
+  // place for this decision — avoids repeating it everywhere a row is rendered
+  // (renderRankings, loadSocialData render, _patchFriendStatusInDOM, etc., see
+  // js/social/social-realtime.js).
   applyCellForStatus(el, code, statusCls) {
     if (!el) return;
     const playing = statusCls === 'playing';
@@ -101,32 +99,31 @@ window.CustomizeAssets = {
     if (hasGreenAsset) el.style.setProperty('--cust-cell-green', `url('${this.cellUrlPlaying(code)}')`);
     el.classList.toggle('cell-green-asset', hasGreenAsset);
   },
-  // Fallback global para filas que nunca llaman a applyCard (bots del
-  // leaderboard, que no son cuentas reales y no tienen card_code propio) —
-  // sin esto, --cust-card queda sin setear en esas filas y la tarjeta se ve
-  // en blanco (ver .lb-entry en style.css, que ya no tiene background-color
-  // de respaldo). Seteado una sola vez acá en :root, vía JS para poder usar
-  // _abs() (un url() relativo en el CSS estático se resuelve contra la
-  // ubicación de la hoja de estilos, no contra la raíz del sitio — ver nota
-  // más abajo en este archivo sobre frameUrl/cardUrl).
+  // Global fallback for rows that never call applyCard (leaderboard bots, which
+  // aren't real accounts and have no card_code of their own) — without this,
+  // --cust-card is left unset on those rows and the card shows blank (see
+  // .lb-entry in style.css, which no longer has a fallback background-color).
+  // Set once here on :root, via JS so _abs() can be used (a relative url() in
+  // the static CSS resolves against the stylesheet location, not the site root
+  // — see note above about frameUrl/cardUrl).
   _initDefaultCardVar() {
     document.documentElement.style.setProperty('--cust-card-default', `url('${this.cardUrl('0001')}')`);
   },
-  // Mismo motivo, para --cust-cell: filas que muestran una CELDA pero no una
-  // persona con cell_code propio (ej. la lista de salas públicas en
-  // .versus-friend-row, ver _renderPublicRooms en js/lobby.js) nunca llaman
-  // a applyCell/applyCellForStatus — sin este default quedaban sin fondo
-  // visible ("solo texto plano" reportado) apenas .versus-friend-row dejó
-  // de tener un background-color hardcodeado de respaldo.
+  // Same reason, for --cust-cell: rows that show a CELL but not a person with
+  // their own cell_code (e.g. the public rooms list in .versus-friend-row, see
+  // _renderPublicRooms in js/lobby.js) never call applyCell/applyCellForStatus
+  // — without this default they had no visible background ("plain text only"
+  // reported) once .versus-friend-row lost its hardcoded fallback
+  // background-color.
   _initDefaultCellVar() {
     document.documentElement.style.setProperty('--cust-cell-default', `url('${this.cellUrl('0001')}')`);
   },
-  // El marco es un ::after (ver .cust-frame-wrap en style.css) para poder
-  // sobresalir del contenedor si el diseño lo pide; se aplica vía CSS var
-  // en vez de <img> nuevo para no tocar la estructura HTML de cada avatar.
-  // --cust-frame-inset viaja aparte de --cust-frame porque cada PNG tiene su
-  // propia proporción de aro (ver CUSTOMIZE_FRAME_INSET arriba) — un solo
-  // inset compartido para todos los códigos no sirve.
+  // The frame is an ::after (see .cust-frame-wrap in style.css) so it can
+  // overhang the container if the design calls for it; applied via CSS var
+  // instead of a new <img> so each avatar's HTML structure stays untouched.
+  // --cust-frame-inset travels separately from --cust-frame because each PNG
+  // has its own ring ratio (see CUSTOMIZE_FRAME_INSET above) — one shared inset
+  // for all codes doesn't work.
   applyFrame(el, code) {
     if (!el) return;
     el.classList.add('cust-frame-wrap');
@@ -149,15 +146,14 @@ window.CustomizeAssets._initDefaultCellVar();
 
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 
-// País por IP para guardarlo en la cuenta desde su creación (ver handle_new_user
-// en la DB, que lo lee de raw_user_meta_data). Usa el valor ya cacheado por
-// analytics.js si está disponible; si no, lo pide en el momento.
+// Country by IP to store on the account from creation (see handle_new_user in
+// the DB, which reads it from raw_user_meta_data). Uses the value already
+// cached by analytics.js if available; otherwise fetches it now.
 //
-// Se resuelve vía la Edge Function get-country (servidor, no el navegador) —
-// antes esto pegaba directo a ipinfo.io desde acá mismo, y cualquier
-// bloqueador de trackers (uBlock Origin, protección de Firefox/Zen) cortaba
-// el fetch en silencio dejando country_code en null para siempre (sin
-// reintento posterior). Al servidor nadie lo bloquea.
+// Resolved via the get-country Edge Function (server, not the browser) — this
+// used to hit ipinfo.io directly from here, and any tracker blocker (uBlock
+// Origin, Firefox/Zen protection) silently cut the fetch, leaving country_code
+// null forever (no later retry). Nobody blocks the server.
 async function _getCountryCodeForSignup() {
   const cached = localStorage.getItem('_an_country');
   if (cached) return cached || null;
@@ -222,17 +218,17 @@ window.sbChangeEmail = async function(newEmail) {
   if (!res.ok) throw new Error(json.error || 'Error al enviar el correo.');
 };
 
-// Límite de 1 cambio cada 30 días: NO se controla solo acá — hay un trigger
-// (protect_username_change) que revierte cualquier UPDATE directo de
-// username/username_changed_at que no pase por este RPC, y el RPC mismo
-// rechaza el cambio si todavía no pasaron los 30 días (ver migración
-// add_change_username_rpc). Errores posibles vía error.message:
+// Limit of 1 change every 30 days: NOT enforced only here — a trigger
+// (protect_username_change) reverts any direct UPDATE of
+// username/username_changed_at that doesn't go through this RPC, and the RPC
+// itself rejects the change if 30 days haven't passed (see migration
+// add_change_username_rpc). Possible errors via error.message:
 // __cooldown_active__:ISODATE, __username_taken__, __same_username__,
 // __invalid_username__, __not_authenticated__.
 window.sbChangeUsername = async function(newUsername) {
   const { data, error } = await sb.rpc('change_username', { p_new_username: newUsername });
   if (error) throw error;
-  return data; // timestamptz de este cambio (nuevo username_changed_at)
+  return data; // timestamptz of this change (new username_changed_at)
 };
 
 window.sbLogout = async function() {
@@ -246,9 +242,9 @@ window.sbGetSession = async function() {
   return data.session;
 };
 
-// Vincula al usuario recién logueado las partidas/visitas que jugó como invitado
-// desde este mismo dispositivo antes de crear la cuenta (ver claim_anonymous_events
-// en la DB). Fire-and-forget: nunca debe interrumpir el flujo de login.
+// Links to the just-logged-in user the games/visits played as a guest from
+// this same device before creating the account (see claim_anonymous_events in
+// the DB). Fire-and-forget: must never interrupt the login flow.
 window.sbClaimAnonymousEvents = async function() {
   try {
     const visitorId = localStorage.getItem('_devstats_vid');
@@ -257,7 +253,7 @@ window.sbClaimAnonymousEvents = async function() {
   } catch (e) {}
 };
 
-// ── SESSION GUARD (un solo dispositivo activo por cuenta) ─────────────────────
+// ── SESSION GUARD (one active device per account) ───────────────────────────
 
 window.sbSetSessionToken = async function(uid, token) {
   try { await window.sb.from('profiles').update({ session_token: token }).eq('id', uid); } catch (e) {}
@@ -292,7 +288,7 @@ window.sbStopSessionGuard = function() {
   if (_sgPoll) { clearInterval(_sgPoll); _sgPoll = null; }
 };
 
-// ── PERFIL ────────────────────────────────────────────────────────────────────
+// ── PROFILE ─────────────────────────────────────────────────────────────────
 
 window.sbGetProfile = async function(userId) {
   const { data, error } = await sb
@@ -306,13 +302,13 @@ window.sbUpdateProfile = async function(userId, fields) {
   if (error) throw error;
 };
 
-// Reclamo del paquete de Fundador — NO usar sbUpdateProfile para esto: hay un
-// trigger (protect_is_founder) que bloquea en silencio cualquier UPDATE directo
-// de is_founder/founder_popup_seen desde el cliente. Este RPC es atómico del
-// lado del server: marca el reclamo solo si la cuenta sigue elegible y no había
-// reclamado antes, y si este reclamo llega a 100 en total, cierra la
-// elegibilidad para todo el resto (revoca is_founder a quien no llegó a
-// reclamar). Devuelve true si el reclamo se aplicó de verdad.
+// Founder pack claim — do NOT use sbUpdateProfile for this: a trigger
+// (protect_is_founder) silently blocks any direct client UPDATE of
+// is_founder/founder_popup_seen. This RPC is atomic server-side: it marks the
+// claim only if the account is still eligible and hadn't claimed before, and if
+// this claim reaches 100 total, it closes eligibility for everyone else
+// (revokes is_founder from those who didn't claim). Returns true if the claim
+// actually applied.
 window.sbClaimFounderPack = async function(userId) {
   const { data, error } = await sb.rpc('claim_founder_pack', { p_user_id: userId });
   if (error) throw error;
@@ -332,20 +328,20 @@ window.sbSaveScores = async function(userId, scores, sessionId) {
   if (error) throw error;
 };
 
-// Registra el resultado de una partida versus en el perfil propio (W o L).
-// Cada cliente actualiza SOLO su propio record según su resultado.
+// Records a versus game result in one's own profile (W or L). Each client
+// updates ONLY its own record based on its result.
 window.sbRecordVersusResult = async function(userId, won) {
   const profile = await window.sbGetProfile(userId);
   const updates = won
     ? { vs_wins:   (profile.vs_wins   || 0) + 1 }
     : { vs_losses: (profile.vs_losses || 0) + 1 };
   await window.sbUpdateProfile(userId, updates);
-  // Mantener la caché local al día para reflejarlo en el perfil sin recargar
+  // Keep the local cache current so it shows in the profile without a reload
   if (window._sbProfile) Object.assign(window._sbProfile, updates);
   return updates;
 };
 
-// ── AMIGOS ────────────────────────────────────────────────────────────────────
+// ── FRIENDS ─────────────────────────────────────────────────────────────────
 
 window.sbGetFriends = async function(userId) {
   const { data, error } = await sb
@@ -380,7 +376,7 @@ window.sbSendFriendRequest = async function(fromId, toUsername) {
   const { data: target, error: fe } = await sb
     .from('profiles').select('id').eq('username', toUsername).single();
   if (fe || !target) throw new Error('Usuario no encontrado');
-  // Verificar que no existe relación en ninguna dirección
+  // Verify no relationship exists in either direction
   const { data: existing } = await sb.from('friendships')
     .select('id')
     .or(`and(user_a.eq.${fromId},user_b.eq.${target.id}),and(user_a.eq.${target.id},user_b.eq.${fromId})`)
@@ -418,17 +414,17 @@ window.sbBlockUser = async function(fromId, targetId, friendshipId) {
 window.sbDeleteFriendship = async function(friendshipId, userA, userB) {
   if (friendshipId) {
     const { data, error } = await sb.from('friendships').delete().eq('id', friendshipId).select();
-    if (!error && data && data.length > 0) return; // borrado confirmado
+    if (!error && data && data.length > 0) return; // deletion confirmed
   }
-  // Fallback: el ID era nulo, inválido o la fila ya no existía con ese ID
+  // Fallback: the ID was null, invalid, or the row no longer existed with that ID
   if (userA && userB) {
     await sb.from('friendships').delete()
       .or(`and(user_a.eq.${userA},user_b.eq.${userB}),and(user_a.eq.${userB},user_b.eq.${userA})`);
   }
 };
 
-// navigator.maxTouchPoints > 1 (mismo criterio que isMobile en js/core/audio.js)
-// para no depender de userAgent, que se puede spoofear/desactualizar.
+// navigator.maxTouchPoints > 1 (same rule as isMobile in js/core/audio.js) so
+// it doesn't depend on userAgent, which can be spoofed/stale.
 function _sbDeviceType() {
   return (navigator.maxTouchPoints > 1) ? 'mobile' : 'pc';
 }
@@ -443,10 +439,10 @@ window.sbSetPlaying = async function(userId, playing, practicing) {
     .eq('id', userId);
 };
 
-// Qué modo específico está jugando (ver /stats "Quién está conectado ahora").
-// Separado de sbSetPlaying: se llama un instante después, una vez que el
-// contexto (campaña/vs/práctica/modo elegido) ya quedó seteado — ver el
-// comentario del microtask en _setPlaying (js/core/campaign.js).
+// Which specific mode is being played (see /stats "Who's online now").
+// Separate from sbSetPlaying: called a moment later, once the context
+// (campaign/vs/practice/chosen mode) is set — see the microtask comment in
+// _setPlaying (js/core/campaign.js).
 window.sbSetPlayingMode = async function(userId, label) {
   await sb.from('profiles').update({ playing_mode: label || null }).eq('id', userId);
 };
@@ -463,7 +459,7 @@ window.sbUploadAvatar = async function(userId, blob) {
   return url;
 };
 
-// Carga todos los datos sociales en una sola consulta.
+// Loads all social data in a single query.
 window.sbLoadSocialData = async function(userId) {
   const { data, error } = await sb.from('friendships')
     .select(`id, status, initiated_by, user_a, user_b,
@@ -510,8 +506,8 @@ window.sbLoadSocialData = async function(userId) {
   };
 };
 
-// ── SESIÓN PERSISTENTE: restaurar al recargar ─────────────────────────────────
-// Mostrar modal de nueva contraseña (recovery link)
+// ── PERSISTENT SESSION: restore on reload ──────────────────────────────────
+// Show the new-password modal (recovery link)
 function _showRecoveryModal() {
   history.replaceState(null, '', window.location.pathname);
   function show() {
@@ -519,7 +515,7 @@ function _showRecoveryModal() {
       window._openRecoveryChangePassView();
       return;
     }
-    // Fallback si js/menu/loading-boot.js todavía no cargó (no debería pasar, __loadingReady lo garantiza)
+    // Fallback if js/menu/loading-boot.js hasn't loaded yet (shouldn't happen, __loadingReady guarantees it)
     window._isPasswordReset = true;
     const modal = document.getElementById('account-modal');
     const viewChangePass = document.getElementById('account-view-change-pass');
@@ -528,7 +524,7 @@ function _showRecoveryModal() {
     viewChangePass.style.display = 'flex';
     modal.classList.add('open');
   }
-  // Esperar a que el preloader termine (window.__loadingReady) antes de abrir el modal
+  // Wait for the preloader to finish (window.__loadingReady) before opening the modal
   function waitAndShow() {
     if (window.__loadingReady) { show(); return; }
     setTimeout(waitAndShow, 200);
@@ -543,7 +539,7 @@ sb.auth.onAuthStateChange((event, session) => {
   if (event === 'PASSWORD_RECOVERY') _showRecoveryModal();
 });
 
-// Fallback: detectar type=recovery o error en hash/query params
+// Fallback: detect type=recovery or an error in hash/query params
 (function() {
   const hash   = window.location.hash;
   const search = window.location.search;
@@ -578,14 +574,14 @@ sb.auth.onAuthStateChange((event, session) => {
     return;
   }
   if (isRecoveryHash || isRecoveryQuery) {
-    console.log('[auth] recovery detectado via URL:', hash || search);
+    console.log('[auth] recovery detected via URL:', hash || search);
     _showRecoveryModal();
   }
 })();
 
 (async function() {
   const session = await window.sbGetSession();
-  // Detectar redirección de verificación de email (signup o email_change)
+  // Detect the email-verification redirect (signup or email_change)
   const hash = window.location.hash;
   const isSignupVerify = hash.includes('type=signup')       && hash.includes('access_token');
   const isEmailChange  = hash.includes('type=email_change') && hash.includes('access_token');
@@ -623,8 +619,8 @@ sb.auth.onAuthStateChange((event, session) => {
     }
   }
   if (!session) return;
-  // Recuperación de contraseña abandonada (recarga/cierre sin terminar): la sesión
-  // de recovery quedaría autenticada indefinidamente si la tratáramos como login normal.
+  // Abandoned password recovery (reload/close without finishing): the recovery
+  // session would stay authenticated indefinitely if treated as a normal login.
   if (localStorage.getItem('_pendingPasswordReset')) {
     localStorage.removeItem('_pendingPasswordReset');
     await sb.auth.signOut();
@@ -633,14 +629,14 @@ sb.auth.onAuthStateChange((event, session) => {
   window._accountLoggedIn = true;
   window._sbUserId = session.user.id;
   document.body.classList.add('account-logged');
-  // Mostrar el nombre guardado localmente YA, sin esperar la respuesta del
-  // servidor: antes el botón se quedaba mostrando "Cuenta" hasta que el fetch
-  // del perfil resolvía (y colgado indefinidamente si no había conexión).
+  // Show the locally stored name NOW, without waiting for the server: the
+  // button used to show "Cuenta" until the profile fetch resolved (and hang
+  // indefinitely with no connection).
   if (typeof window._updateProfileBtnLabel === 'function') window._updateProfileBtnLabel();
   window.sbClaimAnonymousEvents();
   try {
-    // Con timeout: un perfil que tarda/cuelga no debe frenar el resto del
-    // arranque de sesión (heartbeat, evento sbSessionReady) más abajo.
+    // With a timeout: a slow/hung profile must not block the rest of session
+    // startup (heartbeat, sbSessionReady event) below.
     const profilePromise = window.sbGetProfile(session.user.id);
     const profile = typeof window.withConnTimeout === 'function'
       ? await window.withConnTimeout(profilePromise, 6000)
@@ -657,31 +653,30 @@ sb.auth.onAuthStateChange((event, session) => {
     }
   } catch(e) {}
   window.sbUpdateLastActive(session.user.id).catch(() => {});
-  // Session guard DESACTIVADO — la cuenta debe poder usarse en varios
-  // dispositivos a la vez sin cerrar sesión entre sí (decisión del producto).
-  // Quedan sbSetSessionToken/sbStartSessionGuard definidas en este archivo
-  // por si se retoma más adelante, pero ya no se llaman desde ningún lado.
+  // Session guard DISABLED — the account must work on several devices at once
+  // without logging each other out (product decision). sbSetSessionToken/
+  // sbStartSessionGuard stay defined in this file in case it's revisited, but
+  // are no longer called from anywhere.
   // const _sTok = crypto.randomUUID();
   // localStorage.setItem('_sbSessionToken', _sTok);
   // window.sbSetSessionToken(session.user.id, _sTok);
   // window.sbStartSessionGuard(session.user.id);
-  // Notificar a js/profile/profile-account.js que la sesión está lista (sync de datos locales, etc.)
+  // Tell js/profile/profile-account.js the session is ready (local data sync, etc.)
   window._sessionReady = true;
   document.dispatchEvent(new CustomEvent('sbSessionReady', { detail: { userId: session.user.id } }));
-  // Heartbeat periódico — solo si la pestaña está visible, si no un usuario
-  // que deja la pestaña abierta en 2do plano por horas queda marcado como
-  // "conectado" indefinidamente en /stats (setInterval sigue corriendo aunque
-  // esté en background).
+  // Periodic heartbeat — only while the tab is visible, otherwise a user who
+  // leaves the tab open in the background for hours stays marked "online"
+  // indefinitely in /stats (setInterval keeps running in the background).
   setInterval(() => {
     if (window._sbUserId && document.visibilityState === 'visible') window.sbUpdateLastActive(window._sbUserId).catch(() => {});
   }, 25 * 1000);
 
-  // Heartbeat en actividad: volver de background o interacción en el menú
+  // Heartbeat on activity: returning from background or interacting in the menu
   let _lastActivityPing = 0;
   function _activityPing() {
     if (!window._sbUserId) return;
     const now = Date.now();
-    if (now - _lastActivityPing < 15000) return; // throttle 15s
+    if (now - _lastActivityPing < 15000) return; // 15s throttle
     _lastActivityPing = now;
     window.sbUpdateLastActive(window._sbUserId).catch(() => {});
   }

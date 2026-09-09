@@ -1,11 +1,9 @@
 // ============================================================================
-// menu/menu-launchers.js — Listeners de los botones de navegación del loading screen: lanzar Ciudades /
-// GlobeQuiz (+ su power/quit), abrir results, panel 2 (Un jugador: World Tour /
-// Versus / Práctica / back), confirm de play, abrir el panel Social.
+// menu/menu-launchers.js — loading-screen nav button listeners: launch Cities /
+// GlobeQuiz (+ its power/quit), open results, panel 2 (Single player: World Tour
+// / Versus / Practice / back), play confirm, open the Social panel.
 //
-// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
-// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
-// Son <script> clásicos que comparten un mismo scope global.
+// Classic <script>s sharing one global scope, loaded in order in play/index.html.
 // ============================================================================
 
 document.getElementById('loading-play-btn').addEventListener('click', () => {
@@ -13,17 +11,16 @@ document.getElementById('loading-play-btn').addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   window._setPlaying(true);
   window.pendingGameMode = 'game';
-  // Avisar a un posible espectador que entramos a las instrucciones de este
-  // modo — ver comentario largo (con la explicación del defer a microtask)
-  // en el mismo punto de flags.js. Cities todavía no tiene UI real de
-  // espectador (REAL_UI_MODES no lo lista), así que esto solo evita que se
-  // quede viendo la pantalla de "Conectando..." trabada — no podrá ver la
-  // ronda en sí hasta que se integre ese modo.
+  // Tell a possible spectator we entered this mode's instructions — see the long
+  // comment (with the microtask-defer rationale) at the same point in flags.js.
+  // Cities has no real spectator UI yet (REAL_UI_MODES doesn't list it), so this
+  // only keeps them from being stuck on "Connecting..." — they won't see the
+  // round itself until that mode is integrated.
   Promise.resolve().then(() => {
     if (typeof window._specReportSplash === 'function') window._specReportSplash({ mode: 'game' });
   });
   window.resetSplashEntry?.();
-  // Transición visual inmediata — ocultar loading y mostrar splash en este frame
+  // Immediate visual transition — hide loading and show splash this frame
   document.getElementById('loading-screen').style.display = 'none';
   const splashElCity = document.getElementById('splash-screen');
   splashElCity.style.display = 'flex';
@@ -33,7 +30,7 @@ document.getElementById('loading-play-btn').addEventListener('click', () => {
   void splashElCity.offsetWidth;
   animElsCity.forEach(el => el.classList.add('animate-in'));
   playMusic(sfxPregame);
-  // Setup no visual diferido al siguiente frame para no bloquear la transición
+  // Non-visual setup deferred to the next frame so it doesn't block the transition
   requestAnimationFrame(() => {
     document.getElementById('splash-screen').classList.remove('mode-flags', 'mode-shapes', 'mode-monuments');
     document.getElementById('gameover-screen').classList.remove('mode-flags', 'mode-shapes', 'mode-monuments');
@@ -89,9 +86,9 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
 
 document.getElementById('globequiz-btn')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
-  // Gate: GlobeQuiz requiere cuenta, y con cuenta requiere haber completado
-  // al menos 1 Gira Mundial alguna vez (ver el incremento de
-  // campaigns_completed al terminar la campaña, más arriba en este archivo).
+  // Gate: GlobeQuiz requires an account, and with one it requires having
+  // completed at least 1 Gira Mundial ever (see the campaigns_completed
+  // increment when the campaign ends).
   if (!window._accountLoggedIn || !window._sbUserId) {
     const textEl = document.getElementById('globequiz-locked-text');
     if (textEl) { textEl.setAttribute('data-i18n', 'globequiz.lockedNoAccount'); textEl.textContent = t('globequiz.lockedNoAccount'); }
@@ -126,12 +123,12 @@ document.getElementById('globequiz-btn')?.addEventListener('click', () => {
   if (t2) t2.style.display = 'block';
   const gqDesc = document.getElementById('loading-globequiz-desc');
   const gqCountdown = document.getElementById('loading-globequiz-countdown');
-  // Si ya jugó hoy, la burbuja de saludo Y la descripción avisan que vuelva
-  // mañana en vez de invitarlo a buscar el país (igual puede jugar de nuevo,
-  // solo no suma racha) — y ahí recién aparece el countdown a "nuevo día".
-  // Si NO jugó hoy, ambas quedan con su texto normal de invitación y el
-  // countdown ni se muestra (no tiene sentido mostrarlo si todavía puede
-  // sumar la racha de hoy jugando).
+  // If already played today, the greeting bubble AND the description tell them
+  // to come back tomorrow instead of inviting them to find the country (they can
+  // still play again, it just doesn't add to the streak) — and only then does
+  // the "new day" countdown appear. If NOT played today, both keep their normal
+  // invitation text and the countdown isn't shown (pointless while today's
+  // streak is still available by playing).
   if (gqCountdown) gqCountdown.style.display = 'none';
   if (typeof window.gqHasPlayedToday === 'function') {
     const played = window.gqHasPlayedToday();
@@ -201,20 +198,18 @@ document.getElementById('gq-quit-cancel')?.addEventListener('click', () => {
 
 document.getElementById('gq-quit-confirm')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
-  // VS 1v1: a diferencia de flags/cities/monuments (que salen por
-  // quitToMenu(), ver línea ~4642 más abajo, y ESA sí llama _vsAbandon()),
-  // este botón tiene su propia secuencia de salida manual que nunca pasaba
-  // por ahí — quien abandonaba un duelo de GlobeQuiz volvía al menú sin
-  // avisarle nada al rival, que se quedaba esperando para siempre (el
-  // reportado: "no reconoce cuando alguien se va de la partida"). Mismo
-  // criterio que el resto de los modos: avisar el abandono ANTES de
-  // desmontar la UI.
+  // VS 1v1: unlike flags/cities/monuments (which exit via quitToMenu(), and THAT
+  // calls _vsAbandon()), this button has its own manual exit sequence that never
+  // went through there — abandoning a GlobeQuiz duel returned to the menu
+  // without telling the rival, who waited forever (reported: "doesn't recognize
+  // when someone leaves the game"). Same rule as the other modes: announce the
+  // abandon BEFORE tearing down the UI.
   if (window._vsActive && typeof window._vsAbandon === 'function') {
     try { window._vsAbandon(); } catch (e) {}
   }
   window._setPlaying(false);
-  // Cortar TODO lo de GlobeQuiz (timer, rotación automática, música/sfx) —
-  // mismo criterio que quitToMenu() para los demás modos.
+  // Stop EVERYTHING GlobeQuiz (timer, auto-rotate, music/sfx) — same rule as
+  // quitToMenu() for the other modes.
   if (typeof window.stopGlobeQuizTimer === 'function') window.stopGlobeQuizTimer();
   if (typeof window.stopGlobeQuizAutoRotate === 'function') window.stopGlobeQuizAutoRotate();
   if (typeof window.stopGlobeQuizInertia === 'function') window.stopGlobeQuizInertia();
@@ -223,10 +218,10 @@ document.getElementById('gq-quit-confirm')?.addEventListener('click', () => {
   if (typeof window.stopGlobeQuizEndgameCountdown === 'function') window.stopGlobeQuizEndgameCountdown();
   const gqEndgameModalEl = document.getElementById('gq-endgame-modal');
   if (gqEndgameModalEl) gqEndgameModalEl.style.display = 'none';
-  // playMusic(null) corta también el AudioBufferSourceNode de iOS (Web Audio),
-  // que sigue sonando si solo se pausa el <audio> HTML — mismo motivo que en
-  // el submitGuess() de globequiz.js. sfxBonus es un sfx normal, no música,
-  // así que a ese sí alcanza con pausarlo directo.
+  // playMusic(null) also stops the iOS AudioBufferSourceNode (Web Audio), which
+  // keeps playing if only the HTML <audio> is paused — same reason as in
+  // globequiz.js submitGuess(). sfxBonus is a normal sfx, not music, so pausing
+  // it directly is enough.
   if (typeof playMusic === 'function') playMusic(null);
   try { if (sfxBonus) { sfxBonus.pause(); sfxBonus.currentTime = 0; } } catch (e) {}
   const popup = document.getElementById('gq-quit-popup');
@@ -235,21 +230,21 @@ document.getElementById('gq-quit-confirm')?.addEventListener('click', () => {
   if (gqScreen) gqScreen.style.display = 'none';
   document.getElementById('loading-screen').style.display = '';
   document.getElementById('loading-screen')?.classList.remove('table-shown');
-  // Ocultar el panel de GlobeQuiz del menú (texto/mesa/título/globo/desc/
-  // jugar) — sin esto quedaba mostrándose ENCIMA del menú principal al
-  // volver, porque resetEntranceElements()/replayEntranceAnimations() no
-  // conocen estos elementos (son específicos de este panel, ver el handler
-  // de loading-panel2-back más abajo, que hace lo mismo para ese caso).
+  // Hide the menu's GlobeQuiz panel (text/table/title/globe/desc/play) —
+  // without this it stayed ON TOP of the main menu on return, because
+  // resetEntranceElements()/replayEntranceAnimations() don't know these
+  // elements (panel-specific; see the loading-panel2-back handler below, which
+  // does the same for that case).
   ['loading-globequiz-text2', 'loading-globequiz-table', 'loading-globequiz-title',
    'loading-globequiz-globe', 'loading-globequiz-desc', 'loading-globequiz-countdown', 'loading-globequiz-play-wrap']
     .forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
   if (typeof window.stopGlobeQuizMenuCountdown === 'function') window.stopGlobeQuizMenuCountdown();
-  // Volver al MENÚ PRINCIPAL (panel1) con la MISMA animación de entrada que
-  // usa quitToMenu() en el resto de los modos, no un salto abrupto.
+  // Return to the MAIN MENU (panel1) with the SAME entrance animation
+  // quitToMenu() uses for the other modes, not an abrupt jump.
   if (typeof window.resetEntranceElements === 'function') window.resetEntranceElements();
   if (typeof window.replayEntranceAnimations === 'function') window.replayEntranceAnimations();
   if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
-  // Y la música vuelve al loop del menú, como corresponde.
+  // And music goes back to the menu loop.
   if (typeof window.startMenuMusic === 'function') window.startMenuMusic();
   else if (typeof playMusic === 'function') playMusic(sfxMenuMusic);
 });
@@ -323,7 +318,7 @@ document.getElementById('loading-play-confirm-wrap')?.addEventListener('click', 
   setTimeout(() => tableGroup.classList.remove('above-rankings'), 400);
 });
 
-// ── Realtime social (canales de amigos/friendships + polls + badge)
+// ── Realtime social (friends/friendships channels + polls + badge)
 
 document.getElementById('loading-social-btn')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
@@ -333,7 +328,7 @@ document.getElementById('loading-social-btn')?.addEventListener('click', () => {
   }
   document.getElementById('loading-social-group')?.classList.remove('table-gone');
   document.getElementById('loading-screen').classList.add('table-shown');
-  // Ocultar badge y notificación de solicitud al entrar al panel
+  // Hide the request badge and notification on entering the panel
   const badge = document.getElementById('social-notif-badge');
   if (badge) badge.style.display = 'none';
   _dismissFriendRequestNotif();

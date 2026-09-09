@@ -1,12 +1,10 @@
 // ============================================================================
-// menu/rankings-panel.js — Panel de Rankings del loading (Top 100 / Amigos / Cercanos / Invitados),
-// con realtime y cálculo de puesto global. Expone window.getGlobalRankForId,
-// window._cupForRank y window._socialAvatarHtml (usados por profile-stats /
-// social-panel / mapgame-leaderboard en runtime).
+// menu/rankings-panel.js — loading-screen Rankings panel (Top 100 / Friends /
+// Nearby / Guests), with realtime and global-rank computation. Exposes
+// window.getGlobalRankForId, window._cupForRank and window._socialAvatarHtml
+// (used by profile-stats / social-panel / mapgame-leaderboard at runtime).
 //
-// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
-// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
-// Son <script> clásicos que comparten un mismo scope global.
+// Classic <script>s sharing one global scope, loaded in order in play/index.html.
 // ============================================================================
 
 // ── Rankings panel ─────────────────────────────────────────────────────────────
@@ -17,12 +15,11 @@
   let _rankingsRTChannel = null; // realtime channel
   let _allGlobalRows = null;     // full sorted list for rank computation
 
-  // 4ta pestaña "Invitados" (partidas de gente sin cuenta, ver
-  // analytics_events) — visible SOLO para esta cuenta (BlueLite/admin). La
-  // seguridad real vive en el RPC get_guest_rankings (SECURITY DEFINER con
-  // el mismo chequeo de uid adentro) — analytics_events no tiene policy de
-  // SELECT para nadie, así que ocultar el botón acá es solo para que no
-  // aparezca a la vista, no lo único que protege el dato.
+  // 4th "Guests" tab (games from people without an account, see
+  // analytics_events) — visible ONLY to this account (admin). Real security
+  // lives in the get_guest_rankings RPC (SECURITY DEFINER with the same uid
+  // check inside) — analytics_events has no SELECT policy for anyone, so hiding
+  // the button here is just cosmetic, not what protects the data.
   const ADMIN_GUEST_RANKINGS_UID = '530cb816-8562-4e7e-a538-15c6713fcc8d';
   function _escapeHtml(s) {
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -60,9 +57,9 @@
   }
 
   // ── fetchers ──────────────────────────────────────────────────────────────────
-  // window.withConnCheck (final.js) envuelve el pedido con timeout: si tarda
-  // demasiado o no hay internet, muestra la viñeta de error de conexión sola y
-  // devuelve null acá, en vez de dejar el panel de Rankings cargando para siempre.
+  // window.withConnCheck (final.js) wraps the request with a timeout: if it
+  // takes too long or there's no internet, it shows the connection-error bubble
+  // and returns null here, instead of leaving the Rankings panel loading forever.
   async function fetchTop100() {
     if (_rankingsCache.top100) return _rankingsCache.top100;
     if (!window.sb) return [];
@@ -121,10 +118,10 @@
     return rows;
   }
 
-  // Invitados sin cuenta, mejor puntaje de campaña por visitor_id — ver
-  // get_guest_rankings (RPC, Supabase). No hay id de perfil real (isGuest
-  // marca esto para que renderRankings los pinte distinto: sin marco/celda
-  // personalizada, sin click a un perfil que no existe).
+  // Account-less guests, best campaign score per visitor_id — see
+  // get_guest_rankings (RPC, Supabase). No real profile id (isGuest flags this
+  // so renderRankings paints them differently: no custom frame/cell, no click to
+  // a profile that doesn't exist).
   async function fetchTopGuests() {
     if (_rankingsCache.guests) return _rankingsCache.guests;
     if (!window.sb || window._sbUserId !== ADMIN_GUEST_RANKINGS_UID) return [];
@@ -143,8 +140,8 @@
     return rows;
   }
 
-  // Puesto global de un id cualquiera (para el badge de copa en los paneles
-  // de perfil). Reusa el listado completo ya ordenado por fetchTopGlobal.
+  // Global rank of any id (for the cup badge in profile panels). Reuses the
+  // full sorted list from fetchTopGlobal.
   async function getGlobalRankForId(id) {
     if (!id) return null;
     if (!_allGlobalRows) await fetchTopGlobal();
@@ -154,7 +151,7 @@
   }
   window.getGlobalRankForId = getGlobalRankForId;
 
-  // ── copa según puesto ─────────────────────────────────────────────────────────
+  // ── cup by rank ───────────────────────────────────────────────────────────────
   function _cupForRank(rank) {
     if (rank === 1) return 'cup1';
     if (rank === 2) return 'cup2';
@@ -169,10 +166,10 @@
   }
   window._cupForRank = _cupForRank;
 
-  // Avatar circular con marco de personalización para las filas de Rankings/
-  // Amigos (.loading-social-avatar) — a diferencia del .lb-avatar in-game
-  // (ver _refreshLeftPreview), acá SÍ se muestra el marco equipado por cada
-  // usuario, del mismo modo que en la foto grande del perfil.
+  // Circular avatar with customization frame for the Rankings/Friends rows
+  // (.loading-social-avatar) — unlike the in-game .lb-avatar (see
+  // _refreshLeftPreview), here the frame each user has equipped IS shown, like
+  // in the large profile photo.
   function _socialAvatarHtml(avatarUrl, frameCode) {
     const CA = window.CustomizeAssets;
     const code = frameCode || '0001';
@@ -199,12 +196,11 @@
       const medalCls = r.rank === 1 ? ' rk-gold' : r.rank === 2 ? ' rk-silver' : r.rank === 3 ? ' rk-bronze' : '';
       const el = document.createElement('div');
       const flagUrl = window.flagUrlForCountryCode?.(r.country_code);
-      // Invitados (tab "guests", solo admin): sin cuenta real de por medio
-      // — nada de marco/celda personalizada (no existen para ellos) ni
-      // click a un perfil que no existe. guest_name es texto libre sin el
-      // pipeline de validación que sí pasa un username real, por eso se
-      // escapa acá (en el resto de las filas no hace falta, r.name viene
-      // de profiles.username ya validado en el registro).
+      // Guests (tab "guests", admin only): no real account — no custom
+      // frame/cell (don't exist for them) and no click to a nonexistent
+      // profile. guest_name is free text without the validation pipeline a real
+      // username goes through, so it's escaped here (not needed on the other
+      // rows, r.name comes from profiles.username validated at registration).
       if (r.isGuest) {
         el.className = 'loading-social-row';
         el.innerHTML =
@@ -309,8 +305,8 @@
     else                        rows = await fetchTopFriends();
     if (_activeRTab !== tab) return;
     renderRankings(rows, tab);
-    // Subscribe realtime to IDs now visible — los invitados no tienen fila
-    // en profiles, no hay nada a lo que suscribirse.
+    // Subscribe realtime to IDs now visible — guests have no row in profiles,
+    // nothing to subscribe to.
     if (tab !== 'guests' && rows && rows.length) _subscribeRealtime(rows.map(r => r.id));
   }
 

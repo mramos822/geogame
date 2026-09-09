@@ -1,52 +1,50 @@
 // ============================================================================
-// modes/cities-spectate.js — Modo espectador de Ciudades (VS 1v1, lobby grupal y 'esperando al rival').
-// Reutiliza la pantalla real (state/render/advanceDot/leaderboard) y repuebla los
-// datos del jugador espectado. window.citiesSpectator* + _specBuildCountRow
-// (compartido con monuments-spectate.js) + estado _citiesSpec*.
+// modes/cities-spectate.js — Cities spectator mode (1v1 VS, group lobby and
+// 'waiting for rival'). Reuses the real screen
+// (state/render/advanceDot/leaderboard) and repopulates the spectated player's
+// data. window.citiesSpectator* + _specBuildCountRow (shared with
+// monuments-spectate.js) + _citiesSpec* state.
 //
-// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
-// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
-// Son <script> clásicos que comparten un mismo scope global.
+// Classic <script>s sharing one global scope, loaded in order in play/index.html.
 // ============================================================================
 
 // ═════════════════════════════════════════════════════════════════════════════
-// ── MODO ESPECTADOR: CITIES ─────────────────────────────────────────────────
-// A diferencia de flags/shapes (opciones discretas, DOM propio), Cities usa un
-// <canvas> compartido con el jugador real (#game-canvas / ctx / state /
-// render()) — la única forma práctica de "ver" los pines animados es REUSAR
-// esa misma maquinaria (render() ya sabe dibujar pin1Anim/pin2Anim/dots
-// enteramente a partir de `state`, sin importar quién la puebla) en vez de
-// reimplementar un renderer de mapa aparte. Espectar y jugar de verdad son
-// mutuamente excluyentes en una pestaña (mismo supuesto que flags/shapes), así
-// que reasignar `state`/`canvas.style.pointerEvents` acá es seguro.
+// ── SPECTATOR MODE: CITIES ──────────────────────────────────────────────────
+// Unlike flags/shapes (discrete options, own DOM), Cities uses a <canvas> shared
+// with the real player (#game-canvas / ctx / state / render()) — the only
+// practical way to "see" the animated pins is to REUSE that same machinery
+// (render() already draws pin1Anim/pin2Anim/dots entirely from `state`,
+// regardless of who populates it) instead of reimplementing a separate map
+// renderer. Spectating and really playing are mutually exclusive in a tab (same
+// assumption as flags/shapes), so reassigning
+// `state`/`canvas.style.pointerEvents` here is safe.
 //
-// A diferencia de shapes (donde 'round' llega ANTES que 'pregame' en el orden
-// real), en Cities nextCity() —y por lo tanto el 'round'— solo se llama
-// DESPUÉS de que termina el 3-2-1 real (ver runPregameCountdown(...) dentro de
-// startGame()), igual que flags. Como #game-wrapper contiene TODO lo visual
-// (tag+canvas), alcanza con tenerlo oculto durante el 3-2-1 y revelarlo recién
-// en el onDone real — no hace falta el gate explícito
-// (_flagsSpecCountdownDone/_shapesSpecPendingReveal) que sí hizo falta en los
-// otros dos modos: acá "oculto" ya cubre cualquier orden de llegada posible.
-// Reconstruye una fila de íconos (correctas/incorrectas) para el postgame del
-// espectador de Cities/Monuments — replica EXACTO a buildChecksRow()/
-// buildWrongsRow() reales (mismo gap comprimido si hay >12, mismos
-// márgenes/animation-delay/z-index escalonados por ícono, mismo fade del
-// ícono grande + número recién cuando termina de entrar la fila) pero a
-// partir del payload en vez de gradeCounts/wrongCount (estado LOCAL del
-// jugador, que acá no existe). Antes esto era una versión simplificada sin
-// nada de esto — todos los íconos aparecían de golpe, pegados con el gap
-// default de la clase en vez del comprimido, y el ícono grande/número
-// nunca hacían su fade (aparecían ya visibles).
-// startOffset: retraso inicial en segundos (buildWrongsRow real arranca
-// recién cuando termina de entrar la fila de correctas).
-// Devuelve el momento (segundos) en que termina toda la animación de ESTA
-// fila, para poder encadenar la siguiente (igual que checksEndTime real).
+// Unlike shapes (where 'round' arrives BEFORE 'pregame' in the real order), in
+// Cities nextCity() — and thus 'round' — is only called AFTER the real 3-2-1
+// ends (see runPregameCountdown(...) inside startGame()), like flags. Since
+// #game-wrapper contains ALL the visuals (tag+canvas), keeping it hidden during
+// the 3-2-1 and revealing it only in the real onDone is enough — no explicit
+// gate (_flagsSpecCountdownDone/_shapesSpecPendingReveal) like the other two
+// modes needed: here "hidden" already covers any possible arrival order.
+//
+// _specBuildCountRow: rebuilds a row of icons (correct/wrong) for the
+// Cities/Monuments spectator postgame — replicates the real
+// buildChecksRow()/buildWrongsRow() EXACTLY (same compressed gap if >12, same
+// per-icon staggered margins/animation-delay/z-index, same fade of the big
+// icon + number only once the row finishes entering) but from the payload
+// instead of gradeCounts/wrongCount (the player's LOCAL state, which doesn't
+// exist here). This used to be a simplified version without any of that — all
+// icons appeared at once, spaced with the class's default gap instead of the
+// compressed one, and the big icon/number never faded (appeared already visible).
+// startOffset: initial delay in seconds (the real buildWrongsRow only starts
+// once the correct row finishes entering).
+// Returns the moment (seconds) when THIS row's whole animation ends, so the
+// next one can be chained (like the real checksEndTime).
 function _specBuildCountRow(rowEl, staticEl, countEl, count, imgSrc, startOffset) {
   if (!rowEl) return startOffset;
   rowEl.innerHTML = '';
   rowEl.style.gap = '0px';
-  const IMG_W = 6.4, BASE_GAP = 0.33; // vmin, igual que .checks-row/.wrongs-row img
+  const IMG_W = 6.4, BASE_GAP = 0.33; // vmin, same as .checks-row/.wrongs-row img
   const MAX_W = 12 * IMG_W + 11 * BASE_GAP;
   const gap = count > 1 ? (count > 12 ? (MAX_W - count * IMG_W) / (count - 1) : BASE_GAP) : 0;
 
@@ -87,23 +85,21 @@ function _specBuildCountRow(rowEl, staticEl, countEl, count, imgSrc, startOffset
 
 let _citiesSpecMode = false;
 let _citiesSpecTimesUpT1 = null, _citiesSpecTimesUpT2 = null;
-// Igual mecanismo que flags.js/shapes.js: la primera ronda tras entrar espera
-// un margen corto para confirmar si de verdad viene un pregame (llega poco
-// después, mismo orden real de broadcasts) — solo se usa para decidir CUÁNDO
-// arrancar sfxGameMusic. Si hay pregame, lo arranca su propio onDone al
-// terminar el 3-2-1; si no aparece en ese margen, es unión a mitad de una
-// partida ya en curso y hay que arrancarlo ACÁ — sin esto, un espectador que
-// se unía a mitad de partida se quedaba con sfxMenuMusic sonando para
-// siempre, porque citiesSpectatorShowPregame() (el único lugar que arrancaba
-// sfxGameMusic) nunca llegaba a correr.
+// Same mechanism as flags.js/shapes.js: the first round after entering waits a
+// short window to confirm whether a pregame is really coming (arrives shortly
+// after, same real broadcast order) — only used to decide WHEN to start
+// sfxGameMusic. If there's a pregame, its own onDone starts it when the 3-2-1
+// ends; if none appears in that window, it's a join mid-game and it must start
+// HERE — without this, a spectator joining mid-game was left with sfxMenuMusic
+// playing forever, because citiesSpectatorShowPregame() (the only place that
+// started sfxGameMusic) never ran.
 let _citiesSpecIsFirstRound = true;
 let _citiesSpecPregameSeen  = false;
-// Mismo guard que ya tienen flags.js/shapes.js para sfxTickdown: por VALOR
-// (mismo timeLeft repetido) y por TIEMPO REAL transcurrido (el resend de
-// unión a mitad de partida + el próximo tick en vivo pueden llegar pegados
-// con valores DISTINTOS, ninguno bloqueado por el guard de valor solo) —
-// sin esto el beep de los últimos 10s sonaba repetido/cortado feo al
-// unirse justo en esa ventana.
+// Same guard flags.js/shapes.js already have for sfxTickdown: by VALUE (same
+// timeLeft repeated) and by REAL TIME elapsed (the mid-game join resend + the
+// next live tick can arrive back-to-back with DIFFERENT values, neither blocked
+// by the value-only guard) — without this the last-10s beep played
+// repeated/choppy when joining right in that window.
 let _citiesSpecLastTick = null;
 let _citiesSpecLastTickSoundAt = 0;
 
@@ -120,8 +116,8 @@ window.citiesSpectatorEnter = function () {
   if (ls) ls.style.display = 'none';
   if (typeof loadGameSFX === 'function') loadGameSFX();
   if (typeof loadBadges === 'function') loadBadges();
-  // Restos de otros modos espectados antes en esta misma pestaña sin pasar
-  // por su propio Exit — mismo caso ya resuelto en flags.js/shapes.js.
+  // Leftovers from other modes spectated earlier in this tab without going
+  // through their own Exit — same case already handled in flags.js/shapes.js.
   document.querySelectorAll('.shapes-tag').forEach(t => t.remove());
   document.querySelectorAll('.shapes-clip-overlay').forEach(el => el.remove());
   document.querySelectorAll('.shapes-stage-el').forEach(el => { try { el.remove(); } catch (e) {} });
@@ -141,7 +137,7 @@ window.citiesSpectatorEnter = function () {
   clearInterval(timerIntervalId); timerIntervalId = null;
   clearTimeout(pregameTimeout);
   clearTimeout(_citiesSpecTimesUpT1); clearTimeout(_citiesSpecTimesUpT2);
-  canvas.style.pointerEvents = 'none'; // solo-lectura: no hay click que resolver
+  canvas.style.pointerEvents = 'none'; // read-only: no click to resolve
   if (canvas.width < DISPLAY_W) { canvas.width = DISPLAY_W; canvas.height = DISPLAY_H; }
   if (badgeOverlay.width < DISPLAY_W) { badgeOverlay.width = DISPLAY_W; badgeOverlay.height = DISPLAY_H; }
 
@@ -160,9 +156,9 @@ window.citiesSpectatorEnter = function () {
   resultLabel.className = '';
   resultLabel.classList.remove('visible');
 
-  // Construye un `state` MÍNIMO propio (no resetState(), que arma pools de
-  // ciudades/monumentos/práctica pensados para partida REAL) — render() solo
-  // necesita estos campos.
+  // Build a MINIMAL own `state` (not resetState(), which builds
+  // cities/monuments/practice pools meant for a REAL game) — render() only needs
+  // these fields.
   state = {
     phase: 'waiting',
     timeLeft: GAME_DURATION,
@@ -172,11 +168,11 @@ window.citiesSpectatorEnter = function () {
     starParticles: [], sunburst: null, badgeAnim: null,
     lastTimestamp: null, streak: 0, mapDrawn: false,
   };
-  // updateDotsUI() lee state.dots (recién en 0) para des-rellenar los
-  // puntitos del trencito — sin esto quedaban "filled" con lo último que
-  // dejó otro modo/partida espectada antes en esta misma pestaña, ya que
-  // nada más los toca hasta la PRÓXIMA respuesta correcta. progressContainer
-  // también puede haber quedado con las clases del ciclo de vaciado en curso.
+  // updateDotsUI() reads state.dots (just 0) to un-fill the train dots —
+  // without this they stayed "filled" with the last value left by another
+  // mode/spectated game in this tab, since nothing else touches them until the
+  // NEXT correct answer. progressContainer may also have been left with the
+  // classes of an in-progress emptying cycle.
   progressContainer.classList.remove('train-animation', 'dots-fade-out');
   updateDotsUI();
   timerNumberEl.textContent = GAME_DURATION;
@@ -185,70 +181,67 @@ window.citiesSpectatorEnter = function () {
   countdownImg.src = 'images/countdown.png';
   countdownImg.style.animationPlayState = 'running';
 
-  // Visible desde ya, haya o no un 3-2-1 en curso — #pregame-countdown es un
-  // overlay TRANSPARENTE (sin background, ver CSS), así que el jugador real
-  // ve el mapa detrás del número desde el primer instante del 3-2-1. Antes
-  // citiesSpectatorShowPregame() lo ocultaba de nuevo pensando que el mapa
-  // debía estar tapado durante la cuenta — dejaba al espectador con pantalla
-  // en blanco hasta que terminaba, a diferencia del jugador real.
+  // Visible right away, whether or not a 3-2-1 is running — #pregame-countdown
+  // is a TRANSPARENT overlay (no background, see CSS), so the real player sees
+  // the map behind the number from the first instant of the 3-2-1.
+  // citiesSpectatorShowPregame() used to hide it again thinking the map should
+  // be covered during the count — leaving the spectator with a blank screen
+  // until it finished, unlike the real player.
   gameWrapper.style.display = 'block';
-  // redimensionarJuego() se sale de una (no hace NADA) si gameWrapper todavía
-  // tiene display:none — por eso tiene que ir DESPUÉS de mostrarlo, no antes.
-  // Con el orden viejo, esta llamada era un no-op silencioso: el mapa quedaba
-  // con el transform/escala VIEJO (de la última vez que se calculó, o
-  // ninguno) durante todo el 3-2-1, recién corrigiéndose cuando
-  // citiesSpectatorShowPregame() lo volvía a llamar en su onDone — el
-  // "mapimage descolocado durante el 3-2-1-GO, recién se acomoda al empezar
-  // el juego" reportado.
+  // redimensionarJuego() bails immediately (does NOTHING) if gameWrapper is
+  // still display:none — so it must go AFTER showing it, not before. With the
+  // old order this call was a silent no-op: the map kept the OLD
+  // transform/scale (from the last time it was computed, or none) through the
+  // whole 3-2-1, only corrected when citiesSpectatorShowPregame() called it
+  // again in its onDone — the reported "mapimage misplaced during the
+  // 3-2-1-GO, only settles when the game starts".
   redimensionarJuego();
   cityTagEl.style.visibility = 'hidden';
-  // slideMonumentIn() deja cityTagEl POSICIONADO en su punto de llegada
-  // visible (left:-50/top:-55, ver esa función) — visibility:hidden solo lo
-  // tapa, pero sigue "parado" ahí. slideTagIn() (la entrada real de Ciudades)
-  // anima DESDE la posición actual del elemento HACIA la de llegada — si ya
-  // arranca en la de llegada (la de Monumentos, que coincide visualmente),
-  // no hay nada que recorrer: el tag aparecía de una, ya en su lugar ("al
-  // medio"), en vez de deslizarse de izquierda a derecha como corresponde.
-  // Mismo reset de posición de arranque que hace startGame() real.
+  // slideMonumentIn() leaves cityTagEl POSITIONED at its visible landing point
+  // (left:-50/top:-55, see that function) — visibility:hidden only covers it,
+  // it's still "standing" there. slideTagIn() (the real Cities entry) animates
+  // FROM the element's current position TO the landing one — if it already
+  // starts at the landing one (the Monuments one, which visually coincides),
+  // there's nothing to travel: the tag appeared instantly, already in place
+  // ("in the middle"), instead of sliding left to right as it should. Same
+  // start-position reset the real startGame() does.
   cityTagEl.style.transition = 'none';
   cityTagEl.style.left = tpx(-525);
   cityTagEl.style.top  = tpx(-163);
   monumentImgEl.style.display = 'none';
-  // Reset del <img> del cartel a tag3.png — slideTagIn() NUNCA lo toca (da
-  // por sentado que ya vale tag3.png, como deja startGame() real); si el
-  // espectador venía de mirar Monumentos en esta misma pestaña, slideMonumentIn
-  // lo había dejado en photo.png y quedaba pegado ahí para siempre en Cities.
+  // Reset the sign's <img> to tag3.png — slideTagIn() NEVER touches it (assumes
+  // it's already tag3.png, as the real startGame() leaves it); if the spectator
+  // was watching Monuments in this tab, slideMonumentIn had left it at
+  // photo.png and it stayed stuck there forever in Cities.
   const _cityTagImg = cityTagEl.querySelector('img');
-  // slideMonumentIn() deja la clase 'monument-appear' (animación de escala,
-  // ver @keyframes en style.css) puesta en este mismo <img> — a diferencia
-  // de startGame() (real, ver más abajo en este archivo), este reset de
-  // espectador nunca la sacaba. Con la clase todavía puesta, el próximo
-  // slideTagIn() de Cities dispara SU animación de entrada (movimiento)
-  // ENCIMA de la de monument-appear que quedó pendiente — dos animaciones de
-  // entrada superpuestas, la vieja (monuments, da la sensación de "zoom out"
-  // al terminar/revertir) y la correcta (el "el tag3 hace dos animaciones de
-  // entrada en modo espectador" reportado — únicamente ahí, porque el
-  // jugador real sí pasa por startGame(), que ya la sacaba).
+  // slideMonumentIn() leaves the 'monument-appear' class (scale animation, see
+  // @keyframes in style.css) on this same <img> — unlike the real startGame()
+  // (below in this file), this spectator reset never removed it. With the class
+  // still on, the next Cities slideTagIn() fires ITS entry animation (movement)
+  // ON TOP of the pending monument-appear one — two overlapping entry
+  // animations, the old (monuments, feels like a "zoom out" on
+  // finishing/reverting) and the correct one (the reported "tag3 does two entry
+  // animations in spectator mode" — only there, because the real player goes
+  // through startGame(), which already removed it).
   if (_cityTagImg) { _cityTagImg.src = 'images/tag3.png'; _cityTagImg.style.width = ''; _cityTagImg.style.height = ''; _cityTagImg.classList.remove('monument-appear'); }
   monumentImgEl.classList.remove('monument-appear');
   cityTagText.style.display = '';
-  // Ocultar/limpiar el nombre del MONUMENTO (monumentNameEl, elemento
-  // DISTINTO de cityTagText) — si el espectador venía de mirar Monumentos,
-  // ese nombre quedaba visible encima del cartel de Cities (el "sigue
-  // mostrando el nombre de monumentos en el tag3 de ciudades" reportado).
-  // CRÍTICO: cancelar también el setTimeout con delay de slideMonumentIn
-  // (_nameTimer) — ese timer setea monumentNameEl.textContent DESPUÉS de un
-  // delay para la animación; si estaba pendiente al transicionar a Cities,
-  // disparaba más tarde y RE-ESCRIBÍA el nombre del monumento encima del
-  // cartel de la ciudad, aunque ya lo hubiéramos limpiado acá.
+  // Hide/clear the MONUMENT name (monumentNameEl, a DIFFERENT element from
+  // cityTagText) — if the spectator was watching Monuments, that name stayed
+  // visible over the Cities sign (the reported "still shows the monument name
+  // in the cities tag3"). CRITICAL: also cancel slideMonumentIn's delayed
+  // setTimeout (_nameTimer) — that timer sets monumentNameEl.textContent AFTER
+  // a delay for the animation; if pending on the transition to Cities, it fired
+  // later and RE-WROTE the monument name over the city sign, even after we
+  // cleared it here.
   if (typeof slideMonumentIn === 'function' && slideMonumentIn._nameTimer) {
     clearTimeout(slideMonumentIn._nameTimer); slideMonumentIn._nameTimer = null;
   }
   if (monumentNameEl) { monumentNameEl.textContent = ''; monumentNameEl.style.opacity = '0'; }
-  // Sacar cualquier "ghost" del cartel que haya quedado de Monumentos — es un
-  // clon de #city-tag (que incluye un clon de #monument-name con su texto) y
-  // se auto-remueve solo después de ~800ms, pero durante ese rato mostraría
-  // el nombre del monumento encima de Cities.
+  // Remove any sign "ghost" left over from Monuments — it's a clone of
+  // #city-tag (which includes a clone of #monument-name with its text) and
+  // self-removes after ~800ms, but during that time it would show the monument
+  // name over Cities.
   document.querySelectorAll('.city-tag-ghost').forEach(g => g.remove());
 
   if (animFrameId) cancelAnimationFrame(animFrameId);
@@ -257,20 +250,19 @@ window.citiesSpectatorEnter = function () {
   if (typeof window.refreshIngamePower === 'function') window.refreshIngamePower();
 };
 
-// switchingMode=true: la campaña del espectado encadenó a OTRO modo — ver
-// comentario largo en flagsSpectatorExit (mismo mecanismo acá).
+// switchingMode=true: the spectated player's campaign chained to ANOTHER mode —
+// see long comment in flagsSpectatorExit (same mechanism here).
 window.citiesSpectatorExit = function (switchingMode) {
   _citiesSpecMode = false;
   if (!switchingMode) window._isSpectating = false;
-  // Ver comentario largo en flagsSpectatorExit.
+  // See long comment in flagsSpectatorExit.
   document.getElementById('cities-spec-lb-entry')?.remove();
   document.getElementById('cities-spec-lb-opp')?.remove();
-  // Igual que el quit REAL: sin esto, el showStep() del 3-2-1 seguía
-  // corriendo solo en segundo plano (nunca se abortaba), y eventualmente
-  // llegaba a su onDone() — que arranca sfxGameMusic — PISANDO la música de
-  // menú que closeSpectator() ya había puesto momentos antes. También el
-  // beep del countdown (sfxCountdown) seguía sonando de fondo porque nada
-  // lo pausaba.
+  // Like the REAL quit: without this, the 3-2-1's showStep() kept running in
+  // the background (never aborted), and eventually reached its onDone() — which
+  // starts sfxGameMusic — OVERWRITING the menu music closeSpectator() had just
+  // set. The countdown beep (sfxCountdown) also kept playing because nothing
+  // paused it.
   pregameAborted = true;
   clearTimeout(pregameTimeout); pregameTimeout = null;
   if (typeof sfxCountdown !== 'undefined') { try { sfxCountdown.pause(); sfxCountdown.currentTime = 0; } catch (e) {} }
@@ -279,14 +271,13 @@ window.citiesSpectatorExit = function (switchingMode) {
   clearTimeout(_citiesSpecTimesUpT1); clearTimeout(_citiesSpecTimesUpT2);
   window.citiesSpectatorHidePostgame();
   if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
-  // window._vsShowingResult (ver _exitWaitAsSpectator en vs.js, mismo guard
-  // en flagsSpectatorExit/shapesSpectatorExit): este exit no es un
-  // espectador EXTERNO cerrando su sesión — es EL PROPIO JUGADOR a punto de
-  // ver SU PROPIO resultado del duelo. Sin este guard, el mapa/estado del
-  // juego desaparecía (gameWrapper oculto + state=null) antes de que
-  // apareciera el overlay de resultado, en vez de quedar congelado de fondo
-  // (el "se quitan los assets de fondo" reportado, mismo bug que en
-  // banderas/siluetas).
+  // window._vsShowingResult (see _exitWaitAsSpectator in vs.js, same guard in
+  // flagsSpectatorExit/shapesSpectatorExit): this exit isn't an EXTERNAL
+  // spectator closing their session — it's THE PLAYER themselves about to see
+  // THEIR OWN duel result. Without this guard, the game map/state disappeared
+  // (gameWrapper hidden + state=null) before the result overlay showed, instead
+  // of staying frozen in the background (the reported "background assets get
+  // removed", same bug as flags/shapes).
   if (!window._vsShowingResult) {
     gameWrapper.style.display = 'none';
     state = null;
@@ -309,24 +300,24 @@ window.citiesSpectatorExit = function (switchingMode) {
   if (typeof window.refreshIngamePower === 'function') window.refreshIngamePower();
 };
 
-// Cuenta 3-2-1: reusa el 100% de runPregameCountdown (mismo patrón que
-// runFlagsPregame/runShapesPregame en sus propios archivos).
+// 3-2-1 count: reuses 100% of runPregameCountdown (same pattern as
+// runFlagsPregame/runShapesPregame in their own files).
 window.citiesSpectatorShowPregame = function (payload) {
   if (!_citiesSpecMode) return;
-  // Sincrónico, apenas llega el broadcast — lo usa el timer de "fallback" de
-  // citiesSpectatorShowRound para decidir si de verdad hay un 3-2-1 en curso
-  // o si nadie va a mandar un pregame (unión a mitad de partida).
+  // Synchronous, as soon as the broadcast arrives — used by
+  // citiesSpectatorShowRound's "fallback" timer to decide whether a 3-2-1 is
+  // really running or nobody will send a pregame (mid-game join).
   _citiesSpecPregameSeen = true;
   window.citiesSpectatorHidePostgame();
-  // NO ocultar gameWrapper acá — ver el comentario largo en
-  // citiesSpectatorEnter(). El mapa debe quedar visible DETRÁS del 3-2-1
-  // desde el primer instante, igual que ve el jugador real.
+  // Do NOT hide gameWrapper here — see the long comment in
+  // citiesSpectatorEnter(). The map must stay visible BEHIND the 3-2-1 from the
+  // first instant, like the real player sees.
   cityTagEl.style.visibility = 'hidden';
-  // NO ocultar #countdown-widget acá — mismo motivo que gameWrapper más
-  // arriba: startGame() real (línea ~6040) lo deja VISIBLE desde el arranque
-  // (solo se oculta en el caso especial de "recording-mode" de Monumentos,
-  // que no aplica a Cities), solo pausa su animación con
-  // animationPlayState — eso sí se replica un poco más abajo.
+  // Do NOT hide #countdown-widget here — same reason as gameWrapper above: the
+  // real startGame() leaves it VISIBLE from the start (only hidden in the
+  // special Monuments "recording-mode" case, which doesn't apply to Cities),
+  // just pauses its animation via animationPlayState — that part is replicated
+  // below.
   if (payload) {
     timerNumberEl.classList.toggle('timer-number-infinity', !!payload.infinite);
     timerNumberEl.textContent = payload.infinite ? '∞' : (payload.duration != null ? payload.duration : '');
@@ -335,20 +326,20 @@ window.citiesSpectatorShowPregame = function (payload) {
   countdownImg.src = 'images/countdown.png';
   countdownImg.style.animationPlayState = 'paused';
   if (typeof playMusic === 'function') playMusic(null);
-  // El jugador real ya muestra su puntaje acumulado de campaña desde el
-  // arranque del 3-2-1 (no arranca en 0 salvo que sea el primer modo) — acá
-  // sin animación, es el estado base antes de la primera respuesta. render()
-  // solo anima displayedScore->score cuando difieren, así que arrancar
-  // ambos iguales no dispara ningún tween de más.
+  // The real player already shows their accumulated campaign score from the
+  // start of the 3-2-1 (doesn't start at 0 unless it's the first mode) — here
+  // without animation, the base state before the first answer. render() only
+  // animates displayedScore->score when they differ, so starting both equal
+  // triggers no extra tween.
   if (payload && typeof payload.campaignBaseAtStart === 'number' && state) {
     state.score = payload.campaignBaseAtStart;
     state.displayedScore = payload.campaignBaseAtStart;
     scoreValueEl.textContent = payload.campaignBaseAtStart.toLocaleString();
   }
   let elapsedMs = (payload && typeof payload.startedAt === 'number') ? (Date.now() - payload.startedAt) : 0;
-  // Mismo clamp que flags/shapes: sin esto, desfasaje de reloj o un resend
-  // tardío podían inflar elapsedMs más allá de la duración total del 3-2-1 y
-  // saltar DIRECTO a onDone sin mostrar nada del conteo.
+  // Same clamp as flags/shapes: without it, clock skew or a late resend could
+  // inflate elapsedMs past the total 3-2-1 duration and jump STRAIGHT to onDone
+  // showing none of the count.
   const _pregameTotalMs = PREGAME_STEPS.reduce((s, x) => s + x.hold, 0);
   if (elapsedMs > _pregameTotalMs - 400) elapsedMs = Math.max(0, _pregameTotalMs - 400);
   runPregameCountdown(() => {
@@ -364,29 +355,28 @@ window.citiesSpectatorShowPregame = function (payload) {
 // payload = { mode:'game', index, cityName, countryCode, lat, lon, timeLeft }
 window.citiesSpectatorShowRound = function (payload) {
   if (!_citiesSpecMode || !state) return;
-  // Mismo círculo de espera que flags.js/shapes.js apagan acá (ver
-  // _showVsWaitSpinner/_hideVsWaitSpinner en vs.js) — cities/monuments no lo
-  // tenían, así que en sala grupal se quedaba pegado hasta un timeout aparte.
+  // Same waiting spinner flags.js/shapes.js turn off here (see
+  // _showVsWaitSpinner/_hideVsWaitSpinner in vs.js) — cities/monuments didn't
+  // have it, so in a group room it stayed stuck until a separate timeout.
   if (typeof window._hideVsWaitSpinner === 'function') window._hideVsWaitSpinner();
-  // OJO: NO se tocan pin1Anim/pin2Anim/resultLabel acá — el nextCity() REAL
-  // tampoco los toca. El jugador real llama a nextCity() ~750ms después del
-  // click (300ms hasta que aparece pin2 + ~100ms hasta que "aterriza" +
-  // ~350ms más en el onLanded), bien ANTES de que los pines empiecen a
-  // fadear solos (eso recién arranca a partir de 1000-1300ms desde el
-  // click, con sus propios setTimeout independientes armados en
-  // citiesSpectatorResolvePick). Si acá los borrábamos de golpe apenas
-  // llegaba la ronda siguiente, les cortábamos el fade a la mitad — se
-  // veían desaparecer de golpe en vez de irse apagando, el "sin animación"
-  // reportado. Dejarlos solos: se limpian de forma natural cuando su propio
-  // fade termina (opacity<=0 → state.pinXAnim=null, ver render()).
+  // NOTE: pin1Anim/pin2Anim/resultLabel are NOT touched here — the REAL
+  // nextCity() doesn't touch them either. The real player calls nextCity()
+  // ~750ms after the click (300ms until pin2 appears + ~100ms until it "lands"
+  // + ~350ms more in onLanded), well BEFORE the pins start fading on their own
+  // (that begins around 1000-1300ms after the click, with its own independent
+  // setTimeouts set in citiesSpectatorResolvePick). Clearing them here as soon
+  // as the next round arrived would cut their fade in half — they visibly
+  // vanished instead of fading out, the reported "no animation". Leave them:
+  // they clear naturally when their own fade ends (opacity<=0 →
+  // state.pinXAnim=null, see render()).
   state.phase = 'waiting';
   state.cityShownAt = Date.now();
   state.currentCity = { name: payload.cityName, country: payload.countryCode, lat: payload.lat, lon: payload.lon };
-  // Garantizar que el nombre del MONUMENTO (monumentNameEl, hijo de #city-tag)
-  // quede limpio en CADA ronda de Cities — no solo en el enter. Si el
-  // espectador venía de Monumentos, ese nombre podía quedar con texto/opacidad
-  // (y slideTagIn clona #city-tag para su ghost, arrastrándolo). Cancelar
-  // también el timer con delay de slideMonumentIn por si quedó pendiente.
+  // Ensure the MONUMENT name (monumentNameEl, child of #city-tag) is clear on
+  // EVERY Cities round — not just on enter. If the spectator was watching
+  // Monuments, that name could still have text/opacity (and slideTagIn clones
+  // #city-tag for its ghost, carrying it along). Also cancel slideMonumentIn's
+  // delayed timer in case it's pending.
   if (slideMonumentIn._nameTimer) { clearTimeout(slideMonumentIn._nameTimer); slideMonumentIn._nameTimer = null; }
   if (monumentNameEl) { monumentNameEl.textContent = ''; monumentNameEl.style.opacity = '0'; }
   slideTagIn(payload.cityName, payload.countryCode);
@@ -395,21 +385,21 @@ window.citiesSpectatorShowRound = function (payload) {
     timerNumberEl.textContent = payload.timeLeft;
     timerNumberEl.classList.remove('timer-number-infinity');
   }
-  // Igual mecanismo que flags.js/shapes.js: solo en la primera ronda tras
-  // entrar, un margen corto para confirmar si de verdad viene un pregame
-  // (llega poco después, mismo orden real de broadcasts). Si no aparece, es
-  // unión a mitad de partida — recién ahí, con la ronda ya mostrada, arranca
-  // la música del juego (si hay pregame, la arranca su propio onDone al
-  // terminar el 3-2-1) — sin esto, un espectador que se unía a mitad de
-  // partida se quedaba con sfxMenuMusic sonando de fondo para siempre.
+  // Same mechanism as flags.js/shapes.js: only on the first round after
+  // entering, a short window to confirm whether a pregame is really coming
+  // (arrives shortly after, same real broadcast order). If none appears, it's a
+  // mid-game join — only then, with the round already shown, does game music
+  // start (if there's a pregame, its own onDone starts it when the 3-2-1 ends)
+  // — without this, a spectator joining mid-game was left with sfxMenuMusic
+  // playing forever.
   if (_citiesSpecIsFirstRound) {
     _citiesSpecIsFirstRound = false;
     setTimeout(() => {
-      // Guard contra el "sigue sonando la música de juego" reportado en VS:
-      // si para cuando dispara este timer ya se salió del modo espectador
-      // (ej. el jugador que esperaba de prestado ya vio el resultado final,
-      // ver _exitWaitAsSpectator en vs.js), no hay que pisar el postgameloop
-      // que _showVsResult() ya puso sonando.
+      // Guard against the reported "game music keeps playing" in VS: if by the
+      // time this timer fires the spectator mode was already exited (e.g. the
+      // player watching on loan already saw the final result, see
+      // _exitWaitAsSpectator in vs.js), don't overwrite the postgameloop
+      // _showVsResult() already set playing.
       if (!_citiesSpecMode) return;
       if (!_citiesSpecPregameSeen && typeof playMusic === 'function' && typeof sfxGameMusic !== 'undefined') {
         playMusic(sfxGameMusic);
@@ -419,9 +409,9 @@ window.citiesSpectatorShowRound = function (payload) {
 };
 
 // payload = { correct, score, grade, clickX, clickY, correctX, correctY, distKm, totalGained, bonusAmt }
-// Recrea pin1Anim/pin2Anim EXACTAMENTE como el click handler real (línea
-// ~5008 de este archivo) — mismas coordenadas de canvas (portables 1:1, mismo
-// DISPLAY_W/H) — así que render() los anima e interpola solo, sin tocarlo.
+// Recreates pin1Anim/pin2Anim EXACTLY like the real click handler — same canvas
+// coordinates (portable 1:1, same DISPLAY_W/H) — so render() animates and
+// interpolates them on its own, untouched.
 window.citiesSpectatorResolvePick = function (payload) {
   if (!_citiesSpecMode || !state || !state.currentCity) return;
   const { grade, clickX, clickY, correctX, correctY, distKm, totalGained, bonusAmt } = payload;
@@ -429,21 +419,21 @@ window.citiesSpectatorResolvePick = function (payload) {
   state.phase = 'animating';
   if (typeof sfxPin !== 'undefined' && typeof sfxPlay === 'function') { sfxPin.currentTime = 0; sfxPlay(sfxPin); }
 
-  // payload.score YA viene con campaignBase() sumado (ver _specReportAnswer
-  // en el jugador real) — solo hace falta actualizar state.score, render()
-  // anima state.displayedScore hacia ahí solo (línea ~5340), igual que ve
-  // el propio jugador. Antes esto nunca se seteaba acá (el dispatch de
-  // spectate.js solo llama resolvePick, no updateScore, para espectado
-  // solo/campaña) — el marcador quedaba congelado toda la ronda.
+  // payload.score ALREADY has campaignBase() added (see _specReportAnswer in the
+  // real player) — just update state.score, render() animates
+  // state.displayedScore toward it on its own, like the player sees. This was
+  // never set here before (spectate.js's dispatch only calls resolvePick, not
+  // updateScore, for solo/campaign spectating) — the scoreboard stayed frozen
+  // the whole round.
   if (typeof payload.score === 'number') state.score = payload.score;
 
-  // "+puntos" flotante — SOLO lo del acierto, SIN el inRowBonus (que va aparte
-  // en el badge "IN A ROW"), igual que el jugador real.
-  const _acierto = totalGained - (payload.inRowBonus || 0);
-  if (typeof totalGained === 'number' && _acierto > 0 && typeof showScorePopup === 'function') {
-    showScorePopup(_acierto);
+  // Floating "+points" — ONLY the hit value, WITHOUT the inRowBonus (shown
+  // separately in the "IN A ROW" badge), like the real player.
+  const _hitPoints = totalGained - (payload.inRowBonus || 0);
+  if (typeof totalGained === 'number' && _hitPoints > 0 && typeof showScorePopup === 'function') {
+    showScorePopup(_hitPoints);
   }
-  // Cartel de bonus de velocidad — mismo toggle que el click handler real.
+  // Speed-bonus sign — same toggle as the real click handler.
   if (typeof bonusAmt === 'number' && bonusAmt > 0) {
     clearTimeout(speedBonusHideId);
     speedBonusText.classList.remove('visible');
@@ -465,15 +455,14 @@ window.citiesSpectatorResolvePick = function (payload) {
     permanent: grade === 'perfect', fontSize: _dotFontSize,
   });
 
-  // advanceDot() (la misma función que usa el jugador real) hace TODO: suma
-  // el punto, dibuja el trencito, y si llega a 10 dispara el "+5s" con su
-  // popup y la animación de vaciado — reusarla acá evita reimplementar esa
-  // secuencia a mano. payload.dots trae el valor REAL post-incremento del
-  // jugador espectado — se pisa el contador local ANTES de llamar a
-  // advanceDot() (que hace state.dots++ internamente) para que quede
-  // exactamente en payload.dots, así el trencito llena/vacía en el mismo
-  // momento que ve el jugador real, sin importar en qué punto de la partida
-  // se unió el espectador.
+  // advanceDot() (the same function the real player uses) does EVERYTHING: adds
+  // the point, draws the train, and if it reaches 10 fires the "+5s" with its
+  // popup and the emptying animation — reusing it here avoids reimplementing
+  // that sequence by hand. payload.dots carries the spectated player's REAL
+  // post-increment value — the local counter is overwritten BEFORE calling
+  // advanceDot() (which does state.dots++ internally) so it lands exactly at
+  // payload.dots, so the train fills/empties at the same moment the real player
+  // sees, regardless of when the spectator joined.
   if (grade !== 'wayoff' && typeof advanceDot === 'function') {
     if (typeof payload.dots === 'number') state.dots = payload.dots - 1;
     advanceDot();
@@ -485,7 +474,7 @@ window.citiesSpectatorResolvePick = function (payload) {
   const capturedPin1 = state.pin1Anim;
 
   setTimeout(() => {
-    if (!_citiesSpecMode || state.pin1Anim !== capturedPin1) return; // ronda ya cambió
+    if (!_citiesSpecMode || state.pin1Anim !== capturedPin1) return; // round already changed
     state.pin2Anim = { x: correctX, y: correctY, progress: 0, opacity: 1, fading: false,
       wobbleTime: 0, starsSpawned: false,
       onLanded: () => {
@@ -493,11 +482,11 @@ window.citiesSpectatorResolvePick = function (payload) {
         setTimeout(() => {
           if (!_citiesSpecMode) return;
           showResultLabel(correctX, correctY, grade, 0, 0);
-          // Badge "IN A ROW" — mismo mecanismo que el espectador de Monuments
-          // (ver monumentsSpectatorResolvePick): payload.streak viaja como
-          // número y getBadgeImg lo reconstruye local. Ahora Cities también
-          // manda streak/inRowBonus reales (ver score de Cities), así que el
-          // badge se ve igual que para el jugador.
+          // "IN A ROW" badge — same mechanism as the Monuments spectator (see
+          // monumentsSpectatorResolvePick): payload.streak travels as a number
+          // and getBadgeImg rebuilds it locally. Cities now also sends real
+          // streak/inRowBonus (see Cities scoring), so the badge looks the same
+          // as for the player.
           if (typeof payload.streak === 'number' && typeof getBadgeImg === 'function') {
             const badgeColor = getBadgeImg(payload.streak);
             if (badgeColor) {
@@ -535,47 +524,44 @@ window.citiesSpectatorUpdateTimer = function (timeLeft) {
   _citiesSpecLastTick = timeLeft;
 };
 
-// score = puntaje actual del jugador real (viene del broadcast de 'answer').
-// El "conteo subiendo" hasta ahí lo anima render() solo (compara
-// state.displayedScore contra state.score cada frame) — no hace falta nada
-// más acá.
-// Este dispatch (fns.updateScore) se usa para "ponerse al día" al unirse a
-// mitad de ronda (onScoreSync, ver spectate.js), no para una respuesta en
-// vivo (esa pasa por citiesSpectatorResolvePick, que también fija
-// state.score pero deja que render() anime la subida). Acá se fija también
-// displayedScore para que aparezca directo, sin un salto animado desde 0
-// apenas se conecta.
+// score = the real player's current score (from the 'answer' broadcast). The
+// "counting up" to it is animated by render() on its own (compares
+// state.displayedScore vs state.score each frame) — nothing else needed here.
+// This dispatch (fns.updateScore) is used to "catch up" on joining mid-round
+// (onScoreSync, see spectate.js), not for a live answer (that goes through
+// citiesSpectatorResolvePick, which also sets state.score but lets render()
+// animate the rise). Here displayedScore is also set so it appears directly,
+// with no animated jump from 0 on connecting.
 window.citiesSpectatorUpdateScore = function (score, dots) {
   if (!_citiesSpecMode || !state) return;
   state.score = score;
   state.displayedScore = score;
   scoreValueEl.textContent = (score + (window.campaignBase ? window.campaignBase() : 0)).toLocaleString();
-  // dots: progreso YA acumulado del trencito de puntitos al momento de
-  // conectarse — sin esto, alguien que se unía a mitad de partida veía el
-  // trencito vacío hasta la PRÓXIMA respuesta correcta del jugador real, en
-  // vez del progreso real que ya llevaba acumulado.
+  // dots: the train's ALREADY-accumulated progress at the moment of connecting
+  // — without this, someone joining mid-game saw an empty train until the real
+  // player's NEXT correct answer, instead of the real progress already made.
   if (typeof dots === 'number') {
     state.dots = Math.max(0, Math.min(dots, DOTS_NEEDED - 1));
     updateDotsUI();
   }
 };
 
-// Tarjeta única en #leaderboard con el jugador REAL espectado — mismo patrón
-// que flagsSpectatorSetPlayerCard/shapesSpectatorSetPlayerCard, pero acá el
-// leaderboard real ya viene con el guard `if (window._isSpectating) return;`
-// en initLeaderboard() (puesto ahí mismo pensando en este caso). #leaderboard
-// SÍ es compartido con la lógica normal de resize/zoom de Cities/Monuments
-// (ver window.addEventListener('resize', ...) más abajo en el archivo, que
-// ahora llama a citiesSpectatorReposition() en vez de positionLeaderboard()
-// mientras se espectea) — por eso se cachean name/avatar/score, para poder
-// reaplicar la altura de 1 fila correcta sin necesitar esos datos de nuevo.
+// Single card in #leaderboard for the spectated REAL player — same pattern as
+// flagsSpectatorSetPlayerCard/shapesSpectatorSetPlayerCard, but here the real
+// leaderboard already has the guard `if (window._isSpectating) return;` in
+// initLeaderboard() (added there with this case in mind). #leaderboard IS shared
+// with the normal Cities/Monuments resize/zoom logic (see
+// window.addEventListener('resize', ...) below, which now calls
+// citiesSpectatorReposition() instead of positionLeaderboard() while
+// spectating) — so name/avatar/score are cached, to reapply the correct 1-row
+// height without needing that data again.
 let _citiesSpecLastCard = null;
-// oppName/oppAvatar/oppScore (opcionales): en versus, el rival del amigo
-// espectado — antes esta función solo mostraba al amigo (redundante con el
-// marcador principal, que YA lo muestra), y el rival no aparecía en ningún
-// lado. Ahora arma una SEGUNDA fila (mismo estilo lb-vsopp que usa el
-// jugador real para el suyo), para que el espectador vea las dos casillas
-// actualizándose en vivo, igual que ven los jugadores reales.
+// oppName/oppAvatar/oppScore (optional): in versus, the spectated friend's
+// rival — this function used to only show the friend (redundant with the main
+// scoreboard, which ALREADY shows it), and the rival didn't appear anywhere.
+// Now it builds a SECOND row (same lb-vsopp style the real player uses for
+// theirs), so the spectator sees both cells updating live, like the real
+// players do.
 window.citiesSpectatorSetPlayerCard = function (name, avatar, score, oppName, oppAvatar, oppScore, cardCode, oppCardCode) {
   if (!_citiesSpecMode) return;
   _citiesSpecLastCard = { name, avatar, score, oppName, oppAvatar, oppScore, cardCode, oppCardCode };
@@ -583,16 +569,15 @@ window.citiesSpectatorSetPlayerCard = function (name, avatar, score, oppName, op
   if (!lb) return;
   const rowH = getLbRowHeight();
   const showOpp = !!oppName;
-  // #leaderboard recorta todo lo que quede fuera de su propio alto con
-  // clip-path:inset(0 -300px) (0 arriba/abajo — CSS lo aclara: "corta solo en
-  // vertical, deja pasar el globo a la izquierda"). El emote-bubble de
-  // wrongEffect se dibuja POR ENCIMA de su fila (bottom:calc(80%-...), "encima
-  // del entry" dice el propio CSS) — si la fila de arriba queda pegada
-  // exactamente en top:0 del contenedor (como quedaba acá, sin margen extra),
-  // ese globo nace ya recortado por el clip-path antes de llegar a
-  // mostrarse. TOP_MARGIN reserva aire arriba para que tenga dónde
-  // dibujarse — el leaderboard real no lo sufre porque su ventana de varias
-  // filas normalmente deja margen de sobra arriba de la fila que emota.
+  // #leaderboard clips anything outside its own height with
+  // clip-path:inset(0 -300px) (0 top/bottom — the CSS notes: "clips only
+  // vertically, lets the globe through on the left"). The wrongEffect
+  // emote-bubble draws ABOVE its row (bottom:calc(80%-...), "above the entry"
+  // per the CSS) — if the top row sits exactly at the container's top:0 (as it
+  // did here, no extra margin), that bubble is born already clipped by the
+  // clip-path before it can show. TOP_MARGIN reserves headroom so it has
+  // somewhere to draw — the real leaderboard doesn't suffer this because its
+  // multi-row window usually leaves plenty of margin above the emoting row.
   const TOP_MARGIN = Math.round(rowH * 0.4);
   lb.style.height = (showOpp ? rowH * 2 + LB_GAP + TOP_MARGIN : rowH + TOP_MARGIN) + 'px';
   let el = document.getElementById('cities-spec-lb-entry');
@@ -633,11 +618,10 @@ window.citiesSpectatorSetPlayerCard = function (name, avatar, score, oppName, op
     if (oppAvatarEl && oppAvatar) oppAvatarEl.src = oppAvatar;
     const oppScoreEl = document.getElementById('cities-spec-lb-opp-score');
     if (oppScoreEl) oppScoreEl.textContent = (oppScore || 0).toLocaleString();
-    // Reordenar según puesto actual — mismo criterio que positionLeaderboard()
-    // real (mayor puntaje arriba), aprovechando la misma transition:top del
-    // CSS de .lb-entry para que el cambio de puesto se vea animado, no de
-    // golpe. Antes las dos filas quedaban SIEMPRE en el mismo orden fijo
-    // (amigo arriba, rival abajo) sin importar quién iba ganando.
+    // Reorder by current rank — same rule as the real positionLeaderboard()
+    // (higher score on top), using .lb-entry's CSS transition:top so the rank
+    // change animates rather than snapping. The two rows used to ALWAYS stay in
+    // a fixed order (friend on top, rival below) regardless of who was winning.
     const friendOnTop = (score || 0) >= (oppScore || 0);
     el.style.top    = (TOP_MARGIN + (friendOnTop ? 0 : rowH + LB_GAP)) + 'px';
     oppEl.style.top = (TOP_MARGIN + (friendOnTop ? rowH + LB_GAP : 0)) + 'px';
@@ -648,11 +632,11 @@ window.citiesSpectatorSetPlayerCard = function (name, avatar, score, oppName, op
   }
 };
 
-// Flash de "wrong" en la fila del espectador — target: 'friend' | 'opponent'.
-// Mismo mecanismo visual que _lbWrongEffect (animación lb-wrong-flash/
-// lb-shake + emote), pero sobre las filas propias del espectador en vez de
-// lbElements (esas ni existen mientras se espectea, initLeaderboard() está
-// bloqueada con el guard window._isSpectating).
+// "wrong" flash on the spectator row — target: 'friend' | 'opponent'.
+// Same visual mechanism as _lbWrongEffect (lb-wrong-flash/lb-shake animation +
+// emote), but on the spectator's own rows instead of lbElements (those don't
+// exist while spectating, initLeaderboard() is blocked by the
+// window._isSpectating guard).
 window.citiesSpectatorWrongEffect = function (target) {
   if (!_citiesSpecMode) return;
   const el = document.getElementById(target === 'opponent' ? 'cities-spec-lb-opp' : 'cities-spec-lb-entry');
@@ -660,21 +644,20 @@ window.citiesSpectatorWrongEffect = function (target) {
   el.style.animation = 'none'; void el.offsetWidth;
   el.style.animation = 'lb-wrong-flash 0.75s ease-out, lb-shake 0.45s ease-in-out';
   setTimeout(() => { el.style.animation = ''; }, 820);
-  // z-index elevado mientras dura el emote — ambas filas (.lb-player/
-  // .lb-vsopp) comparten el mismo z-index base, así que cuál queda "arriba"
-  // en un empate depende del orden en el DOM, no de quién tiene el emoji
-  // activo. Sin este boost temporal, la fila con el emoji podía quedar
-  // tapada por la otra durante la animación de reordenar puestos (top
-  // transition), que las hace superponerse un instante.
+  // Raised z-index for the emote's duration — both rows (.lb-player/.lb-vsopp)
+  // share the same base z-index, so which is "on top" in a tie depends on DOM
+  // order, not on who has the active emoji. Without this temporary boost, the
+  // row with the emoji could be covered by the other during the rank-reorder
+  // animation (top transition), which briefly overlaps them.
   const prevZ = el.style.zIndex;
   el.style.zIndex = '50';
   setTimeout(() => { el.style.zIndex = prevZ; }, 1800);
   if (typeof spawnEmoteBubble === 'function') spawnEmoteBubble(el);
 };
 
-// Reaplica altura/posición de la tarjeta tras un resize/zoom — ver el
-// addEventListener('resize', ...) de más abajo. No hace falta si nunca se
-// llegó a mostrar ninguna tarjeta (_citiesSpecLastCard null).
+// Reapply the card's height/position after a resize/zoom — see the
+// addEventListener('resize', ...) below. Not needed if no card was ever shown
+// (_citiesSpecLastCard null).
 window.citiesSpectatorReposition = function () {
   if (!_citiesSpecMode || !_citiesSpecLastCard) return;
   window.citiesSpectatorSetPlayerCard(_citiesSpecLastCard.name, _citiesSpecLastCard.avatar, _citiesSpecLastCard.score);
@@ -702,17 +685,16 @@ window.citiesSpectatorShowTimesUp = function () {
   }, 1800);
 };
 
-// Pantalla de resultados (solo camino solo/campaña — versus tiene su propia
-// pantalla W/L, no cubierta acá). Solo-lectura: pointer-events:none + confirm
-// oculto, igual que flags/shapes.
+// Results screen (solo/campaign path only — versus has its own W/L screen, not
+// covered here). Read-only: pointer-events:none + hidden confirm, like flags/shapes.
 window.citiesSpectatorShowPostgame = function (payload) {
   if (!_citiesSpecMode) return;
   const cwEl = document.getElementById('countdown-widget');
   if (cwEl) cwEl.style.display = 'none';
   gameoverScreen.classList.remove('mode-flags', 'mode-shapes', 'mode-monuments');
   gameoverScreen.style.pointerEvents = 'none';
-  // Mismo swap de sprites que hace loading-play-btn del jugador real —
-  // elementos COMPARTIDOS entre modos.
+  // Same sprite swap the real player's loading-play-btn does — elements SHARED
+  // between modes.
   document.querySelectorAll('.game-bg-men1').forEach(el => el.src = 'images/characters/men1.png');
   document.querySelectorAll('.game-bg-men2').forEach(el => el.src = 'images/characters/men2.png');
   document.querySelectorAll('.game-bg-girl1').forEach(el => el.src = 'images/characters/girl1.png');
@@ -720,10 +702,10 @@ window.citiesSpectatorShowPostgame = function (payload) {
   document.querySelectorAll('.game-bg-women1').forEach(el => el.src = 'images/characters/women1.png');
   document.querySelectorAll('.game-bg-women2').forEach(el => el.src = 'images/characters/women1.png');
   document.querySelectorAll('.game-bg-city').forEach(el => el.src = 'images/bg/level3complete.png');
-  // Mismo swap para los íconos grandes de correctas/incorrectas — faltaba
-  // del todo acá (a diferencia de los sprites de arriba, que sí se
-  // actualizaban), así que quedaban con lo último que dejó OTRO modo
-  // (ej. check2/wrong2 de Siluetas) en vez de check3/wrong3 de Ciudades.
+  // Same swap for the big correct/wrong icons — was missing entirely here
+  // (unlike the sprites above, which were updated), so they stayed with what
+  // ANOTHER mode left (e.g. Shapes' check2/wrong2) instead of Cities'
+  // check3/wrong3.
   document.querySelectorAll('.game-bg-check3').forEach(el => el.src = 'images/check3.png');
   document.querySelectorAll('.game-bg-wrong3').forEach(el => el.src = 'images/wrong3.png');
   if (typeof window.hideGameoverConfirm === 'function') window.hideGameoverConfirm();
@@ -736,13 +718,13 @@ window.citiesSpectatorShowPostgame = function (payload) {
   if (newHighscoreBanner) newHighscoreBanner.style.display = payload.isNewHighscore ? 'flex' : 'none';
   const rpEl = document.getElementById('right-panel');
   if (rpEl) rpEl.style.display = 'none';
-  // Reconstruye las filas de íconos individuales (correctas/incorrectas) con
-  // los conteos reales del jugador espectado — buildChecksRow()/
-  // buildWrongsRow() reales usan gradeCounts/wrongCount (estado LOCAL del
-  // jugador, que acá no existe), así que se arma una versión simple propia
-  // reusando getModeCheckImg()/getModeWrongImg() (ya devuelven check3/wrong3
-  // para 'game' vía window.pendingGameMode). Sin esto, las filas quedaban
-  // con la cantidad Y el ícono de la ÚLTIMA vez que se armaron de verdad.
+  // Rebuild the individual icon rows (correct/wrong) with the spectated
+  // player's real counts — the real buildChecksRow()/buildWrongsRow() use
+  // gradeCounts/wrongCount (the player's LOCAL state, which doesn't exist
+  // here), so build an own simple version reusing
+  // getModeCheckImg()/getModeWrongImg() (already return check3/wrong3 for
+  // 'game' via window.pendingGameMode). Without this, the rows kept the count
+  // AND icon from the LAST time they were really built.
   {
     const nCorrect = payload.correctCount || 0;
     const checksEndTime = _specBuildCountRow(
@@ -755,24 +737,24 @@ window.citiesSpectatorShowPostgame = function (payload) {
       gameoverScreen.querySelector('.game-bg-wrong3'),
       gameoverScreen.querySelector('.wrong-count-total'),
       payload.wrongCount || 0, (typeof getModeWrongImg === 'function') ? getModeWrongImg() : 'images/wrong3.png',
-      // Igual que endGame() real: las incorrectas arrancan recién cuando
-      // termina de entrar la fila de correctas, no las dos a la vez.
+      // Like the real endGame(): the wrongs only start once the correct row
+      // finishes entering, not both at once.
       (nCorrect > 0 ? (nCorrect - 1) * 0.1 + 0.2 : 0) + 0.4);
   }
   const wrongTotalEl = document.getElementById('gameover-wrong-total');
   if (wrongTotalEl) wrongTotalEl.textContent = payload.wrongCount || 0;
   const splashWrongEl = document.getElementById('splash-wrong-total');
   if (splashWrongEl) splashWrongEl.textContent = payload.wrongCount || 0;
-  // Contraparte de correctas — mismo elemento que actualiza updateGradeCountsUI()
-  // en el jugador real (gradeCounts.perfect+good+fair, estado LOCAL que acá no
-  // existe) — faltaba del todo, se quedaba con el número de la ÚLTIMA partida
-  // real jugada en esta pestaña en vez del conteo del jugador espectado.
+  // Correct-count counterpart — same element updateGradeCountsUI() updates in
+  // the real player (gradeCounts.perfect+good+fair, LOCAL state that doesn't
+  // exist here) — was missing entirely, stayed with the number from the LAST
+  // real game played in this tab instead of the spectated player's count.
   const correctTotalEl = document.getElementById('gameover-count-total');
   if (correctTotalEl) correctTotalEl.textContent = payload.correctCount || 0;
   const splashCorrectEl = document.getElementById('splash-count-total');
   if (splashCorrectEl) splashCorrectEl.textContent = payload.correctCount || 0;
-  // Igual que endGame() real: el marcador tampoco tiene sentido en la
-  // pantalla de resultados — sin esto quedaba pegado, visible de fondo.
+  // Like the real endGame(): the scoreboard makes no sense on the results
+  // screen either — without this it stayed stuck, visible in the background.
   scoreDisplayEl.style.display = 'none';
   if (typeof playMusic === 'function' && typeof sfxPostgame !== 'undefined') playMusic(sfxPostgame);
 };

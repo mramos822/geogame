@@ -1,19 +1,18 @@
-// ── MENSAJES (chat directo 1:1 entre amigos) ───────────────────────────────
-// A propósito NO usa un canal privado de Realtime con policy propia sobre
-// realtime.messages (como matches/solo-*, ver vs.js/spectate.js) — ese
-// patrón fue la fuente de un bug serio (cast de topic roto + Postgres
-// aplanando un EXISTS en un join, saltándose la protección). Acá el tiempo
-// real sale de postgres_changes sobre la tabla real direct_messages: Realtime
-// respeta la RLS de la tabla tal cual la vería cualquier SELECT normal, sin
-// ningún parseo de topic de por medio — mucho más simple y sin esa clase de
-// bug posible.
+// ── MESSAGES (direct 1:1 chat between friends) ─────────────────────────────
+// Deliberately does NOT use a private Realtime channel with its own policy on
+// realtime.messages (like matches/solo-*, see vs.js/spectate.js) — that pattern
+// was the source of a serious bug (broken topic cast + Postgres flattening an
+// EXISTS in a join, bypassing the protection). Here realtime comes from
+// postgres_changes on the real direct_messages table: Realtime respects the
+// table RLS exactly as any normal SELECT would see it, with no topic parsing —
+// much simpler and without that class of bug possible.
 window.Chat = (() => {
-  let _messages = [];        // hilo de la conversación abierta
-  let _activeFriend = null;  // {id, name, avatar, frameCode, ...} — ver getFriends()
+  let _messages = [];        // thread of the open conversation
+  let _activeFriend = null;  // {id, name, avatar, frameCode, ...} — see getFriends()
   let _view = 'inbox';       // 'inbox' | 'chat'
   let _activeTab = 'history'; // 'history' | 'online' | 'all'
-  let _lastById = new Map();   // friendId -> último mensaje (any direction) — recalculado en cada refreshInbox
-  let _unreadById = new Map(); // friendId -> cantidad de mensajes suyos sin leer — ver _loadUnreadCounts
+  let _lastById = new Map();   // friendId -> last message (any direction) — recomputed on each refreshInbox
+  let _unreadById = new Map(); // friendId -> count of their unread messages — see _loadUnreadCounts
   let _rtChannel = null;
   let _inboxLoading = false;
   let _panelOpen = false;
@@ -28,10 +27,10 @@ window.Chat = (() => {
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
-  // Mismo criterio de estado que el panel de Retar 1v1 / Social (ver
-  // getStatusObj/socialStatusText en js/social/social-panel.js) — reusado tal cual para
-  // que "conectado"/"jugando"/desconectado signifique lo mismo en todos
-  // lados, en vez de reinventar el cálculo acá.
+  // Same status rule as the 1v1 Challenge / Social panel (see
+  // getStatusObj/socialStatusText in js/social/social-panel.js) — reused as-is
+  // so "online"/"playing"/offline means the same everywhere, instead of
+  // reinventing the calc here.
   function _statusOf(f) {
     return (typeof getStatusObj === 'function') ? getStatusObj(f) : { cls: 'offline' };
   }
@@ -39,12 +38,12 @@ window.Chat = (() => {
     return (typeof socialStatusText === 'function') ? socialStatusText(f) : '';
   }
 
-  // ── Bandeja: último mensaje por amigo ──────────────────────────────────────
-  // No hay una tabla/vista de "conversaciones" separada — se arma acá mismo
-  // leyendo los últimos mensajes donde participo y quedándome con el primero
-  // (más nuevo, por el order desc) que aparece para cada otro usuario. Con el
-  // límite de amigos típico de este juego esto alcanza de sobra; si el
-  // volumen de mensajes creciera mucho convendría una vista materializada.
+  // ── Inbox: last message per friend ────────────────────────────────────────
+  // There is no separate "conversations" table/view — it is built here by
+  // reading the latest messages I participate in and keeping the first (newest,
+  // by the desc order) that appears for each other user. With this game's
+  // typical friend limit this is more than enough; if message volume grew a
+  // lot a materialized view would be worthwhile.
   async function _loadLastMessages() {
     const uid = _myId();
     if (!uid || !window.sb) return new Map();
@@ -63,10 +62,10 @@ window.Chat = (() => {
     return map;
   }
 
-  // Cuántos mensajes sin leer llegaron de CADA amigo — la burbujita de la
-  // fila muestra este número, no un simple puntito (a diferencia de
-  // _lastById, que solo mira si el ÚLTIMO mensaje está sin leer). Consulta
-  // liviana: solo trae sender_id de lo no leído, cuenta client-side.
+  // How many unread messages arrived from EACH friend — the row bubble shows
+  // this number, not just a dot (unlike _lastById, which only checks if the
+  // LAST message is unread). Light query: fetches only sender_id of the unread,
+  // counts client-side.
   async function _loadUnreadCounts() {
     const uid = _myId();
     if (!uid || !window.sb) return new Map();
@@ -94,11 +93,10 @@ window.Chat = (() => {
     }
   }
 
-  // Arma la lista a mostrar según la pestaña activa, siempre leyendo el
-  // estado de conexión FRESCO desde getFriends() (no una foto vieja tomada
-  // al abrir el panel) — así basta con re-renderizar (ver onFriendsUpdate
-  // más abajo) para que "conectados"/"jugando" se vea al segundo, sin
-  // re-pedir mensajes.
+  // Builds the list to show for the active tab, always reading the FRESH
+  // connection status from getFriends() (not an old snapshot taken on panel
+  // open) — so a re-render (see onFriendsUpdate below) is enough for
+  // "online"/"playing" to update within a second, without re-fetching messages.
   function _rowsForTab(tab) {
     const friends = (typeof getFriends === 'function') ? getFriends() : [];
     const withMeta = friends.map(f => {
@@ -120,8 +118,8 @@ window.Chat = (() => {
     return withMeta.sort((a, b) => a.friend.name.localeCompare(b.friend.name));
   }
 
-  // Orden pedido: nombre, bandera, estado de conexión — todo en la primera
-  // línea; el último mensaje recibido abajo del nombre, no al costado.
+  // Requested order: name, flag, connection status — all on the first line;
+  // the last received message below the name, not beside it.
   function _buildRow({ friend, last, unreadCount, status }) {
     const uid = _myId();
     const unread = unreadCount > 0;
@@ -178,7 +176,7 @@ window.Chat = (() => {
     _renderCurrentTab();
   }
 
-  // ── Conversación individual ─────────────────────────────────────────────────
+  // ── Individual conversation ───────────────────────────────────────────────
   async function _loadHistory(friendId) {
     const uid = _myId();
     if (!uid || !window.sb) return [];
@@ -223,24 +221,23 @@ window.Chat = (() => {
       .then(() => { refreshUnreadBadge(); }, () => {});
   }
 
-  // Texto de una burbujita roja de notificación, con tope en 99 (99+ para
-  // más) — antes el tope estaba en 9, mostraba "9+" con apenas 10 mensajes.
+  // Text for a red notification bubble, capped at 99 (99+ beyond) — the cap
+  // used to be 9, showing "9+" with just 10 messages.
   function _badgeLabel(n) { return n > 99 ? '99+' : String(n); }
-  // El número va en un <span> propio centrado por posición absoluta
-  // (top/left 50% + translate), NO por line-height/flex del contenedor —
-  // con una fuente display como VAGRoundBold el centrado por line-height
-  // quedaba sistemáticamente corrido (el "aún desalineado" reportado,
-  // incluso después de fijar line-height:1). Centrar por posición en vez
-  // de por métrica de fuente es inmune a esa clase de desajuste.
+  // The number goes in its own <span> centered by absolute position (top/left
+  // 50% + translate), NOT by the container's line-height/flex — with a display
+  // font like VAGRoundBold, line-height centering was systematically off (the
+  // reported "still misaligned", even after fixing line-height:1). Centering by
+  // position instead of font metric is immune to that class of misfit.
   function _setBadgeCount(badge, n) {
     if (!badge) return;
     badge.innerHTML = '<span class="notif-badge-num">' + _badgeLabel(n) + '</span>';
   }
 
-  // ── Burbujita de notificación en el botón "Mensajes" del loading ───────────
-  // Cuenta simple (head:true, no trae filas) — no depende de haber cargado
-  // la bandeja ni el historial de ninguna conversación, así que anda aunque
-  // el panel nunca se haya abierto en la sesión.
+  // ── Notification bubble on the loading "Messages" button ──────────────────
+  // Simple count (head:true, fetches no rows) — doesn't depend on having loaded
+  // the inbox or any conversation history, so it works even if the panel was
+  // never opened in the session.
   async function refreshUnreadBadge() {
     const uid = _myId();
     const badge = document.getElementById('messages-notif-badge');
@@ -285,31 +282,30 @@ window.Chat = (() => {
     if (avatarEl) avatarEl.src = friend.avatar || 'images/profilepic/ppdefault.png';
     window.CustomizeAssets?.applyFrame(document.getElementById('loading-chat-avatar-wrap'), friend.frameCode || '0001');
     _renderChatHeaderStatus(friend);
-    // Bandera circular a la derecha del header, igual que la del perfil
-    // (.profile-flag-badge) — a diferencia de la fila de la bandeja (más
-    // abajo, estilo Rankings), acá no hay celda de fondo de por medio.
+    // Circular flag on the right of the header, like the profile one
+    // (.profile-flag-badge) — unlike the inbox row (below, Rankings-style),
+    // here there's no background cell in the way.
     const flagEl = document.getElementById('loading-chat-flag');
     if (flagEl) {
       const flagUrl = window.flagUrlForCountryCode?.(friend.country_code);
       if (flagUrl) { flagEl.src = flagUrl; flagEl.style.display = ''; }
       else { flagEl.style.display = 'none'; }
     }
-    // La conversación se abre ENCIMA de la bandeja — se oculta la bandeja
-    // (no se cierra del todo) para que "volver" la reabra tal cual estaba,
-    // sin dos overlays .account-modal superpuestos a la vez.
+    // The conversation opens ON TOP of the inbox — the inbox is hidden (not
+    // fully closed) so "back" reopens it as it was, without two overlapping
+    // .account-modal overlays at once.
     document.getElementById('chat-inbox-modal')?.classList.remove('open');
     document.getElementById('chat-conversation-modal')?.classList.add('open');
-    // Vaciar el hilo YA (antes de esperar la consulta) — si no, mientras
-    // _loadHistory está en vuelo se seguía viendo un instante el hilo de la
-    // conversación ANTERIOR (el "sale el antiguo y de ahí el nuevo"
-    // reportado), porque _messages todavía tenía los mensajes de la última
-    // vez hasta que la nueva consulta resolvía.
+    // Empty the thread NOW (before awaiting the query) — otherwise, while
+    // _loadHistory is in flight the PREVIOUS conversation's thread was still
+    // visible for an instant (the reported "the old one shows then the new"),
+    // because _messages still held the last messages until the new query
+    // resolved.
     _messages = [];
     _renderMessages();
     const history = await _loadHistory(friend.id);
-    // Guard de carrera: si mientras esto esperaba el jugador ya abrió OTRA
-    // conversación, esta respuesta (de la que quedó atrás) no debe pisar la
-    // que se está mostrando ahora.
+    // Race guard: if while awaiting this the player opened ANOTHER
+    // conversation, this (stale) response must not overwrite the one shown now.
     if (_activeFriend !== friend) return;
     _messages = history;
     _renderMessages();
@@ -319,8 +315,8 @@ window.Chat = (() => {
     if (input) { input.value = ''; input.style.height = ''; input.focus(); }
   }
 
-  // Flecha "←": vuelve a la bandeja (que sigue "abierta" de fondo, ver
-  // openConversation). Distinto de closeAll() (la ✕), que cierra todo.
+  // "←" arrow: back to the inbox (still "open" in the background, see
+  // openConversation). Different from closeAll() (the ✕), which closes everything.
   function backToInbox() {
     document.getElementById('chat-conversation-modal')?.classList.remove('open');
     document.getElementById('chat-inbox-modal')?.classList.add('open');
@@ -358,11 +354,11 @@ window.Chat = (() => {
     refreshInbox();
   }
 
-  // ── Realtime: persistente durante toda la sesión logueada (no solo con el
-  // panel abierto) — así la burbujita de notificación se actualiza sola
-  // aunque el jugador nunca haya abierto Mensajes todavía. Un solo canal
-  // hace las dos cosas: si el panel está mostrando la conversación/bandeja
-  // correspondiente las actualiza en vivo, y siempre refresca el contador. */
+  // ── Realtime: persistent for the whole logged-in session (not just with the
+  // panel open) — so the notification bubble updates itself even if the player
+  // never opened Messages. A single channel does both: if the panel is showing
+  // the corresponding conversation/inbox it updates them live, and it always
+  // refreshes the counter. */
   function _subscribeRealtime() {
     const uid = _myId();
     if (!uid || !window.sb || _rtChannel) return;
@@ -374,7 +370,7 @@ window.Chat = (() => {
           _messages.push(msg);
           _renderMessages();
           _scrollToBottom();
-          _markConversationRead(msg.sender_id); // ya refresca el badge al terminar
+          _markConversationRead(msg.sender_id); // refreshes the badge on completion
         } else {
           refreshUnreadBadge();
           if (_panelOpen && _view === 'inbox') refreshInbox();
@@ -383,9 +379,9 @@ window.Chat = (() => {
       .subscribe();
   }
 
-  // Estado de conexión en vivo: onFriendsUpdate ya corre por el poll social
-  // genérico (friends.js) — reengancharse acá es gratis, mismo patrón que
-  // _renderOnlineFriends en vs.js para el panel de Retar 1v1.
+  // Live connection status: onFriendsUpdate already runs via the generic
+  // social poll (friends.js) — hooking in here is free, same pattern as
+  // _renderOnlineFriends in vs.js for the 1v1 Challenge panel.
   if (typeof onFriendsUpdate === 'function') {
     onFriendsUpdate(() => {
       if (!_panelOpen) return;
@@ -394,10 +390,10 @@ window.Chat = (() => {
     });
   }
 
-  // Arranca apenas hay sesión (evento disparado por sb.js al loguear, tanto
-  // en un login fresco como al retomar una sesión guardada) — así el badge
-  // ya está correcto desde que carga el loading, sin depender de que el
-  // jugador toque el botón de Mensajes primero.
+  // Starts as soon as there's a session (event fired by sb.js on login, both a
+  // fresh login and resuming a saved session) — so the badge is already correct
+  // from when the loading screen loads, without waiting for the player to tap
+  // the Messages button first.
   function _startSession() {
     _subscribeRealtime();
     refreshUnreadBadge();
@@ -405,12 +401,12 @@ window.Chat = (() => {
   document.addEventListener('sbSessionReady', _startSession);
   if (window._sessionReady) _startSession();
 
-  // ── Abrir/cerrar el panel principal ─────────────────────────────────────────
+  // ── Open/close the main panel ─────────────────────────────────────────────
   async function openInbox() {
     document.getElementById('chat-inbox-modal')?.classList.add('open');
     _panelOpen = true;
     _view = 'inbox';
-    _subscribeRealtime(); // no-op si ya está suscripto desde el login
+    _subscribeRealtime(); // no-op if already subscribed since login
     if (typeof loadFriends === 'function') loadFriends();
     await refreshInbox();
   }
@@ -425,7 +421,7 @@ window.Chat = (() => {
   return { openInbox, closeInbox, openConversation, backToInbox, sendMessage, setTab: _setTab };
 })();
 
-// ── Wiring de UI ─────────────────────────────────────────────────────────────
+// ── UI wiring ───────────────────────────────────────────────────────────────
 document.getElementById('loading-messages-btn')?.addEventListener('click', () => {
   if (typeof sfxCheck !== 'undefined' && typeof sfxPlay === 'function') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
   if (!window._accountLoggedIn) {
@@ -440,8 +436,8 @@ document.getElementById('chat-inbox-close')?.addEventListener('click', () => {
   window.Chat.closeInbox();
 });
 
-// Flecha "←": única salida de la conversación, vuelve a la bandeja (la "✕"
-// de cerrar todo queda solo en el modal de la bandeja, ver arriba).
+// "←" arrow: the only exit from the conversation, back to the inbox (the "✕"
+// to close everything stays only in the inbox modal, see above).
 document.getElementById('loading-chat-back')?.addEventListener('click', () => {
   if (typeof sfxCheck !== 'undefined' && typeof sfxPlay === 'function') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
   window.Chat.backToInbox();
@@ -454,12 +450,12 @@ document.getElementById('loading-chat-back')?.addEventListener('click', () => {
   });
 });
 
-// El input es un <textarea> (no <input>) para que un mensaje largo pase a
-// una segunda línea en vez de recortarse sin verse. Sin scrollbar interna a
-// propósito (pedido explícito) — la caja simplemente crece en alto junto
-// con los renglones, sin techo (hasta los 400 caracteres del maxlength);
-// se vuelve a su alto mínimo después de cada envío (ver openConversation/
-// el handler de "enviar" más abajo, que resetean style.height).
+// The input is a <textarea> (not <input>) so a long message wraps to a second
+// line instead of being clipped out of sight. No inner scrollbar on purpose
+// (explicit request) — the box simply grows in height with the lines, with no
+// ceiling (up to the 400-char maxlength); it returns to its minimum height
+// after each send (see openConversation / the "send" handler below, which reset
+// style.height).
 function _autoGrowChatInput() {
   const input = document.getElementById('loading-chat-input');
   if (!input) return;
@@ -476,9 +472,8 @@ document.getElementById('loading-chat-send')?.addEventListener('click', () => {
   _autoGrowChatInput();
   window.Chat.sendMessage(val);
 });
-// Enter envía; Shift+Enter salta de línea (igual que cualquier chat) — sin
-// el guard de shiftKey, un mensaje de más de un renglón era imposible de
-// escribir a mano.
+// Enter sends; Shift+Enter adds a newline (like any chat) — without the
+// shiftKey guard, a multi-line message was impossible to type by hand.
 document.getElementById('loading-chat-input')?.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); document.getElementById('loading-chat-send')?.click(); }
 });

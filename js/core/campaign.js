@@ -1,17 +1,15 @@
 // ============================================================================
-// core/campaign.js — Gira Mundial (window.campaign, campaignBase, _commitCampaignHighscores,
-// startCampaign) + el helper global _setPlaying (is_playing en Supabase +
-// etiqueta de /stats) y preloadNextModeAssets.
+// core/campaign.js — Gira Mundial (window.campaign, campaignBase,
+// _commitCampaignHighscores, startCampaign) + the global _setPlaying helper
+// (is_playing in Supabase + /stats label) and preloadNextModeAssets.
 //
-// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
-// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
-// Son <script> clásicos que comparten un mismo scope global.
+// Classic <script>s sharing one global scope, loaded in order in play/index.html.
 // ============================================================================
 
-// Etiqueta legible de "qué está jugando" para /stats (ver sbSetPlayingMode
-// en sb.js) — best-effort a partir del contexto disponible en el momento
-// del microtask (después de que quien llamó a _setPlaying ya terminó de
-// setear pendingGameMode/campaign/_vsActive en su misma función síncrona).
+// Human-readable "what is being played" label for /stats (see sbSetPlayingMode
+// in sb.js) — best-effort from the context available at microtask time (after
+// the _setPlaying caller finished setting pendingGameMode/campaign/_vsActive in
+// its own synchronous function).
 const _MODE_NAME_LABELS = { flags: 'Banderas', shapes: 'Figuras', game: 'Ciudades', monuments: 'Monumentos', globequiz: 'GlobeQuiz' };
 function _computePlayingLabel(isPracticing) {
   const modeName = _MODE_NAME_LABELS[window.pendingGameMode] || null;
@@ -21,32 +19,31 @@ function _computePlayingLabel(isPracticing) {
   return modeName || 'Jugando';
 }
 
-// Helper global: actualiza is_playing en Supabase si hay sesión activa
+// Global helper: updates is_playing in Supabase if there's an active session
 window._setPlaying = function(playing) {
   window._isPlaying = !!playing;
   const isPracticing = !!(window.practiceConfig && window.practiceConfig.active);
   if (window._sbUserId) {
     window.sbSetPlaying(window._sbUserId, playing, playing && isPracticing).catch(() => {});
   } else if (window.Analytics && typeof window.Analytics.guestSetPlaying === 'function') {
-    // Invitado (sin cuenta): mismo latido que sbSetPlaying, pero a
-    // guest_presence — es lo único que le permite a /stats "En línea
-    // ahora"/"Jugando ahora" verlos, ver js/analytics.js.
+    // Guest (no account): same heartbeat as sbSetPlaying but to
+    // guest_presence — the only thing that lets /stats "online now" /
+    // "playing now" see them, see js/analytics.js.
     window.Analytics.guestSetPlaying(playing, null);
   }
   if (playing) {
     window._scoresUploadedThisGame = false;
     window._gameSessionId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
-    // Diferido a un microtask: quien nos llamó (vs.js/lobby.js) recién termina de
-    // setear _vsActive/_lobbyActive unas líneas después de llamar _setPlaying(true)
-    // en la MISMA función síncrona — si decidiéramos acá mismo, siempre veríamos
-    // esos flags todavía en false y abriríamos un canal de espectador "solo" aunque
-    // en realidad sea versus/lobby. Tampoco tiene sentido abrir el canal en modo
-    // práctica: no hay ojo para clickear (is_practicing lo oculta) y la sesión
-    // no es una partida "real" para mostrarle a nadie.
+    // Deferred to a microtask: the caller (vs.js/lobby.js) sets
+    // _vsActive/_lobbyActive a few lines after calling _setPlaying(true) in the
+    // SAME synchronous function — deciding here would always see those flags
+    // still false and open a "solo" spectator channel even for a versus/lobby.
+    // Opening the channel makes no sense in practice mode either: there's no eye
+    // to click (is_practicing hides it) and the session isn't a "real" game.
     Promise.resolve().then(() => {
-      // sbSetPlayingMode va PRIMERO y en su propio try/catch: si SoloSpectate.start()
-      // más abajo tirara una excepción, no debe cortar esto a mitad de camino (pasó
-      // exactamente eso antes de este cambio — el modo nunca llegaba a /stats).
+      // sbSetPlayingMode goes FIRST in its own try/catch: if SoloSpectate.start()
+      // below throws, it must not cut this off midway (that's exactly what
+      // happened before this change — the mode never reached /stats).
       try {
         if (window._isPlaying && window._sbUserId && typeof window.sbSetPlayingMode === 'function') {
           window.sbSetPlayingMode(window._sbUserId, _computePlayingLabel(isPracticing)).catch(() => {});
@@ -63,14 +60,14 @@ window._setPlaying = function(playing) {
   } else {
     if (typeof window.SoloSpectate !== 'undefined') window.SoloSpectate.stop();
     if (window._sbUserId && typeof window.sbSetPlayingMode === 'function') window.sbSetPlayingMode(window._sbUserId, null).catch(() => {});
-    // Al volver de una partida, entregar invitaciones que llegaron mientras jugaba
+    // Back from a game: deliver invites that arrived while playing
     if (typeof window.flushQueuedInvite === 'function') window.flushQueuedInvite();
   }
 };
 
-// ── PRELOAD PROACTIVO PARA TRANSICIONES DE CAMPAÑA ───────────────────────────
-// Se llama al mostrar el gameover del modo N para que los assets del modo N+1
-// lleguen al caché HTTP antes de que el usuario haga click en Confirm.
+// ── PROACTIVE PRELOAD FOR CAMPAIGN TRANSITIONS ───────────────────────────────
+// Called when mode N's gameover shows, so mode N+1's assets reach the HTTP
+// cache before the user clicks Confirm.
 window.preloadNextModeAssets = function (nextMode) {
   const assetMap = {
     shapes: [
@@ -95,13 +92,13 @@ window.preloadNextModeAssets = function (nextMode) {
   };
   const list = assetMap[nextMode];
   if (!list) return Promise.resolve();
-  // Videos excluidos del preload proactivo: son demasiado pesados para tener
-  // en RAM mientras el modo anterior todavía no liberó su memoria → OOM en iOS.
+  // Videos excluded from proactive preload: too heavy to keep in RAM while the
+  // previous mode hasn't freed its memory yet → OOM on iOS.
   const images = list.filter(url => !url.endsWith('.mp4'));
   if (!images.length) return Promise.resolve();
-  // En mobile: fetch() para calentar el HTTP cache sin decodificar el bitmap en RAM.
-  // Así no se acumula memoria decodificada mientras el modo anterior todavía no liberó la suya.
-  // En PC: new Image() para decodificar proactivamente (más rápido al renderizar).
+  // Mobile: fetch() to warm the HTTP cache without decoding the bitmap into RAM,
+  // so decoded memory doesn't pile up before the previous mode frees its own.
+  // PC: new Image() to decode proactively (faster to render).
   if (IS_MOBILE) {
     return Promise.all(
       images.map(url => fetch(url, { cache: 'force-cache' }).catch(() => {}))
@@ -117,7 +114,7 @@ window.preloadNextModeAssets = function (nextMode) {
   });
 };
 
-// ── CAMPAÑA: 4 modos encadenados ─────────────────────────────────────────────
+// ── CAMPAIGN: 4 chained modes ────────────────────────────────────────────────
 window.campaign = {
   active: false,
   idx: 0,
@@ -125,18 +122,17 @@ window.campaign = {
   btns:  ['loading-flags-btn', 'loading-shapes-btn', 'loading-play-btn', 'loading-mode4-btn'],
   modes: ['flags', 'shapes', 'game', 'monuments'],
   scores: {},
-  // Highscores por-modo conseguidos DURANTE una campaña en curso: se guardan acá
-  // en lugar de en localStorage hasta que la Vuelta Mundial se completa entera.
-  // Si se abandona a mitad de camino, se descartan (ver quitToMenu) y el
-  // highscore persistido no cambia.
+  // Per-mode highscores earned DURING an in-progress campaign: kept here instead
+  // of localStorage until the whole campaign completes. If abandoned midway they
+  // are discarded (see quitToMenu) and the persisted highscore doesn't change.
   pendingHS: {},
 };
-// puntaje acumulado de rondas anteriores (0 si no hay campaña activa)
+// accumulated score from previous rounds (0 if no active campaign)
 window.campaignBase = function () {
   return (window.campaign && window.campaign.active) ? (window.campaign.base || 0) : 0;
 };
-// Confirma en localStorage los highscores por-modo que se lograron durante la
-// campaña recién completada. Solo se llama cuando se terminaron los 4 modos.
+// Commit to localStorage the per-mode highscores earned during the just-completed
+// campaign. Only called once all 4 modes are finished.
 window._commitCampaignHighscores = function () {
   const pending = window.campaign && window.campaign.pendingHS;
   if (!pending) return;

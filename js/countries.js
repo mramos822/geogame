@@ -1,9 +1,9 @@
-// Países del mundo divididos por reconocimiento de bandera a nivel mundial
-// inicio  → las 5 banderas más icónicas, usadas en el modo banderas de inicio
-// easy    → banderas muy icónicas y ampliamente reconocidas
-// medium  → banderas conocidas regionalmente o con elementos distintivos
-// hard    → banderas poco conocidas, similares entre sí o de países pequeños
-// insane  → banderas extremadamente oscuras, territorios, islas micro y similares
+// World countries split by flag recognition worldwide
+// inicio  → the 5 most iconic flags, used in the flags starter mode
+// easy    → very iconic, widely recognized flags
+// medium  → regionally known flags or ones with distinctive elements
+// hard    → little-known flags, similar to each other or from small countries
+// insane  → extremely obscure flags, territories, micro islands and the like
 
 const COUNTRIES = {
 
@@ -473,10 +473,10 @@ const COUNTRY_FLAGS = {
   "Chad":           "images/flags/chad.png",
 };
 
-// Código de país ISO 3166-1 alpha-2 (el que devuelve ipinfo.io) → archivo de
-// bandera. Usado para el circulito de "país de creación de cuenta" en el
-// panel de perfil. No cubre banderas sin código de país propio en IP
-// geolocation (Inglaterra/Escocia/Gales/etc. quedan dentro de "GB").
+// ISO 3166-1 alpha-2 country code (what ipinfo.io returns) → flag file. Used
+// for the "account creation country" circle in the profile panel. Doesn't cover
+// flags without their own country code in IP geolocation (England/Scotland/
+// Wales/etc. fall under "GB").
 const COUNTRY_CODE_TO_FLAG = {
   AF: "afghanistan", AL: "albania", DZ: "algeria", AS: "americansamoa",
   AD: "andorra", AO: "angola", AI: "anguila", AQ: "antarctica",
