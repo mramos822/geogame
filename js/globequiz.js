@@ -2414,6 +2414,18 @@
     if (typeof loadGameSFX === 'function') loadGameSFX();
     const spinner = document.getElementById('gq-loading-spinner');
     if (spinner) spinner.style.display = 'block';
+    // Hide the input row + hint SYNCHRONOUSLY, right when the screen appears —
+    // not inside the loadThree()/loadCountries() .then() below. In versus the
+    // sync panel wait (and, if three.js isn't cached, the load itself) can
+    // last seconds, and #globequiz-screen is already display:block by then:
+    // the "type the name of your first guess" hint and the text field were
+    // showing under/around the sync popup before the 3-2-1-GO. They only come
+    // back in runGqPregameCountdown's onDone. Also covers re-entry after
+    // spectating (globequizSpectatorExit leaves them visible).
+    const _guessRow0 = document.querySelector('.gq-guess-row');
+    if (_guessRow0) _guessRow0.style.display = 'none';
+    const _hint0 = document.getElementById('gq-hint');
+    if (_hint0) { _hint0.style.display = 'none'; _hint0.classList.remove('gq-hint-wrap'); }
     // The input/confirm wiring is done HERE, outside the 3D globe promise —
     // it used to live inside the .then() below, so if loadThree() or
     // initThreeScene() failed (WebGL blocked/disabled, typical in Firefox
