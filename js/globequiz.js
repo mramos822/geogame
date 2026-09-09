@@ -67,41 +67,56 @@
   // neither onload NOR onerror) left initGlobeQuiz waiting forever: in
   // 1-player the spinner spun eternally, and in a 1v1 duel the opponent
   // started solo after the timeout while this client stayed frozen (the
-  // reported "one gets frozen and the other loads fine"). Now each attempt
-  // has its own timeout and there's one retry.
-  const THREE_SRC = 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js';
-  const THREE_ATTEMPT_TIMEOUT_MS = 10000;
-  function _loadThreeAttempt() {
+  // reported "one gets frozen and the other loads fine").
+  //
+  // Each attempt has its own timeout, and we try SEVERAL CDNs in turn:
+  // jsdelivr routes poorly to parts of Latin America (reported: GloboReto
+  // stuck loading for a player in Peru — three.js never arrived), Cloudflare
+  // (cdnjs) has much better regional coverage, unpkg is a last resort. First
+  // one that lands wins.
+  const THREE_SRCS = [
+    'https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js',
+    'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js',
+    'https://unpkg.com/three@0.160.0/build/three.min.js',
+  ];
+  const THREE_ATTEMPT_TIMEOUT_MS = 9000;
+  function _loadThreeAttempt(src) {
     return new Promise((resolve, reject) => {
       if (window.THREE) { THREE = window.THREE; resolve(); return; }
       const s = document.createElement('script');
-      s.src = THREE_SRC;
+      s.src = src;
       let done = false;
       const to = setTimeout(() => {
         if (done) return;
         done = true;
         s.onload = s.onerror = null;
         try { s.remove(); } catch (e) {}
-        reject(new Error('three.js load timeout'));
+        reject(new Error('three.js load timeout: ' + src));
       }, THREE_ATTEMPT_TIMEOUT_MS);
       s.onload = () => {
         if (done) return;
         done = true; clearTimeout(to);
         if (window.THREE) { THREE = window.THREE; resolve(); }
-        else reject(new Error('three.js missing after load'));
+        else reject(new Error('three.js missing after load: ' + src));
       };
       s.onerror = () => {
         if (done) return;
         done = true; clearTimeout(to);
         try { s.remove(); } catch (e) {}
-        reject(new Error('three.js load error'));
+        reject(new Error('three.js load error: ' + src));
       };
       document.head.appendChild(s);
     });
   }
   function loadThree() {
     if (window.THREE) { THREE = window.THREE; return Promise.resolve(); }
-    return _loadThreeAttempt().catch(() => _loadThreeAttempt());
+    // Chain the CDNs: each .catch tries the next source. The seed rejection is
+    // caught synchronously by the first link, so it never surfaces as an
+    // unhandled rejection.
+    return THREE_SRCS.reduce(
+      (p, src) => p.catch(() => _loadThreeAttempt(src)),
+      Promise.reject(new Error('three.js: starting CDN chain'))
+    );
   }
 
   // Caribbean micro-territories too obscure/impossible to guess blind (nobody

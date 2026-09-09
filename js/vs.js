@@ -304,16 +304,11 @@ window.VS = (() => {
 
   // ── Accept invite (guest) ──────────────────────────────────────────────────
 
-  // START_DELAY_MS: margin between "the guest accepted" and "both start" —
-  // enough for the realtime notification to reach the HOST with time to
-  // spare regardless of network latency. Each client used to start as soon
-  // as ITS OWN side found out: the guest, as soon as its own accept()
-  // finished (~instant, it's its own write); the host, only when the
-  // notification of that write arrived via Realtime (WAL + broadcast, with
-  // real network latency in between) — the guest always started first, from
-  // milliseconds to sometimes a whole second (the reported "it's unfair").
-  // Now both wait for the SAME started_at (wall clock, not "when I found
-  // out") before actually starting.
+  // started_at is written here for the record (analytics / DB debugging) but
+  // is NOT used for start timing any more — comparing a guest-clock timestamp
+  // against the host's Date.now() broke on clock skew. The actual start delay
+  // is a fixed local wait on each side, see VS_START_DELAY_MS / the long
+  // comment on _scheduleVersusStart.
   const START_DELAY_MS = 1500;
 
   async function accept(matchId) {
@@ -1741,7 +1736,7 @@ window.refreshVsSpectatorBadge = function (n) {
   // channel) so the match is cancelled for BOTH instead of the host starting
   // alone (reported: "only I load"). Comfortably covers Chile/Argentina →
   // us-east-1 round-trip plus the guest's own GQ_GO_DELAY_MS wait.
-  const GQ_GO_ACK_TIMEOUT_MS = 4000;
+  const GQ_GO_ACK_TIMEOUT_MS = 5000;
   let _gqReadyMe = false, _gqReadyOpp = false, _gqReadyDone = false, _gqReadyTimer = null, _gqReadyResolveCb = null;
   let _gqSyncFailed = false;
   let _gqGoWaitCb = null, _gqGoFallbackTimer = null;
@@ -2306,18 +2301,28 @@ window.refreshVsSpectatorBadge = function (n) {
 
   // ── Start versus match ────────────────────────────────────────────────────
 
-  // Waits until match.started_at (wall clock, set by accept() with a
-  // START_DELAY_MS margin) before actually starting — without this, each
-  // client called _launchVersus() as soon as it FOUND OUT the match was
-  // active, and the guest always found out before the host (its own write
-  // vs. the realtime notification of that write reaching the host, with
-  // real network latency in between) — they started desynced, from
-  // milliseconds to sometimes a whole second.
+  // How long the "Duel accepted!" popup shows before the real 3-2-1, on BOTH
+  // sides.
+  //
+  // This used to compare match.started_at (a timestamp the guest wrote using
+  // ITS OWN wall clock, = guest_now + 1500ms) against the host's Date.now().
+  // That only works if the two devices' clocks agree — they don't. With the
+  // host's clock even a couple of seconds ahead, `started_at - host_now`
+  // came out <= 0, so the host skipped the popup entirely AND reached the
+  // 3-2-1 up to a full second and a half before the guest — the exact
+  // unfairness the delay was meant to remove (reported: "it took me straight
+  // to the 3-2-1, my friend got the 'duel accepted' screen").
+  //
+  // Now each side just waits this fixed amount locally from the moment it
+  // learns the match is active. The guest learns instantly (its own accept()
+  // write); the host learns one realtime message later, so the host starts
+  // ~that latency after the guest — a ~100-400ms guest edge on a normal
+  // connection instead of 1500ms+, and the host ALWAYS sees the popup.
+  const VS_START_DELAY_MS = 1500;
+
   // Short popup ("Duel accepted!") shown to BOTH players (host and guest) as
   // soon as the duel is known to be starting — visually fills the
-  // START_DELAY_MS margin between "the guest accepted" and the real 3-2-1,
-  // which used to feel like a blunt jump from "waiting for response" to the
-  // game screen with no confirmation in between.
+  // VS_START_DELAY_MS margin between "the guest accepted" and the real 3-2-1.
   function _showDuelAcceptedPopup() {
     const pop = document.getElementById('vs-duel-accepted-popup');
     if (!pop) return;
@@ -2334,18 +2339,14 @@ window.refreshVsSpectatorBadge = function (n) {
   }
 
   function _scheduleVersusStart(match) {
-    if (_vsLaunching) return; // already scheduled/started from another call site
-    _showDuelAcceptedPopup();
-    const startedAtMs = match.started_at ? new Date(match.started_at).getTime() : Date.now();
-    const delay = Math.max(0, startedAtMs - Date.now());
-    if (delay <= 0) { _launchVersus(match); return; }
-    // Blocks other call sites while waiting, without marking _vsLaunching yet
-    // (_launchVersus does that, only when it actually starts) — an own flag
-    // prevents two near-simultaneous triggers (e.g. the onStart callback AND
-    // a late resend) from scheduling the setTimeout twice.
-    if (_vsStartScheduled) return;
+    // _vsLaunching (set by _launchVersus) and _vsStartScheduled (our own flag)
+    // stop two near-simultaneous triggers — e.g. the onStart callback AND a
+    // late resend, or the inbox accept AND the banner accept — from scheduling
+    // the start twice.
+    if (_vsLaunching || _vsStartScheduled) return;
     _vsStartScheduled = true;
-    setTimeout(() => { _vsStartScheduled = false; _launchVersus(match); }, delay);
+    _showDuelAcceptedPopup();
+    setTimeout(() => { _vsStartScheduled = false; _launchVersus(match); }, VS_START_DELAY_MS);
   }
 
   function _launchVersus(match) {
