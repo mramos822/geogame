@@ -1,9 +1,11 @@
 // ============================================================================
-// menu/customize-panel.js — panel de Personalización del loading (marco de foto,
-// tarjeta del leaderboard, recuadro del tablero, celda de fila): tabs + grilla
-// de opciones + vista previa en vivo, persistencia en profiles vía sbUpdateProfile.
-// Expone window._applyFounderFrame. Extraído de monuments.js (fase 19). Usa
-// window.CustomizeAssets (sb.js), sbUpdateProfile, i18n, audio — todo en runtime.
+// menu/customize-panel.js — Panel de Personalización del loading (marco de foto / tarjeta del leaderboard /
+// recuadro del tablero / celda de fila): tabs + grilla de opciones + vista previa
+// en vivo, persistencia en profiles vía sbUpdateProfile. Expone window._applyFounderFrame.
+//
+// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
+// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
+// Son <script> clásicos que comparten un mismo scope global.
 // ============================================================================
 
 // ── Panel de personalización (items por código, preparado para la tienda) ─────

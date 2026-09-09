@@ -1,11 +1,12 @@
 // ============================================================================
-// modes/mapgame-vs.js — capa VS/lobby de los modos de mapa (Ciudades y
-// Monumentos): buildFriendPlayers (arma la barra de rivales), hooks de VS 1v1
-// y de lobby grupal (score del rival, wrong/timesup, desconexión), hardReset
-// de cada modo, y el RNG sembrado de Monumentos (monumentsSetSeed).
-// Extraído de monuments.js (fase 11). Carga antes que monuments.js; usa
-// getFriends (friends.js), y comparte lbElements/positionLeaderboard/state/
-// gameAborted... con monuments.js por el scope global (todo en runtime).
+// modes/mapgame-vs.js — Capa VS/lobby de los modos de mapa: buildFriendPlayers (arma la barra de
+// rivales), hooks de VS 1v1 y de lobby grupal (score del rival, wrong/timesup,
+// desconexión), citiesHardReset/monumentsHardReset, y el RNG sembrado de
+// Monumentos (monumentsSetSeed).
+//
+// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
+// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
+// Son <script> clásicos que comparten un mismo scope global.
 // ============================================================================
 
 const LB_COLORS = ['#e74c3c','#e67e22','#f1c40f','#2ecc71','#1abc9c',

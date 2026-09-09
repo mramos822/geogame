@@ -1,7 +1,10 @@
 // ============================================================================
-// core/audio.js — SFX, música en loop (HTML5 <audio> en PC, Web Audio en iOS),
-// mute global y detección de plataforma. Extraído de monuments.js (fase 1 de la
-// modularización). Se carga ANTES de monuments.js y del resto de los modos.
+// core/audio.js — SFX, música en loop (HTML5 <audio> en PC, Web Audio en iOS), mute global
+// y detección de plataforma (IS_IOS / IS_MOBILE / IS_CHROME_IOS).
+//
+// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
+// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
+// Son <script> clásicos que comparten un mismo scope global.
 // ============================================================================
 
 // ── SFX ───────────────────────────────────────────────────────────────────────

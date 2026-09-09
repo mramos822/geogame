@@ -21,7 +21,7 @@
   <link rel="icon" type="image/png" href="images/planet3.png">
   <title>myGeoChallenge</title>
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6238929099865050" crossorigin="anonymous"></script>
-  <link rel="stylesheet" href="css/style.css?v=3.5.63">
+  <link rel="stylesheet" href="css/style.css?v=3.5.64">
   <link rel="preload" href="images/characters/men3.png" as="image">
   <link rel="preload" href="images/characters/men4.png" as="image">
   <link rel="preload" href="images/characters/girl3.png" as="image">
@@ -1063,7 +1063,7 @@
           <button class="loading-social-tab"        data-rtab="global"  type="button" data-i18n="rankings.tab.global">Top Global</button>
           <button class="loading-social-tab"        data-rtab="friends" type="button" data-i18n="rankings.tab.friends">Top Friends</button>
           <!-- Invisible salvo para la cuenta admin (BlueLite) — ver
-               ADMIN_GUEST_RANKINGS_UID en monuments.js, que la muestra solo
+               ADMIN_GUEST_RANKINGS_UID en js/menu/rankings-panel.js, que la muestra solo
                si window._sbUserId coincide. La seguridad real está en el
                RPC get_guest_rankings (SECURITY DEFINER con el mismo chequeo
                de uid adentro), esto es solo para que no aparezca por
@@ -1340,7 +1340,7 @@
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
     </div>
-    <div id="loading-version">Ver. 3.5.63</div>
+    <div id="loading-version">Ver. 3.5.64</div>
   </div>
 
   <!-- Pantalla de resultado versus (W/L) — fuera del loading-screen para verse tras la partida -->
@@ -2107,75 +2107,74 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 
   <!-- ── Backend client + plataforma ─────────────────────────────────────── -->
-  <script src="js/sb.js?v=3.5.63"></script>
-  <script src="js/analytics.js?v=3.5.63"></script>
-  <script src="js/guestmsg.js?v=3.5.63"></script>
-  <script src="js/profanity-filter.js?v=3.5.63"></script>
+  <script src="js/sb.js?v=3.5.64"></script>
+  <script src="js/analytics.js?v=3.5.64"></script>
+  <script src="js/guestmsg.js?v=3.5.64"></script>
+  <script src="js/profanity-filter.js?v=3.5.64"></script>
 
   <!-- ── Layout / entorno / i18n ─────────────────────────────────────────── -->
-  <script src="js/letterbox.js?v=3.5.63"></script>
-  <script src="js/i18n.js?v=3.5.63"></script>
-  <script src="js/i18n-data.js?v=3.5.63"></script>
+  <script src="js/letterbox.js?v=3.5.64"></script>
+  <script src="js/i18n.js?v=3.5.64"></script>
+  <script src="js/i18n-data.js?v=3.5.64"></script>
 
   <!-- ── Core (audio, helpers UI, campaña) ───────────────────────────────── -->
-  <script src="js/core/audio.js?v=3.5.63"></script>
-  <script src="js/core/ui-helpers.js?v=3.5.63"></script>
-  <script src="js/core/campaign.js?v=3.5.63"></script>
+  <script src="js/core/audio.js?v=3.5.64"></script>
+  <script src="js/core/ui-helpers.js?v=3.5.64"></script>
+  <script src="js/core/campaign.js?v=3.5.64"></script>
 
   <!-- ── Datos del juego ─────────────────────────────────────────────────── -->
-  <script src="js/manifest.js?v=3.5.63"></script>
-  <script src="js/practice-data.js?v=3.5.63"></script>
-  <script src="js/cities.js?v=3.5.63"></script>
-  <script src="js/countries.js?v=3.5.63"></script>
-  <script src="js/places.js?v=3.5.63"></script>
-  <script src="js/ranks.js?v=3.5.63"></script>
-  <script src="js/globequiz-names-es.js?v=3.5.63"></script>
-  <script src="js/globequiz-countries-data.js?v=3.5.63"></script>
+  <script src="js/manifest.js?v=3.5.64"></script>
+  <script src="js/practice-data.js?v=3.5.64"></script>
+  <script src="js/cities.js?v=3.5.64"></script>
+  <script src="js/countries.js?v=3.5.64"></script>
+  <script src="js/places.js?v=3.5.64"></script>
+  <script src="js/ranks.js?v=3.5.64"></script>
+  <script src="js/globequiz-names-es.js?v=3.5.64"></script>
+  <script src="js/globequiz-countries-data.js?v=3.5.64"></script>
 
   <!-- ── Social / perfil ─────────────────────────────────────────────────── -->
-  <script src="js/social/social-realtime.js?v=3.5.63"></script>
-  <script src="js/social/social-panel.js?v=3.5.63"></script>
-  <script src="js/profile/profile-stats.js?v=3.5.63"></script>
-  <script src="js/profile/profile-account.js?v=3.5.63"></script>
+  <script src="js/social/social-realtime.js?v=3.5.64"></script>
+  <script src="js/social/social-panel.js?v=3.5.64"></script>
+  <script src="js/profile/profile-stats.js?v=3.5.64"></script>
+  <script src="js/profile/profile-account.js?v=3.5.64"></script>
 
   <!-- ── Menú del loading screen ─────────────────────────────────────────── -->
-  <script src="js/menu/entrance-anim.js?v=3.5.63"></script>
-  <script src="js/menu/loading-boot.js?v=3.5.63"></script>
-  <script src="js/menu/rankings-panel.js?v=3.5.63"></script>
-  <script src="js/menu/customize-panel.js?v=3.5.63"></script>
+  <script src="js/menu/entrance-anim.js?v=3.5.64"></script>
+  <script src="js/menu/loading-boot.js?v=3.5.64"></script>
+  <script src="js/menu/rankings-panel.js?v=3.5.64"></script>
+  <script src="js/menu/customize-panel.js?v=3.5.64"></script>
 
   <!-- ── Capa de datos de amigos ─────────────────────────────────────────── -->
-  <script src="js/friends.js?v=3.5.63"></script>
+  <script src="js/friends.js?v=3.5.64"></script>
 
   <!-- ── Modos de mapa (Ciudades / Monumentos) ───────────────────────────── -->
-  <script src="js/modes/mapgame-core.js?v=3.5.63"></script>
-  <script src="js/modes/mapgame-vs.js?v=3.5.63"></script>
-  <script src="js/modes/mapgame-leaderboard.js?v=3.5.63"></script>
-  <script src="js/modes/mapgame-play.js?v=3.5.63"></script>
-  <script src="js/modes/mapgame-misc.js?v=3.5.63"></script>
-  <script src="js/modes/cities-spectate.js?v=3.5.63"></script>
-  <script src="js/modes/monuments-spectate.js?v=3.5.63"></script>
-  <script src="js/modes/practice-panel.js?v=3.5.63"></script>
+  <script src="js/modes/mapgame-core.js?v=3.5.64"></script>
+  <script src="js/modes/mapgame-vs.js?v=3.5.64"></script>
+  <script src="js/modes/mapgame-leaderboard.js?v=3.5.64"></script>
+  <script src="js/modes/mapgame-play.js?v=3.5.64"></script>
+  <script src="js/modes/mapgame-misc.js?v=3.5.64"></script>
+  <script src="js/modes/cities-spectate.js?v=3.5.64"></script>
+  <script src="js/modes/monuments-spectate.js?v=3.5.64"></script>
+  <script src="js/modes/practice-panel.js?v=3.5.64"></script>
 
   <!-- ── Multijugador (versus / espectador / lobby / chat) ───────────────── -->
-  <script src="js/vs.js?v=3.5.63"></script>
-  <script src="js/spectate.js?v=3.5.63"></script>
-  <script src="js/lobby.js?v=3.5.63"></script>
-  <script src="js/chat.js?v=3.5.63"></script>
+  <script src="js/vs.js?v=3.5.64"></script>
+  <script src="js/spectate.js?v=3.5.64"></script>
+  <script src="js/lobby.js?v=3.5.64"></script>
+  <script src="js/chat.js?v=3.5.64"></script>
 
   <!-- ── Otros modos ─────────────────────────────────────────────────────── -->
-  <script src="js/flags.js?v=3.5.63"></script>
-  <script src="js/shapes.js?v=3.5.63"></script>
-  <script src="js/globequiz.js?v=3.5.63"></script>
+  <script src="js/flags.js?v=3.5.64"></script>
+  <script src="js/shapes.js?v=3.5.64"></script>
+  <script src="js/globequiz.js?v=3.5.64"></script>
 
   <!-- ── Launchers del menú + IIFEs de UI global ─────────────────────────── -->
-  <script src="js/menu/menu-launchers.js?v=3.5.63"></script>
-  <script src="js/menu/misc.js?v=3.5.63"></script>
+  <script src="js/menu/menu-launchers.js?v=3.5.64"></script>
+  <script src="js/menu/misc.js?v=3.5.64"></script>
 
-  <!-- ── Pantallas de resultados + debug ─────────────────────────────────── -->
-  <script src="js/results.js?v=3.5.63"></script>
-  <script src="js/final.js?v=3.5.63"></script>
-  <script src="js/memdebug.js?v=3.5.63"></script>
+  <!-- ── Pantallas de resultados ────────────────────────────────────────── -->
+  <script src="js/results.js?v=3.5.64"></script>
+  <script src="js/final.js?v=3.5.64"></script>
 
   <button id="recording-toggle" style="display:none" onclick="document.body.classList.toggle('recording-mode');this.classList.toggle('active')">⏺</button>
   <script>

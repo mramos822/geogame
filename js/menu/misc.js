@@ -1,8 +1,11 @@
 // ============================================================================
-// menu/misc.js — IIFEs sueltos de UI global: popup "necesitás cuenta" del panel
-// Social, botón de pantalla completa (con toast iOS), lock de zoom/scroll del
-// loading screen, aviso de pantalla muy chica, y el hook de test para abrir la
-// pantalla de results desde el loading. Extraído de monuments.js (fase 20).
+// menu/misc.js — IIFEs sueltos de UI global: popup 'necesitás cuenta' del panel Social, botón de
+// pantalla completa (con toast iOS), lock de zoom/scroll del loading screen, aviso
+// de pantalla muy chica, y el hook de test para abrir la pantalla de results.
+//
+// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
+// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
+// Son <script> clásicos que comparten un mismo scope global.
 // ============================================================================
 
 // ── Popup "necesitás cuenta" del panel Social ────────────────────────────────

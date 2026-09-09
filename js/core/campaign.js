@@ -1,11 +1,11 @@
 // ============================================================================
-// core/campaign.js — Gira Mundial (los 4 modos encadenados): estado
-// window.campaign, base acumulada (campaignBase), commit de highscores al
-// completar (_commitCampaignHighscores), startCampaign; más el helper global
-// _setPlaying (is_playing en Supabase + etiqueta de /stats vía
-// _computePlayingLabel) y preloadNextModeAssets (warm del cache HTTP del
-// modo siguiente). Extraído de monuments.js (fase 9). Carga antes que
-// monuments.js; usa IS_MOBILE (audio.js) y varios window.* en runtime.
+// core/campaign.js — Gira Mundial (window.campaign, campaignBase, _commitCampaignHighscores,
+// startCampaign) + el helper global _setPlaying (is_playing en Supabase +
+// etiqueta de /stats) y preloadNextModeAssets.
+//
+// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
+// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
+// Son <script> clásicos que comparten un mismo scope global.
 // ============================================================================
 
 // Etiqueta legible de "qué está jugando" para /stats (ver sbSetPlayingMode

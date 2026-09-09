@@ -1,11 +1,11 @@
 // ============================================================================
-// social/social-realtime.js — canales de Supabase Realtime para amigos
-// (estados online/jugando, cambios de friendship) + polls de respaldo (5s) +
-// badge de solicitudes + parcheo en vivo de filas del panel social.
-// Extraído de monuments.js (fase 5). Se carga antes que monuments.js.
-// loadSocialData / socialData / renderSocial / getStatusObj / currentFriendProfile
-// / socialSort / socialActiveTab siguen en monuments.js; acá se usan sólo en
-// runtime (callbacks de realtime / poll / handlers), con monuments.js ya cargado.
+// social/social-realtime.js — Canales de Supabase Realtime para amigos (estados online/jugando, cambios de
+// friendship) + polls de respaldo (5s) + badge de solicitudes + parcheo en vivo de
+// filas del panel social.
+//
+// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
+// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
+// Son <script> clásicos que comparten un mismo scope global.
 // ============================================================================
 
 let _friendRealtimeChannel = null;

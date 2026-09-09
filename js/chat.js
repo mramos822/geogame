@@ -29,7 +29,7 @@ window.Chat = (() => {
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
   // Mismo criterio de estado que el panel de Retar 1v1 / Social (ver
-  // getStatusObj/socialStatusText en monuments.js) — reusado tal cual para
+  // getStatusObj/socialStatusText en js/social/social-panel.js) — reusado tal cual para
   // que "conectado"/"jugando"/desconectado signifique lo mismo en todos
   // lados, en vez de reinventar el cálculo acá.
   function _statusOf(f) {

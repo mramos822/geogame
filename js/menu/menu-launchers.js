@@ -1,10 +1,11 @@
 // ============================================================================
-// menu/menu-launchers.js — listeners de los botones de navegación del loading
-// screen: lanzar Ciudades / GlobeQuiz (+ su power/quit), abrir results, panel 2
-// ("Un jugador": World Tour / Versus / Práctica / back), confirm de play, abrir
-// el panel Social. Extraído de monuments.js (fase 20). Todo son listeners; el
-// cuerpo corre en runtime usando módulos ya cargados (_setPlaying, startCampaign,
-// loadSocialData, swapHowtoVideo, i18n, audio...).
+// menu/menu-launchers.js — Listeners de los botones de navegación del loading screen: lanzar Ciudades /
+// GlobeQuiz (+ su power/quit), abrir results, panel 2 (Un jugador: World Tour /
+// Versus / Práctica / back), confirm de play, abrir el panel Social.
+//
+// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
+// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
+// Son <script> clásicos que comparten un mismo scope global.
 // ============================================================================
 
 document.getElementById('loading-play-btn').addEventListener('click', () => {
@@ -52,9 +53,6 @@ document.getElementById('loading-play-btn').addEventListener('click', () => {
     { const _pk = (window.practiceConfig && window.practiceConfig.active) ? 'splash.practice.cities.1' : 'splash.cities.1'; if (label) { label.textContent = t(_pk); label.classList.remove('step2'); } }
   });
 });
-
-// ── preloadNextModeAssets / campaña (window.campaign, campaignBase,
-//    _commitCampaignHighscores) → js/core/campaign.js (fase 9)
 
 document.getElementById('loading-results-btn')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
@@ -313,12 +311,6 @@ document.getElementById('loading-panel2-worldtour')?.addEventListener('click', (
   window.startCampaign();
 });
 
-// ── startCampaign → js/core/campaign.js (fase 9)
-
-// ── Modal de cuenta / name-prompt / foto de perfil / _onSessionReady /
-//    welcome popups / _updateProfileBtnLabel → js/profile/profile-account.js (fase 4)
-
-
 document.getElementById('loading-play-confirm-wrap')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   const wrap = document.getElementById('loading-play-confirm-wrap');
@@ -331,11 +323,7 @@ document.getElementById('loading-play-confirm-wrap')?.addEventListener('click', 
   setTimeout(() => tableGroup.classList.remove('above-rankings'), 400);
 });
 
-
-
 // ── Realtime social (canales de amigos/friendships + polls + badge)
-//    → js/social/social-realtime.js (fase 5)
-
 
 document.getElementById('loading-social-btn')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);

@@ -2022,7 +2022,7 @@ window.refreshVsSpectatorBadge = function (n) {
   }
 
   // Lee el puntaje EN VIVO del modo actualmente en curso, directo de la
-  // variable global de cada juego (flags.js/shapes.js/monuments.js
+  // variable global de cada juego (flags/shapes/cities/monuments
   // comparten el mismo scope global, sin build step) — no depende de que
   // reportScore() ya haya hecho ida y vuelta a la base.
   function _getLiveScore() {
@@ -2521,7 +2521,7 @@ window.refreshVsSpectatorBadge = function (n) {
     }
   };
 
-  // Exponer funciones para monuments.js
+  // Exponer funciones para los modos de mapa (js/modes/)
   window.showVersusPanel = showVersusPanel;
   window.hideVersusPanel = hideVersusPanel;
 })();

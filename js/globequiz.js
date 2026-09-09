@@ -806,7 +806,7 @@
   }
 
   // "3, 2, 1, GO" al entrar — MISMOS timings que PREGAME_STEPS (el
-  // countdown real del juego, ver monuments.js), overlay propio (no
+  // countdown real del juego, ver js/modes/mapgame-play.js), overlay propio (no
   // comparte #pregame-countdown con los demás modos para no interferir).
   const GQ_COUNTDOWN_STEPS = [
     { src: 'images/countdown/3.png', hold: 750, size: 46 },
@@ -825,7 +825,7 @@
   // elapsedMs (opcional): cuánto del 3-2-1 ya pasó de otro lado — lo usa el
   // espectador (ver globequizSpectatorShowPregame) para arrancar en el número
   // que corresponde en vez de siempre desde "3", si se conecta a mitad de la
-  // cuenta. Mismo patrón que runPregameCountdown en monuments.js/cities.
+  // cuenta. Mismo patrón que runPregameCountdown en js/modes/mapgame-play.js/cities.
   // _specReportPregame vive en el CALL SITE (initGlobeQuiz), no acá adentro —
   // solo el jugador real debe transmitir el arranque del 3-2-1; el espectador
   // llama a esta misma función para MOSTRARLO, nunca para reportarlo de nuevo.
@@ -1794,7 +1794,7 @@
       }
       // playMusic(null) en vez de sfxGameMusic.pause() directo — en iOS el
       // audio real de gamemusic corre por un AudioBufferSourceNode aparte
-      // (Web Audio, ver playMusicIOS en monuments.js), no por el <audio>
+      // (Web Audio, ver playMusicIOS en js/core/audio.js), no por el <audio>
       // HTML; pausar solo el <audio> no lo corta y el loop sigue sonando.
       if (typeof playMusic === 'function') playMusic(null);
       if (typeof sfxBonus !== 'undefined' && typeof sfxPlay === 'function') { sfxBonus.currentTime = 0; sfxPlay(sfxBonus); }
@@ -1974,7 +1974,7 @@
     if (nameEl) nameEl.textContent = (window._sbProfile && window._sbProfile.name) || localStorage.getItem('playerName') || 'Tú';
     if (avatarEl) avatarEl.src = localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png';
     // Misma carta equipada que el resto del leaderboard (ver _applyFounderFrame
-    // en monuments.js, que también la aplica acá cuando corre); esto es un
+    // en js/menu/customize-panel.js, que también la aplica acá cuando corre); esto es un
     // respaldo por si esta pantalla se abre antes de que corra esa función.
     const p = window._sbProfile;
     const cardCode = (p && p.card_code) || localStorage.getItem('cust_card_code') || '0001';
@@ -2061,7 +2061,7 @@
   // que hicieron ESE día (gq_today_time_ms, ver updateStreak) — no su mejor
   // tiempo histórico. Si nadie jugó hoy, la barra queda con solo tu carta.
   //
-  // Mismo mecanismo que positionLeaderboard en monuments.js: las cartas
+  // Mismo mecanismo que positionLeaderboard en js/modes/mapgame-leaderboard.js: las cartas
   // quedan fijas en el DOM, se les pisa el `top` (GQ_LB_ROW_H_CQMIN acá
   // abajo, ver también .gq-friends-bar en style.css), y la transición es la
   // que YA trae .lb-entry de fábrica (`top 0.7s cubic-bezier(...)`) — misma
@@ -2097,7 +2097,7 @@
   // partida) — lee el snapshot actual de getFriends() (js/friends.js), así
   // que si loadFriends() todavía no resolvió para cuando arrancás la
   // primera partida, simplemente no hay filas de amigos esa vez (igual que
-  // buildFriendPlayers en monuments.js, mismo criterio de "mejor esfuerzo").
+  // buildFriendPlayers en js/modes/mapgame-leaderboard.js, mismo criterio de "mejor esfuerzo").
   function buildGqFriendRows() {
     // En VS 1v1 esta barra no muestra amigos del día — muestra al rival del
     // duelo (ver globequizVsPrepareOpponentRow), basado en km, no en tiempo.
@@ -2143,7 +2143,7 @@
 
   // ── VS 1v1: fila del rival en .gq-friends-bar ──────────────────────────────
   // Mismo estilo lb-vsopp que usan cities/monuments para el rival (ver
-  // citiesSpectatorSetPlayerCard en monuments.js) — acá en vez de comparar
+  // citiesSpectatorSetPlayerCard en js/modes/cities-spectate.js) — acá en vez de comparar
   // puntaje o tiempo se compara km (más cerca = mejor puesto). gqVsOppBestKm/
   // gqVsMyBestKm son Infinity hasta el primer guess de cada lado.
   let gqVsOppBestKm = Infinity;
@@ -2318,7 +2318,7 @@
   // leídos) al empezar una partida nueva, SIN animación (todavía no hay
   // nada que "ver" en ese momento) — mismo patrón de "plantar sin
   // transición, reactivarla en el frame siguiente" que usa buildLeaderboard
-  // en monuments.js.
+  // en js/modes/mapgame-leaderboard.js.
   function resetLeaderboardOrder() {
     if (gqEmoteTimeout) { clearTimeout(gqEmoteTimeout); gqEmoteTimeout = null; }
     // VS 1v1 arma/posiciona su propia fila aparte (globequizVsPrepareOpponentRow,
@@ -2353,7 +2353,7 @@
 
   // Corte total del modo (VS: rival abandonó, o quitToMenu genérico
   // encontrándose con un duelo en curso) — mismo criterio de limpieza que ya
-  // hace gq-quit-confirm a mano (monuments.js), reunido acá para poder
+  // hace gq-quit-confirm a mano (js/modes/mapgame-misc.js), reunido acá para poder
   // reusarlo desde vs.js (_onOpponentAbandoned) y desde window.gameStoppers.
   function globequizHardReset() {
     stopTimer();
@@ -2390,7 +2390,7 @@
     const wireOnce = !initialized;
     fillPlayerCard();
     // Marca is_playing para que amigos/grupos vean "Jugando" (window._setPlaying
-    // es el helper genérico de monuments.js: además prende el canal
+    // es el helper genérico de js/core/campaign.js: además prende el canal
     // SoloSpectate para que un amigo pueda mirar, igual que el resto de los
     // modos — ver panel espectador en spectate.js/REAL_UI_MODES.globequiz).
     window.pendingGameMode = 'globequiz';
@@ -2492,7 +2492,7 @@
           window._specReportPregame({ mode: 'globequiz', startedAt: Date.now() });
         }
         // Música recién arranca cuando termina el 3-2-1-GO, igual que en el
-        // resto de los modos (ver runPregameCountdown en monuments.js).
+        // resto de los modos (ver runPregameCountdown en js/modes/mapgame-play.js).
         runGqPregameCountdown(() => {
           if (guessRow) guessRow.style.display = '';
           if (hintEl2) hintEl2.style.display = '';
@@ -2657,7 +2657,7 @@
     if (screenEl) screenEl.style.display = '';
     // Ocultar todo lo que requiere ESCRIBIR/actuar como jugador: input de
     // guess, power/quit real (el cierre del espectador usa #ingame-power —
-    // ver refreshIngamePower en monuments.js, ahora incluye #globequiz-screen
+    // ver refreshIngamePower en js/modes/mapgame-misc.js, ahora incluye #globequiz-screen
     // en modo espectador — no este popup, aunque este power SÍ dispara la
     // salida real de GlobeQuiz vía _setPlaying(false) para el jugador de
     // verdad), y el hint de "más caliente/frío" (.gq-hint, información de la

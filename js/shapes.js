@@ -823,7 +823,7 @@ window.shapesSpectatorUpdateTimer = function (timeLeft) {
 };
 
 // dots = progreso YA acumulado del trencito al momento de conectarse — mismo
-// fix ya aplicado en flags.js/monuments.js: sin esto, alguien que se unía a
+// fix ya aplicado en flags/cities: sin esto, alguien que se unía a
 // mitad de partida veía los puntitos apagados hasta la PRÓXIMA respuesta del
 // jugador real, en vez del progreso real que ya llevaba acumulado.
 window.shapesSpectatorUpdateScore = function (score, dots) {
@@ -926,7 +926,7 @@ window.shapesSpectatorWrongEffect = function (target) {
   el.style.animation = 'none'; void el.offsetWidth;
   el.style.animation = 'lb-wrong-flash 0.75s ease-out, lb-shake 0.45s ease-in-out';
   setTimeout(() => { el.style.animation = ''; }, 820);
-  // z-index elevado mientras dura el emote — ver comentario largo en citiesSpectatorWrongEffect (monuments.js).
+  // z-index elevado mientras dura el emote — ver comentario largo en citiesSpectatorWrongEffect (js/modes/cities-spectate.js).
   const prevZ = el.style.zIndex;
   el.style.zIndex = '50';
   setTimeout(() => { el.style.zIndex = prevZ; }, 1800);
@@ -1054,7 +1054,7 @@ window.shapesSpectatorHidePostgame = function () {
 window.shapesSetLobbyScores = function(members) {
   if (!Array.isArray(members) || typeof window._lbUpdateEntry !== 'function') return;
   members.forEach(m => window._lbUpdateEntry('lob' + m.id, m.score || 0));
-  // Ver mismo fix en monuments.js/citiesSetVsOpponentScore — durante el
+  // Ver mismo fix en js/modes/mapgame-vs.js/citiesSetVsOpponentScore — durante el
   // espectador el leaderboard lo posiciona el renderer de espectador.
   if (window._isSpectating) { window._refreshGroupSpectatorLeaderboard?.(); return; }
   if (typeof positionLeaderboard === 'function') positionLeaderboard(shapesScore, true);
@@ -1088,7 +1088,7 @@ window.shapesSetVsDisconnected = function(disconnected) {
 window.shapesSetVsOpponentScore = function(score) {
   window._vsOppScore = score;
   if (typeof window._lbUpdateEntry === 'function') window._lbUpdateEntry('vsopp', score);
-  // Ver mismo fix en monuments.js/citiesSetVsOpponentScore.
+  // Ver mismo fix en js/modes/mapgame-vs.js/citiesSetVsOpponentScore.
   if (window._isSpectating) { window._refreshGroupSpectatorLeaderboard?.(); return; }
   if (typeof positionLeaderboard === 'function') positionLeaderboard(shapesScore, true);
 };
@@ -1951,7 +1951,7 @@ function runShapesPregame(onDone, elapsedMs) {
   if (!el || !img) { console.warn('[spec] runShapesPregame: missing el/img, skipping straight to onDone'); onDone(); return; }
   el.style.display = 'flex';
   // Desbloquear el compositor de Opera al arrancar la cuenta regresiva (ver
-  // window.nudgeRepaint en monuments.js).
+  // window.nudgeRepaint en js/core/ui-helpers.js).
   if (typeof window.nudgeRepaint === 'function') {
     window.nudgeRepaint();
     setTimeout(window.nudgeRepaint, 120);
@@ -2077,7 +2077,7 @@ function shapesPracticePickNext(exc) {
 // tiempo real; acá se autocorrige de una sola vez en cuanto vuelve a
 // tickear (o la pestaña vuelve a primer plano), en vez de arrastrar el atraso.
 function _shapesTimerTick() {
-  // Guarda defensiva — mismo motivo que _timerTick (monuments.js) y
+  // Guarda defensiva — mismo motivo que _timerTick (js/modes/mapgame-play.js) y
   // _flagsTimerTick (flags.js): un tick fantasma de una ronda ya terminada,
   // si el interval no se limpió a tiempo, podía mostrar el TIMES UP gigante
   // encima del menú.
@@ -2234,7 +2234,7 @@ function showShapesMode() {
     // mode:'shapes' por las dudas — acá el 'round' YA llega antes que este
     // 'pregame' y actualiza _mode del lado espectador, pero declararlo acá
     // también hace que no dependa de ese orden para ser correcto (ver el
-    // mismo campo agregado en flags.js/monuments.js).
+    // mismo campo agregado en flags/cities).
     // campaignBaseAtStart: el jugador real muestra este número desde el
     // arranque del 3-2-1 — el espectador no tiene forma propia de saberlo.
     window._specReportPregame({
@@ -2338,7 +2338,7 @@ function hideShapesMode() {
   if (finalScore > prevHS) {
     // Durante una campaña en curso no se persiste todavía: se guarda como
     // pendiente y solo se confirma en localStorage al completar la Vuelta
-    // Mundial entera (ver window._commitCampaignHighscores en monuments.js).
+    // Mundial entera (ver window._commitCampaignHighscores en js/core/campaign.js).
     if (window.campaign && window.campaign.active) {
       window.campaign.pendingHS.shapes = finalScore;
     } else {

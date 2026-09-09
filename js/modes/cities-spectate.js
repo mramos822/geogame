@@ -1,12 +1,12 @@
 // ============================================================================
-// modes/cities-spectate.js — modo espectador de Ciudades (VS 1v1, lobby grupal
-// y "esperando al rival" del propio jugador). Reutiliza la pantalla real
-// (#game-wrapper/canvas/state/render/advanceDot/leaderboard) y solo repuebla
-// los datos del jugador espectado. window.citiesSpectator* + _specBuildCountRow
-// (compartido con monuments-spectate.js, que carga después) + estado
-// _citiesSpec*. Extraído de monuments.js (fase 12). Carga antes que monuments.js;
-// todo lo que toca de monuments.js (state, render, slideTagIn, positionLeaderboard)
-// es runtime, por el scope global.
+// modes/cities-spectate.js — Modo espectador de Ciudades (VS 1v1, lobby grupal y 'esperando al rival').
+// Reutiliza la pantalla real (state/render/advanceDot/leaderboard) y repuebla los
+// datos del jugador espectado. window.citiesSpectator* + _specBuildCountRow
+// (compartido con monuments-spectate.js) + estado _citiesSpec*.
+//
+// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
+// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
+// Son <script> clásicos que comparten un mismo scope global.
 // ============================================================================
 
 // ═════════════════════════════════════════════════════════════════════════════

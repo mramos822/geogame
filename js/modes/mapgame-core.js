@@ -1,14 +1,15 @@
 // ============================================================================
-// modes/mapgame-core.js — núcleo compartido de los modos de mapa (Ciudades y
-// Monumentos): quitToMenu universal + botón power.png ingame, constantes de
-// juego y scoring, proyección Mercator + calibración, refs DOM, cámara/zoom/
-// arrastre del mapa, assets (Image()), estado del juego (state, highscore,
-// gradeCounts, correctCount/wrongCount...), badge overlay, releaseGameMemory,
-// buildChecksRow/buildWrongsRow. Extraído de monuments.js (fase 10).
+// modes/mapgame-core.js — Núcleo compartido de los modos de mapa (Ciudades y Monumentos): quitToMenu +
+// botón power.png ingame, constantes de juego y scoring, proyección Mercator +
+// calibración, refs DOM, cámara/zoom/arrastre del mapa, assets Image(), estado del
+// juego (state, highscore, gradeCounts, correctCount/wrongCount, canvas, ctx...),
+// badge overlay, releaseGameMemory, buildChecksRow/buildWrongsRow.
 // DEBE cargar DESPUÉS de letterbox.js (window.STAGE_W/H, GAME_DURATION) y de
-// places.js (MONUMENTS), y antes de monuments.js. El resto del motor de juego
-// (leaderboard, VS/espectador, resetState, render, timer, startGame) sigue en
-// monuments.js y comparte estos let/const por el scope global de scripts clásicos.
+// places.js (MONUMENTS).
+//
+// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
+// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
+// Son <script> clásicos que comparten un mismo scope global.
 // ============================================================================
 
 // Termina la partida en curso (cualquier modo) y vuelve al menú principal sin recargar.
@@ -312,8 +313,6 @@ if (typeof onFriendsUpdate === 'function') onFriendsUpdate(() => {
   const panelOpen = !document.getElementById('loading-social-group')?.classList.contains('table-gone');
   if (panelOpen) renderSocial();
 });
-
-// ── SFX de juego / playMusic* → js/core/audio.js (fase 1 modularización) ──────
 
 // ── CONFIG ──────────────────────────────────────────────────────────────────
 const GAME_DURATION   = window.GAME_DURATION;
@@ -820,5 +819,4 @@ function buildWrongsRow(startOffset = 0) {
     if (wrongCountEl)  wrongCountEl.style.opacity   = '1';
   }, revealDelay * 1000);
 }
-
 

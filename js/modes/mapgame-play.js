@@ -1,12 +1,13 @@
 // ============================================================================
-// modes/mapgame-play.js — motor de juego de Ciudades y Monumentos: pools de
-// práctica, resetState, helpers de proyección/geometría, animación del cartel
-// (slideTagIn / slideMonumentIn), dots, result label, partículas, nextCity
-// (elige ciudad/monumento), manejo del click en el mapa, badges de racha,
+// modes/mapgame-play.js — Motor de juego de Ciudades y Monumentos: pools de práctica, resetState, helpers
+// de proyección/geometría, animación del cartel (slideTagIn / slideMonumentIn), dots,
+// result label, partículas, nextCity, manejo del click en el mapa, badges de racha,
 // render loop, dibujo de pins, timer, endGame, showScorePopup, redimensionado
-// responsive, pregame countdown y startGame. Extraído de monuments.js (fase 15).
-// Carga después de mapgame-core/vs/leaderboard/campaign/audio/places/cities y
-// antes de monuments.js; comparte state/ctx/canvas/etc. por el scope global.
+// responsive, pregame countdown, startGame, y el gameStopper del map-game.
+//
+// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
+// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
+// Son <script> clásicos que comparten un mismo scope global.
 // ============================================================================
 
 function practiceGetCityPool() {
@@ -1672,7 +1673,7 @@ function startGame() {
 btnStart.addEventListener('click', () => { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); startGame(); });
 
 // ── gameStopper del map-game (teardown de timers/canvas/overlays al cambiar
-//    de modo o abandonar) — movido acá desde monuments.js (fase 20) ──────────
+//    de modo o abandonar) — movido acá al desmantelar monuments.js ──────────
 // Cada modo registra aquí cómo detener sus loops (timers/animaciones)
 window.gameStoppers = window.gameStoppers || [];
 window.gameStoppers.push(() => {

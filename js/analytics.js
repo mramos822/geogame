@@ -23,7 +23,7 @@
     localStorage.setItem('_devstats_vid', visitorId);
   }
 
-  // Se llama al cerrar sesión (ver _doLogout, monuments.js): genera un
+  // Se llama al cerrar sesión (ver _doLogout, js/profile/profile-account.js): genera un
   // visitor_id NUEVO para este dispositivo. Sin esto, dos cuentas distintas
   // usando el mismo dispositivo como invitado (sin loguearse) compartirían
   // el mismo visitor_id, y claim_anonymous_events() podría mezclar las
@@ -65,7 +65,7 @@
   }
 
   // Nombre que el invitado se puso localmente (input de nombre en el splash,
-  // ver monuments.js) — solo tiene sentido mandarlo mientras es invitado; una
+  // ver js/profile/profile-account.js) — solo tiene sentido mandarlo mientras es invitado; una
   // vez con cuenta ya se identifica por username real desde profiles.
   function guestName() {
     if (window._sbUserId) return null;
@@ -119,7 +119,7 @@
   // 'practice' (modo práctica libre) | 'campaign' (Gira Mundial, encadena los 4
   // modos) | 'standalone' (un modo suelto jugado fuera de campaña). Se lee acá
   // en vez de recibirlo como parámetro para no tener que tocar flags/shapes/
-  // monuments.js: ambos flags ya son globales y están seteados cuando termina
+  // js/core/campaign.js: ambos flags ya son globales y están seteados cuando termina
   // la partida.
   function currentSessionType() {
     if (window.practiceConfig && window.practiceConfig.active) return 'practice';
@@ -176,7 +176,7 @@
   }
 
   // 1 evento por Gira Mundial completa (los 4 modos terminados sin salir antes).
-  // Llamado por monuments.js justo cuando la campaña llega al último modo y
+  // Llamado por js/core/campaign.js justo cuando la campaña llega al último modo y
   // window.campaign.active pasa a false. `score` es el puntaje acumulado total.
   async function logCampaign(score) {
     const cc = (localStorage.getItem('_an_country') || null) || null;
@@ -294,7 +294,7 @@
       });
     } catch (e) { /* silencioso, igual que el resto de analytics.js */ }
   }
-  // Llamado desde window._setPlaying (monuments.js) para invitados, mismo
+  // Llamado desde window._setPlaying (js/core/campaign.js) para invitados, mismo
   // punto que sbSetPlaying para cuentas.
   function guestSetPlaying(playing, mode) {
     _guestPlaying = !!playing;

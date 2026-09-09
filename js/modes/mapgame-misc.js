@@ -1,10 +1,12 @@
 // ============================================================================
-// modes/mapgame-misc.js — misceláneos de los modos de mapa (Ciudades/Monumentos):
-// confirmStep/confirmCooldown + handlers de los botones "confirm" del splash
-// (pre-partida) y del gameover (avanzar de modo / campaña / results), y las
-// animaciones frame-by-frame de la azafata (loading, splash y la ingame
-// restartFlightAtt). Extraído de monuments.js (fase 16). Carga tras
-// mapgame-play.js; usa startGame/resetState/pendingGameMode/campaign... en runtime.
+// modes/mapgame-misc.js — Misceláneos de los modos de mapa: confirmStep/confirmCooldown + handlers de los
+// botones 'confirm' del splash (pre-partida) y del gameover (avanzar de modo /
+// campaña / results), y las animaciones frame-by-frame de la azafata (loading,
+// splash, y la ingame restartFlightAtt).
+//
+// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
+// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
+// Son <script> clásicos que comparten un mismo scope global.
 // ============================================================================
 
 let confirmStep = 0;

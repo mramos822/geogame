@@ -284,7 +284,7 @@ document.getElementById('final-confirm-back-wrap')?.addEventListener('click', ()
     showGuestRankPopup(_finalTotal || 0);
   }
   // Popup de Fundador: recién acá, de vuelta en el menú tras terminar una
-  // Vuelta Mundial completa (flag puesta en js/monuments.js al cerrar la
+  // Vuelta Mundial completa (flag puesta en js/modes/mapgame-misc.js al cerrar la
   // campaña) — window._sbProfile ya viene fresco del guardado de resultados
   // (ver js/results.js). Solo desbloquea, no equipa nada (ver showFounderWelcomePopup).
   if (window._pendingFounderPopupCheck) {

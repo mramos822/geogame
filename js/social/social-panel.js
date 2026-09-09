@@ -1,12 +1,13 @@
 // ============================================================================
-// social/social-panel.js — panel Social del loading: lista de amigos y sus
-// estados, pestañas Amigos/Solicitudes, perfil de un amigo, botones de relación
-// (fav/agregar/aceptar/eliminar/bloquear), tableros de Bloqueados y Enviadas,
-// buscador/orden, panel Añadir Amigo, notificación banner de solicitud.
-// Extraído de monuments.js (fase 6). Carga tras i18n-data.js (usa onLangChange
-// al registrar). El realtime vive en social/social-realtime.js (fase 5);
-// window._socialAvatarHtml lo expone el IIFE de Rankings, aún en monuments.js
-// (referencia window., runtime).
+// social/social-panel.js — Panel Social del loading: lista de amigos y sus estados, pestañas
+// Amigos/Solicitudes, perfil de un amigo, botones de relación (fav / agregar /
+// aceptar / eliminar / bloquear), tableros de Bloqueados y Enviadas, buscador/orden,
+// panel Añadir Amigo, notificación banner de solicitud.
+// Carga tras i18n-data.js (usa onLangChange al registrar).
+//
+// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
+// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
+// Son <script> clásicos que comparten un mismo scope global.
 // ============================================================================
 
 document.getElementById('loading-social-back-wrap')?.addEventListener('click', () => {

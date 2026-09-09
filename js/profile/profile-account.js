@@ -1,12 +1,12 @@
 // ============================================================================
-// profile/profile-account.js — modal de cuenta (login/registro/recuperación/
-// cambio de usuario|contraseña|correo|logout), primer ingreso (name-prompt),
-// cambio de foto de perfil, popups de bienvenida (normal y Fundador),
-// _onSessionReady (sync al restaurar sesión) y _updateProfileBtnLabel.
-// Extraído de monuments.js (fase 4). Se carga antes que monuments.js.
-// Las funciones sociales que usa _onSessionReady (_subscribeFriendshipChanges,
-// _startSocialListPoll) viven aún en monuments.js y se invocan sólo después del
-// primer await de _onSessionReady, con monuments.js ya cargado.
+// profile/profile-account.js — Modal de cuenta (login / registro / recuperación / cambio de
+// usuario-contraseña-correo / logout), primer ingreso (name-prompt), cambio de foto
+// de perfil, popups de bienvenida (normal y Fundador), _onSessionReady (sync al
+// restaurar sesión) y _updateProfileBtnLabel.
+//
+// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
+// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
+// Son <script> clásicos que comparten un mismo scope global.
 // ============================================================================
 
 // ── MODAL CUENTA ─────────────────────────────────────────────────────────────

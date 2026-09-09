@@ -1,10 +1,12 @@
 // ============================================================================
-// modes/practice-panel.js — modo Práctica (Practice Tour): window.practiceConfig,
-// panel de configuración (elegir modo / continentes / pills de timer /
-// dificultad de monumentos), showPracticePanel/hidePracticePanel/backFromConfig,
-// buildPracticeImgRow + popup de score (showPracticeScore), endPracticeSession,
-// y el botón Start que lanza la sesión. Extraído de monuments.js (fase 17).
-// Carga justo antes de monuments.js (misma posición que tenía este código).
+// modes/practice-panel.js — Modo Práctica (Practice Tour): window.practiceConfig, panel de configuración
+// (elegir modo / continentes / pills de timer / dificultad de monumentos),
+// showPracticePanel/hidePracticePanel/backFromConfig, buildPracticeImgRow + popup
+// de score (showPracticeScore), endPracticeSession, y el botón Start.
+//
+// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
+// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
+// Son <script> clásicos que comparten un mismo scope global.
 // ============================================================================
 
 // ═══════════════════════════════════════════════════════════════
@@ -132,7 +134,7 @@ window.showPracticeScore = function(score) {
 
 // Cierra una sesión de práctica (timeout natural o quit manual) y vuelve al panel
 // de práctica con el score. Único punto de esta secuencia — antes estaba duplicada
-// casi idéntica en monuments.js (x2), flags.js y shapes.js, lo que la hacía propensa
+// casi idéntica en mapgame-play.js (x2), flags.js y shapes.js, lo que la hacía propensa
 // a que las copias se desincronizaran entre sí (ver bug mezcla panel1/panel2).
 window.endPracticeSession = function (score, correct, wrong) {
   window.practiceConfig.active = false;

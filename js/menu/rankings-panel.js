@@ -1,9 +1,12 @@
 // ============================================================================
-// menu/rankings-panel.js — panel de Rankings del loading (Top 100 / Amigos /
-// Cercanos / Invitados[admin]), con realtime, cálculo de puesto global y filas
-// con avatar+marco. Expone window.getGlobalRankForId, window._cupForRank y
-// window._socialAvatarHtml (usados por profile-stats / social-panel /
-// mapgame-leaderboard en runtime). Extraído de monuments.js (fase 18).
+// menu/rankings-panel.js — Panel de Rankings del loading (Top 100 / Amigos / Cercanos / Invitados),
+// con realtime y cálculo de puesto global. Expone window.getGlobalRankForId,
+// window._cupForRank y window._socialAvatarHtml (usados por profile-stats /
+// social-panel / mapgame-leaderboard en runtime).
+//
+// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
+// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
+// Son <script> clásicos que comparten un mismo scope global.
 // ============================================================================
 
 // ── Rankings panel ─────────────────────────────────────────────────────────────

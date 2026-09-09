@@ -1,10 +1,13 @@
 // ============================================================================
-// core/ui-helpers.js — helpers de UI globales reutilizables desde cualquier
-// pantalla: confirms de splash/gameover, video de howtoplay, reset del splash,
-// ocultar HUD ingame, nudge de repaint (Opera), toast global. Extraído de
-// monuments.js (fase 2 de la modularización). Se carga antes que monuments.js.
-// Depende de IS_MOBILE / IS_CHROME_IOS (js/core/audio.js, carga antes) y de
-// `confirmStep` (monuments.js, sólo se lee en runtime bajo try/catch).
+// core/ui-helpers.js — Helpers de UI reutilizables desde cualquier pantalla: confirms de splash y
+// gameover, video de howtoplay (swapHowtoVideo), resetSplashEntry, hideIngameHud,
+// nudgeRepaint (workaround de Opera), showGlobalToast.
+// Usa IS_MOBILE / IS_CHROME_IOS (core/audio.js) y confirmStep (modes/mapgame-misc.js,
+// leído sólo en runtime bajo try/catch).
+//
+// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
+// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
+// Son <script> clásicos que comparten un mismo scope global.
 // ============================================================================
 
 // Muestra/oculta el confirm del gameover (se revela tras cargar assets del siguiente modo).

@@ -2,7 +2,7 @@
 // Lado del jugador que está jugando SOLO (Gira Mundial / modo individual, no
 // versus). No hay fila en `matches` para una partida individual, así que en
 // vez de un canal por partida usamos un canal fijo por usuario: 'solo-{uid}'.
-// Arranca/para desde window._setPlaying (monuments.js) y transmite ronda/click
+// Arranca/para desde window._setPlaying (js/core/campaign.js) y transmite ronda/click
 // exactamente igual que vs.js, para que Spectate.watchSolo() del lado de quien
 // mira reciba lo mismo sin importar si la partida es versus o individual.
 window.SoloSpectate = (() => {
@@ -1404,7 +1404,7 @@ window.GroupSpectate = (() => {
   let _friendName   = '';
   let _friendAvatar = '';
   // Código de card (images/customize/cards/<code>.png) del amigo espectado —
-  // usado por *SpectatorSetPlayerCard (flags.js/shapes.js/monuments.js) para
+  // usado por *SpectatorSetPlayerCard (flags/shapes/cities/monuments) para
   // que la ficha REAL de leaderboard que ve el espectador muestre la carta
   // que ese jugador tiene equipada de verdad, no el default. El marco NO va
   // acá a propósito (regla establecida: frame solo en la foto grande de
@@ -1532,7 +1532,7 @@ window.GroupSpectate = (() => {
   // el jugador espectado, no solo un "Cargando...". Mismos class/texto que
   // ponen los handlers reales de loading-flags-btn/loading-shapes-btn/
   // loading-play-btn/loading-mode4-btn (paso 1) y el handler de
-  // .splash-confirm-wrap en monuments.js (paso 2, tras el primer confirm real
+  // .splash-confirm-wrap en js/core/ui-helpers.js (paso 2, tras el primer confirm real
   // — ver el window._specReportSplash({mode, step:2}) agregado ahí) — ver esos
   // mismos bloques si esto se desincroniza en el futuro. .game-bg-men1/men2/
   // girl1/girl2/women1/women2 son elementos COMPARTIDOS entre los 4 modos
@@ -1619,7 +1619,7 @@ window.GroupSpectate = (() => {
       // (normal en el espectador) — igual que sfxPlay en el resto del código,
       // se intenta y se ignora el rechazo; el video igual queda ahí, pausado
       // en su primer frame, que es mejor que nada.
-      // Chrome-iOS (ver IS_CHROME_IOS, monuments.js): nunca decodificar acá
+      // Chrome-iOS (ver IS_CHROME_IOS, js/core/audio.js): nunca decodificar acá
       // tampoco — mismo crash reportado en el flujo real, ver Ver.3.5.41.
       if (howtoVideo && !(typeof IS_CHROME_IOS !== 'undefined' && IS_CHROME_IOS)) {
         try { howtoVideo.play().catch(() => {}); } catch (e) {}
@@ -1695,7 +1695,7 @@ window.GroupSpectate = (() => {
 
   // Modos con pantalla real reusable — Banderas, Siluetas, Cities y
   // Monuments. La key 'game' coincide con window.pendingGameMode==='game'
-  // (así lo manda monuments.js en _specReportRound/_specReportSplash) — no
+  // (así lo manda js/modes/mapgame-play.js en _specReportRound/_specReportSplash) — no
   // 'cities', para no tener que mapear entre nombres en ningún lado. 'monuments'
   // coincide igual con pendingGameMode==='monuments'.
   const REAL_UI_MODES = {
@@ -2885,7 +2885,7 @@ window.GroupSpectate = (() => {
   // el POV actual — ver comentario largo en el listener 'wrong' de
   // GroupSpectate: el flash tiene que verse para CUALQUIER miembro de la
   // sala, no solo mientras lo estás mirando). Reusa las mismas clases/
-  // animación CSS (lb-wrong-flash/lb-shake) y spawnEmoteBubble (monuments.js,
+  // animación CSS (lb-wrong-flash/lb-shake) y spawnEmoteBubble (js/modes/mapgame-leaderboard.js,
   // global).
   function _groupWrongEffect(uid) {
     if (!_groupMode || !uid) return;
@@ -2920,7 +2920,7 @@ window.GroupSpectate = (() => {
   // existía: al transicionar de modo el espectador se quedaba sin nada en
   // pantalla durante toda la pantalla intermedia real (el "no sale nada"
   // reportado), porque _specReportPostgame nunca se llega a disparar para
-  // partidas de lobby (flags.js/shapes.js/monuments.js cortan ANTES, ver
+  // partidas de lobby (flags/shapes/cities/monuments cortan ANTES, ver
   // window._lobbyActive en hideFlagsMode/etc, y van directo a
   // _lobbyHandleGameEnd en vez del postgame individual).
   function _showGroupResultMirror(payload) {
@@ -3316,7 +3316,7 @@ window.GroupSpectate = (() => {
   // Expuestos para que cities/monuments (y cualquier otro módulo) puedan
   // chequear "¿estoy espectando un GRUPO ahora mismo?" y, si es así,
   // refrescar MI cartilla (no la de 1v1) — ver los call sites de
-  // window._isSpectating + citiesSpectatorReposition() en monuments.js
+  // window._isSpectating + citiesSpectatorReposition() en js/modes/cities-spectate.js
   // (render loop de la animación de puntaje + resize/zoom). Antes esos dos
   // sitios llamaban SIEMPRE a la reposición de 1v1 (que en modo grupal no
   // hace nada, _citiesSpecLastCard nunca se llega a setear), así que la

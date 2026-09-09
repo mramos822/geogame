@@ -1,9 +1,11 @@
 // ============================================================================
-// menu/entrance-anim.js — animaciones de entrada/salida del loading screen
-// (avión, azafata, sombra, logo, planeta), reset al volver de una partida,
-// versión estática para el panel 2 de práctica, y el efecto universal de
-// "se acabó el tiempo" sobre una cartilla del leaderboard.
-// Extraído de monuments.js (fase 7). Todo son window.* — sin estado propio.
+// menu/entrance-anim.js — _applyTimesUpEffect + animaciones de entrada/salida del loading screen
+// (resetEntranceElements, showEntranceElementsStatic, replayEntranceAnimations).
+// Todo window.*, sin estado propio.
+//
+// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
+// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
+// Son <script> clásicos que comparten un mismo scope global.
 // ============================================================================
 
 // Efecto UNIVERSAL de "se acabó el tiempo" sobre una cartilla del leaderboard:

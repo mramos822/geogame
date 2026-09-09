@@ -1,10 +1,12 @@
 // ============================================================================
-// menu/loading-boot.js — preloader del loading screen: barra de progreso,
-// precarga de assets (manifest auto-generado, saltada en mobile), disparo de
-// las animaciones de entrada cuando todo está listo, y el bloque anti-titileo
-// (decode anticipado de <img>). Extraído de monuments.js (fase 8).
-// DEBE cargar DESPUÉS de manifest.js (usa window.ASSET_MANIFEST en parse) y de
-// profile-stats.js / audio.js (usa _loadingHsValues / startMenuMusic en runtime).
+// menu/loading-boot.js — Preloader del loading screen: barra de progreso, precarga de assets vía
+// window.ASSET_MANIFEST (saltada en mobile), disparo de las animaciones de
+// entrada al terminar, y el bloque anti-titileo (decode anticipado de <img>).
+// DEBE cargar DESPUÉS de manifest.js.
+//
+// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
+// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
+// Son <script> clásicos que comparten un mismo scope global.
 // ============================================================================
 
 // ── LOADING SCREEN ───────────────────────────────────────────────────────────

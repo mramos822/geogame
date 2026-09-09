@@ -1,11 +1,13 @@
 // ============================================================================
-// profile/profile-stats.js — sincronización de stats local <-> Supabase y
-// pintado del panel de perfil del loading (nombre, veces jugadas, promedios,
-// highscores, rango, copa de puesto global, bandera del país, badge de
-// supporter, record de versus). Extraído de monuments.js (fase 3).
-// Se carga antes que monuments.js; todas las dependencias externas
-// (getRank de ranks.js, getGlobalRankForId/_cupForRank de monuments.js,
-// COUNTRY_CODE_TO_FLAG, i18n) se usan sólo en runtime y están guardadas.
+// profile/profile-stats.js — Sincronización de stats local <-> Supabase y pintado del panel de perfil del
+// loading (nombre, veces jugadas, promedios, highscores, rango, copa de puesto
+// global, bandera del país, badge de supporter, record de versus).
+// Dependencias externas (getRank de ranks.js, getGlobalRankForId/_cupForRank de
+// menu/rankings-panel.js, COUNTRY_CODE_TO_FLAG, i18n) se usan sólo en runtime.
+//
+// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
+// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
+// Son <script> clásicos que comparten un mismo scope global.
 // ============================================================================
 
 // Sincroniza los datos locales (scores/averages/plays) a la cuenta de Supabase al iniciar sesión.

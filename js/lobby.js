@@ -1155,13 +1155,13 @@ window.Lobby = (() => {
   let _lobbyModes      = [];  // secuencia de modos para la sesión de juego actual
   let _baseSeed        = null;
   let _modeAccScore    = 0;   // puntaje acumulado de todos los modos del jugador local
-  // La campaña de UN JUGADOR usa window.campaignBase (definida en monuments.js:
+  // La campaña de UN JUGADOR usa window.campaignBase (definida en js/core/campaign.js:
   // devuelve window.campaign.base). El modo grupo la PISA con () => _modeAccScore
   // mientras dura la partida de sala, y al terminar la restaura a ESTA función
-  // original — antes la seteaba en null, DESTRUYENDO la de monuments.js, así que
+  // original — antes la seteaba en null, DESTRUYENDO la de js/core/campaign.js, así que
   // después de un versus de grupo el campaign de un jugador se quedaba sin base
   // y el score se reiniciaba entre modos (reportado). Se captura la primera vez
-  // que se pisa (ahí todavía es la de monuments.js).
+  // que se pisa (ahí todavía es la de js/core/campaign.js).
   let _origCampaignBase = null;
   let _intermediateTimer = null;
   let _pendingModesOrder = []; // estado del picker antes de guardar
@@ -1535,7 +1535,7 @@ window.Lobby = (() => {
       _resultPresented = false;
       _currentModeIdx = 0; _lobbyModes = []; _baseSeed = null; _modeAccScore = 0;
       _savedLobbyModes = [];
-      if (_origCampaignBase) window.campaignBase = _origCampaignBase; // restaurar la de monuments.js (campaña 1 jugador), NO destruirla
+      if (_origCampaignBase) window.campaignBase = _origCampaignBase; // restaurar la de js/core/campaign.js (campaña 1 jugador), NO destruirla
       if (_waitingTimeout) { clearTimeout(_waitingTimeout); _waitingTimeout = null; }
       // Restaurar lobby a estado de espera: eliminar kicks pendientes + status→waiting
       window.LB.reportScore?.(0).catch?.(() => {});
@@ -1559,7 +1559,7 @@ window.Lobby = (() => {
     });
 
     // Base acumulada de modos previos: permite mostrar puntaje total en pantalla desde el inicio del modo
-    // Capturar la campaignBase ORIGINAL (monuments.js) la primera vez, para
+    // Capturar la campaignBase ORIGINAL (js/core/campaign.js) la primera vez, para
     // poder restaurarla al terminar (ver _origCampaignBase).
     if (_origCampaignBase === null && typeof window.campaignBase === 'function') _origCampaignBase = window.campaignBase;
     window.campaignBase = () => _modeAccScore;
@@ -2261,7 +2261,7 @@ window.Lobby = (() => {
     _revealAt = null; if (_revealTimer) { clearTimeout(_revealTimer); _revealTimer = null; }
     _currentModeIdx = 0; _lobbyModes = []; _baseSeed = null; _modeAccScore = 0;
     _savedLobbyModes = [];
-    if (_origCampaignBase) window.campaignBase = _origCampaignBase; // restaurar la de monuments.js (campaña 1 jugador), NO destruirla
+    if (_origCampaignBase) window.campaignBase = _origCampaignBase; // restaurar la de js/core/campaign.js (campaña 1 jugador), NO destruirla
     clearInterval(_intermediateTimer); _intermediateTimer = null;
     if (_waitingTimeout) { clearTimeout(_waitingTimeout); _waitingTimeout = null; }
     const lid = window.LB.getId();
@@ -2290,7 +2290,7 @@ window.Lobby = (() => {
     window._lobbyMembers = [];
     window.LB.clearPendingKicks?.();
     _savedLobbyModes = [];
-    if (_origCampaignBase) window.campaignBase = _origCampaignBase; // restaurar la de monuments.js (campaña 1 jugador), NO destruirla
+    if (_origCampaignBase) window.campaignBase = _origCampaignBase; // restaurar la de js/core/campaign.js (campaña 1 jugador), NO destruirla
     if (typeof window.flagsClearSeed === 'function') window.flagsClearSeed();
     if (typeof window.shapesClearSeed === 'function') window.shapesClearSeed();
     if (typeof window.monumentsClearSeed === 'function') window.monumentsClearSeed();
@@ -2798,7 +2798,7 @@ window.Lobby = (() => {
     pop.style.display = 'flex';
   }
 
-  // Llamado desde el handler de realtime en monuments.js cuando un amigo cambia is_playing
+  // Llamado desde el handler de realtime en js/social/social-realtime.js cuando un amigo cambia is_playing
   window._refreshLobbyInviteList = function() {
     const pop   = document.getElementById('lobby-invite-popup');
     const list  = document.getElementById('lobby-invite-list');

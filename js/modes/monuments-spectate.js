@@ -1,12 +1,12 @@
 // ============================================================================
-// modes/monuments-spectate.js — modo espectador de Monumentos (VS 1v1, lobby
-// grupal y "esperando al rival"). Mismo patrón que cities-spectate.js: reutiliza
-// la pantalla real (#game-wrapper/canvas/state/render/advanceDot/leaderboard),
-// cambia la revelación de ronda (slideMonumentIn) y los assets (check4/wrong4/
-// level4complete...). Incluye también citiesSpectatorTimesUpEffect (agrupado
-// acá con monumentsSpectatorTimesUpEffect). Extraído de monuments.js (fase 13).
-// Carga después de cities-spectate.js (usa _specBuildCountRow) y antes de
-// monuments.js; todo lo demás es runtime por el scope global.
+// modes/monuments-spectate.js — Modo espectador de Monumentos (VS 1v1, lobby grupal, 'esperando al rival').
+// Mismo patrón que cities-spectate.js, cambia la revelación de ronda
+// (slideMonumentIn) y los assets. Incluye también citiesSpectatorTimesUpEffect.
+// Carga DESPUÉS de cities-spectate.js (usa _specBuildCountRow).
+//
+// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
+// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
+// Son <script> clásicos que comparten un mismo scope global.
 // ============================================================================
 
 // ── MONUMENTS SPECTATOR (espectador de partida individual) ────────────────────

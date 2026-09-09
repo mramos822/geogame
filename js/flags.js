@@ -150,7 +150,7 @@ function showFlagsMode() {
     // mode:'flags' — hasta ahora "zafaba" sin este campo porque _mode en
     // spectate.js arranca en 'flags' por default (siempre es el primer modo
     // de la campaña), pero eso era casualidad de orden, no una garantía real
-    // — ver el mismo campo agregado en monuments.js (Cities), donde SÍ hacía
+    // — ver el mismo campo agregado en js/modes/mapgame-play.js (Cities), donde SÍ hacía
     // falta de verdad.
     // campaignBaseAtStart: el jugador real muestra este número desde el
     // arranque del 3-2-1 (antes de cualquier respuesta) — el espectador no
@@ -622,7 +622,7 @@ window.flagsSpectatorWrongEffect = function (target) {
   el.style.animation = 'none'; void el.offsetWidth;
   el.style.animation = 'lb-wrong-flash 0.75s ease-out, lb-shake 0.45s ease-in-out';
   setTimeout(() => { el.style.animation = ''; }, 820);
-  // z-index elevado mientras dura el emote — ver comentario largo en citiesSpectatorWrongEffect (monuments.js).
+  // z-index elevado mientras dura el emote — ver comentario largo en citiesSpectatorWrongEffect (js/modes/cities-spectate.js).
   const prevZ = el.style.zIndex;
   el.style.zIndex = '50';
   setTimeout(() => { el.style.zIndex = prevZ; }, 1800);
@@ -1342,7 +1342,7 @@ function _flagsSyncedVersus() { return window._vsActive || window._lobbyActive; 
 // Antes: `(_flagsSyncedVersus() && _flagsSeededRand) ? ... : Math.random()`.
 // window._lobbyActive/_vsActive son banderas de ESTADO que cambian en otros
 // puntos del código (fin de ronda, transición a espectar de prestado, etc.)
-// — shapes.js/monuments.js/cities.js NUNCA chequean un flag de estado acá,
+// — shapes/cities/monuments NUNCA chequean un flag de estado acá,
 // solo si el generador sembrado (_xSeededRand) está seteado o no, seteado y
 // limpiado explícitamente por flagsSetSeed/flagsClearSeed. Si CUALQUIER
 // llamada a flagsRand() caía en la ventana donde el seed ya estaba puesto
@@ -1545,7 +1545,7 @@ function initFlagsLeaderboard() {
       el.style.transition = 'none';
       el.style.top = '-9999px';
       // Todas las filas traen su cardCode real ahora (mismo fix que
-      // buildFriendPlayers/initLeaderboard en monuments.js) — antes los
+      // buildFriendPlayers/initLeaderboard en js/modes/mapgame-leaderboard.js) — antes los
       // amigos reales de la barra ingame en Gira Mundial solo se quedaban
       // afuera de este chequeo y siempre mostraban la carta default.
       window.CustomizeAssets?.applyCard(el, p.cardCode || '0001');
@@ -1727,7 +1727,7 @@ function flagsSetLobbyScores(members) {
   // Durante el espectador el leaderboard lo posiciona el renderer de
   // espectador (_renderGroupLeaderboard) — no el normal del jugador, que
   // pelearía por la misma posición y haría saltar las celdas (ver mismo fix
-  // en monuments.js/citiesSetVsOpponentScore).
+  // en js/modes/mapgame-vs.js/citiesSetVsOpponentScore).
   if (window._isSpectating) { window._refreshGroupSpectatorLeaderboard?.(); return; }
   flagsPositionLeaderboard(flagsLastLbScore >= 0 ? flagsLastLbScore : 0, true);
 }
@@ -2671,7 +2671,7 @@ function hideFlagsMode() {
   if (finalScore > prevHighscore) {
     // Durante una campaña en curso no se persiste todavía: se guarda como
     // pendiente y solo se confirma en localStorage al completar la Vuelta
-    // Mundial entera (ver window._commitCampaignHighscores en monuments.js).
+    // Mundial entera (ver window._commitCampaignHighscores en js/core/campaign.js).
     if (window.campaign && window.campaign.active) {
       window.campaign.pendingHS.flags = finalScore;
     } else {
@@ -2726,7 +2726,7 @@ function runFlagsPregame(onDone, elapsedMs) {
   flagsAborted = false;
   flagsPregameEl.style.display = 'flex';
   // Desbloquear el compositor de Opera al arrancar la cuenta regresiva (ver
-  // window.nudgeRepaint en monuments.js).
+  // window.nudgeRepaint en js/core/ui-helpers.js).
   if (typeof window.nudgeRepaint === 'function') {
     window.nudgeRepaint();
     setTimeout(window.nudgeRepaint, 120);
@@ -2833,7 +2833,7 @@ window.flagsHardReset = flagsHardReset;
 // tickear (o la pestaña vuelve a primer plano), en vez de arrastrar el
 // atraso.
 function _flagsTimerTick() {
-  // Guarda defensiva — mismo motivo que la de _timerTick en monuments.js: si
+  // Guarda defensiva — mismo motivo que la de _timerTick en js/modes/mapgame-play.js: si
   // por lo que sea flagsTimerIntervalId no se limpió a tiempo (pestaña
   // minimizada mucho rato, etc.), un tick fantasma de una ronda ya
   // terminada podía disparar endFlagsGame() y el TIMES UP gigante encima

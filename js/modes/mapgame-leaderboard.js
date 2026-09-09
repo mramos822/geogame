@@ -1,11 +1,13 @@
 // ============================================================================
-// modes/mapgame-leaderboard.js — barra de amigos/rivales ingame de los modos de
-// mapa (Ciudades y Monumentos): mockPlayers, getTotalHighscore, highscorePlayer,
-// emotes (spawnEmoteBubble), initLeaderboard (arma la barra + expone
-// window._lbUpdateEntry/_lbWrongEffect), positionLeaderboard, sortLeaderboard.
-// Extraído de monuments.js (fase 14). DEBE cargar DESPUÉS de friends.js
-// (getFriends/onFriendsUpdate/loadFriends — se llaman en parse) y de mapgame-vs.js
-// (buildFriendPlayers), antes de monuments.js.
+// modes/mapgame-leaderboard.js — Barra de amigos/rivales ingame de los modos de mapa: mockPlayers,
+// getTotalHighscore, highscorePlayer, emotes (spawnEmoteBubble), initLeaderboard
+// (+ expone window._lbUpdateEntry/_lbWrongEffect), positionLeaderboard, sortLeaderboard.
+// DEBE cargar DESPUÉS de friends.js (getFriends/onFriendsUpdate/loadFriends) y de
+// mapgame-vs.js (buildFriendPlayers).
+//
+// Antes todo esto vivía en el god-file js/monuments.js; ahora está partido en
+// js/{core,menu,modes,profile,social}/, cargados en orden en play/index.html.
+// Son <script> clásicos que comparten un mismo scope global.
 // ============================================================================
 
 let mockPlayers = buildFriendPlayers();

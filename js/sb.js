@@ -47,7 +47,7 @@ window.CUSTOMIZE_FRAME_INSET = {
 // posición/nombre en su color normal (marrón #8b6a00/#4a3b00) se pierda —
 // para esas, el nombre pasa a blanco con contorno del color que tendría
 // normalmente (ver .cell-light-text en style.css y _swatchPreview en
-// monuments.js). '0001' (fondo claro/beige) no es modo oscuro. Si se agrega
+// js/menu/customize-panel.js). '0001' (fondo claro/beige) no es modo oscuro. Si se agrega
 // un cell code nuevo de fondo oscuro, sumarlo acá — no hace falta tocar CSS
 // ni el JS de cada renderer, todos leen de esta lista.
 window.CUSTOMIZE_CELL_LIGHT_TEXT = new Set(['0002', '0009']);
@@ -59,7 +59,7 @@ window.CUSTOMIZE_CELL_LIGHT_TEXT = new Set(['0002', '0009']);
 // la clase sola, así que los 3 lugares que llaman a applyCard (#lb-player,
 // #flags-lb-player, #customize-preview-lb-card) la reciben gratis; el único
 // lugar que NO pasa por applyCard es el swatch de la grilla
-// (_swatchPreview 'leaderboard' en monuments.js, arma el HTML a mano), que
+// (_swatchPreview 'leaderboard' en js/modes/mapgame-leaderboard.js, arma el HTML a mano), que
 // chequea este mismo set directamente.
 window.CUSTOMIZE_CARD_LIGHT_TEXT = new Set(['0002']);
 
@@ -92,7 +92,7 @@ window.CustomizeAssets = {
   // dos (ver @keyframes cell-green-blink) en vez del tinte genérico. Un
   // solo lugar para esta decisión — evita repetirla en cada sitio que
   // renderiza una fila (renderRankings, loadSocialData render,
-  // _patchFriendStatusInDOM, etc., ver monuments.js).
+  // _patchFriendStatusInDOM, etc., ver js/social/social-realtime.js).
   applyCellForStatus(el, code, statusCls) {
     if (!el) return;
     const playing = statusCls === 'playing';
@@ -427,7 +427,7 @@ window.sbDeleteFriendship = async function(friendshipId, userA, userB) {
   }
 };
 
-// navigator.maxTouchPoints > 1 (mismo criterio que isMobile en monuments.js)
+// navigator.maxTouchPoints > 1 (mismo criterio que isMobile en js/core/audio.js)
 // para no depender de userAgent, que se puede spoofear/desactualizar.
 function _sbDeviceType() {
   return (navigator.maxTouchPoints > 1) ? 'mobile' : 'pc';
@@ -446,7 +446,7 @@ window.sbSetPlaying = async function(userId, playing, practicing) {
 // Qué modo específico está jugando (ver /stats "Quién está conectado ahora").
 // Separado de sbSetPlaying: se llama un instante después, una vez que el
 // contexto (campaña/vs/práctica/modo elegido) ya quedó seteado — ver el
-// comentario del microtask en _setPlaying (monuments.js).
+// comentario del microtask en _setPlaying (js/core/campaign.js).
 window.sbSetPlayingMode = async function(userId, label) {
   await sb.from('profiles').update({ playing_mode: label || null }).eq('id', userId);
 };
@@ -519,7 +519,7 @@ function _showRecoveryModal() {
       window._openRecoveryChangePassView();
       return;
     }
-    // Fallback si monuments.js todavía no cargó (no debería pasar, __loadingReady lo garantiza)
+    // Fallback si js/menu/loading-boot.js todavía no cargó (no debería pasar, __loadingReady lo garantiza)
     window._isPasswordReset = true;
     const modal = document.getElementById('account-modal');
     const viewChangePass = document.getElementById('account-view-change-pass');
@@ -665,7 +665,7 @@ sb.auth.onAuthStateChange((event, session) => {
   // localStorage.setItem('_sbSessionToken', _sTok);
   // window.sbSetSessionToken(session.user.id, _sTok);
   // window.sbStartSessionGuard(session.user.id);
-  // Notificar a monuments.js que la sesión está lista (sync de datos locales, etc.)
+  // Notificar a js/profile/profile-account.js que la sesión está lista (sync de datos locales, etc.)
   window._sessionReady = true;
   document.dispatchEvent(new CustomEvent('sbSessionReady', { detail: { userId: session.user.id } }));
   // Heartbeat periódico — solo si la pestaña está visible, si no un usuario
