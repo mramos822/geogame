@@ -1162,6 +1162,11 @@ window.refreshVsSpectatorBadge = function (n) {
 
   async function _sendInvite(guestId, guestName, guestAvatar, mode) {
     mode = mode || 'flags';
+    // GloboReto → begin the three.js download while we wait for the guest to
+    // accept (see the preload note in _scheduleVersusStart).
+    if (mode === 'globequiz' && typeof window.preloadGlobeQuiz === 'function') {
+      try { window.preloadGlobeQuiz(); } catch (e) {}
+    }
     const guestFriend = (typeof getFriends === 'function') ? getFriends().find(f => f.id === guestId) : null;
     _pendingOppName   = guestName;
     _pendingOppAvatar = guestAvatar;
@@ -1208,6 +1213,11 @@ window.refreshVsSpectatorBadge = function (n) {
   // ── Incoming invite (guest) ───────────────────────────────────────────────
 
   function _showIncomingPopup(match) {
+    // GloboReto invite → start the three.js download while the guest is still
+    // deciding whether to accept (see the preload note in _scheduleVersusStart).
+    if (match && match.mode === 'globequiz' && typeof window.preloadGlobeQuiz === 'function') {
+      try { window.preloadGlobeQuiz(); } catch (e) {}
+    }
     // Look up the host's data in the friends list
     const friends = (typeof getFriends === 'function') ? getFriends() : [];
     const host    = friends.find(f => f.id === match.host_id);
@@ -1718,11 +1728,14 @@ window.refreshVsSpectatorBadge = function (n) {
   // (the reported "versus must not start until both have the 3D globe
   // loaded").
   // Margin for BOTH to confirm their 3D globe finished loading. Must cover
-  // the worst legitimate case (slow mobile downloading three.js from the CDN
-  // + loadThree's internal retry, see globequiz.js) without hanging the
-  // match forever if one side truly can't. If it expires, it does NOT start
-  // solo: it's cancelled for both (see _handleGqSyncFailed).
-  const GQ_READY_TIMEOUT_MS = 25000;
+  // the worst legitimate case (slow mobile downloading three.min.js, and
+  // loadThree() now walking a 3-CDN fallback chain — see globequiz.js)
+  // without hanging the match forever if one side truly can't. If it
+  // expires, it does NOT start solo: it's cancelled for both (see
+  // _handleGqSyncFailed). _scheduleVersusStart also kicks off the three.js
+  // download the moment the duel is known to be starting, so both sides
+  // usually get a head start on this.
+  const GQ_READY_TIMEOUT_MS = 30000;
   // Relative offset between "the host gave the order" and "the 3-2-1 starts".
   // The host waits it after sending 'gqgo'; the guest waits it after
   // receiving it — the real difference between the two starts is just ONE
@@ -2346,6 +2359,13 @@ window.refreshVsSpectatorBadge = function (n) {
     if (_vsLaunching || _vsStartScheduled) return;
     _vsStartScheduled = true;
     _showDuelAcceptedPopup();
+    // GloboReto is the only mode that pulls a runtime <script> (three.js) at
+    // match start — start that download NOW, during the "duel accepted"
+    // popup, so neither side is waiting on a cold CDN fetch when the 3D globe
+    // sync gate kicks in. Idempotent (checks its own cache).
+    if ((match.mode || 'flags') === 'globequiz' && typeof window.preloadGlobeQuiz === 'function') {
+      try { window.preloadGlobeQuiz(); } catch (e) {}
+    }
     setTimeout(() => { _vsStartScheduled = false; _launchVersus(match); }, VS_START_DELAY_MS);
   }
 
