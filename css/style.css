@@ -9636,6 +9636,19 @@ body.is-mobile #splash-screen.mode-monuments .game-bg-city-monuments2 {
   white-space: nowrap;
   transition: opacity 0.3s;
   pointer-events: none !important;
+  text-align: center;
+}
+.versus-toast-item.versus-toast-error {
+  background: rgba(70,14,14,0.94);
+  color: #ffe4e0;
+  border: 0.25cqmin solid rgba(255,120,110,0.55);
+}
+.versus-toast-code {
+  margin-top: 0.5cqmin;
+  font-size: 1.8cqmin;
+  letter-spacing: 0.12cqmin;
+  color: #ff9d92;
+  opacity: 0.9;
 }
 
 /* Overlay "Esperando a los otros miembros" */

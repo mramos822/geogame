@@ -905,6 +905,7 @@ window.refreshVsSpectatorBadge = function (n) {
   // Toast stack reusable by lobby.js — max 6 messages, staggered opacity
   const _TOAST_MAX = 6;
   const _TOAST_DURATION = 2800;
+  const _TOAST_DURATION_ERROR = 7000; // error toasts (with a code) linger so the code can be read
   let _toastEntries = [];
 
   function _updateToastOpacities() {
@@ -912,12 +913,25 @@ window.refreshVsSpectatorBadge = function (n) {
     _toastEntries.forEach((e, i) => { e.el.style.opacity = ((i + 1) / n).toFixed(4); });
   }
 
-  window.showVersusToast = function(msg) {
+  // opts.code: shown on a second line as "Código: <code>" and makes the toast
+  // an error toast (red-ish, stays up longer). opts.sticky: also uses the
+  // long duration without a code.
+  window.showVersusToast = function(msg, opts) {
     const stack = document.getElementById('versus-toast-stack');
     if (!stack) return;
+    opts = opts || {};
     const item = document.createElement('div');
-    item.className = 'versus-toast-item';
-    item.textContent = msg;
+    item.className = 'versus-toast-item' + (opts.code ? ' versus-toast-error' : '');
+    const msgEl = document.createElement('div');
+    msgEl.className = 'versus-toast-msg';
+    msgEl.textContent = msg;
+    item.appendChild(msgEl);
+    if (opts.code) {
+      const codeEl = document.createElement('div');
+      codeEl.className = 'versus-toast-code';
+      codeEl.textContent = 'Código: ' + opts.code;
+      item.appendChild(codeEl);
+    }
     item.style.opacity = '0';
     stack.appendChild(item);
     const entry = { el: item, fadeTimer: null, removeTimer: null };
@@ -930,6 +944,7 @@ window.refreshVsSpectatorBadge = function (n) {
     }
     _updateToastOpacities();
     // auto-remove
+    const dur = (opts.code || opts.sticky) ? _TOAST_DURATION_ERROR : _TOAST_DURATION;
     entry.fadeTimer = setTimeout(() => {
       item.style.opacity = '0';
       entry.removeTimer = setTimeout(() => {
@@ -937,7 +952,7 @@ window.refreshVsSpectatorBadge = function (n) {
         _toastEntries = _toastEntries.filter(e => e !== entry);
         _updateToastOpacities();
       }, 320);
-    }, _TOAST_DURATION);
+    }, dur);
   };
 
   // Generic modal confirmation (Yes/No)
@@ -1831,7 +1846,10 @@ window.refreshVsSpectatorBadge = function (n) {
   // with no warning (the reported "one gets frozen and the other loads
   // fine"). It's cancelled for BOTH, no winner or loss recorded, with a
   // banner and return to the menu.
-  function _handleGqSyncFailed(fromOpponent) {
+  // reason (optional): { code, msg } — a specific failure cause + error code
+  // shown in the toast on the way back to the menu. Falls back to a generic
+  // message when omitted.
+  function _handleGqSyncFailed(fromOpponent, reason) {
     if (_gqSyncFailed || _resultShown) return;
     _gqSyncFailed = true;
     _gqReadyReset();
@@ -1840,7 +1858,8 @@ window.refreshVsSpectatorBadge = function (n) {
       if (typeof window.VS.cancelMatchNoResult === 'function') window.VS.cancelMatchNoResult();
     }
     if (typeof window.showVersusToast === 'function') {
-      window.showVersusToast(T('vs.gqSyncFailed', 'No se pudo sincronizar el globo 3D con el rival. Prueben de nuevo.'));
+      const msg = (reason && reason.msg) || T('vs.gqSyncFailed', 'No se pudo sincronizar el globo 3D con el rival. Prueben de nuevo.');
+      window.showVersusToast(msg, { code: (reason && reason.code) || 'GLB-00' });
     }
     const spinner = document.getElementById('gq-loading-spinner');
     if (spinner) spinner.style.display = 'none';
@@ -1861,8 +1880,14 @@ window.refreshVsSpectatorBadge = function (n) {
     _matchResultRecorded = false;
   }
   // Called from globequiz.js when its Promise.all([loadThree, loadCountries])
-  // rejects while in a duel (see initGlobeQuiz's .catch).
-  window._vsGqSyncFailed = function () { _handleGqSyncFailed(false); };
+  // rejects while in a duel (see initGlobeQuiz's .catch). `err` (optional)
+  // lets us tell a blocked-WebGL browser apart from an unreachable CDN.
+  window._vsGqSyncFailed = function (err) {
+    const isWebgl = /error creating webgl context|webgl/i.test(String((err && err.message) || err || ''));
+    _handleGqSyncFailed(false, isWebgl
+      ? { code: 'GLB-05', msg: 'Tu navegador tiene WebGL bloqueado o deshabilitado' }
+      : { code: 'GLB-01', msg: 'Error de conexión: no se pudo descargar el globo 3D' });
+  };
 
   // Registered in _launchVersus BEFORE calling initGlobeQuiz() — so the
   // listener is already hooked to the channel (subscribed by then) whatever
@@ -1927,7 +1952,7 @@ window.refreshVsSpectatorBadge = function (n) {
       _gqHostAckTimer = setTimeout(() => {
         if (!_gqHostGoCb) return;
         _gqHostGoCb = null;
-        _handleGqSyncFailed(false);
+        _handleGqSyncFailed(false, { code: 'GLB-03', msg: 'Error de conexión: Timeout de sincronización con el rival' });
       }, GQ_GO_ACK_TIMEOUT_MS);
     } else {
       // The guest waits for the host's 'gqgo' (arrives in tens of ms on a
@@ -1976,7 +2001,7 @@ window.refreshVsSpectatorBadge = function (n) {
       _gqReadyResolveCb = null;
       // The opponent never confirmed their 3D globe finished loading. We do
       // NOT start solo (see _handleGqSyncFailed) — it's cancelled for both.
-      _handleGqSyncFailed(false);
+      _handleGqSyncFailed(false, { code: 'GLB-02', msg: 'Error de conexión: Timeout — el rival no respondió' });
     }, GQ_READY_TIMEOUT_MS);
     _gqTryResolveReady();
   };
@@ -2503,7 +2528,7 @@ window.refreshVsSpectatorBadge = function (n) {
       // already hooked regardless of who loads first.
       _gqReadySetup();
       // The opponent announced their 3D globe didn't load → both return to the menu.
-      window.VS.onGqAbort(() => _handleGqSyncFailed(true));
+      window.VS.onGqAbort(() => _handleGqSyncFailed(true, { code: 'GLB-04', msg: 'El rival no pudo conectarse al duelo' }));
       // Sync panel: bar + each side's status + when it starts (sits over the
       // game screen loading behind it).
       _showGqSyncPanel();
@@ -2524,9 +2549,14 @@ window.refreshVsSpectatorBadge = function (n) {
   // returns to the loading screen) — before this, a CHANNEL_ERROR left
   // _vsLaunching/_vsActive stuck true forever, with no error message,
   // blocking any new duel until manually reloading the page.
-  window.VS.onSubscribeError(() => {
+  window.VS.onSubscribeError((status) => {
     if (typeof window.showVersusToast === 'function') {
-      window.showVersusToast(T('vs.connectionFailed', 'No se pudo conectar al duelo, volviendo al menú'));
+      const timedOut = status === 'TIMED_OUT';
+      window.showVersusToast(
+        timedOut ? 'Error de conexión: Timeout al conectar al duelo'
+                 : 'Error de conexión: no se pudo conectar al duelo',
+        { code: timedOut ? 'NET-02' : 'NET-01' }
+      );
     }
     _hideOutgoingPopup();
     _hideIncomingPopup();

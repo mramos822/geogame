@@ -2559,7 +2559,7 @@
       // letting them start solo while I'm stuck here (see _handleGqSyncFailed
       // in vs.js).
       if (window._vsActive && typeof window._vsGqSyncFailed === 'function') {
-        window._vsGqSyncFailed();
+        window._vsGqSyncFailed(err); // err lets vs.js pick the right error code (CDN vs WebGL)
         return;
       }
       // This used to fail silently (console only) and input/confirm didn't
