@@ -2542,9 +2542,9 @@
       // different times per device/network) — without this, whoever loaded
       // faster started their timer earlier, a real advantage in a mode won
       // by being first to guess right. While waiting, vs.js's sync panel
-      // (bar + each side's status) covers the screen; the 3-2-1 start is
-      // coordinated by the host via 'gqgo' (see _gqTryResolveReady in vs.js,
-      // with a safety timeout in case the opponent never signals).
+      // (bar + each side's status) covers the screen. _vsGqAwaitBothReady
+      // (vs.js) broadcasts 'ready' and starts the local 3-2-1 once both
+      // sides have announced, or bounces both after a timeout.
       if (window._vsActive && typeof window._vsGqAwaitBothReady === 'function') {
         _gqPhase('scene');
         window._vsGqAwaitBothReady(startGqCountdown);

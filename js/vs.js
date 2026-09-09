@@ -46,7 +46,6 @@ window.VS = (() => {
   let _onReady   = null; // cb({role}) — opponent finished loading their heavy assets (see reportReady). Only used by GlobeQuiz today.
   let _onGqAbort = null; // cb() — GlobeQuiz: one side couldn't finish loading the 3D globe in time; both return to menu with NO winner or loss recorded (see _handleGqSyncFailed).
   let _onGqPhase = null; // cb({role, phase}) — GlobeQuiz: opponent load milestone ('start'|'assets'|'scene'), for the sync bar.
-  let _onGqGo    = null; // cb() — GlobeQuiz: host confirms both are starting; the guest schedules its 3-2-1 with the same relative offset (no dependence on synced clocks).
   // cb(status) — the Realtime channel NEVER got authorized (typically a
   // broken RLS policy on the server, see the sep-2026 one: an invalid cast
   // made ANY attempt to join 'match-{id}'/'solo-{id}' throw CHANNEL_ERROR).
@@ -181,10 +180,6 @@ window.VS = (() => {
       .on('broadcast', { event: 'gqabort' }, () => { if (_onGqAbort) _onGqAbort(); })
       // GlobeQuiz: opponent load milestone — feeds the sync bar.
       .on('broadcast', { event: 'gqphase' }, ({ payload }) => { if (_onGqPhase && payload) _onGqPhase(payload); })
-      // GlobeQuiz: 'gqgo' carries a role — the host's is the start order, the
-      // guest's is the ack that it received it and is starting too (see
-      // _gqTryResolveReady). The payload lets the handler tell them apart.
-      .on('broadcast', { event: 'gqgo' }, ({ payload }) => { if (_onGqGo) _onGqGo(payload || {}); })
       // Presence: detects tab close / connection loss of the opponent.
       .on('presence', { event: 'leave' }, ({ key }) => {
         // A spectator disconnecting (key 'spectator-{uid}', see
@@ -411,12 +406,6 @@ window.VS = (() => {
     if (_channel) { try { _channel.send({ type: 'broadcast', event: 'gqphase', payload: { role: _role, phase } }); } catch (e) {} }
   }
 
-  // GlobeQuiz: only the host sends it, once it knows both are ready — the
-  // guest starts its 3-2-1 on receipt (see _gqTryResolveReady).
-  function reportGqGo() {
-    if (_channel) { try { _channel.send({ type: 'broadcast', event: 'gqgo', payload: { role: _role } }); } catch (e) {} }
-  }
-
   // Closes the match row with no winner or loss (unlike abandon()/finish()):
   // the match never actually started because one side couldn't load.
   // Best-effort, only if still 'active'.
@@ -626,7 +615,7 @@ window.VS = (() => {
     clearTimeout(_oppGoneTimer);
     _oppFinishedGameEnd = false;
     _matchId = _role = _match = null;
-    _onStart = _onScore = _onEnd = _onOppLeft = _onWrong = _onGameEnd = _onAnswer = _onReady = _onGqAbort = _onGqPhase = _onGqGo = null;
+    _onStart = _onScore = _onEnd = _onOppLeft = _onWrong = _onGameEnd = _onAnswer = _onReady = _onGqAbort = _onGqPhase = null;
     _started = false;
     _lastPhase = null;
     _lastRoundPayload = null;
@@ -650,7 +639,6 @@ window.VS = (() => {
     reportReady,
     reportGqAbort,
     reportGqPhase,
-    reportGqGo,
     cancelMatchNoResult,
     reportGameEnd,
     releaseChannel,
@@ -685,7 +673,6 @@ window.VS = (() => {
     onReady:   cb => { _onReady = cb; },
     onGqAbort: cb => { _onGqAbort = cb; },
     onGqPhase: cb => { _onGqPhase = cb; },
-    onGqGo:    cb => { _onGqGo = cb; },
     onSubscribeError: cb => { _onSubscribeError = cb; },
     getMatch: () => _match,
     getRole:  () => _role,
@@ -1736,39 +1723,32 @@ window.refreshVsSpectatorBadge = function (n) {
 
   // ── GlobeQuiz VS: wait for BOTH to load the 3D globe ──────────────────────
   // Each client runs its own Promise.all([loadThree(), loadCountries()])
-  // (see initGlobeQuiz in globequiz.js) — without this handshake, the 3-2-1
-  // started as soon as EACH ONE finished loading separately, so whoever
-  // loaded faster (better network/CPU) started their timer before the
-  // opponent, a real advantage in a mode won by being first to guess right
-  // (the reported "versus must not start until both have the 3D globe
-  // loaded").
-  // Margin for BOTH to confirm their 3D globe finished loading. Must cover
-  // the worst legitimate case (slow mobile downloading three.min.js, and
-  // loadThree() now walking a 3-CDN fallback chain — see globequiz.js)
-  // without hanging the match forever if one side truly can't. If it
-  // expires, it does NOT start solo: it's cancelled for both (see
-  // _handleGqSyncFailed). _scheduleVersusStart also kicks off the three.js
-  // download the moment the duel is known to be starting, so both sides
-  // usually get a head start on this.
+  // (see initGlobeQuiz in globequiz.js). Without a gate, the 3-2-1 started as
+  // soon as EACH ONE finished loading separately, so whoever loaded faster
+  // (better network/CPU) started their timer first — a real advantage in a
+  // mode won by being first to guess right.
+  //
+  // The gate is dead simple now — the same shape the other modes use, no
+  // host/guest asymmetry, no ack round-trip (that extra layer was what left
+  // one side stuck while the other started): each client broadcasts 'ready'
+  // when its own globe is loaded, and starts its LOCAL 3-2-1 the moment it
+  // has BOTH its own 'ready' and the opponent's. Both sides trigger on the
+  // same event (receiving the 2nd 'ready'), skewed only by one network hop —
+  // exactly like the local 3-2-1 in flags/shapes. 'ready' is re-broadcast
+  // every RESEND_MS while waiting so a single dropped packet doesn't hang a
+  // side.
+  //
+  // GQ_READY_TIMEOUT_MS: if the opponent's 'ready' never arrives within this,
+  // the match is cancelled for BOTH (never started solo — see
+  // _handleGqSyncFailed). Must cover the worst legit case (slow mobile
+  // pulling three.min.js down the 3-CDN fallback chain, see globequiz.js);
+  // _scheduleVersusStart also pre-warms that download.
   const GQ_READY_TIMEOUT_MS = 30000;
-  // Relative offset between "the host gave the order" and "the 3-2-1 starts".
-  // The host waits it after sending 'gqgo'; the guest waits it after
-  // receiving it — the real difference between the two starts is just ONE
-  // message's latency (~50-150ms), without depending on the two devices'
-  // clocks being synced (they aren't).
-  const GQ_GO_DELAY_MS = 900;
-  const GQ_GO_FALLBACK_MS = 1500; // the guest starts anyway if the host's 'gqgo' never arrives (normally arrives in <200ms)
-  // The host no longer starts its 3-2-1 the moment it sends 'gqgo' — it waits
-  // for the guest to echo 'gqgo' back as an ack. If that ack doesn't arrive in
-  // this window the guest never got the go (dropped broadcast / one-way
-  // channel) so the match is cancelled for BOTH instead of the host starting
-  // alone (reported: "only I load"). Comfortably covers Chile/Argentina →
-  // us-east-1 round-trip plus the guest's own GQ_GO_DELAY_MS wait.
-  const GQ_GO_ACK_TIMEOUT_MS = 5000;
-  let _gqReadyMe = false, _gqReadyOpp = false, _gqReadyDone = false, _gqReadyTimer = null, _gqReadyResolveCb = null;
+  const GQ_READY_RESEND_MS = 1500; // re-broadcast 'ready' this often while waiting
+  const GQ_GO_DELAY_MS = 900;      // small settle after "both ready" so the bar is seen, then the 3-2-1
+  let _gqReadyMe = false, _gqReadyOpp = false, _gqReadyDone = false;
+  let _gqReadyTimer = null, _gqReadyResolveCb = null, _gqReadyResendTimer = null;
   let _gqSyncFailed = false;
-  let _gqGoWaitCb = null, _gqGoFallbackTimer = null;
-  let _gqHostGoCb = null, _gqHostAckTimer = null; // host: waiting for the guest's 'gqgo' ack
   // 0..1 progress of each side for the sync bar.
   let _gqMyProg = 0, _gqOppProg = 0;
 
@@ -1890,102 +1870,55 @@ window.refreshVsSpectatorBadge = function (n) {
   };
 
   // Registered in _launchVersus BEFORE calling initGlobeQuiz() — so the
-  // listener is already hooked to the channel (subscribed by then) whatever
-  // happens with each side's load order; no need to persist anything in the
-  // matches row to cover the "opponent's notice arrives before I listen"
-  // race.
+  // 'ready' listener is already hooked to the channel whatever happens with
+  // each side's load order.
   function _gqReadySetup() {
     _gqReadyMe = false; _gqReadyOpp = false; _gqReadyDone = false;
     clearTimeout(_gqReadyTimer); _gqReadyTimer = null; _gqReadyResolveCb = null;
-    clearTimeout(_gqGoFallbackTimer); _gqGoFallbackTimer = null; _gqGoWaitCb = null;
-    clearTimeout(_gqHostAckTimer); _gqHostAckTimer = null; _gqHostGoCb = null;
+    clearInterval(_gqReadyResendTimer); _gqReadyResendTimer = null;
     const myRole = () => (window.VS.isHost() ? 'host' : 'guest');
     window.VS.onReady(payload => {
       if (!payload || payload.role === myRole()) return; // own echo, same filter as 'answer'
       _gqReadyOpp = true;
       _gqOnOppPhase('ready');
-      _gqTryResolveReady();
+      _gqMaybeStart();
     });
     window.VS.onGqPhase(payload => {
       if (!payload || payload.role === myRole()) return;
       _gqOnOppPhase(payload.phase);
     });
-    window.VS.onGqGo(payload => {
-      const iAmHost = window.VS.isHost();
-      if (iAmHost) {
-        // The guest echoed 'gqgo' back — it got the order and is starting too,
-        // so it's safe for the host to start now.
-        if (!_gqHostGoCb || (payload && payload.role === 'host')) return; // ignore own echo
-        clearTimeout(_gqHostAckTimer); _gqHostAckTimer = null;
-        const cb = _gqHostGoCb; _gqHostGoCb = null;
-        _gqStartCountdownSoon(cb);
-      } else {
-        // The host's start order. Ack it back (so the host can start) and
-        // start our own 3-2-1.
-        if (!_gqGoWaitCb || (payload && payload.role === 'guest')) return;
-        clearTimeout(_gqGoFallbackTimer); _gqGoFallbackTimer = null;
-        window.VS.reportGqGo();
-        const cb = _gqGoWaitCb; _gqGoWaitCb = null;
-        _gqStartCountdownSoon(cb);
-      }
-    });
   }
-  // Starts the 3-2-1 after GQ_GO_DELAY_MS, hiding the sync panel just before.
-  // Both sides call this with the same relative offset.
-  function _gqStartCountdownSoon(cb) {
-    _gqSyncAllReady();
-    setTimeout(() => { _hideGqSyncPanel(); cb(); }, GQ_GO_DELAY_MS);
-  }
-  function _gqTryResolveReady() {
+  // Both sides land here on the same trigger — the moment they hold both their
+  // own 'ready' and the opponent's — so the two local 3-2-1s are skewed only
+  // by one network hop, same as flags/shapes. GQ_GO_DELAY_MS is just a settle
+  // so the "ready!" bar is seen.
+  function _gqMaybeStart() {
     if (_gqReadyDone || !_gqReadyResolveCb) return;
     if (!(_gqReadyMe && _gqReadyOpp)) return;
     _gqReadyDone = true;
-    clearTimeout(_gqReadyTimer);
+    clearTimeout(_gqReadyTimer); _gqReadyTimer = null;
+    clearInterval(_gqReadyResendTimer); _gqReadyResendTimer = null;
     const cb = _gqReadyResolveCb; _gqReadyResolveCb = null;
-    if (window.VS.isHost()) {
-      // The host is the single reference for the start — prevents both from
-      // sending 'gqgo' and racing over which one wins. It does NOT start yet:
-      // it waits for the guest to echo 'gqgo' back (see onGqGo above). No ack
-      // in GQ_GO_ACK_TIMEOUT_MS → the guest never got it → cancel for both.
-      window.VS.reportGqGo();
-      _gqHostGoCb = cb;
-      _gqHostAckTimer = setTimeout(() => {
-        if (!_gqHostGoCb) return;
-        _gqHostGoCb = null;
-        _handleGqSyncFailed(false, { code: 'GLB-03', msg: 'Error de conexión: Timeout de sincronización con el rival' });
-      }, GQ_GO_ACK_TIMEOUT_MS);
-    } else {
-      // The guest waits for the host's 'gqgo' (arrives in tens of ms on a
-      // normal network); if it never arrives, it starts anyway after the
-      // fallback — and still echoes 'gqgo' so the host's ack wait resolves.
-      _gqGoWaitCb = cb;
-      _gqGoFallbackTimer = setTimeout(() => {
-        if (!_gqGoWaitCb) return;
-        try { window.VS.reportGqGo(); } catch (e) {}
-        const c = _gqGoWaitCb; _gqGoWaitCb = null;
-        _gqStartCountdownSoon(c);
-      }, GQ_GO_FALLBACK_MS);
-    }
+    // One last 'ready' — if the opponent missed ours they get this one and
+    // start too (their _gqMaybeStart already has _gqReadyMe by then).
+    try { window.VS.reportReady(); } catch (e) {}
+    _gqSyncAllReady();
+    setTimeout(() => { _hideGqSyncPanel(); cb(); }, GQ_GO_DELAY_MS);
   }
-  // Handshake cutoff (abandonment/quitToMenu while waiting) — without this,
-  // a stale timeout could fire the 3-2-1 over a screen that already returned
-  // to the menu.
+  // Cutoff (abandonment/quitToMenu while waiting) — without this, a stale
+  // timeout could fire the 3-2-1 over a screen that already returned to the
+  // menu.
   function _gqReadyReset() {
     clearTimeout(_gqReadyTimer); _gqReadyTimer = null;
-    clearTimeout(_gqGoFallbackTimer); _gqGoFallbackTimer = null;
-    clearTimeout(_gqHostAckTimer); _gqHostAckTimer = null;
+    clearInterval(_gqReadyResendTimer); _gqReadyResendTimer = null;
     _gqReadyMe = _gqReadyOpp = _gqReadyDone = false;
     _gqReadyResolveCb = null;
-    _gqGoWaitCb = null;
-    _gqHostGoCb = null;
   }
 
   // Called from globequiz.js as soon as THIS client finishes loading three.js
-  // + the GeoJSON — notifies the opponent and calls onBothReady() only once
-  // BOTH have announced, or after GQ_READY_TIMEOUT_MS if the opponent never
-  // announces (their load failed, connection dropped, etc.) — a generous
-  // timeout so the whole match doesn't hang over it, but without leaving
-  // whoever did load waiting forever.
+  // + the GeoJSON — broadcasts 'ready' (repeating until start or timeout) and
+  // calls onBothReady() once BOTH sides have announced, or bounces both after
+  // GQ_READY_TIMEOUT_MS if the opponent never does.
   window._vsGqAwaitBothReady = function (onBothReady) {
     if (_gqSyncFailed) return; // the duel is already closing due to sync failure
     if (!window._vsActive || !window.VS.getMatchId()) { onBothReady(); return; }
@@ -1995,15 +1928,23 @@ window.refreshVsSpectatorBadge = function (n) {
     _gqSyncSetState('vs-sync-me-state', 'vs.syncReady', true);
     _gqSyncRenderBar();
     window.VS.reportReady();
+    // Keep re-announcing until we start or time out — a single dropped 'ready'
+    // broadcast would otherwise hang this side until GQ_READY_TIMEOUT_MS.
+    clearInterval(_gqReadyResendTimer);
+    _gqReadyResendTimer = setInterval(() => {
+      if (_gqReadyDone) { clearInterval(_gqReadyResendTimer); _gqReadyResendTimer = null; return; }
+      try { window.VS.reportReady(); } catch (e) {}
+    }, GQ_READY_RESEND_MS);
     _gqReadyTimer = setTimeout(() => {
       if (_gqReadyDone) return;
       _gqReadyDone = true;
       _gqReadyResolveCb = null;
+      clearInterval(_gqReadyResendTimer); _gqReadyResendTimer = null;
       // The opponent never confirmed their 3D globe finished loading. We do
       // NOT start solo (see _handleGqSyncFailed) — it's cancelled for both.
       _handleGqSyncFailed(false, { code: 'GLB-02', msg: 'Error de conexión: Timeout — el rival no respondió' });
     }, GQ_READY_TIMEOUT_MS);
-    _gqTryResolveReady();
+    _gqMaybeStart();
   };
 
   // ── GlobeQuiz: instant win ─────────────────────────────────────────────────
