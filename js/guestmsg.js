@@ -124,9 +124,11 @@
       'display:flex;flex-direction:column;align-items:center;gap:6px;' +
       'animation:gmPopIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both;';
 
-    var heart = document.createElement('div');
-    heart.textContent = '🌍';
-    heart.style.cssText = 'font-size:38px;line-height:1;margin-bottom:6px;';
+    var heart = document.createElement('img');
+    heart.src = 'images/logo.png';
+    heart.alt = '';
+    heart.draggable = false;
+    heart.style.cssText = 'width:128px;height:auto;margin-bottom:6px;user-select:none;';
 
     var body = document.createElement('div');
     body.textContent = row.body || '';
@@ -136,11 +138,11 @@
     var btn = document.createElement('div');
     btn.style.cssText = 'position:relative;width:76px;cursor:pointer;margin-top:2px;';
     var c1 = document.createElement('img');
-    c1.src = '/images/confirm1.png';
+    c1.src = 'images/confirm1.png';
     c1.draggable = false;
     c1.style.cssText = 'display:block;width:100%;height:auto;pointer-events:none;user-select:none;';
     var c2 = document.createElement('img');
-    c2.src = '/images/confirm2.png';
+    c2.src = 'images/confirm2.png';
     c2.draggable = false;
     c2.style.cssText =
       'position:absolute;top:49%;left:50%;transform:translate(-50%,-50%);' +

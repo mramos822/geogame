@@ -766,6 +766,8 @@ window.refreshVsSpectatorBadge = function (n) {
 (function() {
   const TIMEOUT_MS = 30000;
   let _resultShown = false;    // evita mostrar la pantalla de resultado dos veces
+  let _gqLoseHandled = false;  // GloboReto: evita procesar el broadcast de victoria del rival dos veces
+  let _matchResultRecorded = false; // evita contar el mismo match en vs_wins/vs_losses dos veces
   let _endedByAbandon = false; // el match terminó por abandono del rival
   // Espera a que AMBOS jugadores terminen su propio cronómetro antes de
   // mostrar el resultado — ver comentario largo en _vsHandleGameEnd. El
@@ -1835,6 +1837,8 @@ window.refreshVsSpectatorBadge = function (n) {
     if (window.VS && typeof window.VS.cleanup === 'function') window.VS.cleanup();
     if (typeof window.quitToMenu === 'function') window.quitToMenu();
     _resultShown = false;
+    _gqLoseHandled = false;
+    _matchResultRecorded = false;
   }
   // Llamada desde globequiz.js cuando su Promise.all([loadThree, loadCountries])
   // rechaza estando en un duelo (ver el .catch de initGlobeQuiz).
@@ -1975,7 +1979,12 @@ window.refreshVsSpectatorBadge = function (n) {
   // terminada esa animación aparece el cartel de "PERDISTE".
   let _gqLoseAnimT1 = null, _gqLoseAnimT2 = null, _gqLoseResultT = null;
   function _handleGqOpponentWin(payload) {
-    if (_resultShown) return;
+    // _resultShown recién se activa ~2s después (en _gqLoseResultT), así que un
+    // segundo broadcast 'answer' con win:true (eco/duplicado de Realtime, común
+    // con alta latencia) reentraba y disparaba la animación de derrota de nuevo
+    // — el "you lost dos veces" reportado. Guard propio, inmediato.
+    if (_resultShown || _gqLoseHandled) return;
+    _gqLoseHandled = true;
     window.globequizVsShowLoss?.();
     const animMs = window._GQ_VS_ANIM_MS || 2000;
     const goOverlay = document.getElementById('powerquit-overlay');
@@ -2027,8 +2036,13 @@ window.refreshVsSpectatorBadge = function (n) {
 
   // Llamado desde quitToMenu cuando salgo de una partida versus en curso.
   window._vsAbandon = function() {
-    // Quien abandona pierde: registrar derrota en mi propio record
-    if (window._sbUserId && typeof window.sbRecordVersusResult === 'function') {
+    // Quien abandona pierde: registrar derrota en mi propio record.
+    // sbRecordVersusResult NO es idempotente (hace vs_losses+1 con read-modify-
+    // write), y también se llama desde _showVsResult('lose') — sin este guard,
+    // perder y después disparar quitToMenu con _vsActive aún vivo contaba la
+    // derrota dos veces.
+    if (!_matchResultRecorded && window._sbUserId && typeof window.sbRecordVersusResult === 'function') {
+      _matchResultRecorded = true;
       window.sbRecordVersusResult(window._sbUserId, false).catch(() => {});
     }
     if (window.VS && typeof window.VS.abandon === 'function') window.VS.abandon();
@@ -2100,9 +2114,11 @@ window.refreshVsSpectatorBadge = function (n) {
       const el = document.getElementById(id);
       if (el) el.style.display = 'none';
     });
-    // Registrar el resultado en mi propio record (las tablas no cuentan empates)
-    if ((outcome === 'win' || outcome === 'lose') && window._sbUserId
+    // Registrar el resultado en mi propio record (las tablas no cuentan empates).
+    // Guard de idempotencia: ver comentario en _vsAbandon.
+    if (!_matchResultRecorded && (outcome === 'win' || outcome === 'lose') && window._sbUserId
         && typeof window.sbRecordVersusResult === 'function') {
+      _matchResultRecorded = true;
       window.sbRecordVersusResult(window._sbUserId, outcome === 'win').catch(() => {});
     }
     const T = (k, d) => (typeof t === 'function' ? t(k) : d);
@@ -2148,6 +2164,8 @@ window.refreshVsSpectatorBadge = function (n) {
       try { window.VS.finish(); } catch (e) {}
     }
     _resultShown = false;
+    _gqLoseHandled = false;
+    _matchResultRecorded = false;
     _endedByAbandon = false;
     _vsLaunching = false;
     if (window.VS && typeof window.VS.cleanup === 'function') window.VS.cleanup();
@@ -2318,6 +2336,8 @@ window.refreshVsSpectatorBadge = function (n) {
 
     window._vsActive = true;
     _resultShown = false;
+    _gqLoseHandled = false;
+    _matchResultRecorded = false;
     _endedByAbandon = false;
     _myGameEnded = false; _oppGameEnded = false;
     _myFinalScoreCache = null; _oppFinalScoreCache = null;
