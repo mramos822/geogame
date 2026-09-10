@@ -316,10 +316,12 @@ const BONUS_TIME      = 5;
 const DOTS_NEEDED     = 10;
 const SPEED_BONUS_WIN = 3;
 
-// Pixel thresholds on the DISPLAYED canvas
-const PERFECT_PX = 5;
-const GOOD_PX    = 20;
-const FAIR_PX    = 45;
+// Pixel thresholds on the DISPLAYED canvas. Base +1 on perfect for everyone;
+// mobile gets extra leeway on every grade (fat-finger taps vs. mouse clicks):
+// perfect +3, good +5, fair +7.
+const PERFECT_PX = 6  + (IS_MOBILE ? 3 : 0);
+const GOOD_PX    = 20 + (IS_MOBILE ? 5 : 0);
+const FAIR_PX    = 45 + (IS_MOBILE ? 7 : 0);
 
 const LABEL_MAP = { perfect: 'Perfecto', good: 'Bien', fair: 'Regular', wayoff: 'Muy lejos' };
 
@@ -587,15 +589,21 @@ gameWrapper.appendChild(badgeOverlay);
 // sessions — keeping the baseline flat with no page reload needed. Images re-set
 // themselves when the next mode starts (handlers assign their src), so clearing
 // here is safe: the menu doesn't use these game <img>s.
-window.releaseGameMemory = function () {
+window.releaseGameMemory = function (opts) {
   try {
-    // Backgrounds, characters, check/wrong, skies, monument, country flags.
-    // NOTE: don't include .game-bg-sky-monuments — no handler re-assigns the
-    // monuments sky, so clearing it leaves it blank on mode entry.
-    document.querySelectorAll(
-      '.game-bg-city, .game-bg-men1, .game-bg-men2, .game-bg-girl1, .game-bg-girl2, ' +
-      '.game-bg-women1, .game-bg-women2, .game-bg-check3, .game-bg-wrong3, #monument-img'
-    ).forEach(el => { if (el && el.tagName === 'IMG') el.removeAttribute('src'); });
+    // opts.keepBitmaps: only free the GPU-heavy surfaces (canvas pixel buffers +
+    // howtoplay video decoder) and leave the decoded <img> bitmaps in place.
+    // Used between campaign modes, where the next handler re-assigns the <img>
+    // srcs a frame later and blanking them here would flash.
+    if (!opts || !opts.keepBitmaps) {
+      // Backgrounds, characters, check/wrong, skies, monument, country flags.
+      // NOTE: don't include .game-bg-sky-monuments — no handler re-assigns the
+      // monuments sky, so clearing it leaves it blank on mode entry.
+      document.querySelectorAll(
+        '.game-bg-city, .game-bg-men1, .game-bg-men2, .game-bg-girl1, .game-bg-girl2, ' +
+        '.game-bg-women1, .game-bg-women2, .game-bg-check3, .game-bg-wrong3, #monument-img'
+      ).forEach(el => { if (el && el.tagName === 'IMG') el.removeAttribute('src'); });
+    }
     // Do NOT clear #results-screen / #final-screen img: their src are in the
     // HTML and aren't re-assigned on show, so clearing them left results/final
     // blank (no images, no confirm button). The ranks are small, not worth

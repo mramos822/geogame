@@ -391,7 +391,7 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   width: 6.4cqmin;
   height: auto;
   opacity: 0;
-  animation: check-pop-in 0.2s ease-out forwards;
+  animation: check-pop-in 0.1s ease-out forwards;
 }
 
 @keyframes check-pop-in {
@@ -417,7 +417,7 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   width: 6.4cqmin;
   height: auto;
   opacity: 0;
-  animation: check-pop-in 0.2s ease-out forwards;
+  animation: check-pop-in 0.1s ease-out forwards;
 }
 
 .grade-count-total span:last-child {
@@ -6781,7 +6781,7 @@ body.is-mobile #screen-warning-icon {
 }
 
 #result-label.visible {
-  animation: result-label-anim 0.7s ease-out forwards;
+  animation: result-label-anim 0.6s ease-out forwards;
 }
 
 #result-label.perfect { color: #ffffff; -webkit-text-stroke: 1px #ff2222; }
@@ -6939,7 +6939,7 @@ body.is-mobile #screen-warning-icon {
 }
 
 #flags-result-label.visible {
-  animation: result-label-anim 0.7s ease-out forwards;
+  animation: result-label-anim 0.6s ease-out forwards;
 }
 
 #flags-result-label.perfect { color: #ffffff; -webkit-text-stroke: 1px #ff2222; }
@@ -7350,7 +7350,7 @@ body.is-mobile #screen-warning-icon {
 #flags-wrong-overlay.animate,
 #flags-badge-overlay.animate {
   display: block;
-  animation: flags-check-pop 0.82s ease-out forwards;
+  animation: flags-check-pop 0.72s ease-out forwards;
 }
 
 @keyframes flags-check-pop {
@@ -7689,6 +7689,14 @@ html[lang="en"] #splash-screen.mode-shapes .splash-text2-label.step2 { padding-t
    desktop el splash sigue con el titileo infinito de siempre. */
 body.is-mobile #splash-screen.mode-monuments .game-bg-city-monuments2 {
   animation: monuments-flicker 0.2s steps(1, end) 20 forwards;
+}
+/* Same reasoning for the 3 scrolling cloud layers: on mobile they were the only
+   remaining INFINITE animation left running under the splash (each a ~70cqw
+   compositing layer) while the player reads the instructions — exactly the
+   cities->monuments entry window where iOS reloads the tab. Freeze them on the
+   splash; they scroll normally once the round starts (gameover keeps them too). */
+body.is-mobile #splash-screen.mode-monuments .game-bg-clouds-monuments {
+  animation: none;
 }
 .mode-monuments .game-bg-sky-monuments { display: block; }
 .mode-monuments .game-bg-sky:not(.game-bg-sky-monuments) { display: none; }

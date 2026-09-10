@@ -418,7 +418,7 @@ window.Chat = (() => {
     _view = 'inbox';
   }
 
-  return { openInbox, closeInbox, openConversation, backToInbox, sendMessage, setTab: _setTab };
+  return { openInbox, closeInbox, openConversation, backToInbox, sendMessage, setTab: _setTab, refreshUnreadBadge };
 })();
 
 // ── UI wiring ───────────────────────────────────────────────────────────────

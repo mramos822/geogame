@@ -110,6 +110,16 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
         if (labelC) { labelC.classList.remove('step2'); labelC.textContent = ''; }
         document.querySelectorAll('#splash-screen .flightatt-splash, .splash-text2-wrap')
           .forEach(el => el.classList.remove('animate-in'));
+        // Mobile: free the finished mode's GPU surfaces (canvas pixel buffers +
+        // howtoplay video decoder) at EVERY campaign hop, not just
+        // cities→monuments. These IOSurfaces accumulate across the 4 modes under
+        // the transformed #app-stage and are the documented trigger of the iOS
+        // tab reload. Bitmaps are kept — the next handler re-assigns the <img>
+        // srcs it needs a frame later, and blanking them here would flash.
+        // See project_ios_crash_investigation.
+        if (IS_MOBILE && typeof window.releaseGameMemory === 'function') {
+          window.releaseGameMemory({ keepBitmaps: true });
+        }
         document.getElementById(_nextBtn).click();
         setTimeout(() => { sfxCheck.volume = isMuted ? 0 : 1; }, 150);
       };

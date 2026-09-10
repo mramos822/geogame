@@ -25,7 +25,7 @@
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
-  const SEL = 'id, username, avatar_url, hs_flags, hs_shapes, hs_cities, hs_monuments, hs_total, play_count, vs_wins, vs_losses, is_supporter, avg_sum_flags, avg_sum_shapes, avg_sum_cities, avg_sum_monuments, play_count_flags, play_count_shapes, play_count_cities, play_count_monuments, country_code, is_founder, cell_code, frame_code, panel_code';
+  const SEL = 'id, username, avatar_url, hs_flags, hs_shapes, hs_cities, hs_monuments, hs_total, play_count, vs_wins, vs_losses, is_supporter, avg_sum_flags, avg_sum_shapes, avg_sum_cities, avg_sum_monuments, play_count_flags, play_count_shapes, play_count_cities, play_count_monuments, country_code, is_founder, cell_code, frame_code, panel_code, last_active, is_playing, is_practicing';
 
   function _totalScore(p) {
     const fromCols = (p.hs_flags||0)+(p.hs_shapes||0)+(p.hs_cities||0)+(p.hs_monuments||0);
@@ -47,6 +47,12 @@
       cellCode: p.cell_code || '0001',
       frameCode: p.frame_code || '0001',
       panelCode: p.panel_code || '0001',
+      // Presence: so opening this row's profile shows "last seen" like the
+      // friends panel does, instead of always "Sin conexión" (the row object is
+      // passed straight to openFriendProfile).
+      last_active: p.last_active || null,
+      is_playing: p.is_playing || false,
+      is_practicing: p.is_practicing || false,
     };
   }
   function _sortAndRank(profiles) {

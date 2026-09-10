@@ -244,3 +244,38 @@ function _stopSocialListPoll() {
   clearInterval(_socialListPollInterval);
   _socialListPollInterval = null;
 }
+
+// ── RESYNC ON RETURN TO FOREGROUND ──────────────────────────────────────────
+// On mobile the OS suspends the Realtime WebSocket AND throttles/pauses timers
+// while the tab is backgrounded (screen locked, app switched). Realtime does not
+// replay what was missed on reconnect, so friend requests / 1v1 challenges / DMs
+// that landed while away would only surface on the next slow poll tick — or not
+// at all. This forces an immediate full catch-up the moment the tab is visible
+// again (and on `focus` / `online`), so a notification always arrives.
+let _lastResyncAt = 0;
+function _resyncNotificationsNow(force) {
+  if (!window._accountLoggedIn || !window._sbUserId) return;
+  const now = Date.now();
+  if (!force && now - _lastResyncAt < 2500) return; // collapse duplicate events
+  _lastResyncAt = now;
+  // Kick the Realtime socket if it dropped while backgrounded.
+  try {
+    const rt = window.sb && window.sb.realtime;
+    if (rt && typeof rt.isConnected === 'function' && !rt.isConnected() && typeof rt.connect === 'function') {
+      rt.connect();
+    }
+  } catch (e) {}
+  // Friend requests (badge + banner) + friend list / statuses.
+  try { if (typeof loadSocialData === 'function') loadSocialData(false); } catch (e) {}
+  // Pending 1v1 challenges that were INSERTed while the socket was asleep.
+  try { if (typeof window._vsCheckPendingInvites === 'function') window._vsCheckPendingInvites(); } catch (e) {}
+  // Unread DM bubble.
+  try { if (window.Chat && typeof window.Chat.refreshUnreadBadge === 'function') window.Chat.refreshUnreadBadge(); } catch (e) {}
+}
+window._resyncNotificationsNow = _resyncNotificationsNow;
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') _resyncNotificationsNow(false);
+});
+window.addEventListener('focus', () => _resyncNotificationsNow(false));
+window.addEventListener('online', () => _resyncNotificationsNow(true));

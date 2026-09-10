@@ -3156,24 +3156,39 @@ window.refreshVsSpectatorBadge = function (n) {
       } // host cancelled / expired
     );
     // Immediate query for pending invites that arrived before connecting.
-    // Only shown once per match (localStorage prevents it reappearing on reload).
+    window._vsCheckPendingInvites();
+  };
+
+  // Poll the matches table for still-pending 1v1 challenges and surface any that
+  // haven't been shown yet. Needed because Realtime does NOT replay INSERTs
+  // missed while the tab was backgrounded (phone locked / app switched) — the
+  // socket is suspended by the OS and reconnects without a backlog. Called at
+  // listen setup AND on every return-to-foreground (see social-realtime.js).
+  // Each match is surfaced at most once (localStorage), so returning to the app
+  // doesn't re-nag for invites already seen.
+  window._vsCheckPendingInvites = function () {
     const uid = window._sbUserId;
-    if (uid && window.sb) {
-      window.sb.from('matches')
-        .select('id, host_id, guest_id, status, seed')
-        .eq('guest_id', uid).eq('status', 'pending')
-        .order('created_at', { ascending: false }).limit(1)
-        .then(({ data }) => {
-          if (!data || !data[0]) return;
-          const match = data[0];
-          const seenKey = '_seenMatchInvite_' + uid;
-          const seen = JSON.parse(localStorage.getItem(seenKey) || '[]');
-          if (seen.includes(match.id)) return; // already shown before
+    if (!uid || !window.sb) return;
+    window.sb.from('matches')
+      .select('id, host_id, guest_id, status, seed, mode, created_at')
+      .eq('guest_id', uid).eq('status', 'pending')
+      .order('created_at', { ascending: false }).limit(5)
+      .then(({ data }) => {
+        if (!data || !data.length) return;
+        const seenKey = '_seenMatchInvite_' + uid;
+        let seen = [];
+        try { seen = JSON.parse(localStorage.getItem(seenKey) || '[]'); } catch (e) {}
+        // Oldest first, so the newest challenge ends up as the visible banner.
+        data.slice().reverse().forEach(match => {
+          if (seen.includes(match.id)) return;
+          // Ignore anything older than 5 min — the host is long gone.
+          const age = Date.now() - (new Date(match.created_at).getTime() || 0);
+          if (age > 5 * 60 * 1000) return;
           seen.unshift(match.id);
-          localStorage.setItem(seenKey, JSON.stringify(seen.slice(0, 10)));
           _showIncomingPopup(match);
-        }).catch(() => {});
-    }
+        });
+        try { localStorage.setItem(seenKey, JSON.stringify(seen.slice(0, 20))); } catch (e) {}
+      }).catch(() => {});
   };
 
   // Accept a 1v1 invite directly from the inbox (without going through the banner)

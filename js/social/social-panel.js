@@ -495,6 +495,30 @@ function openFriendProfile(friend) {
   currentFriendProfile = friend;
   const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
 
+  // If this record came without presence data (e.g. opened from Rankings, or a
+  // stale cache), pull it from the friends cache first and always do an
+  // immediate one-shot fetch so the status isn't stuck on "Sin conexión" until
+  // the 10s poll.
+  if (friend && friend.id && friend.last_active == null) {
+    const cached = ((typeof getFriends === 'function' ? getFriends() : []) || [])
+      .find(x => x.id === friend.id) || socialData.friends.find(x => x.id === friend.id);
+    if (cached && cached.last_active) {
+      friend.last_active = cached.last_active;
+      friend.is_playing = cached.is_playing;
+      friend.is_practicing = cached.is_practicing;
+    }
+    if (window.sb) {
+      window.sb.from('profiles').select('last_active,is_playing,is_practicing').eq('id', friend.id).single()
+        .then(({ data }) => {
+          if (!data || currentFriendProfile !== friend) return;
+          friend.last_active = data.last_active;
+          friend.is_playing = data.is_playing;
+          friend.is_practicing = data.is_practicing;
+          _applyFriendPanelStatus(friend);
+        }).catch(() => {});
+    }
+  }
+
   // Friend's GloboReto streak — not in the friends-list/rankings selects
   // (partial), so it's fetched separately, small.
   if (window.sb && friend.id) {
