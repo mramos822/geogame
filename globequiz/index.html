@@ -20,8 +20,10 @@
   <meta name="twitter:description"  content="One country a day. Spin the 3D globe, guess it in as few tries as possible and keep your streak alive. Can you get today's?">
   <meta name="twitter:image"        content="https://mygeochallenge.com/images/globequiz-preview.png">
 
-  <!-- Humans go straight into the game; crawlers stay for the card above. -->
-  <meta http-equiv="refresh" content="0; url=/play/?goto=globequiz">
+  <!-- Humans go straight into the game (JS redirect); social crawlers don't
+       run JS, so they stay on this page and read the card above. No
+       <meta http-equiv="refresh"> on purpose — some crawlers follow it and
+       end up scraping /play/'s generic card instead of this one. -->
   <script>location.replace('/play/?goto=globequiz');</script>
   <style>
     body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;

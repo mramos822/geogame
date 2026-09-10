@@ -5257,6 +5257,34 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   font-size: 3.6cqmin;
   color: #5a4400;
 }
+
+/* Flame + current streak count under the title of #gq-guest-popup */
+.gq-guest-popup-streak {
+  position: relative;
+  width: 20cqmin;
+  align-self: center;
+  margin: -0.4cqmin 0;
+}
+.gq-guest-popup-streak-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+.gq-guest-popup-streak-num {
+  position: absolute;
+  top: 63%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Arial Black', Impact, sans-serif;
+  font-size: 8cqmin;
+  color: #ffffff;
+  -webkit-text-stroke: 0.9cqmin #d81e0a;
+  paint-order: stroke fill;
+  pointer-events: none;
+}
 .account-modal-desc {
   font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
   font-size: 2cqmin;

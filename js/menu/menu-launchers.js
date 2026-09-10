@@ -246,10 +246,19 @@ document.getElementById('gq-quit-confirm')?.addEventListener('click', () => {
   // stuck in localStorage — same idea as the post-Gira-Mundial guest popup
   // (#guest-rank-popup in js/final.js), with its own "don't show again" flag.
   if (!window._accountLoggedIn && localStorage.getItem('hideGqGuestPopup') !== '1') {
-    setTimeout(() => {
+    setTimeout(async () => {
       if (window._accountLoggedIn) return;
       const accountModal = document.getElementById('account-modal');
       if (accountModal && accountModal.classList.contains('open')) return;
+      const numEl = document.getElementById('gq-guest-popup-streak-num');
+      const wrapEl = document.getElementById('gq-guest-popup-streak');
+      if (numEl && typeof window.gqReadCurrentStreak === 'function') {
+        try {
+          const s = await window.gqReadCurrentStreak();
+          numEl.textContent = String(s || 0);
+          if (wrapEl) wrapEl.style.display = (s > 0) ? 'block' : 'none';
+        } catch (e) {}
+      }
       document.getElementById('gq-guest-popup')?.classList.add('open');
     }, 700);
   }

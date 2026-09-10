@@ -35,7 +35,7 @@
   <meta name="twitter:description"  content="Identify cities on maps, recognize country flags, match country shapes and name world landmarks. Compete with friends online.">
   <meta name="twitter:image"        content="https://mygeochallenge.com/images/og-preview.png">
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6238929099865050" crossorigin="anonymous"></script>
-  <link rel="stylesheet" href="css/style.css?v=3.6.4">
+  <link rel="stylesheet" href="css/style.css?v=3.6.5">
   <link rel="preload" href="images/characters/men3.png" as="image">
   <link rel="preload" href="images/characters/men4.png" as="image">
   <link rel="preload" href="images/characters/girl3.png" as="image">
@@ -1010,6 +1010,10 @@
       <div class="account-modal-box">
         <button class="account-modal-close" id="gq-guest-popup-close" type="button">✕</button>
         <span class="account-modal-title" data-i18n="gqGuestPopup.title">¡No pierdas tu racha!</span>
+        <div class="gq-guest-popup-streak" id="gq-guest-popup-streak">
+          <img class="gq-guest-popup-streak-img" src="images/streak.png" alt="" draggable="false" oncontextmenu="return false">
+          <span class="gq-guest-popup-streak-num" id="gq-guest-popup-streak-num">0</span>
+        </div>
         <p class="account-modal-desc" data-i18n="gqGuestPopup.msg">Crea una cuenta para guardar tu racha de GloboReto, entrar al ranking y retar a tus amigos.</p>
         <button class="account-modal-opt account-modal-register" id="gq-guest-popup-register" type="button" data-i18n="guestPopup.register">Registrarme</button>
         <button class="account-modal-link" id="gq-guest-popup-login" type="button" data-i18n="guestPopup.haveAccount">Ya tengo una cuenta</button>
@@ -1368,7 +1372,7 @@
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
     </div>
-    <div id="loading-version">Ver. 3.6.4</div>
+    <div id="loading-version">Ver. 3.6.5</div>
   </div>
 
   <!-- Pantalla de resultado versus (W/L) — fuera del loading-screen para verse tras la partida -->
@@ -2268,10 +2272,10 @@
   <!-- ── Otros modos ─────────────────────────────────────────────────────── -->
   <script src="js/flags.js?v=3.5.65"></script>
   <script src="js/shapes.js?v=3.5.65"></script>
-  <script src="js/globequiz.js?v=3.6.4"></script>
+  <script src="js/globequiz.js?v=3.6.5"></script>
 
   <!-- ── Launchers del menú + IIFEs de UI global ─────────────────────────── -->
-  <script src="js/menu/menu-launchers.js?v=3.6.4"></script>
+  <script src="js/menu/menu-launchers.js?v=3.6.5"></script>
   <script src="js/menu/misc.js?v=3.5.65"></script>
 
   <!-- ── Pantallas de resultados ────────────────────────────────────────── -->
