@@ -162,6 +162,16 @@
         if (resultsBtn) resultsBtn.style.display = 'block';
         // Start menuloop; if autoplay is blocked, wait for the first gesture
         window.startMenuMusic();
+
+        // Deep link: ?goto=globequiz opens the GlobeQuiz panel straight away.
+        // Runs only here, i.e. after the name-prompt / account-modal (if any)
+        // have been closed — a first-time visitor still picks a name first.
+        try {
+          if (new URLSearchParams(location.search).get('goto') === 'globequiz') {
+            setTimeout(() => { document.getElementById('globequiz-btn')?.click(); }, 400);
+            history.replaceState(null, '', location.pathname);
+          }
+        } catch (e) {}
       }
 
       // Wait for name-prompt and account-modal to be closed before animating

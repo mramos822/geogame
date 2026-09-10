@@ -86,23 +86,11 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
 
 document.getElementById('globequiz-btn')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
-  // Gate: GlobeQuiz requires an account, and with one it requires having
-  // completed at least 1 Gira Mundial ever (see the campaigns_completed
-  // increment when the campaign ends).
-  if (!window._accountLoggedIn || !window._sbUserId) {
-    const textEl = document.getElementById('globequiz-locked-text');
-    if (textEl) { textEl.setAttribute('data-i18n', 'globequiz.lockedNoAccount'); textEl.textContent = t('globequiz.lockedNoAccount'); }
-    const popup = document.getElementById('globequiz-locked-popup');
-    if (popup) popup.style.display = 'flex';
-    return;
-  }
-  if (!((window._sbProfile && window._sbProfile.campaigns_completed) || 0)) {
-    const textEl = document.getElementById('globequiz-locked-text');
-    if (textEl) { textEl.setAttribute('data-i18n', 'globequiz.lockedNoCampaign'); textEl.textContent = t('globequiz.lockedNoCampaign'); }
-    const popup = document.getElementById('globequiz-locked-popup');
-    if (popup) popup.style.display = 'flex';
-    return;
-  }
+  // GlobeQuiz is open to everyone now — no account and no completed Gira
+  // Mundial required (the streak has a full localStorage fallback for guests,
+  // see loadState/updateStreak/gqStreakAlive in js/globequiz.js). The
+  // #globequiz-locked-popup + its i18n keys are kept in case the gate is
+  // reinstated.
   if (typeof window.preloadGlobeQuiz === 'function') window.preloadGlobeQuiz();
   [
     document.getElementById('loading-actions'),
@@ -253,6 +241,30 @@ document.getElementById('gq-quit-confirm')?.addEventListener('click', () => {
   // And music goes back to the menu loop.
   if (typeof window.startMenuMusic === 'function') window.startMenuMusic();
   else if (typeof playMusic === 'function') playMusic(sfxMenuMusic);
+
+  // Guest: nudge them to create an account so their GlobeQuiz streak isn't
+  // stuck in localStorage — same idea as the post-Gira-Mundial guest popup
+  // (#guest-rank-popup in js/final.js), with its own "don't show again" flag.
+  if (!window._accountLoggedIn && localStorage.getItem('hideGqGuestPopup') !== '1') {
+    setTimeout(() => {
+      if (window._accountLoggedIn) return;
+      const accountModal = document.getElementById('account-modal');
+      if (accountModal && accountModal.classList.contains('open')) return;
+      document.getElementById('gq-guest-popup')?.classList.add('open');
+    }, 700);
+  }
+});
+
+['close', 'register', 'login'].forEach(kind => {
+  document.getElementById('gq-guest-popup-' + kind)?.addEventListener('click', () => {
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    if ((kind === 'close') && document.getElementById('gq-guest-popup-dontshow')?.checked) {
+      localStorage.setItem('hideGqGuestPopup', '1');
+    }
+    document.getElementById('gq-guest-popup')?.classList.remove('open');
+    if (kind === 'register' && typeof window.openAccountModal === 'function') window.openAccountModal('register');
+    if (kind === 'login' && typeof window.openAccountModal === 'function') window.openAccountModal('login');
+  });
 });
 
 document.getElementById('loading-panel2-back')?.addEventListener('click', () => {

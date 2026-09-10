@@ -1672,6 +1672,45 @@
     badge.classList.toggle('streak-inactive', shown === 0);
   };
 
+  // ── SHARE RESULT ON X ─────────────────────────────────────────────────────
+  let _gqShareData = null;
+  const _GQ_SHARE_URL = 'https://mygeochallenge.com/globequiz/';
+
+  function _gqBuildShareText() {
+    const d = _gqShareData || {};
+    const secs = (d.timeMs || 0) / 1000;
+    const time = (secs >= 10 ? secs.toFixed(1) : secs.toFixed(2)) + 's';
+    const lang = (typeof window.getLang === 'function' && window.getLang() === 'en') ? 'en' : 'es';
+    // Deliberately does NOT reveal the country — the point is to tease friends
+    // into playing the same daily.
+    const V = { time: time, streak: d.streak || 0, attempts: d.attempts || 1, url: _GQ_SHARE_URL };
+    const TPL = {
+      es: [
+        '🌍 ¡Acerté el país de hoy en GeoChallenge! 🤔\n\nIntentos: {attempts}\nTiempo: {time}\n🔥 ¡{streak} días seguidos!\n\n¿Tú también lo adivinaste? 🎯\n\nJuega aquí:\n{url}',
+        '🗺️ País de hoy: ¡resuelto! ✅\n\nLo logré en {attempts} intentos ({time}).\n🔥 Racha: {streak} días sin fallar.\n\nTe toca 👇\n{url}',
+        '🎯 Otro país que cae en GeoChallenge.\n\nIntentos: {attempts} · Tiempo: {time}\n🔥 {streak} días de racha, imparable.\n\n¿Cuánto aguantas tú? 🌍\n{url}',
+        '🌍 ¡Lo logré! El país de hoy en GeoChallenge.\n\nSolo {attempts} intentos y {time} ⏱️\n🔥 Racha: {streak} días 🔥\n\n¿Tú también lo adivinaste?\n{url}',
+        '🔥 {streak} días seguidos adivinando en GeoChallenge.\n\nHoy: {attempts} intentos, {time}.\n\n¿Te animas con la de hoy? 🎯\n{url}',
+      ],
+      en: [
+        "🌍 Nailed today's country on GeoChallenge! 🤔\n\nGuesses: {attempts}\nTime: {time}\n🔥 {streak} days in a row!\n\nDid you get it too? 🎯\n\nPlay here:\n{url}",
+        "🗺️ Today's country: solved! ✅\n\nGot it in {attempts} guesses ({time}).\n🔥 Streak: {streak} days without a miss.\n\nYour turn 👇\n{url}",
+        '🎯 Another country down on GeoChallenge.\n\nGuesses: {attempts} · Time: {time}\n🔥 {streak}-day streak, unstoppable.\n\nHow long can you last? 🌍\n{url}',
+        "🌍 Got it! Today's country on GeoChallenge.\n\nJust {attempts} guesses and {time} ⏱️\n🔥 Streak: {streak} days 🔥\n\nDid you guess it too?\n{url}",
+        '🔥 {streak} days straight guessing on GeoChallenge.\n\nToday: {attempts} guesses, {time}.\n\nThink you can beat me? 🎯\n{url}',
+      ],
+    };
+    const list = TPL[lang];
+    const tpl = list[Math.floor(Math.random() * list.length)];
+    return tpl.replace(/\{(\w+)\}/g, (m, k) => (V[k] != null ? V[k] : m));
+  }
+
+  function _gqOpenShare() {
+    const href = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(_gqBuildShareText());
+    window.open(href, '_blank', 'noopener,noreferrer');
+  }
+  window._gqOpenShare = _gqOpenShare;
+
   async function showEndgameModal() {
     const modal = document.getElementById('gq-endgame-modal');
     if (!modal) return;
@@ -1710,6 +1749,8 @@
     }
     const attemptsEl = document.getElementById('gq-endgame-attempts');
     if (attemptsEl) attemptsEl.textContent = String(guesses.length + 1); // +1: the winning guess isn't pushed to guesses
+    // Snapshot for the "Share on X" button.
+    _gqShareData = { country: displayName(dailyCountry), streak: currentStreak, attempts: guesses.length + 1, timeMs: gqFinalElapsedMs };
     const table = document.getElementById('gq-endgame-table');
     if (table) {
       table.innerHTML = '';
@@ -2527,6 +2568,10 @@
         if (modal) modal.style.display = 'none';
         stopGqEndgameCountdown();
         document.getElementById('gq-quit-confirm')?.click();
+      });
+      document.getElementById('gq-endgame-share')?.addEventListener('click', () => {
+        playCheckSfx();
+        _gqOpenShare();
       });
     }
     // Load milestones for the duel sync bar (see _vsGqLoadPhase in vs.js) —

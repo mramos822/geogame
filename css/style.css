@@ -1481,6 +1481,31 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 }
 .gq-endgame-confirm:hover .gq-guess-btn2 { opacity: 1; }
 
+/* "Share result on X" — sits between the guesses table/messages and the footer */
+.gq-endgame-share {
+  display: inline-flex;
+  align-items: center;
+  gap: 1cqmin;
+  align-self: center;
+  margin-top: 1cqmin;
+  padding: 1cqmin 2.4cqmin;
+  border: none;
+  border-radius: 1.4cqmin;
+  background: #1da1f2;
+  color: #fff;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 1.5cqmin;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+.gq-endgame-share:hover { background: #0d8ddb; transform: translateY(-0.3cqmin); }
+.gq-endgame-share:active { transform: translateY(0); }
+.gq-endgame-share-icon {
+  width: 2cqmin;
+  height: 2cqmin;
+  flex: none;
+}
+
 .gq-panel {
   position: absolute;
   top: 18%;
