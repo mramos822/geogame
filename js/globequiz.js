@@ -1687,28 +1687,29 @@
     // Deliberately does NOT reveal the country — the point is to tease friends
     // into playing the same daily. Low streak → "just getting started" + a
     // stronger call to play; higher streak → bragging.
-    const V = { time: time, streak: s, days: daysWord, attempts: d.attempts || 1, url: _GQ_SHARE_URL };
+    const game = lang === 'en' ? 'GeoChallenge GlobeQuiz' : 'GloboReto de GeoChallenge';
+    const V = { time: time, streak: s, days: daysWord, attempts: d.attempts || 1, game: game, url: _GQ_SHARE_URL };
     const START = s <= 3;
     const TPL = {
       es: START ? [
-        '🌍 ¡Acerté el país de hoy en GeoChallenge! 🤔\n\nIntentos: {attempts}\nTiempo: {time}\n🌱 Apenas arranco mi racha: {streak} {days}.\n\n¿Te animas con la de hoy? 🎯\n{url}',
-        '🗺️ País de hoy: ¡resuelto! ✅\n\n{attempts} intentos, {time}.\n🌱 Racha: {streak} {days}... esto recién empieza.\n\n¿Cuántos días aguantas tú? 👇\n{url}',
-        '🎯 Primer país del día en GeoChallenge, listo.\n\nIntentos: {attempts} · {time}\n🌱 Racha: {streak} {days}.\n\nUn país nuevo cada día. ¿Jugamos?\n{url}',
+        '🌍 ¡Acerté el país de hoy en {game}! 🤔\n\nIntentos: {attempts}\nTiempo: {time}\n🌱 Apenas arranco mi racha: {streak} {days}.\n\n¿Te animas con la de hoy? 🎯\n{url}',
+        '🗺️ Resolví el país de hoy en {game}. ✅\n\n{attempts} intentos, {time}.\n🌱 Racha: {streak} {days}... esto recién empieza.\n\n¿Cuántos días aguantas tú? 👇\n{url}',
+        '🎯 Primer país del día en {game}, listo.\n\nIntentos: {attempts} · {time}\n🌱 Racha: {streak} {days}.\n\nUn país nuevo cada día. ¿Jugamos?\n{url}',
       ] : [
-        '🌍 ¡Acerté el país de hoy en GeoChallenge! 🤔\n\nIntentos: {attempts}\nTiempo: {time}\n🔥 ¡{streak} {days} seguidos!\n\n¿Tú también lo adivinaste? 🎯\n{url}',
-        '🗺️ País de hoy: ¡resuelto! ✅\n\n{attempts} intentos ({time}).\n🔥 Racha: {streak} {days} sin fallar.\n\nTe toca 👇\n{url}',
-        '🎯 Otro país que cae en GeoChallenge.\n\nIntentos: {attempts} · {time}\n🔥 {streak} {days} de racha, imparable.\n\n¿Cuánto aguantas tú? 🌍\n{url}',
-        '🔥 {streak} {days} seguidos adivinando en GeoChallenge.\n\nHoy: {attempts} intentos, {time}.\n\n¿Te animas con la de hoy? 🎯\n{url}',
+        '🌍 ¡Acerté el país de hoy en {game}! 🤔\n\nIntentos: {attempts}\nTiempo: {time}\n🔥 ¡{streak} {days} seguidos!\n\n¿Tú también lo adivinaste? 🎯\n{url}',
+        '🗺️ Resolví el país de hoy en {game}. ✅\n\n{attempts} intentos ({time}).\n🔥 Racha: {streak} {days} sin fallar.\n\nTe toca 👇\n{url}',
+        '🎯 Otro país que cae en {game}.\n\nIntentos: {attempts} · {time}\n🔥 {streak} {days} de racha, imparable.\n\n¿Cuánto aguantas tú? 🌍\n{url}',
+        '🔥 {streak} {days} seguidos adivinando en {game}.\n\nHoy: {attempts} intentos, {time}.\n\n¿Te animas con la de hoy? 🎯\n{url}',
       ],
       en: START ? [
-        "🌍 Nailed today's country on GeoChallenge! 🤔\n\nGuesses: {attempts}\nTime: {time}\n🌱 Just started my streak: {streak} {days}.\n\nThink you can get today's? 🎯\n{url}",
-        "🗺️ Today's country: solved! ✅\n\n{attempts} guesses, {time}.\n🌱 Streak: {streak} {days} — just getting going.\n\nHow many days can you last? 👇\n{url}",
-        "🎯 First country of the day on GeoChallenge, done.\n\nGuesses: {attempts} · {time}\n🌱 Streak: {streak} {days}.\n\nA new country every day. Play?\n{url}",
+        "🌍 Nailed today's country on {game}! 🤔\n\nGuesses: {attempts}\nTime: {time}\n🌱 Just started my streak: {streak} {days}.\n\nThink you can get today's? 🎯\n{url}",
+        "🗺️ Solved today's country on {game}. ✅\n\n{attempts} guesses, {time}.\n🌱 Streak: {streak} {days} — just getting going.\n\nHow many days can you last? 👇\n{url}",
+        "🎯 First country of the day on {game}, done.\n\nGuesses: {attempts} · {time}\n🌱 Streak: {streak} {days}.\n\nA new country every day. Play?\n{url}",
       ] : [
-        "🌍 Nailed today's country on GeoChallenge! 🤔\n\nGuesses: {attempts}\nTime: {time}\n🔥 {streak} {days} in a row!\n\nDid you get it too? 🎯\n{url}",
-        "🗺️ Today's country: solved! ✅\n\n{attempts} guesses ({time}).\n🔥 Streak: {streak} {days} without a miss.\n\nYour turn 👇\n{url}",
-        '🎯 Another country down on GeoChallenge.\n\nGuesses: {attempts} · {time}\n🔥 {streak} {days} streak, unstoppable.\n\nHow long can you last? 🌍\n{url}',
-        '🔥 {streak} {days} straight guessing on GeoChallenge.\n\nToday: {attempts} guesses, {time}.\n\nThink you can beat me? 🎯\n{url}',
+        "🌍 Nailed today's country on {game}! 🤔\n\nGuesses: {attempts}\nTime: {time}\n🔥 {streak} {days} in a row!\n\nDid you get it too? 🎯\n{url}",
+        "🗺️ Solved today's country on {game}. ✅\n\n{attempts} guesses ({time}).\n🔥 Streak: {streak} {days} without a miss.\n\nYour turn 👇\n{url}",
+        '🎯 Another country down on {game}.\n\nGuesses: {attempts} · {time}\n🔥 {streak} {days} streak, unstoppable.\n\nHow long can you last? 🌍\n{url}',
+        '🔥 {streak} {days} straight guessing on {game}.\n\nToday: {attempts} guesses, {time}.\n\nThink you can beat me? 🎯\n{url}',
       ],
     };
     const list = TPL[lang];
