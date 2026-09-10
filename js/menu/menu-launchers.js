@@ -228,6 +228,12 @@ document.getElementById('gq-quit-confirm')?.addEventListener('click', () => {
   if (popup) popup.style.display = 'none';
   const gqScreen = document.getElementById('globequiz-screen');
   if (gqScreen) gqScreen.style.display = 'none';
+  // Release the WebGL contexts (globe + starfield): GlobeQuiz keeps its scene
+  // alive across the session, but that permanent GPU allocation crashed iOS
+  // when a Gira Mundial followed. Rebuilds cleanly on next entry.
+  if (typeof window.globequizReleaseGL === 'function') {
+    try { window.globequizReleaseGL(); } catch (e) {}
+  }
   document.getElementById('loading-screen').style.display = '';
   document.getElementById('loading-screen')?.classList.remove('table-shown');
   // Hide the menu's GlobeQuiz panel (text/table/title/globe/desc/play) —

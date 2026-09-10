@@ -158,6 +158,13 @@ window._commitCampaignHighscores = function () {
 };
 
 window.startCampaign = function () {
+  // Free GlobeQuiz's WebGL contexts (globe + starfield) before the campaign
+  // begins — they stay alive after leaving GlobeQuiz and, stacked under the
+  // transformed #app-stage, pushed iOS over the edge on the shapes->cities hop
+  // (reported: GlobeQuiz then Gira Mundial crashes).
+  if (typeof window.globequizReleaseGL === 'function') {
+    try { window.globequizReleaseGL(); } catch (e) {}
+  }
   window.campaign.active = true;
   window.campaign.idx = 0;
   window.campaign.base = 0;

@@ -2715,6 +2715,11 @@ window.refreshVsSpectatorBadge = function (n) {
     if (screen) screen.style.display = 'none';
     const gqScreen = document.getElementById('gq-vs-result-screen');
     if (gqScreen) gqScreen.style.display = 'none';
+    // Leaving GlobeQuiz for good — free its WebGL contexts (globe + starfield)
+    // so the next Gira Mundial doesn't stack on top of them on iOS.
+    if (_vsCurrentMode === 'globequiz' && typeof window.globequizReleaseGL === 'function') {
+      try { window.globequizReleaseGL(); } catch (e) {}
+    }
     // Record the match as finished in the DB (normal matches only; an
     // abandonment was already marked by whoever left). Before cleanup (which
     // clears the matchId).

@@ -2428,6 +2428,46 @@
   window.gameStoppers = window.gameStoppers || [];
   window.gameStoppers.push(globequizHardReset);
 
+  // Fully release the two WebGL contexts (globe + starfield) and their GPU
+  // resources. GlobeQuiz keeps `initialized` true for the whole session so the
+  // scene is reused on re-entry / rematch / spectate — but that means the WebGL
+  // context stays alive after leaving to the menu. On iOS that permanent GPU
+  // allocation, stacked under the transformed #app-stage, pushed the following
+  // Gira Mundial over the edge (reported crash: GlobeQuiz -> campaign, shapes
+  // -> cities). Called on the real exit-to-menu and right before a campaign
+  // starts; the scene rebuilds cleanly on the next initGlobeQuiz() because we
+  // reset `initialized` and swap in fresh <canvas> nodes (a force-lost context
+  // can't be re-acquired on the same element).
+  function globequizReleaseGL() {
+    if (!initialized && !renderer && !starRenderer) return;
+    try { stopAutoRotate(); } catch (e) {}
+    try { stopInertia(); } catch (e) {}
+    try { if (focusAnimId) cancelAnimationFrame(focusAnimId); } catch (e) {}
+    try { clearOutlines(); } catch (e) {}
+    try { if (sphere) { sphere.geometry?.dispose(); sphere.material?.dispose(); } } catch (e) {}
+    try { canvasTex?.dispose(); } catch (e) {}
+    try { starMaterial?.dispose(); starPoints?.geometry?.dispose(); } catch (e) {}
+    try { starScene?.traverse(o => { o.geometry?.dispose?.(); if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { m.map?.dispose?.(); m.dispose?.(); }); } }); } catch (e) {}
+    [renderer, starRenderer].forEach(r => {
+      try { r?.dispose(); } catch (e) {}
+      try { r?.forceContextLoss(); } catch (e) {}
+    });
+    // Swap the canvas elements for fresh ones so a new WebGLRenderer can attach.
+    ['gq-canvas', 'gq-starfield-canvas'].forEach(id => {
+      const old = document.getElementById(id);
+      if (old && old.parentNode) {
+        const fresh = old.cloneNode(false);
+        old.parentNode.replaceChild(fresh, old);
+      }
+    });
+    scene = camera = renderer = sphere = null;
+    outlineGroup = null;
+    canvasTex = texCanvas = texCtx = null;
+    starScene = starCamera = starRenderer = starPoints = starGroup = starMaterial = null;
+    initialized = false;
+  }
+  window.globequizReleaseGL = globequizReleaseGL;
+
   window.initGlobeQuiz = function () {
     const wireOnce = !initialized;
     fillPlayerCard();
