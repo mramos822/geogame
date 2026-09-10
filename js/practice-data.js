@@ -100,6 +100,13 @@ const FLAG_COUNTRY_CONTINENT = {
   'Palestina':'asia','Bután':'asia','Brunéi':'asia','Timor Oriental':'asia',
   'Maldivas':'asia','Mongolia':'asia','Islandia':'europa',
   'Nueva Caledonia':'oceania','Bahamas':'america','Barbados':'america',
+  // Caribbean — all count as América for the practice continent filter
+  'Antigua y Barbuda':'america','Dominica':'america','Granada':'america',
+  'San Cristóbal y Nieves':'america','Santa Lucía':'america',
+  'San Vicente y las Granadinas':'america','Puerto Rico':'america',
+  'Aruba':'america','Curazao':'america','Bermudas':'america','Islas Caimán':'america',
+  'Islas Vírgenes Estadounidenses':'america','Islas Vírgenes Británicas':'america',
+  'Montserrat':'america','Anguila':'america','Islas Turcas y Caicos':'america',
 };
 
 // Internal shape name (`name` field in SHAPE_COUNTRIES) → continent
@@ -128,7 +135,7 @@ const SHAPE_COUNTRY_CONTINENT = {
   'ElSalvador':'america','Trinidad':'america','Surinam':'america',
   'Guyana':'america','Haiti':'america','Dominicana':'america',
   'PuertoRico':'america','Hawaii':'america','Groenlandia':'america',
-  'Bahamas':'america',
+  'Bahamas':'america','Jamaica':'america',
   'Mauritania':'africa','Marruecos':'africa','Nigeria':'africa',
   'Niger':'africa','Mali':'africa','Libia':'africa','Argelia':'africa',
   'Etiopia':'africa','Sudan':'africa','Angola':'africa','Tanzania':'africa',
