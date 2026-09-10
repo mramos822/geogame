@@ -263,3 +263,64 @@ if (IS_IOS) {
 document.getElementById('loading-play-btn').addEventListener('mouseenter', () => {
   sfxSelect.currentTime = 0; sfxPlay(sfxSelect);
 });
+
+// Fade a music loop out over `ms` (default 150) then stop it — so it doesn't
+// cut abruptly. Used by the GloboReto rematch transition (postgameloop.mp3
+// fades with the panel). Handles both the iOS (Web Audio gain) and the plain
+// <audio> paths, and restores the volume afterwards so the next play() isn't
+// silent.
+function fadeOutMusic(track, ms) {
+  ms = ms || 150;
+  if (IS_IOS && _iosGain && _iosNode) {
+    try {
+      const now = iosCtx().currentTime;
+      const g = _iosGain.gain;
+      g.cancelScheduledValues(now);
+      g.setValueAtTime(g.value, now);
+      g.linearRampToValueAtTime(0.0001, now + ms / 1000);
+      setTimeout(() => { iosStopMusic(); applyMusicMute(); }, ms + 40);
+    } catch (e) { iosStopMusic(); }
+    return;
+  }
+  if (!track || track.paused) return;
+  const startVol = isMuted ? 0 : (track.volume || 1);
+  const t0 = performance.now();
+  const step = () => {
+    const k = Math.min(1, (performance.now() - t0) / ms);
+    try { track.volume = startVol * (1 - k); } catch (e) {}
+    if (k < 1) { requestAnimationFrame(step); return; }
+    try { track.pause(); track.currentTime = 0; track.volume = startVol; } catch (e) {}
+  };
+  step();
+}
+window.fadeOutMusic = fadeOutMusic;
+
+// Play pin.mp3 as a ~1s clip with a tiny fade-out tail — used by the GloboReto
+// rematch +1 score bump. sfxPin is lazy (loadGameSFX); no-op if not loaded yet.
+function playPinClip() {
+  if (typeof sfxPin === 'undefined' || !sfxPin) return;
+  const vol = isMuted ? 0 : 1;
+  try {
+    sfxPin.pause();
+    sfxPin.currentTime = 0;
+    sfxPin.muted = isMuted;
+    sfxPin.volume = vol;
+    const p = sfxPin.play();
+    if (p) p.catch(() => {});
+  } catch (e) { return; }
+  const CLIP_MS = 500, FADE_MS = 120;
+  const t0 = performance.now();
+  const tick = () => {
+    const el = performance.now() - t0;
+    if (el >= CLIP_MS) {
+      try { sfxPin.pause(); sfxPin.currentTime = 0; sfxPin.volume = vol; } catch (e) {}
+      return;
+    }
+    if (el >= CLIP_MS - FADE_MS) {
+      try { sfxPin.volume = vol * (1 - (el - (CLIP_MS - FADE_MS)) / FADE_MS); } catch (e) {}
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+window.playPinClip = playPinClip;

@@ -10123,6 +10123,420 @@ body.is-mobile #splash-screen.mode-monuments .game-bg-city-monuments2 {
   opacity: 0.75;
 }
 
+/* ── Panel de fin de duelo — SOLO GloboReto 1v1 (GlobeQuiz) ──────────────
+   Ventana crema, mismo lenguaje que .account-modal-box (login/cuenta) y el
+   resto de los modales del juego. Ver #gq-vs-result-screen en el HTML y
+   _showGqVsResult en js/vs.js. */
+#gq-vs-result-screen { z-index: 400; }
+.gqvr-box {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2.6cqmin;
+  background: #fffbe6;
+  border: 0.6cqmin solid #8b6a00;
+  border-radius: 2.4cqmin;
+  padding: 4cqmin 7cqmin 4cqmin;
+  min-width: 78cqmin;
+  box-shadow: 0 1cqmin 3cqmin rgba(0,0,0,0.45);
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  animation: welcomePopIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+/* Al dar "jugar de nuevo": encogida rápida del panel (keyframe, para que gane
+   limpio sobre welcomePopIn), en simultáneo con las líneas del marcador
+   entrando y con el fondo oscuro haciendo fade (ver _gqvrRelaunch). */
+.gqvr-box.gqvr-box-out {
+  animation: gqvrBoxShrink 0.32s cubic-bezier(0.5, 0, 0.75, 0) forwards;
+}
+@keyframes gqvrBoxShrink {
+  0%   { transform: scale(1);   opacity: 1; }
+  100% { transform: scale(0.28); opacity: 0; }
+}
+#gq-vs-result-screen { transition: background-color 0.38s ease; }
+#gq-vs-result-screen.gqvr-vr-out { background-color: transparent; }
+.gqvr-title {
+  font-size: 5.6cqmin;
+  color: #5a4400;
+  text-align: center;
+}
+.gqvr-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8cqmin;
+  width: 100%;
+}
+.gqvr-country {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1cqmin;
+}
+.gqvr-country-label {
+  font-size: 2.3cqmin;
+  color: #7a6020;
+  letter-spacing: 0.05em;
+}
+.gqvr-flag-wrap {
+  width: 24cqmin;
+  height: 15cqmin;
+  border: 0.5cqmin solid #8b6a00;
+  border-radius: 1.2cqmin;
+  background: #fff;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.gqvr-flag { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gqvr-country-name {
+  font-size: 3cqmin;
+  color: #5a4400;
+  text-align: center;
+  max-width: 30cqmin;
+}
+.gqvr-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 1.8cqmin;
+}
+.gqvr-stat {
+  font-size: 3cqmin;
+  color: #7a6020;
+  white-space: nowrap;
+}
+.gqvr-stat b { color: #5a4400; }
+.gqvr-stat-who {
+  display: inline-block;
+  max-width: 22cqmin;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+.gqvr-scores {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 14cqmin;
+  width: 100%;
+  border-top: 0.3cqmin solid rgba(139,106,0,0.25);
+  padding-top: 5.5cqmin;
+}
+.gqvr-side {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9cqmin;
+  min-width: 18cqmin;
+}
+.gqvr-pic-wrap {
+  position: relative;
+  display: inline-block;
+  width: 13cqmin;
+  height: 13cqmin;
+}
+/* SIN border ni overflow:hidden — mismo criterio que .vs-result-pic-wrap: el
+   aro lo pone el marco de personalización (.cust-frame-wrap::after, aplicado
+   por applyFrame en _showGqVsResult; 0001.png es el default de quien no tiene
+   uno equipado). La foto se recorta sola con su border-radius:50%. */
+.gqvr-pic {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+/* Ganador: glow dorado alrededor del avatar (ver _showGqVsResult) — en
+   .gqvr-pic-wrap, así se ve por encima del marco de personalización. */
+.gqvr-side.gqvr-winner .gqvr-pic-wrap {
+  border-radius: 50%;
+  box-shadow: 0 0 0 0.5cqmin #f4a800, 0 0 2cqmin rgba(244,168,0,0.6);
+}
+.gqvr-name {
+  font-size: 2.4cqmin;
+  color: #5a4400;
+  margin-top: 1.2cqmin;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 18cqmin;
+}
+.gqvr-win {
+  font-size: 5cqmin;
+  color: #b89642;
+  line-height: 1;
+}
+.gqvr-side.gqvr-winner .gqvr-win { color: #f4a800; }
+
+/* Foto del rival cuando abandona la pantalla de resultado (ver
+   _gqvrOnOpponentLeft en vs.js) — gris + ícono de desconectado reutilizando
+   .lb-disconnected-icon (mismo que las partidas grupales). */
+/* grayscale sobre la foto Y el marco de personalización (.cust-frame-wrap::after,
+   su aro) — el ícono de desconectado (.lb-disconnected-icon) queda a full. */
+.gqvr-side.gqvr-dc .gqvr-pic { filter: grayscale(1); opacity: 0.55; }
+.gqvr-side.gqvr-dc .gqvr-pic-wrap { box-shadow: none; }
+.gqvr-side.gqvr-dc .gqvr-pic-wrap::after { filter: grayscale(1); opacity: 0.55; }
+.gqvr-side.gqvr-dc .gqvr-name,
+.gqvr-side.gqvr-dc .gqvr-win { opacity: 0.55; }
+
+/* Globo de texto "Rematch?" que rebota sobre el avatar de quien pidió
+   revancha (ver _gqvrOnAgainClick / _gqvrOnOpponentRematch). */
+.gqvr-bubble {
+  position: absolute;
+  bottom: calc(100% - 1cqmin);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  color: #5a4400;
+  border: 0.4cqmin solid #8b6a00;
+  border-radius: 1.4cqmin;
+  padding: 0.8cqmin 1.8cqmin;
+  font-size: 2.4cqmin;
+  white-space: nowrap;
+  z-index: 10;
+  transform-origin: 50% 100%;
+  animation: gqvrBubbleBounce 0.9s ease-in-out infinite;
+}
+.gqvr-bubble::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 1cqmin solid transparent;
+  border-top-color: #8b6a00;
+}
+@keyframes gqvrBubbleBounce {
+  0%, 100% { transform: translateX(-50%) translateY(0.4cqmin); }
+  50%      { transform: translateX(-50%) translateY(-0.4cqmin); }
+}
+
+/* Check de confirmación de revancha — sale del centro del avatar de quien
+   aceptó y crece (ver _gqvrConfirm en vs.js). */
+.gqvr-check {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 120%;
+  height: auto;
+  transform: translate(-50%, -50%) scale(0);
+  z-index: 12;
+  pointer-events: none;
+  filter: drop-shadow(0 0.4cqmin 0.6cqmin rgba(0,0,0,0.4));
+}
+.gqvr-check.gqvr-check-anim {
+  animation: gqvrCheckPop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes gqvrCheckPop {
+  0%   { transform: translate(-50%, -50%) scale(0);   opacity: 0; }
+  60%  { transform: translate(-50%, -50%) scale(1.35); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1.1);  opacity: 1; }
+}
+
+/* Estado "cargando nueva partida" (reemplaza los botones tras confirmar).
+   [hidden] necesita reforzarse: display:flex de acá abajo le gana al UA. */
+.gqvr-btns[hidden],
+.gqvr-loading[hidden] { display: none; }
+.gqvr-loading {
+  display: flex;
+  align-items: center;
+  gap: 1.6cqmin;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2.5cqmin;
+  color: #5a4400;
+  margin-top: 0.6cqmin;
+}
+.gqvr-spinner {
+  width: 3cqmin;
+  height: 3cqmin;
+  border: 0.5cqmin solid rgba(139,106,0,0.3);
+  border-top-color: #8b6a00;
+  border-radius: 50%;
+  animation: gqvrSpin 0.8s linear infinite;
+}
+@keyframes gqvrSpin { to { transform: rotate(360deg); } }
+
+/* Aviso "X abandonó la partida" — notificación estilo toast del menú versus
+   (.versus-toast-item): píldora azul oscuro flotante que se desvanece sola.
+   NO forma parte del panel (va absoluto sobre el overlay). */
+.gqvr-toast {
+  position: absolute;
+  bottom: 5cqmin;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(8,30,55,0.92);
+  color: #fffbe6;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2.4cqmin;
+  padding: 1.2cqmin 3cqmin;
+  border-radius: 1.4cqmin;
+  white-space: nowrap;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+.gqvr-toast.gqvr-toast-show { opacity: 1; }
+
+/* ── Transición de revancha estilo tetr.io (ver _gqvrPlayTransition) ────────
+   Dos mitades a pantalla completa: celeste desde la izquierda, roja desde la
+   derecha, cierran al medio con glow en el borde de ataque, muestran el
+   marcador con +1 al ganador de la ronda anterior, y luego se abren. */
+#gqvr-transition {
+  position: absolute;
+  inset: 0;
+  z-index: 500;
+  overflow: hidden;
+  pointer-events: none;
+}
+#gqvr-transition[hidden] { display: none; }
+.gqvr-tr-half {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  /* Entrada: ease-OUT (llega frenando al centro), más lenta. */
+  transition: transform 0.72s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+/* Relleno translúcido para ver el juego detrás, PERO más saturado cerca del
+   centro: tú = azul (izquierda), rival = rojo (derecha). Las dos "líneas" se
+   juntan justo en el medio (50/50) con glow fuerte pegado a la línea. */
+.gqvr-tr-left {
+  left: 0;
+  background: linear-gradient(90deg, rgba(18,70,190,0.06) 0%, rgba(28,96,235,0.20) 55%, rgba(46,128,255,0.42) 100%);
+  border-right: 0.55cqmin solid rgba(150, 205, 255, 1);
+  transform: translateX(-101%);
+  box-shadow: 1.6cqmin 0 3cqmin 0.4cqmin rgba(60, 150, 255, 1),
+              3cqmin 0 9cqmin 2.5cqmin rgba(60, 150, 255, 0.75);
+}
+.gqvr-tr-right {
+  right: 0;
+  background: linear-gradient(270deg, rgba(180,20,20,0.06) 0%, rgba(220,35,35,0.20) 55%, rgba(240,55,55,0.42) 100%);
+  border-left: 0.55cqmin solid rgba(255, 165, 165, 1);
+  transform: translateX(101%);
+  box-shadow: -1.6cqmin 0 3cqmin 0.4cqmin rgba(240, 60, 60, 1),
+              -3cqmin 0 9cqmin 2.5cqmin rgba(240, 60, 60, 0.75);
+}
+#gqvr-transition.gqvr-tr-closed .gqvr-tr-left,
+#gqvr-transition.gqvr-tr-closed .gqvr-tr-right { transform: translateX(0); }
+/* Salida: ease-IN (arranca lento, sale acelerando), más lenta. */
+#gqvr-transition.gqvr-tr-opening .gqvr-tr-half {
+  transition: transform 0.62s cubic-bezier(0.7, 0, 0.84, 0);
+}
+#gqvr-transition.gqvr-tr-opening .gqvr-tr-left  { transform: translateX(-102%); }
+#gqvr-transition.gqvr-tr-opening .gqvr-tr-right { transform: translateX(102%); }
+
+.gqvr-tr-board {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 7cqmin;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+}
+/* Marcador + nombre entran/salen JUNTO con su mitad (cada lado con su lado):
+   ease-in al cerrar (aceleran hacia el centro), ease-out al abrir. */
+.gqvr-tr-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6cqmin;
+  transition: transform 0.72s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.gqvr-tr-side-me  { transform: translateX(-120cqmin); }
+.gqvr-tr-side-opp { transform: translateX(120cqmin); }
+#gqvr-transition.gqvr-tr-closed .gqvr-tr-side-me,
+#gqvr-transition.gqvr-tr-closed .gqvr-tr-side-opp { transform: translateX(0); }
+#gqvr-transition.gqvr-tr-opening .gqvr-tr-side {
+  transition: transform 0.62s cubic-bezier(0.7, 0, 0.84, 0);
+}
+#gqvr-transition.gqvr-tr-opening .gqvr-tr-side-me  { transform: translateX(-120cqmin); }
+#gqvr-transition.gqvr-tr-opening .gqvr-tr-side-opp { transform: translateX(120cqmin); }
+.gqvr-tr-vs {
+  font-size: 5cqmin;
+  color: rgba(255, 255, 255, 0.85);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+#gqvr-transition.gqvr-tr-closed .gqvr-tr-vs { opacity: 1; transition-delay: 0.18s; }
+.gqvr-tr-name {
+  font-size: 3.6cqmin;
+  color: #fff;
+  text-shadow: 0 0.3cqmin 0.7cqmin rgba(0, 0, 0, 0.55);
+  max-width: 30cqmin;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gqvr-tr-numwrap { position: relative; display: inline-block; }
+.gqvr-tr-num {
+  display: inline-block;
+  font-size: 24cqmin;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 0.6cqmin 2cqmin rgba(0, 0, 0, 0.7);
+  min-width: 15cqmin;
+  text-align: center;
+}
+/* Al aumentar (ej. 1→2): el dígito nuevo "crece" desde chico con overshoot. */
+.gqvr-tr-num.gqvr-tr-bump { animation: gqvrTrGrow 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes gqvrTrGrow {
+  0%   { transform: scale(0.15); opacity: 0.25; }
+  50%  { transform: scale(1.6);  opacity: 1; color: #fff700; }
+  75%  { transform: scale(0.9); }
+  100% { transform: scale(1); color: #fff; }
+}
+.gqvr-tr-plus {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translate(-50%, 1cqmin);
+  font-size: 6cqmin;
+  color: #fff700;
+  text-shadow: 0 0.3cqmin 0.8cqmin rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  pointer-events: none;
+}
+.gqvr-tr-plus.gqvr-tr-plus-anim { animation: gqvrTrPlus 0.75s ease-out; }
+@keyframes gqvrTrPlus {
+  0%   { opacity: 0; transform: translate(-50%, 3cqmin); }
+  25%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -16cqmin); }
+}
+
+.gqvr-btns {
+  display: flex;
+  gap: 3cqmin;
+  margin-top: 0.6cqmin;
+}
+.gqvr-btn {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2.5cqmin;
+  color: #fff;
+  border: 0.5cqmin solid;
+  border-radius: 1.4cqmin;
+  padding: 1.4cqmin 2cqmin;
+  min-width: 26cqmin;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+.gqvr-btn:hover  { transform: scale(1.04); }
+.gqvr-btn:active { transform: scale(0.96); }
+.gqvr-btn-again { background: #2bd14b; border-color: #1c8a32; }
+.gqvr-btn-exit  { background: #e8462e; border-color: #a5301d; }
+.gqvr-btn:disabled {
+  opacity: 0.5;
+  filter: grayscale(0.4);
+  cursor: default;
+  transform: none;
+}
+
 /* ═══════════════════════════════════════════════════════════════
    MODO ESPECTADOR
    ═══════════════════════════════════════════════════════════════ */

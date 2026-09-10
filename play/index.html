@@ -21,7 +21,7 @@
   <link rel="icon" type="image/png" href="images/planet3.png">
   <title>myGeoChallenge</title>
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6238929099865050" crossorigin="anonymous"></script>
-  <link rel="stylesheet" href="css/style.css?v=3.5.70">
+  <link rel="stylesheet" href="css/style.css?v=3.6.0">
   <link rel="preload" href="images/characters/men3.png" as="image">
   <link rel="preload" href="images/characters/men4.png" as="image">
   <link rel="preload" href="images/characters/girl3.png" as="image">
@@ -435,7 +435,7 @@
           </button>
           <button class="vs-mode-btn" id="vs-mode-btn-globequiz">
             <img class="vs-mode-icon" src="images/globe.png" alt="" draggable="false" oncontextmenu="return false">
-            <span class="vs-mode-label">GloboReto</span>
+            <span class="vs-mode-label" data-i18n="panel2.globequizTitle">GloboReto</span>
           </button>
         </div>
         <div class="vs-popup-confirm" id="vs-mode-cancel">
@@ -482,7 +482,7 @@
       <div class="vs-popup-box">
         <div class="vs-popup-pic-wrap" id="vs-out-pic-wrap"><img class="vs-popup-pic" id="vs-out-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false"></div>
         <span class="vs-popup-name" id="vs-out-name"></span>
-        <span class="vs-popup-sub">Esperando respuesta…</span>
+        <span class="vs-popup-sub" data-i18n="vs.waitingResponse">Esperando respuesta…</span>
         <div class="vs-popup-timer-wrap"><div class="vs-popup-timer-bar" id="vs-out-bar"></div></div>
         <div class="vs-popup-confirm" id="vs-out-cancel">
           <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
@@ -1340,7 +1340,7 @@
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
     </div>
-    <div id="loading-version">Ver. 3.5.71</div>
+    <div id="loading-version">Ver. 3.6.0</div>
   </div>
 
   <!-- Pantalla de resultado versus (W/L) — fuera del loading-screen para verse tras la partida -->
@@ -1368,6 +1368,76 @@
       <div class="vs-popup-confirm" id="vs-result-back">
         <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel de fin de duelo — SOLO GloboReto 1v1 (GlobeQuiz). Reemplaza a
+       #vs-result-screen cuando el modo es globequiz (ver _showGqVsResult en
+       js/vs.js). El botón "Jugar de nuevo" está deshabilitado a propósito por
+       ahora. -->
+  <div id="gq-vs-result-screen" class="vs-popup-overlay" style="display:none">
+    <div class="gqvr-box">
+      <span class="gqvr-title" id="gqvr-title" data-i18n="gqvr.title">Ronda terminada</span>
+      <div class="gqvr-main">
+        <div class="gqvr-country">
+          <span class="gqvr-country-label" data-i18n="gqvr.countryWas">El país era</span>
+          <div class="gqvr-flag-wrap"><img class="gqvr-flag" id="gqvr-flag" src="" alt="" draggable="false" oncontextmenu="return false"></div>
+          <span class="gqvr-country-name" id="gqvr-country-name"></span>
+        </div>
+        <div class="gqvr-stats">
+          <span class="gqvr-stat"><span data-i18n="gqvr.time">Tiempo</span>:&nbsp;<b id="gqvr-time">0:00</b></span>
+          <span class="gqvr-stat"><span data-i18n="gqvr.attempts">Intentos</span>&nbsp;<span class="gqvr-stat-who" id="gqvr-me-lbl"></span>:&nbsp;<b id="gqvr-me-att">0</b></span>
+          <span class="gqvr-stat"><span data-i18n="gqvr.attempts">Intentos</span>&nbsp;<span class="gqvr-stat-who" id="gqvr-opp-lbl"></span>:&nbsp;<b id="gqvr-opp-att">0</b></span>
+        </div>
+      </div>
+      <div class="gqvr-scores">
+        <div class="gqvr-side" id="gqvr-me-side">
+          <span class="gqvr-bubble" id="gqvr-me-bubble" data-i18n="gqvr.rematch" hidden>Rematch?</span>
+          <div class="gqvr-pic-wrap" id="gqvr-me-pic-wrap">
+            <img class="gqvr-pic" id="gqvr-me-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
+            <img class="gqvr-check" id="gqvr-me-check" src="images/check.png" alt="" draggable="false" oncontextmenu="return false" hidden>
+          </div>
+          <span class="gqvr-name" id="gqvr-me-name">Tú</span>
+          <span class="gqvr-win" id="gqvr-me-win">0</span>
+        </div>
+        <div class="gqvr-side" id="gqvr-opp-side">
+          <span class="gqvr-bubble" id="gqvr-opp-bubble" data-i18n="gqvr.rematch" hidden>Rematch?</span>
+          <div class="gqvr-pic-wrap" id="gqvr-opp-pic-wrap">
+            <img class="gqvr-pic" id="gqvr-opp-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
+            <img class="gqvr-check" id="gqvr-opp-check" src="images/check.png" alt="" draggable="false" oncontextmenu="return false" hidden>
+          </div>
+          <span class="gqvr-name" id="gqvr-opp-name">Rival</span>
+          <span class="gqvr-win" id="gqvr-opp-win">0</span>
+        </div>
+      </div>
+      <div class="gqvr-btns" id="gqvr-btns">
+        <button class="gqvr-btn gqvr-btn-again" id="gqvr-again" type="button" disabled data-i18n="gqvr.playAgain">Jugar de nuevo</button>
+        <button class="gqvr-btn gqvr-btn-exit" id="gqvr-exit" type="button" data-i18n="gqvr.exit">Salir</button>
+      </div>
+      <div class="gqvr-loading" id="gqvr-loading" hidden>
+        <span class="gqvr-spinner"></span>
+        <span data-i18n="gqvr.loadingNew">Cargando nueva partida...</span>
+      </div>
+    </div>
+    <div class="gqvr-toast" id="gqvr-msg" hidden></div>
+  </div>
+
+  <!-- Transición de revancha estilo tetr.io: dos mitades (celeste izq / roja der)
+       se cierran al medio mostrando el marcador con un +1 al ganador de la ronda,
+       y luego se abren revelando la nueva partida. Ver _gqvrPlayTransition en vs.js. -->
+  <div id="gqvr-transition" hidden>
+    <div class="gqvr-tr-half gqvr-tr-left"></div>
+    <div class="gqvr-tr-half gqvr-tr-right"></div>
+    <div class="gqvr-tr-board">
+      <div class="gqvr-tr-side gqvr-tr-side-me">
+        <span class="gqvr-tr-numwrap"><span class="gqvr-tr-num" id="gqvr-tr-me-num">0</span><span class="gqvr-tr-plus" id="gqvr-tr-me-plus">+1</span></span>
+        <span class="gqvr-tr-name" id="gqvr-tr-me-name">Tú</span>
+      </div>
+      <span class="gqvr-tr-vs">VS</span>
+      <div class="gqvr-tr-side gqvr-tr-side-opp">
+        <span class="gqvr-tr-numwrap"><span class="gqvr-tr-num" id="gqvr-tr-opp-num">0</span><span class="gqvr-tr-plus" id="gqvr-tr-opp-plus">+1</span></span>
+        <span class="gqvr-tr-name" id="gqvr-tr-opp-name">Rival</span>
       </div>
     </div>
   </div>
@@ -2107,18 +2177,18 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 
   <!-- ── Backend client + plataforma ─────────────────────────────────────── -->
-  <script src="js/sb.js?v=3.5.65"></script>
+  <script src="js/sb.js?v=3.6.0"></script>
   <script src="js/analytics.js?v=3.5.65"></script>
   <script src="js/guestmsg.js?v=3.5.65"></script>
   <script src="js/profanity-filter.js?v=3.5.65"></script>
 
   <!-- ── Layout / entorno / i18n ─────────────────────────────────────────── -->
   <script src="js/letterbox.js?v=3.5.65"></script>
-  <script src="js/i18n.js?v=3.5.65"></script>
+  <script src="js/i18n.js?v=3.6.0"></script>
   <script src="js/i18n-data.js?v=3.5.65"></script>
 
   <!-- ── Core (audio, helpers UI, campaña) ───────────────────────────────── -->
-  <script src="js/core/audio.js?v=3.5.65"></script>
+  <script src="js/core/audio.js?v=3.6.0"></script>
   <script src="js/core/ui-helpers.js?v=3.5.65"></script>
   <script src="js/core/campaign.js?v=3.5.65"></script>
 
@@ -2158,7 +2228,7 @@
   <script src="js/modes/practice-panel.js?v=3.5.65"></script>
 
   <!-- ── Multijugador (versus / espectador / lobby / chat) ───────────────── -->
-  <script src="js/vs.js?v=3.5.71"></script>
+  <script src="js/vs.js?v=3.6.0"></script>
   <script src="js/spectate.js?v=3.5.66"></script>
   <script src="js/lobby.js?v=3.5.65"></script>
   <script src="js/chat.js?v=3.5.65"></script>
@@ -2166,7 +2236,7 @@
   <!-- ── Otros modos ─────────────────────────────────────────────────────── -->
   <script src="js/flags.js?v=3.5.65"></script>
   <script src="js/shapes.js?v=3.5.65"></script>
-  <script src="js/globequiz.js?v=3.5.71"></script>
+  <script src="js/globequiz.js?v=3.6.0"></script>
 
   <!-- ── Launchers del menú + IIFEs de UI global ─────────────────────────── -->
   <script src="js/menu/menu-launchers.js?v=3.5.65"></script>

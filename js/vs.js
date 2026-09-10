@@ -46,6 +46,9 @@ window.VS = (() => {
   let _onReady   = null; // cb({role}) — opponent finished loading their heavy assets (see reportReady). Only used by GlobeQuiz today.
   let _onGqAbort = null; // cb() — GlobeQuiz: one side couldn't finish loading the 3D globe in time; both return to menu with NO winner or loss recorded (see _handleGqSyncFailed).
   let _onGqPhase = null; // cb({role, phase}) — GlobeQuiz: opponent load milestone ('start'|'assets'|'scene'), for the sync bar.
+  let _onRematch = null; // cb() — GloboReto result screen: opponent clicked "Jugar de nuevo".
+  let _onResultLeave = null; // cb() — GloboReto result screen: opponent left it (Exit / tab close).
+  let _onRematchGo = null; // cb({seed}) — GloboReto rematch: host published the new round's seed.
   // cb(status) — the Realtime channel NEVER got authorized (typically a
   // broken RLS policy on the server, see the sep-2026 one: an invalid cast
   // made ANY attempt to join 'match-{id}'/'solo-{id}' throw CHANNEL_ERROR).
@@ -180,6 +183,20 @@ window.VS = (() => {
       .on('broadcast', { event: 'gqabort' }, () => { if (_onGqAbort) _onGqAbort(); })
       // GlobeQuiz: opponent load milestone — feeds the sync bar.
       .on('broadcast', { event: 'gqphase' }, ({ payload }) => { if (_onGqPhase && payload) _onGqPhase(payload); })
+      // GloboReto result screen: opponent asked for a rematch / left the screen.
+      // (Both echo back to the sender — filter own role out.)
+      .on('broadcast', { event: 'rematch' }, ({ payload }) => {
+        if (payload && payload.role === _role) return;
+        if (_onRematch) _onRematch();
+      })
+      .on('broadcast', { event: 'resultleave' }, ({ payload }) => {
+        if (payload && payload.role === _role) return;
+        if (_onResultLeave) _onResultLeave();
+      })
+      .on('broadcast', { event: 'rematchgo' }, ({ payload }) => {
+        if (payload && payload.role === _role) return;
+        if (_onRematchGo && payload) _onRematchGo(payload);
+      })
       // Presence: detects tab close / connection loss of the opponent.
       .on('presence', { event: 'leave' }, ({ key }) => {
         // A spectator disconnecting (key 'spectator-{uid}', see
@@ -406,6 +423,21 @@ window.VS = (() => {
     if (_channel) { try { _channel.send({ type: 'broadcast', event: 'gqphase', payload: { role: _role, phase } }); } catch (e) {} }
   }
 
+  // GloboReto result screen: this client clicked "Jugar de nuevo" (rematch
+  // request) / left the screen. Broadcast only — the channel is still alive
+  // between the two players until one returns to the menu (see cleanup()).
+  function reportRematch() {
+    if (_channel && _role) { try { _channel.send({ type: 'broadcast', event: 'rematch', payload: { role: _role } }); } catch (e) {} }
+  }
+  function reportResultLeave() {
+    if (_channel && _role) { try { _channel.send({ type: 'broadcast', event: 'resultleave', payload: { role: _role } }); } catch (e) {} }
+  }
+  // GloboReto rematch: the host picks the new round's seed and publishes it so
+  // both clients relaunch the duel with the same country.
+  function reportRematchGo(seed) {
+    if (_channel && _role) { try { _channel.send({ type: 'broadcast', event: 'rematchgo', payload: { role: _role, seed } }); } catch (e) {} }
+  }
+
   // Closes the match row with no winner or loss (unlike abandon()/finish()):
   // the match never actually started because one side couldn't load.
   // Best-effort, only if still 'active'.
@@ -616,6 +648,7 @@ window.VS = (() => {
     _oppFinishedGameEnd = false;
     _matchId = _role = _match = null;
     _onStart = _onScore = _onEnd = _onOppLeft = _onWrong = _onGameEnd = _onAnswer = _onReady = _onGqAbort = _onGqPhase = null;
+    _onRematch = _onResultLeave = _onRematchGo = null;
     _started = false;
     _lastPhase = null;
     _lastRoundPayload = null;
@@ -639,6 +672,9 @@ window.VS = (() => {
     reportReady,
     reportGqAbort,
     reportGqPhase,
+    reportRematch,
+    reportResultLeave,
+    reportRematchGo,
     cancelMatchNoResult,
     reportGameEnd,
     releaseChannel,
@@ -673,6 +709,9 @@ window.VS = (() => {
     onReady:   cb => { _onReady = cb; },
     onGqAbort: cb => { _onGqAbort = cb; },
     onGqPhase: cb => { _onGqPhase = cb; },
+    onRematch: cb => { _onRematch = cb; },
+    onResultLeave: cb => { _onResultLeave = cb; },
+    onRematchGo: cb => { _onRematchGo = cb; },
     onSubscribeError: cb => { _onSubscribeError = cb; },
     getMatch: () => _match,
     getRole:  () => _role,
@@ -1410,6 +1449,11 @@ window.refreshVsSpectatorBadge = function (n) {
     window._vsOpponent = null;
     window._vsOppScore = 0;
     _vsLaunching = false;
+    // The rematch-chain tally only lives while the two stay in the match.
+    _gqvrMyWins = 0; _gqvrOppWins = 0;
+    _gqvrPendingGoSeed = null; _gqvrRelaunching = false; _gqvrLastOutcome = null;
+    const _trEl = document.getElementById('gqvr-transition');
+    if (_trEl) { _trEl.hidden = true; _trEl.classList.remove('gqvr-tr-closed', 'gqvr-tr-opening'); }
     window._vsSpectatorCount = 0;
     if (typeof window.refreshVsSpectatorBadge === 'function') window.refreshVsSpectatorBadge(0);
     _clearGqLoseAnim();
@@ -1642,7 +1686,13 @@ window.refreshVsSpectatorBadge = function (n) {
 
   // The opponent disconnected or abandoned → I win by abandonment.
   function _onOpponentAbandoned() {
-    if (_resultShown) return;
+    if (_resultShown) {
+      // The duel already ended and we're sitting on the GloboReto result
+      // screen — the opponent left THAT screen (tab close, in case the
+      // 'resultleave' broadcast was lost). Reflect it there instead.
+      if (_vsCurrentMode === 'globequiz') _gqvrOnOpponentLeft();
+      return;
+    }
     window._hideVsWaitSpinner();
     // If they were watching the opponent on loan (see _enterWaitAsSpectator)
     // they must be taken out of there BEFORE touching the real mode's hard
@@ -1650,6 +1700,11 @@ window.refreshVsSpectatorBadge = function (n) {
     // game, so doing both at once would clobber the DOM.
     _exitWaitAsSpectator();
     _endedByAbandon = true;
+    // GlobeQuiz: snapshot the duel summary BEFORE globequizHardReset() below
+    // wipes dailyCountry/guesses — the cream end panel needs the country and
+    // both attempt counts.
+    const _gqAbandonSummary = _vsCurrentMode === 'globequiz'
+      ? (window.globequizGetVsSummary?.() || {}) : null;
     // Mark the VS result as visible so the hardResets don't clean assets
     window._vsShowingResult = true;
     // Stop the current mode's timers/RAF without wiping assets or hiding game
@@ -1676,49 +1731,379 @@ window.refreshVsSpectatorBadge = function (n) {
     const myScoreFromMatch = isHost ? (m.host_score || 0) : (m.guest_score || 0);
     const myScore  = Math.max(liveScore, myScoreFromMatch);
     const oppScore = isHost ? (m.guest_score || 0) : (m.host_score || 0);
-    _showVsResult('win', myScore, oppScore, 'abandon');
-    // GlobeQuiz has no comparable numeric score — overwrite the spans with my
-    // best km achieved (or "—" if I didn't guess any) and "—" for the
-    // opponent, who abandoned.
+    // GlobeQuiz uses its own cream end-of-duel panel (opponent abandoned →
+    // count it as a win); every other mode keeps the shared W/L screen.
     if (_vsCurrentMode === 'globequiz') {
-      const summary = window.globequizGetVsSummary?.() || {};
-      _patchGqResultScores(
-        summary.bestKm != null ? Math.round(summary.bestKm) + ' km' : '—',
-        '—'
-      );
+      const summary = _gqAbandonSummary || {};
+      _showGqVsResult('win', {
+        myTime: summary.elapsedMs || 0,
+        myAtt: summary.guessCount,
+        oppAtt: summary.oppGuessCount,
+        countryName: summary.countryName,
+        iso2: summary.iso2,
+      }, 'abandon');
+      // No rematch possible — mark the opponent as gone on the panel.
+      _gqvrOnOpponentLeft();
+      return;
+    }
+    _showVsResult('win', myScore, oppScore, 'abandon');
+  }
+
+  // GloboReto 1v1 end-of-duel panel (#gq-vs-result-screen) — replaces the
+  // shared #vs-result-screen ONLY for globequiz. Runs _showVsResult() first
+  // for the tested bookkeeping (is_playing off, reportPostgame, record W/L,
+  // hide HUD, sfx — NOT finish(), so the channel survives for a rematch),
+  // then swaps the shared W/L panel for GlobeQuiz's own cream one in the same
+  // frame (no flash). Keeps a running rounds-won tally across rematches.
+  //   outcome: 'win' | 'lose'
+  //   d: { myTime (ms), myAtt, oppAtt, countryName, iso2 }
+  //   reason: 'abandon' when the win is only because the opponent left mid-game
+  //     — the rounds-won tally does NOT advance and the rematch is closed off.
+  let _gqvrWired = false;
+  function _showGqVsResult(outcome, d, reason) {
+    if (_resultShown) return;
+    _showVsResult(outcome, 0, 0);
+    const shared = document.getElementById('vs-result-screen');
+    if (shared) shared.style.display = 'none';
+    const screen = document.getElementById('gq-vs-result-screen');
+    if (!screen) return;
+    screen.querySelector('.gqvr-box')?.classList.remove('gqvr-box-out');
+    screen.classList.remove('gqvr-vr-out');
+    const T = (k, def) => (typeof t === 'function' ? t(k) : def);
+    const setTxt = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+
+    const myName  = localStorage.getItem('playerName') || T('vs.result.you', 'Tú');
+    const opp     = window._vsOpponent || {};
+    const oppName = opp.name || 'Rival';
+
+    // Title stays "Ronda terminada" (data-i18n on the span) — the win/lose
+    // read comes from the gold ring + 1/0 under the avatars.
+    const flag = document.getElementById('gqvr-flag');
+    const flagUrl = (d.iso2 && window.flagUrlForCountryCode) ? window.flagUrlForCountryCode(d.iso2) : '';
+    if (flag) { flag.style.display = flagUrl ? 'block' : 'none'; flag.src = flagUrl || ''; }
+    setTxt('gqvr-country-name', d.countryName || '');
+
+    setTxt('gqvr-time', window.formatGqCardTime ? window.formatGqCardTime(d.myTime || 0) : String(d.myTime || 0));
+    setTxt('gqvr-me-lbl', myName);
+    setTxt('gqvr-opp-lbl', oppName);
+    setTxt('gqvr-me-att', d.myAtt != null ? d.myAtt : '—');
+    setTxt('gqvr-opp-att', d.oppAtt != null ? d.oppAtt : '—');
+
+    setTxt('gqvr-me-name', myName);
+    setTxt('gqvr-opp-name', oppName);
+    // Running tally of rounds won across the rematch chain — resets only when
+    // a player leaves the match (see _teardownVsOpponent). A win by
+    // mid-game abandonment does NOT count as a round.
+    _gqvrLastOutcome = outcome;
+    const abandonWin = reason === 'abandon';
+    if (!abandonWin) {
+      if (outcome === 'win') _gqvrMyWins++; else _gqvrOppWins++;
+    }
+    setTxt('gqvr-me-win', String(_gqvrMyWins));
+    setTxt('gqvr-opp-win', String(_gqvrOppWins));
+    // Persist this round's result: head-to-head vs this opponent in this mode
+    // (both need an account). Kept for an abandonment win too — same as every
+    // other mode's vs_wins.
+    if (window._sbUserId && opp.id) {
+      try { window.sbRecordVersusH2H?.(opp.id, 'globequiz', outcome === 'win'); } catch (e) {}
+    }
+    const mePic  = document.getElementById('gqvr-me-pic');
+    const oppPic = document.getElementById('gqvr-opp-pic');
+    if (mePic)  mePic.src  = localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png';
+    if (oppPic) oppPic.src = opp.avatar || 'images/profilepic/ppdefault.png';
+    // Own frame: profile first, then the Customize cache (guests keep theirs
+    // in localStorage) — same source the loading profile photo uses (see
+    // customize-panel.js). The shared #vs-result-screen only reads _sbProfile,
+    // which misses the guest case.
+    let myFrame = '0001';
+    try { myFrame = window._sbProfile?.frame_code || localStorage.getItem('cust_frame_code') || '0001'; } catch (e) {}
+    window.CustomizeAssets?.applyFrame(document.getElementById('gqvr-me-pic-wrap'), myFrame);
+    window.CustomizeAssets?.applyFrame(document.getElementById('gqvr-opp-pic-wrap'), opp.frameCode || '0001');
+    document.getElementById('gqvr-me-side')?.classList.toggle('gqvr-winner', outcome === 'win');
+    document.getElementById('gqvr-opp-side')?.classList.toggle('gqvr-winner', outcome !== 'win');
+
+    // Fresh panel state (a previous duel could have left the rematch / left-
+    // match visuals stuck on).
+    _gqvrRematchSent = false;
+    _gqvrOppRematch = false;
+    _gqvrConfirmed = false;
+    _gqvrOppLeftHandled = false;
+    _gqvrPendingGoSeed = null;
+    _gqvrRelaunching = false;
+    const tr = document.getElementById('gqvr-transition');
+    if (tr) { tr.hidden = true; tr.classList.remove('gqvr-tr-closed', 'gqvr-tr-opening'); }
+    clearTimeout(_gqvrToastFadeT); clearTimeout(_gqvrToastHideT);
+    const _hide = id => { const el = document.getElementById(id); if (el) el.hidden = true; };
+    _hide('gqvr-me-bubble'); _hide('gqvr-opp-bubble'); _hide('gqvr-loading');
+    _hide('gqvr-me-check'); _hide('gqvr-opp-check');
+    document.getElementById('gqvr-me-check')?.classList.remove('gqvr-check-anim');
+    document.getElementById('gqvr-opp-check')?.classList.remove('gqvr-check-anim');
+    const toast = document.getElementById('gqvr-msg');
+    if (toast) { toast.hidden = true; toast.classList.remove('gqvr-toast-show'); }
+    document.getElementById('gqvr-btns')?.removeAttribute('hidden');
+    document.getElementById('gqvr-opp-side')?.classList.remove('gqvr-dc');
+    document.getElementById('gqvr-opp-pic-wrap')?.querySelector('.lb-disconnected-icon')?.remove();
+    const again = document.getElementById('gqvr-again');
+    if (again) {
+      again.disabled = false;
+      again.textContent = T('gqvr.playAgain', 'Jugar de nuevo');
+    }
+
+    if (!_gqvrWired) {
+      _gqvrWired = true;
+      document.getElementById('gqvr-exit')?.addEventListener('click', () => {
+        if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+        if (window._isSpectating) { window.closeSpectator?.(); return; }
+        try { window.VS?.reportResultLeave?.(); } catch (e) {}
+        _vsReturnToMenu();
+      });
+      document.getElementById('gqvr-again')?.addEventListener('click', _gqvrOnAgainClick);
+    }
+    screen.style.display = 'flex';
+  }
+
+  // ── GloboReto result screen: rematch handshake + opponent-left ────────────
+  // Two clicks, one per player. The FIRST to click shows a bouncing "Rematch?"
+  // bubble over their avatar (and "Esperando respuesta" on their button); when
+  // the SECOND clicks, a check.png pops out of that second player's avatar and
+  // BOTH screens swap the buttons for "Cargando nueva partida…" + a spinner.
+  // (The actual re-launch of the duel is still pending.)
+  let _gqvrRematchSent = false;   // I clicked "Jugar de nuevo"
+  let _gqvrOppRematch = false;    // opponent clicked theirs
+  let _gqvrConfirmed = false;     // both in → loading a new match
+  let _gqvrOppLeftHandled = false;
+  let _gqvrToastFadeT = null, _gqvrToastHideT = null;
+  let _gqvrPendingGoSeed = null;  // guest got the seed before its own confirm resolved
+  let _gqvrRelaunching = false;
+  let _gqvrLastOutcome = null;    // 'win'|'lose' of the round just shown (for the transition's +1)
+  // Rounds won across the current rematch chain (reset in _teardownVsOpponent).
+  let _gqvrMyWins = 0, _gqvrOppWins = 0;
+
+  function _gqvrOnAgainClick() {
+    if (_gqvrConfirmed || _gqvrOppLeftHandled || _gqvrRematchSent) return;
+    _gqvrRematchSent = true;
+    if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+    try { window.VS?.reportRematch?.(); } catch (e) {}
+    if (_gqvrOppRematch) {
+      // Opponent already asked → this click is the acceptance (I'm 2nd).
+      _gqvrConfirm('me');
+    } else {
+      // I'm 1st → wait for the opponent.
+      const T = (k, def) => (typeof t === 'function' ? t(k) : def);
+      const again = document.getElementById('gqvr-again');
+      if (again) { again.disabled = true; again.textContent = T('gqvr.waitingRematch', 'Esperando respuesta'); }
+      const b = document.getElementById('gqvr-me-bubble');
+      if (b) b.hidden = false;
     }
   }
 
-  // Overwrites the two numeric spans of #vs-result-screen with GlobeQuiz's
-  // own text (time/km instead of a score with toLocaleString()) — always
-  // called AFTER _showVsResult(), which already did everything else (hide
-  // HUD, record win/lose, reportPostgame/finish).
-  function _patchGqResultScores(meText, oppText) {
-    const meEl  = document.getElementById('vs-result-me-score');
-    const oppEl = document.getElementById('vs-result-opp-score');
-    if (meEl)  meEl.textContent  = meText;
-    if (oppEl) oppEl.textContent = oppText;
+  // Opponent clicked their own "Jugar de nuevo".
+  function _gqvrOnOpponentRematch() {
+    if (_gqvrConfirmed || _gqvrOppLeftHandled || _gqvrOppRematch) return;
+    _gqvrOppRematch = true;
+    if (_gqvrRematchSent) {
+      // I already asked → the opponent's click is the acceptance (they're 2nd).
+      _gqvrConfirm('opp');
+    } else {
+      // Opponent is 1st → bouncing bubble over THEIR avatar.
+      const b = document.getElementById('gqvr-opp-bubble');
+      if (b) b.hidden = false;
+    }
   }
 
-  // Revealed country + own attempts, below the avatars — same text the
-  // 1-player end-of-game modal uses (globequiz.hintCorrect/attempts, see
-  // gq-endgame-country-label/gq-endgame-attempts in globequiz.js), here
-  // placed in the W/L panel instead of a separate modal.
-  function _patchGqResultExtra(countryName, guessCount) {
-    const wrap        = document.getElementById('vs-result-gq-extra');
-    const countryEl   = document.getElementById('vs-result-gq-country');
-    const attemptsEl  = document.getElementById('vs-result-gq-attempts');
-    if (!wrap) return;
-    const T = (k, d, vars) => (typeof t === 'function' ? t(k, vars) : d);
-    if (countryEl) {
-      countryEl.textContent = countryName
-        ? T('globequiz.hintCorrect', 'El país correcto es ' + countryName + '.', { name: countryName })
-        : '';
+  // Both players are in — check.png pops out of `who`'s avatar ('me'|'opp')
+  // and the buttons become the "loading new match" row on both screens.
+  function _gqvrConfirm(who) {
+    if (_gqvrConfirmed) return;
+    _gqvrConfirmed = true;
+    if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+    ['gqvr-me-bubble', 'gqvr-opp-bubble'].forEach(id => { const el = document.getElementById(id); if (el) el.hidden = true; });
+    const check = document.getElementById(who === 'me' ? 'gqvr-me-check' : 'gqvr-opp-check');
+    if (check) {
+      check.classList.remove('gqvr-check-anim');
+      check.hidden = false;
+      void check.offsetWidth; // restart the animation
+      check.classList.add('gqvr-check-anim');
     }
-    if (attemptsEl) {
-      attemptsEl.textContent = T('globequiz.attempts', 'Intentos', {}) + ': ' + (guessCount != null ? guessCount : '—');
+    document.getElementById('gqvr-btns')?.setAttribute('hidden', '');
+    const loading = document.getElementById('gqvr-loading');
+    if (loading) loading.hidden = false;
+    // Give the check its moment, then relaunch. The HOST picks the new seed
+    // and publishes it; the guest waits for 'rematchgo' (or applies a seed
+    // that already arrived).
+    setTimeout(() => {
+      if (!_gqvrConfirmed) return; // panel was reset / player left in the meantime
+      if (window.VS && window.VS.isHost && window.VS.isHost()) {
+        const seed = (Math.random() * 2147483646 + 1) | 0;
+        try { window.VS.reportRematchGo(seed); } catch (e) {}
+        _gqvrRelaunch(seed);
+      } else if (_gqvrPendingGoSeed != null) {
+        _gqvrRelaunch(_gqvrPendingGoSeed);
+      }
+      // else: guest waits for _gqvrOnRematchGo.
+    }, 850);
+  }
+
+  // Host published the new round's seed (guest side, mostly).
+  function _gqvrOnRematchGo(payload) {
+    if (!payload || typeof payload.seed !== 'number') return;
+    if (!_gqvrConfirmed) { _gqvrPendingGoSeed = payload.seed; return; }
+    _gqvrRelaunch(payload.seed);
+  }
+
+  // Rematch → new round. Sequence:
+  //  1. the "juego terminado" panel leaves (slide up),
+  //  2. THEN the tetr.io-style transition: two colour halves close over the
+  //     screen (ease-out) with the running score + a +1 grow on the previous
+  //     round's winner,
+  //  3. the duel reloads BEHIND the cover,
+  //  4. the halves open (ease-in), revealing the 3-2-1.
+  // Falls back to a plain panel slide-out if the overlay is missing.
+  function _gqvrRelaunch(seed) {
+    if (_gqvrRelaunching) return;
+    _gqvrRelaunching = true;
+    const tr = document.getElementById('gqvr-transition');
+    if (!tr) { _gqvrPlainSlideOut(seed); return; }
+
+    const meWon   = _gqvrLastOutcome === 'win';
+    const meFrom  = Math.max(0, _gqvrMyWins  - (meWon ? 1 : 0));
+    const oppFrom = Math.max(0, _gqvrOppWins - (meWon ? 0 : 1));
+    const setT = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = String(v); };
+    setT('gqvr-tr-me-name',  localStorage.getItem('playerName') || 'Tú');
+    setT('gqvr-tr-opp-name', (window._vsOpponent && window._vsOpponent.name) || 'Rival');
+    setT('gqvr-tr-me-num',  meFrom);
+    setT('gqvr-tr-opp-num', oppFrom);
+    ['gqvr-tr-me-num', 'gqvr-tr-opp-num'].forEach(id => document.getElementById(id)?.classList.remove('gqvr-tr-bump'));
+    ['gqvr-tr-me-plus', 'gqvr-tr-opp-plus'].forEach(id => document.getElementById(id)?.classList.remove('gqvr-tr-plus-anim'));
+    tr.classList.remove('gqvr-tr-closed', 'gqvr-tr-opening');
+
+    // 1. The result panel shrinks away (quick) and its dark backdrop fades,
+    //    AT THE SAME TIME as the score lines close in over it.
+    const screen = document.getElementById('gq-vs-result-screen');
+    const box = screen ? screen.querySelector('.gqvr-box') : null;
+    if (box) box.classList.add('gqvr-box-out');
+    if (screen) screen.classList.add('gqvr-vr-out');
+    // postgameloop.mp3 fades out (0.15s) together with the panel.
+    if (typeof window.fadeOutMusic === 'function' && typeof sfxPostgame !== 'undefined') {
+      try { window.fadeOutMusic(sfxPostgame, 150); } catch (e) {}
     }
-    wrap.style.display = 'flex';
+    tr.hidden = false;
+    void tr.offsetWidth;
+    tr.classList.add('gqvr-tr-closed');
+
+    // Panel shrunk + backdrop faded — take the whole result screen out.
+    setTimeout(() => {
+      if (screen) { screen.style.display = 'none'; screen.classList.remove('gqvr-vr-out'); }
+      if (box) box.classList.remove('gqvr-box-out');
+    }, 430);
+
+    // 2. Lines met (~0.72s entry): reload the duel behind the cover and grow
+    //    the winner's number.
+    setTimeout(() => {
+      _gqvrDoRelaunch(seed);
+      const numId  = meWon ? 'gqvr-tr-me-num'  : 'gqvr-tr-opp-num';
+      const plusId = meWon ? 'gqvr-tr-me-plus' : 'gqvr-tr-opp-plus';
+      const numEl = document.getElementById(numId);
+      if (numEl) { numEl.textContent = String(meWon ? _gqvrMyWins : _gqvrOppWins); numEl.classList.add('gqvr-tr-bump'); }
+      document.getElementById(plusId)?.classList.add('gqvr-tr-plus-anim');
+      // pin.mp3, clipped to ~1s with a tiny fade tail.
+      if (typeof window.playPinClip === 'function') { try { window.playPinClip(); } catch (e) {} }
+    }, 780);
+
+    // 3. Open the halves (board slides out with them, ease-in).
+    setTimeout(() => { tr.classList.remove('gqvr-tr-closed'); tr.classList.add('gqvr-tr-opening'); }, 2050);
+    setTimeout(() => {
+      tr.hidden = true;
+      tr.classList.remove('gqvr-tr-closed', 'gqvr-tr-opening');
+      _gqvrRelaunching = false;
+    }, 2750);
+  }
+
+  function _gqvrPlainSlideOut(seed) {
+    const screen = document.getElementById('gq-vs-result-screen');
+    const box = screen ? screen.querySelector('.gqvr-box') : null;
+    if (box) box.classList.add('gqvr-box-out');
+    if (typeof window.fadeOutMusic === 'function' && typeof sfxPostgame !== 'undefined') {
+      try { window.fadeOutMusic(sfxPostgame, 150); } catch (e) {}
+    }
+    setTimeout(() => {
+      if (screen) screen.style.display = 'none';
+      if (box) box.classList.remove('gqvr-box-out');
+      _gqvrDoRelaunch(seed);
+      _gqvrRelaunching = false;
+    }, 420);
+  }
+
+  function _gqvrDoRelaunch(seed) {
+    // Reset the round-scoped duel state (same fields _launchVersus clears).
+    _resultShown = false;
+    _gqLoseHandled = false;
+    _gqSyncFailed = false;
+    _matchResultRecorded = false;
+    _endedByAbandon = false;
+    _myGameEnded = _oppGameEnded = false;
+    _myFinalScoreCache = _oppFinalScoreCache = null;
+    _gqMyProg = _gqOppProg = 0;
+    _revealAt = null;
+    clearTimeout(_gameEndFallbackTimer);
+    clearTimeout(_revealTimer);
+    _clearGqLoseAnim();
+    window._vsActive = true;
+    window._vsShowingResult = false;
+    if (typeof window._setPlaying === 'function') window._setPlaying(true);
+    try { window.globequizHardReset?.(); } catch (e) {}
+    // New shared country from the new seed, then the standard GloboReto launch
+    // (sync gate + 3-2-1 live inside initGlobeQuiz). The VS.on* callbacks from
+    // the first _launchVersus are still registered (only cleanup() drops them).
+    _startSeededRandom(seed, 'globequiz');
+    const gqScreen = document.getElementById('globequiz-screen');
+    if (gqScreen) gqScreen.style.display = 'block';
+    if (typeof window.letterboxRefresh === 'function') window.letterboxRefresh();
+    window.globequizVsPrepareOpponentRow?.();
+    _gqReadySetup();
+    window.VS.onGqAbort(() => _handleGqSyncFailed(true, { code: 'GLB-04', msg: 'El rival no pudo conectarse al duelo' }));
+    _showGqSyncPanel();
+    if (typeof window.initGlobeQuiz === 'function') window.initGlobeQuiz();
+  }
+
+  // Opponent left the result screen (Exit or tab close) — disconnect look on
+  // their avatar + a self-dismissing toast (like the versus menu one).
+  function _gqvrOnOpponentLeft() {
+    if (_gqvrOppLeftHandled) return;
+    const screen = document.getElementById('gq-vs-result-screen');
+    if (!screen || screen.style.display === 'none') return;
+    _gqvrOppLeftHandled = true;
+    const T = (k, def, vars) => (typeof t === 'function' ? t(k, vars) : def);
+    const oppName = (window._vsOpponent && window._vsOpponent.name)
+      || document.getElementById('gqvr-opp-name')?.textContent || 'Rival';
+    document.getElementById('gqvr-opp-side')?.classList.add('gqvr-dc');
+    ['gqvr-opp-bubble', 'gqvr-me-bubble'].forEach(id => { const el = document.getElementById(id); if (el) el.hidden = true; });
+    const wrap = document.getElementById('gqvr-opp-pic-wrap');
+    if (wrap && !wrap.querySelector('.lb-disconnected-icon')) {
+      const icon = document.createElement('div');
+      icon.className = 'lb-disconnected-icon';
+      icon.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.5 2.5 5.09 3.91l2.59 2.59-2.09 2.09A3.003 3.003 0 0 0 6 14.83V17H4v2h2v2h2v-2h2v-2h.17c.93 0 1.76-.37 2.37-.96l-.01-.01 2.06 2.06 1.41-1.41-9.5-9.5zm1.59 9.09A1.003 1.003 0 0 1 8 10.83V9.41l1.5 1.5-.41.68H8.09zm5.72 1.64-.01-.01c.13-.29.2-.61.2-.93V9.17c0-.93-.37-1.76-.96-2.37L11.66 5h2.59L19 9.75l-3.17 3.17.02.01zM19.07 4.93l-1.41 1.42L19 7.68l1.5-1.5-1.43-1.25z"/></svg>';
+      wrap.appendChild(icon);
+    }
+    // Rematch is off the table now.
+    const again = document.getElementById('gqvr-again');
+    if (again) { again.disabled = true; again.textContent = T('gqvr.playAgain', 'Jugar de nuevo'); }
+    document.getElementById('gqvr-btns')?.removeAttribute('hidden');
+    const loading = document.getElementById('gqvr-loading');
+    if (loading) loading.hidden = true;
+    // Self-dismissing toast, same lifetime feel as showVersusToast.
+    const toast = document.getElementById('gqvr-msg');
+    if (toast) {
+      clearTimeout(_gqvrToastFadeT); clearTimeout(_gqvrToastHideT);
+      toast.textContent = T('gqvr.leftMatch', oppName + ' abandonó la partida', { name: oppName });
+      toast.hidden = false;
+      void toast.offsetWidth;
+      toast.classList.add('gqvr-toast-show');
+      _gqvrToastFadeT = setTimeout(() => {
+        toast.classList.remove('gqvr-toast-show');
+        _gqvrToastHideT = setTimeout(() => { toast.hidden = true; }, 350);
+      }, 3200);
+    }
   }
 
   // ── GlobeQuiz VS: wait for BOTH to load the 3D globe ──────────────────────
@@ -1967,7 +2352,8 @@ window.refreshVsSpectatorBadge = function (n) {
     // Reuses the existing 'answer' broadcast (VS.reportScore with detail) —
     // the opponent already listens via VS.onAnswer (see _launchVersus,
     // globequiz branch).
-    window.VS.reportScore(1, { win: true, elapsedMs, countryName, iso2, correct: true });
+    const summary = window.globequizGetVsSummary?.() || {};
+    window.VS.reportScore(1, { win: true, elapsedMs, countryName, iso2, correct: true, guessCount: summary.guessCount });
   };
 
   // Called from globequiz.js TOGETHER with _vsReportGqWin (same instant) —
@@ -1976,10 +2362,14 @@ window.refreshVsSpectatorBadge = function (n) {
   // below), with no celebration delay in between.
   window._vsShowGqWinResult = function(elapsedMs) {
     if (_resultShown) return;
-    _showVsResult('win', 0, 0);
-    _patchGqResultScores(window.formatGqCardTime ? window.formatGqCardTime(elapsedMs) : String(elapsedMs), '—');
     const summary = window.globequizGetVsSummary?.() || {};
-    _patchGqResultExtra(summary.countryName, summary.guessCount);
+    _showGqVsResult('win', {
+      myTime: elapsedMs,
+      myAtt: summary.guessCount,
+      oppAtt: summary.oppGuessCount,
+      countryName: summary.countryName,
+      iso2: summary.iso2,
+    });
   };
 
   // Called from VS.onAnswer (see _launchVersus) when the opponent announced
@@ -2014,12 +2404,14 @@ window.refreshVsSpectatorBadge = function (n) {
       }, Math.max(0, animMs - 400));
     }
     _gqLoseResultT = setTimeout(() => {
-      _showVsResult('lose', 0, 0);
-      const oppText = window.formatGqCardTime ? window.formatGqCardTime(payload.elapsedMs || 0) : String(payload.elapsedMs || 0);
       const summary = window.globequizGetVsSummary?.() || {};
-      const meText = summary.bestKm != null ? Math.round(summary.bestKm) + ' km' : '—';
-      _patchGqResultScores(meText, oppText);
-      _patchGqResultExtra(summary.countryName, summary.guessCount);
+      _showGqVsResult('lose', {
+        myTime: payload.elapsedMs || 0,
+        myAtt: summary.guessCount,
+        oppAtt: payload.guessCount,
+        countryName: summary.countryName,
+        iso2: summary.iso2,
+      });
     }, animMs);
   }
   // Cutoff for the animation above (opponent abandonment, generic quitToMenu)
@@ -2109,7 +2501,12 @@ window.refreshVsSpectatorBadge = function (n) {
       // even called in that case with _resultShown still false). isHost: same
       // owner that already had write permission in _vsReturnToMenu, the
       // criterion isn't duplicated.
-      if (isHost && !_endedByAbandon && typeof window.VS.finish === 'function') {
+      // GloboReto: DON'T finish the match here — the two players stay on the
+      // result screen with a live channel so they can rematch (see
+      // _gqvrConfirm/_gqvrRelaunch). It's finished for real in _vsReturnToMenu
+      // when someone actually leaves. Every other mode finishes now.
+      if (isHost && !_endedByAbandon && _vsCurrentMode !== 'globequiz'
+          && typeof window.VS.finish === 'function') {
         try { window.VS.finish(); } catch (e) {}
       }
     }
@@ -2169,6 +2566,8 @@ window.refreshVsSpectatorBadge = function (n) {
     window._vsShowingResult = false;
     const screen = document.getElementById('vs-result-screen');
     if (screen) screen.style.display = 'none';
+    const gqScreen = document.getElementById('gq-vs-result-screen');
+    if (gqScreen) gqScreen.style.display = 'none';
     // Record the match as finished in the DB (normal matches only; an
     // abandonment was already marked by whoever left). Before cleanup (which
     // clears the matchId).
@@ -2363,6 +2762,10 @@ window.refreshVsSpectatorBadge = function (n) {
 
     window._vsActive = true;
     _resultShown = false;
+    // A leftover GloboReto end panel from a previous duel would sit on top of
+    // the new match otherwise (it's only hidden on the way back to the menu).
+    const _gqPrevResult = document.getElementById('gq-vs-result-screen');
+    if (_gqPrevResult) _gqPrevResult.style.display = 'none';
     _gqLoseHandled = false;
     _matchResultRecorded = false;
     _endedByAbandon = false;
@@ -2468,6 +2871,12 @@ window.refreshVsSpectatorBadge = function (n) {
       // three.js/GeoJSON) — see _gqReadySetup, so the 'ready' listener is
       // already hooked regardless of who loads first.
       _gqReadySetup();
+      // Result-screen signals (channel stays alive between the two players
+      // until one returns to the menu): opponent asked for a rematch / left /
+      // the host published the new round's seed.
+      window.VS.onRematch(_gqvrOnOpponentRematch);
+      window.VS.onResultLeave(_gqvrOnOpponentLeft);
+      window.VS.onRematchGo(_gqvrOnRematchGo);
       // The opponent announced their 3D globe didn't load → both return to the menu.
       window.VS.onGqAbort(() => _handleGqSyncFailed(true, { code: 'GLB-04', msg: 'El rival no pudo conectarse al duelo' }));
       // Sync panel: bar + each side's status + when it starts (sits over the

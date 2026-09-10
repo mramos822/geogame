@@ -2166,6 +2166,10 @@
   // guess.
   let gqVsOppBestKm = Infinity;
   let gqVsMyBestKm = Infinity;
+  // Opponent's failed-guess count — the 'answer' broadcast never carries it,
+  // but it arrives one per wrong guess (see globequizSetVsOpponentGuess), so
+  // counting the calls is enough for the end-of-duel panel (_showGqVsResult).
+  let gqVsOppGuessCount = 0;
   // true only when THIS client was the one who guessed right (see the win
   // branch in submitGuess) — distinguishes the winner's attempt count (their
   // failed guesses + the final correct one) from the loser's (only their
@@ -2192,6 +2196,7 @@
     gqVsOppBestKm = Infinity;
     gqVsMyBestKm = Infinity;
     gqVsWon = false;
+    gqVsOppGuessCount = 0;
     const opp = window._vsOpponent || {};
     let el = document.getElementById('gq-lb-vsopp');
     if (!el) {
@@ -2266,6 +2271,7 @@
   // Called from vs.js (VS.onAnswer) with the opponent's incorrect guess —
   // never carries the name of the country they tried, only km (see submitGuess).
   window.globequizSetVsOpponentGuess = function (km) {
+    gqVsOppGuessCount++;
     gqVsOppBestKm = Math.min(gqVsOppBestKm, km);
     const el = document.getElementById('gq-lb-vsopp-km');
     if (el) el.textContent = formatGqKm(gqVsOppBestKm);
@@ -2282,7 +2288,10 @@
     return {
       bestKm: isFinite(gqVsMyBestKm) ? gqVsMyBestKm : null,
       countryName: dailyCountry ? displayName(dailyCountry) : null,
+      iso2: dailyCountry ? dailyCountry.iso2 : null,
       guessCount: guesses.length + (gqVsWon ? 1 : 0),
+      oppGuessCount: gqVsOppGuessCount,
+      elapsedMs: gqFinalElapsedMs || (gqTimerStart ? Math.max(0, Date.now() - gqTimerStart) : 0),
     };
   };
 

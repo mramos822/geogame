@@ -341,6 +341,14 @@ window.sbRecordVersusResult = async function(userId, won) {
   return updates;
 };
 
+// Head-to-head versus record vs one opponent in one mode (see versus_h2h /
+// record_versus_h2h). Fire-and-forget, per round. Both must be logged in.
+window.sbRecordVersusH2H = async function(opponentId, mode, won) {
+  if (!opponentId || !mode) return;
+  try { await sb.rpc('record_versus_h2h', { p_opponent: opponentId, p_mode: mode, p_won: !!won }); }
+  catch (e) {}
+};
+
 // ── FRIENDS ─────────────────────────────────────────────────────────────────
 
 window.sbGetFriends = async function(userId) {
