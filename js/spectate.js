@@ -247,6 +247,13 @@ window._specReportAnswer = function (correct, score, detail) {
 // duplicating the send here made each guess paint TWICE on the spectator
 // side (the reported lag).
 window._specReportGqGuesses = function (list) {
+  // VS 1v1: broadcast the full list so a spectator joining mid-round (or after
+  // a rematch) rebuilds the friend's guesses with flags. The opponent's own
+  // client never subscribes to 'gqguesses', so this is spectator-only.
+  if (window._vsActive && !window._lobbyActive && window.VS && typeof window.VS.reportGqSpec === 'function') {
+    try { window.VS.reportGqGuesses && window.VS.reportGqGuesses(list); } catch (e) {}
+    return;
+  }
   if (!window._vsActive && !window._lobbyActive && window.SoloSpectate && window.SoloSpectate.isActive()) {
     window.SoloSpectate.updateGqGuessesCache(list);
   }
@@ -369,6 +376,7 @@ window.Spectate = (() => {
   let _onScoreSync = null; // cb(score) — already-known score resent to whoever joins mid-round (see SoloSpectate.reportScoreSync)
   let _onSpectatorCount = null; // cb(n) — how many spectators are watching (this one included), see watchSolo
   let _onGqGuesses = null; // cb(list) — GlobeQuiz: ALL guesses already made, resent to whoever joins mid-match (see reportGqGuesses)
+  let _onGqSpec = null; // cb(payload) — GloboReto VS ONLY: rich data for the spectator's #gq-vs-result-screen + rematch transition (see VS.reportGqSpec)
 
   function _myId() { return window._sbUserId || null; }
 
@@ -400,6 +408,9 @@ window.Spectate = (() => {
         const m = payload.new;
         _match = m;
         if (_onScore) _onScore(m.host_score, m.guest_score);
+        // GloboReto keeps the row 'active' through the result screen and every
+        // rematch (see _showVsResult) — so 'finished' here means the players
+        // really left; close like any other mode.
         if (m.status === 'finished')  { if (_onEnd) _onEnd('finished');  stop(); }
         if (m.status === 'abandoned') { if (_onEnd) _onEnd('abandoned'); stop(); }
       })
@@ -423,6 +434,8 @@ window.Spectate = (() => {
       .on('broadcast', { event: 'pregame' }, ({ payload }) => { if (_onPregame) _onPregame(payload); })
       .on('broadcast', { event: 'postgame' }, ({ payload }) => { if (payload && _onPostgame) _onPostgame(payload); })
       .on('broadcast', { event: 'gameend' }, ({ payload }) => { if (payload && _onGameEnd) _onGameEnd(payload); })
+      .on('broadcast', { event: 'gqguesses' }, ({ payload }) => { if (payload && _onGqGuesses) _onGqGuesses(payload.list, payload.role); })
+      .on('broadcast', { event: 'gqspec' }, ({ payload }) => { if (payload && _onGqSpec) _onGqSpec(payload); })
       // Spectator counter — same mechanism as watchSolo() (see that long
       // comment), but it was missing entirely here: a VERSUS spectator never
       // learned how many others were watching them too, so the eye+counter
@@ -535,7 +548,7 @@ window.Spectate = (() => {
       .on('broadcast', { event: 'pregame' }, ({ payload }) => { if (_onPregame) _onPregame(payload); })
       .on('broadcast', { event: 'postgame' }, ({ payload }) => { if (payload && _onPostgame) _onPostgame(payload); })
       .on('broadcast', { event: 'advancing' }, () => { if (_onAdvancing) _onAdvancing(); })
-      .on('broadcast', { event: 'gqguesses' }, ({ payload }) => { if (payload && _onGqGuesses) _onGqGuesses(payload.list); })
+      .on('broadcast', { event: 'gqguesses' }, ({ payload }) => { if (payload && _onGqGuesses) _onGqGuesses(payload.list, payload.role); })
       .on('broadcast', { event: 'scoresync' }, ({ payload }) => { if (payload && _onScoreSync) _onScoreSync(payload.score, payload.dots); })
       .on('presence', { event: 'leave' }, ({ key }) => {
         // The only possible "player" in this channel is the owner (userId, no
@@ -613,6 +626,7 @@ window.Spectate = (() => {
     onScoreSync: cb => { _onScoreSync = cb; },
     onSpectatorCount: cb => { _onSpectatorCount = cb; },
     onGqGuesses: cb => { _onGqGuesses = cb; },
+    onGqSpec:   cb => { _onGqSpec = cb; },
     getMatch:   () => _match,
     getMatchId: () => _matchId,
     isSolo:     () => _isSolo,
@@ -1781,6 +1795,12 @@ window.GroupSpectate = (() => {
     if (fns && typeof window[fns.setPlayerCard] === 'function') {
       window[fns.setPlayerCard](_friendName, _friendAvatar, friendScore, _oppName, _oppAvatar, oppScore, _friendCardCode, _oppCardCode);
     }
+    // GloboReto has no numeric score row — build the rival's own row instead
+    // (name/avatar/km), see globequizSpectatorSetOpponent.
+    if (_mode === 'globequiz' && !window.Spectate.isSolo() && _oppName
+        && typeof window.globequizSpectatorSetOpponent === 'function') {
+      window.globequizSpectatorSetOpponent(_oppName, _oppAvatar, _oppCardCode);
+    }
   }
 
   function _enterRealUIIfPossible(mode) {
@@ -2196,7 +2216,10 @@ window.GroupSpectate = (() => {
         // prompt/correctSlot/options because cities has none of those last
         // three — without index, ALL cities rounds would collide on the same
         // key and showRound() would never be called again after the first.
-        const roundKey = payload.mode + '|' + payload.index + '|' + payload.prompt + '|' + payload.cityName + '|' + payload.correctSlot + '|' + JSON.stringify(payload.options || []);
+        // startedAt distinguishes GloboReto rounds (its 'round' payload has
+        // only mode+startedAt — without it every rematch round collided on the
+        // same key and showRound() never ran again: no timer/music/cards).
+        const roundKey = payload.mode + '|' + payload.index + '|' + payload.prompt + '|' + payload.cityName + '|' + payload.correctSlot + '|' + payload.startedAt + '|' + JSON.stringify(payload.options || []);
         const isDuplicate = roundKey === _lastRoundKey;
         _lastRoundKey = roundKey;
         if (!isDuplicate && fns && typeof window[fns.showRound] === 'function') window[fns.showRound](payload);
@@ -2216,6 +2239,19 @@ window.GroupSpectate = (() => {
     });
     window.Spectate.onAnswer(payload => {
       if (_closing) return;
+      // GloboReto — the RIVAL's side (not the spectated friend's):
+      if (_mode === 'globequiz' && payload && !_isFromFriendSide(payload.role) && _usingRealUI) {
+        if (payload.win) {
+          // The friend LOST — reveal the country + game-over overlay, same as
+          // the real loser sees (the result panel follows via 'gqspec').
+          _resetIdleWatchdog();
+          if (typeof window.globequizSpectatorShowLoss === 'function') window.globequizSpectatorShowLoss(payload);
+          return;
+        }
+        if (typeof payload.km === 'number' && typeof window.globequizSpectatorSetOppGuess === 'function') {
+          window.globequizSpectatorSetOppGuess(payload.km);
+        }
+      }
       // Versus: this answer is the OPPONENT's, not the spectated friend's —
       // the board (picks/reveals) should only react to the friend's plays.
       // The opponent's score is updated separately anyway, via onScore
@@ -2226,20 +2262,12 @@ window.GroupSpectate = (() => {
       if (_usingRealUI) {
         const fns = REAL_UI_MODES[_mode];
         if (fns && typeof window[fns.resolvePick] === 'function') window[fns.resolvePick](payload);
-        // GlobeQuiz has no more rounds — payload.win=true is LITERALLY the
-        // end of the friend's match (unlike any correct answer in
-        // flags/shapes/cities/monuments, which just advances to the next
-        // round), so here the session closes itself after 3s instead of
-        // waiting for the friend, already back in the menu, to cut it
-        // themselves (the reported "it doesn't disconnect on its own").
-        // window._setPlaying(false) (see submitGuess in globequiz.js, 2s
-        // after this same correct guess) also ends up disconnecting via the
-        // generic presence path ("stopped playing") if it arrives first —
-        // this timeout here is what guarantees the cut at a fixed,
-        // predictable time (3s) without depending on the real propagation
-        // latency, and with the right message ("finished the match", not the
-        // generic abandonment one).
-        if (_mode === 'globequiz' && payload && payload.win) {
+        // GlobeQuiz SOLO: payload.win=true is the end of the friend's match
+        // (a single round), so the session closes itself after 3s. In a DUEL
+        // it's only the end of ONE round — the players can rematch, so the
+        // spectator stays (the 'gqspec' result panel showed and it follows
+        // the next round / closes on 'abandoned' / presence).
+        if (_mode === 'globequiz' && payload && payload.win && window.Spectate.isSolo()) {
           setTimeout(() => {
             if (_closing) return;
             const who = _friendName || ((typeof t === 'function') ? t('spectator.defaultPlayer') : 'El jugador');
@@ -2349,6 +2377,11 @@ window.GroupSpectate = (() => {
         if (typeof sfxPlay === 'function' && typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
         if (fns && typeof window[fns.showPregame] === 'function') window[fns.showPregame](payload);
       }
+      // GloboReto rematch: the new round's 3-2-1 just started behind the
+      // still-closed line transition — open it now to reveal it.
+      if (_mode === 'globequiz' && typeof window.vsSpectatorOpenGqTransition === 'function') {
+        setTimeout(window.vsSpectatorOpenGqTransition, 250);
+      }
     });
     // Already-known score (and dot streak, Cities/Monuments only) resent
     // ONLY to whoever joins mid-round already in progress (with no pregame in
@@ -2395,6 +2428,9 @@ window.GroupSpectate = (() => {
       // instead of correctCount/wrongCount, so it needs its own neutral
       // panel (who won the duel), not the per-mode dispatch.
       if (!window.Spectate.isSolo()) {
+        // GloboReto has its own cream panel driven by the 'gqspec' broadcast
+        // (vsSpectatorShowGqResult) — don't also raise the old neutral one.
+        if (_mode === 'globequiz') return;
         if (typeof window.vsSpectatorShowResult === 'function') window.vsSpectatorShowResult(payload);
         return;
       }
@@ -2407,9 +2443,61 @@ window.GroupSpectate = (() => {
     // reported "the already-typed countries don't show"). Deliberately no
     // animation/sound (globequizSpectatorSyncGuesses, separate from
     // resolvePick which is the live route).
-    window.Spectate.onGqGuesses(list => {
+    window.Spectate.onGqGuesses((list, role) => {
       if (_closing || _mode !== 'globequiz' || !_usingRealUI) return;
+      if (!_isFromFriendSide(role)) return; // in a duel each player sends their own list
       if (typeof window.globequizSpectatorSyncGuesses === 'function') window.globequizSpectatorSyncGuesses(list);
+    });
+    // GloboReto VS: the friend's #gq-vs-result-screen data + rematch
+    // transition + rival identity. Payloads are CANONICAL host/guest (either
+    // player's broadcast is complete) — map to me=friend / opp=rival here.
+    let _lastGqSpecKey = null;
+    window.Spectate.onGqSpec(p => {
+      if (_closing || _mode !== 'globequiz' || !p) return;
+      // me = the spectated friend's side.
+      const me   = k => _friendIsHost ? p['host'  + k] : p['guest' + k];
+      const opp  = k => _friendIsHost ? p['guest' + k] : p['host'  + k];
+      const meWon = p.winnerRole === (_friendIsHost ? 'host' : 'guest');
+
+      if (p.kind === 'identity') {
+        _oppName = opp('Name') || _oppName || 'Rival';
+        _oppAvatar = opp('Avatar') || _oppAvatar;
+        _oppCardCode = opp('Card') || _oppCardCode || '0001';
+        const oppWrap = _friendIsHost ? guestPicWrap : hostPicWrap;
+        if (window.CustomizeAssets) window.CustomizeAssets.applyFrame(oppWrap, opp('Frame') || '0001');
+        const oppNameEl = _friendIsHost ? guestNameEl : hostNameEl;
+        if (oppNameEl) oppNameEl.textContent = _oppName;
+        const oppPicEl = _friendIsHost ? guestPic : hostPic;
+        if (oppPicEl && _oppAvatar) oppPicEl.src = _oppAvatar;
+        // friend identity too (may not have been in the social row)
+        if (me('Name')) { const el = _friendIsHost ? hostNameEl : guestNameEl; if (el) el.textContent = me('Name'); }
+        if (_usingRealUI) _updateMiniScores();
+        return;
+      }
+
+      // dedupe: the same round-end / rematch is broadcast by both players.
+      const key = p.kind + ':' + (me('Wins') || 0) + '-' + (opp('Wins') || 0) + ':' + (p.winnerRole || '');
+      if (key === _lastGqSpecKey) return;
+      _lastGqSpecKey = key;
+
+      const mapped = {
+        outcome: meWon ? 'win' : 'lose',
+        meName: me('Name') || _friendName || 'Jugador',
+        oppName: opp('Name') || _oppName || 'Rival',
+        meWins: me('Wins') || 0, oppWins: opp('Wins') || 0,
+        meAtt: me('Att'), oppAtt: opp('Att'),
+        meFrame: me('Frame') || _friendFrameCode || '0001', oppFrame: opp('Frame') || '0001',
+        meAvatar: me('Avatar') || _friendAvatar || '', oppAvatar: opp('Avatar') || _oppAvatar || '',
+        time: p.time, countryName: p.countryName, iso2: p.iso2,
+      };
+      if (p.kind === 'transition') {
+        if (typeof window.vsSpectatorPlayGqTransition === 'function') window.vsSpectatorPlayGqTransition(mapped);
+        return;
+      }
+      // kind: 'result'
+      _clearIdleWatchdog();
+      _hideLoading(true);
+      if (typeof window.vsSpectatorShowGqResult === 'function') window.vsSpectatorShowGqResult(mapped);
     });
     // The real player confirmed leaving the postgame toward the campaign's
     // next mode — there's no new round/pregame yet (can take a while as they

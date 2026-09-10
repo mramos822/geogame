@@ -2203,6 +2203,12 @@ window.Lobby = (() => {
         : T('lobby.placed', 'Quedaste #{n}').replace('{n}', myRank);
       title.className = 'vs-result-title ' + (myRank === 1 ? 'win' : 'lose');
     }
+    // Coins/XP for this group match (server caps at 10 versus grants/day) —
+    // rank 1 = winner. _presentFinalResult's _resultPresented guard means this
+    // runs once per match.
+    if (myRank >= 1 && window._sbUserId && typeof window.sbGrantVersusCurrency === 'function') {
+      window.sbGrantVersusCurrency(myRank === 1);
+    }
     const medals = ['🥇', '🥈', '🥉'];
     list.innerHTML = '';
     members.forEach((m, i) => {

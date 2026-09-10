@@ -1353,16 +1353,20 @@ function renderSocial(s){
     }).join('');
 }
 
-const ECONOMY_REASON_LABELS = { campaign_complete:'🌍 Gira Mundial', globequiz_win:'🌎 GlobeQuiz', accept_failed:'—' };
+const ECONOMY_REASON_LABELS = { campaign_complete:'🌍 Gira Mundial', globequiz_win:'🌎 GlobeQuiz', versus_win:'⚔️ Versus (victoria)', versus_loss:'⚔️ Versus (derrota)', accept_failed:'—' };
 function renderEconomy(e, rl){
   const totalCoins = e.totalCoins||0, totalXp = e.totalXp||0, events = e.eventCount||0;
   $('economy-status').innerHTML = events
     ? `<div class="insight-card ok">💰 Sistema de niveles todavía <b>sin lanzar</b> en el juego — esto es solo el historial crudo acumulado (${rl}) para no perder datos mientras se termina de diseñar.</div>`
     : `<div class="insight-card warn">💰 Todavía no hay eventos de monedas/XP registrados en este período. El tracking ya está activo (Gira Mundial + GlobeQuiz); en cuanto haya partidas nuevas va a empezar a llenarse acá.</div>`;
+  const vc = e.versusCurrency || {};
   $('cards-economy').innerHTML = [
     ['🪙', totalCoins.toLocaleString('es'), `Monedas acumuladas (${rl})`],
     ['✨', totalXp.toLocaleString('es'), `XP acumulado (${rl})`],
     ['📋', events.toLocaleString('es'), `Eventos registrados (${rl})`],
+    ['⚔️', (vc.grants||0).toLocaleString('es'), `Rondas versus premiadas (${vc.wins||0} W / ${vc.losses||0} L)`],
+    ['🪙', (vc.coins||0).toLocaleString('es'), `Monedas por versus (${rl})`],
+    ['✨', (vc.xp||0).toLocaleString('es'), `XP por versus — tope 10/día · ${vc.capHitUserDays||0} tope alcanzado`],
   ].map(([icon,v,l])=>`<div class="card"><div class="icon">${icon}</div><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
 
   const tbR = $('tbl-economy-reasons');

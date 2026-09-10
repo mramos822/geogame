@@ -1035,6 +1035,15 @@ Deno.serve(async (req) => {
       const u = expectedByUser[r.user_id] = expectedByUser[r.user_id] || { coins: 0, xp: 0 };
       u.coins += Math.round(10 * mult); u.xp += Math.round(20 * mult);
     }
+    // Versus (win 20c/10xp, loss 5c/2xp, capped 10/day) is granted SERVER-side
+    // by grant_versus_currency (SECURITY DEFINER) — the ledger rows are
+    // trustworthy, so "expected" for versus IS what the ledger holds; add it
+    // here so xpRetroactive doesn't flag it as a suspicious excess.
+    for (const r of (allCurrencyLedgerRes.data || []) as any[]) {
+      if (!r.user_id || (r.reason !== 'versus_win' && r.reason !== 'versus_loss')) continue;
+      const u = expectedByUser[r.user_id] = expectedByUser[r.user_id] || { coins: 0, xp: 0 };
+      u.coins += r.coins || 0; u.xp += r.xp || 0;
+    }
     const actualLedgerByUser: Record<string, { coins: number; xp: number }> = {};
     for (const r of (allCurrencyLedgerRes.data || []) as any[]) {
       if (!r.user_id) continue;
@@ -1062,11 +1071,31 @@ Deno.serve(async (req) => {
       })
       .sort((a, b) => b.totalXp - a.totalXp);
 
+    // ── Monedas/XP por versus (otorgado server-side, tope 10/día) ─────────
+    const vcRows = currencyRows.filter((r: any) => r.reason === 'versus_win' || r.reason === 'versus_loss');
+    const vcPerUserDay: Record<string, number> = {};
+    for (const r of vcRows) {
+      if (!r.user_id) continue;
+      const k = r.user_id + '|' + (r.created_at as string).slice(0, 10);
+      vcPerUserDay[k] = (vcPerUserDay[k] || 0) + 1;
+    }
+    const versusCurrency = {
+      grants:    vcRows.length,
+      wins:      vcRows.filter((r: any) => r.reason === 'versus_win').length,
+      losses:    vcRows.filter((r: any) => r.reason === 'versus_loss').length,
+      coins:     vcRows.reduce((s: number, r: any) => s + (r.coins || 0), 0),
+      xp:        vcRows.reduce((s: number, r: any) => s + (r.xp || 0), 0),
+      series:    bucketByKey(vcRows, labels, granularity),
+      // (usuario, día) que llegaron al tope de 10 en el período
+      capHitUserDays: Object.values(vcPerUserDay).filter((n) => n >= 10).length,
+    };
+
     const economy = {
       totalCoins: currencyTotalCoins,
       totalXp: currencyTotalXp,
       eventCount: currencyRows.length,
       byReason: currencyByReason,
+      versusCurrency,
       topEarners: currencyTopEarners,
       config: (xpConfigRes.data || []).map((r: any) => ({
         key: r.rule_key, value: r.rule_value, description: r.description, status: r.status,

@@ -349,6 +349,14 @@ window.sbRecordVersusH2H = async function(opponentId, mode, won) {
   catch (e) {}
 };
 
+// Coins/XP for a finished versus round (1v1 or group). The server caps it at
+// 10 grants/day (see grant_versus_currency). Winner 20c/10xp, loser 5c/2xp.
+// Fire-and-forget; logged-in only.
+window.sbGrantVersusCurrency = async function(won) {
+  if (!window._sbUserId) return;
+  try { await sb.rpc('grant_versus_currency', { p_won: !!won }); } catch (e) {}
+};
+
 // ── FRIENDS ─────────────────────────────────────────────────────────────────
 
 window.sbGetFriends = async function(userId) {

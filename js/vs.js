@@ -437,6 +437,21 @@ window.VS = (() => {
   function reportRematchGo(seed) {
     if (_channel && _role) { try { _channel.send({ type: 'broadcast', event: 'rematchgo', payload: { role: _role, seed } }); } catch (e) {} }
   }
+  // GloboReto: rich data for a spectator's own #gq-vs-result-screen + rematch
+  // transition (kind: 'result' | 'transition'). Both players broadcast their
+  // own; the spectator keeps only the one matching the friend's side.
+  function reportGqSpec(payload) {
+    if (payload && payload.kind === 'result')   _lastGqSpecResult = payload;
+    if (payload && payload.kind === 'identity') _lastGqIdentity = payload;
+    if (_channel) { try { _channel.send({ type: 'broadcast', event: 'gqspec', payload: payload || {} }); } catch (e) {} }
+  }
+  // GloboReto: full guess list (with country names) for a spectator — carries
+  // the sender's role so the spectator keeps only the friend's list.
+  function reportGqGuesses(list) {
+    if (!_role) return;
+    _lastGqGuesses = { role: _role, list };
+    if (_channel) { try { _channel.send({ type: 'broadcast', event: 'gqguesses', payload: _lastGqGuesses }); } catch (e) {} }
+  }
 
   // Closes the match row with no winner or loss (unlike abandon()/finish()):
   // the match never actually started because one side couldn't load.
@@ -517,6 +532,12 @@ window.VS = (() => {
   let _lastTick          = null;
   let _lastPregamePayload  = null;
   let _lastPostgamePayload = null;
+  // GloboReto: last 'result' gqspec + last full guess list + the rival's
+  // identity, so a spectator who joins mid-round or while the result panel is
+  // up still gets everything.
+  let _lastGqSpecResult  = null;
+  let _lastGqGuesses     = null;
+  let _lastGqIdentity    = null;
 
   // Saves a full SNAPSHOT of the current state (phase + round + pregame +
   // postgame) into host_state/guest_state — this used to live ONLY in THIS
@@ -572,15 +593,24 @@ window.VS = (() => {
     if (_lastPhase === 'pregame' && _lastPregamePayload) {
       if (_lastRoundPayload) reportRound(_lastRoundPayload);
       reportPregame(_lastPregamePayload);
+      _resendGqIdentity();
       return;
     }
     if (_lastPhase === 'postgame' && _lastPostgamePayload) {
       if (_lastRoundPayload) reportRound(_lastRoundPayload);
       reportPostgame(_lastPostgamePayload);
+      if (_lastGqGuesses && _channel) { try { _channel.send({ type: 'broadcast', event: 'gqguesses', payload: _lastGqGuesses }); } catch (e) {} }
+      if (_lastGqSpecResult && _channel) { try { _channel.send({ type: 'broadcast', event: 'gqspec', payload: _lastGqSpecResult }); } catch (e) {} }
+      _resendGqIdentity();
       return;
     }
     if (_lastRoundPayload) reportRound(_lastRoundPayload);
     if (_lastTick != null) reportTick(_lastTick);
+    if (_lastGqGuesses && _channel) { try { _channel.send({ type: 'broadcast', event: 'gqguesses', payload: _lastGqGuesses }); } catch (e) {} }
+    _resendGqIdentity();
+  }
+  function _resendGqIdentity() {
+    if (_lastGqIdentity && _channel) { try { _channel.send({ type: 'broadcast', event: 'gqspec', payload: _lastGqIdentity }); } catch (e) {} }
   }
 
   // This game round's time ran out (not the full versus match) — the
@@ -598,6 +628,10 @@ window.VS = (() => {
     if (!_channel || !_role) return;
     _lastPhase = 'pregame';
     _lastPregamePayload = payload || {};
+    // A new round is starting — the previous round's GloboReto result/guesses
+    // are no longer what a late joiner should see.
+    _lastGqSpecResult = null;
+    _lastGqGuesses = null;
     try { _channel.send({ type: 'broadcast', event: 'pregame', payload: { role: _role, ...(payload || {}) } }); } catch (e) {}
     _persistLiveState();
   }
@@ -621,7 +655,10 @@ window.VS = (() => {
     const winnerId = m.host_score >= m.guest_score ? m.host_id : m.guest_id;
     await window.sb.from('matches')
       .update({ status: 'finished', winner_id: winnerId }).eq('id', _matchId);
-    if (window.Analytics && typeof window.Analytics.logVersus === 'function') {
+    // GloboReto logs one 'versus' analytics event PER ROUND (see
+    // _showGqVsResult) since it can rematch on the same match row — don't
+    // also log here on the final leave.
+    if (m.mode !== 'globequiz' && window.Analytics && typeof window.Analytics.logVersus === 'function') {
       window.Analytics.logVersus(m.mode || null);
     }
   }
@@ -655,6 +692,9 @@ window.VS = (() => {
     _lastTick = null;
     _lastPregamePayload = null;
     _lastPostgamePayload = null;
+    _lastGqSpecResult = null;
+    _lastGqGuesses = null;
+    _lastGqIdentity = null;
     _restoreRandom();
   }
 
@@ -675,6 +715,8 @@ window.VS = (() => {
     reportRematch,
     reportResultLeave,
     reportRematchGo,
+    reportGqSpec,
+    reportGqGuesses,
     cancelMatchNoResult,
     reportGameEnd,
     releaseChannel,
@@ -1860,6 +1902,36 @@ window.refreshVsSpectatorBadge = function (n) {
       document.getElementById('gqvr-again')?.addEventListener('click', _gqvrOnAgainClick);
     }
     screen.style.display = 'flex';
+
+    // Count this round as one individual versus game in analytics (host only,
+    // same as VS.finish() does for the other modes — one 'versus' event per
+    // finished round; not on an abandonment, like the other modes). The
+    // profile W/L + head-to-head are recorded per round in _showVsResult / above.
+    if (reason !== 'abandon' && window.VS && window.VS.isHost && window.VS.isHost()
+        && window.Analytics && typeof window.Analytics.logVersus === 'function') {
+      try { window.Analytics.logVersus('globequiz'); } catch (e) {}
+    }
+
+    // Feed a spectator's own copy of this panel — CANONICAL host/guest form
+    // (each player knows both sides), so it doesn't matter which of the two
+    // broadcasts the spectator gets; it just dedupes.
+    if (window.VS && window.VS.getMatchId && window.VS.getMatchId() && typeof window.VS.reportGqSpec === 'function') {
+      try {
+        const isHost = window.VS.isHost();
+        const meWon = outcome === 'win';
+        const pick = (mine, theirs) => (isHost ? mine : theirs);
+        window.VS.reportGqSpec({
+          kind: 'result', reason: reason || null,
+          winnerRole: meWon ? (isHost ? 'host' : 'guest') : (isHost ? 'guest' : 'host'),
+          hostName:  pick(myName, oppName),  guestName:  pick(oppName, myName),
+          hostWins:  pick(_gqvrMyWins, _gqvrOppWins), guestWins: pick(_gqvrOppWins, _gqvrMyWins),
+          hostAtt:   pick(d.myAtt, d.oppAtt), guestAtt:  pick(d.oppAtt, d.myAtt),
+          hostFrame: pick(myFrame, opp.frameCode || '0001'), guestFrame: pick(opp.frameCode || '0001', myFrame),
+          hostAvatar: pick(mePic ? mePic.src : '', opp.avatar || ''), guestAvatar: pick(opp.avatar || '', mePic ? mePic.src : ''),
+          time: d.myTime, countryName: d.countryName, iso2: d.iso2,
+        });
+      } catch (e) {}
+    }
   }
 
   // ── GloboReto result screen: rematch handshake + opponent-left ────────────
@@ -1952,38 +2024,37 @@ window.refreshVsSpectatorBadge = function (n) {
   }
 
   // Rematch → new round. Sequence:
-  //  1. the "juego terminado" panel leaves (slide up),
-  //  2. THEN the tetr.io-style transition: two colour halves close over the
-  //     screen (ease-out) with the running score + a +1 grow on the previous
-  //     round's winner,
-  //  3. the duel reloads BEHIND the cover,
+  //  1. the "juego terminado" panel shrinks away + its backdrop fades,
+  //  2. AT THE SAME TIME the tetr.io-style transition: two colour halves close
+  //     over the screen (ease-out) with the running score + a +1 grow on the
+  //     previous round's winner,
+  //  3. `onCovered` runs behind the cover (the player relaunches the duel;
+  //     a spectator does nothing — the new round arrives via broadcast),
   //  4. the halves open (ease-in), revealing the 3-2-1.
   // Falls back to a plain panel slide-out if the overlay is missing.
-  function _gqvrRelaunch(seed) {
-    if (_gqvrRelaunching) return;
-    _gqvrRelaunching = true;
+  //
+  // o: { meWon, meFrom, oppFrom, meTo, oppTo, meName, oppName, onCovered, holdOpen }
+  //   holdOpen (spectator): after the lines close + the +1, DON'T auto-open —
+  //   wait for _gqvrOpenTransition() (called when the new round's pregame
+  //   arrives), with a safety fallback so it can't stay stuck.
+  let _gqvrTrHoldTimer = null;
+  function _gqvrRunTransition(o) {
+    clearTimeout(_gqvrTrHoldTimer); _gqvrTrHoldTimer = null;
     const tr = document.getElementById('gqvr-transition');
-    if (!tr) { _gqvrPlainSlideOut(seed); return; }
-
-    const meWon   = _gqvrLastOutcome === 'win';
-    const meFrom  = Math.max(0, _gqvrMyWins  - (meWon ? 1 : 0));
-    const oppFrom = Math.max(0, _gqvrOppWins - (meWon ? 0 : 1));
-    const setT = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = String(v); };
-    setT('gqvr-tr-me-name',  localStorage.getItem('playerName') || 'Tú');
-    setT('gqvr-tr-opp-name', (window._vsOpponent && window._vsOpponent.name) || 'Rival');
-    setT('gqvr-tr-me-num',  meFrom);
-    setT('gqvr-tr-opp-num', oppFrom);
+    if (!tr) { _gqvrPlainSlideOut(o.onCovered); return; }
+    const setT = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    setT('gqvr-tr-me-name',  o.meName  || 'Tú');
+    setT('gqvr-tr-opp-name', o.oppName || 'Rival');
+    setT('gqvr-tr-me-num',  String(o.meFrom));
+    setT('gqvr-tr-opp-num', String(o.oppFrom));
     ['gqvr-tr-me-num', 'gqvr-tr-opp-num'].forEach(id => document.getElementById(id)?.classList.remove('gqvr-tr-bump'));
     ['gqvr-tr-me-plus', 'gqvr-tr-opp-plus'].forEach(id => document.getElementById(id)?.classList.remove('gqvr-tr-plus-anim'));
     tr.classList.remove('gqvr-tr-closed', 'gqvr-tr-opening');
 
-    // 1. The result panel shrinks away (quick) and its dark backdrop fades,
-    //    AT THE SAME TIME as the score lines close in over it.
     const screen = document.getElementById('gq-vs-result-screen');
     const box = screen ? screen.querySelector('.gqvr-box') : null;
     if (box) box.classList.add('gqvr-box-out');
     if (screen) screen.classList.add('gqvr-vr-out');
-    // postgameloop.mp3 fades out (0.15s) together with the panel.
     if (typeof window.fadeOutMusic === 'function' && typeof sfxPostgame !== 'undefined') {
       try { window.fadeOutMusic(sfxPostgame, 150); } catch (e) {}
     }
@@ -1991,35 +2062,77 @@ window.refreshVsSpectatorBadge = function (n) {
     void tr.offsetWidth;
     tr.classList.add('gqvr-tr-closed');
 
-    // Panel shrunk + backdrop faded — take the whole result screen out.
     setTimeout(() => {
       if (screen) { screen.style.display = 'none'; screen.classList.remove('gqvr-vr-out'); }
       if (box) box.classList.remove('gqvr-box-out');
     }, 430);
 
-    // 2. Lines met (~0.72s entry): reload the duel behind the cover and grow
-    //    the winner's number.
     setTimeout(() => {
-      _gqvrDoRelaunch(seed);
-      const numId  = meWon ? 'gqvr-tr-me-num'  : 'gqvr-tr-opp-num';
-      const plusId = meWon ? 'gqvr-tr-me-plus' : 'gqvr-tr-opp-plus';
+      if (typeof o.onCovered === 'function') { try { o.onCovered(); } catch (e) {} }
+      const numId  = o.meWon ? 'gqvr-tr-me-num'  : 'gqvr-tr-opp-num';
+      const plusId = o.meWon ? 'gqvr-tr-me-plus' : 'gqvr-tr-opp-plus';
       const numEl = document.getElementById(numId);
-      if (numEl) { numEl.textContent = String(meWon ? _gqvrMyWins : _gqvrOppWins); numEl.classList.add('gqvr-tr-bump'); }
+      if (numEl) { numEl.textContent = String(o.meWon ? o.meTo : o.oppTo); numEl.classList.add('gqvr-tr-bump'); }
       document.getElementById(plusId)?.classList.add('gqvr-tr-plus-anim');
-      // pin.mp3, clipped to ~1s with a tiny fade tail.
       if (typeof window.playPinClip === 'function') { try { window.playPinClip(); } catch (e) {} }
     }, 780);
 
-    // 3. Open the halves (board slides out with them, ease-in).
+    if (o.holdOpen) {
+      // Spectator: hold closed until the new round arrives (fallback at 8s).
+      _gqvrTrHoldTimer = setTimeout(_gqvrOpenTransition, 8000);
+      return;
+    }
     setTimeout(() => { tr.classList.remove('gqvr-tr-closed'); tr.classList.add('gqvr-tr-opening'); }, 2050);
-    setTimeout(() => {
-      tr.hidden = true;
-      tr.classList.remove('gqvr-tr-closed', 'gqvr-tr-opening');
-      _gqvrRelaunching = false;
-    }, 2750);
+    setTimeout(_gqvrHideTransition, 2750);
   }
 
-  function _gqvrPlainSlideOut(seed) {
+  function _gqvrOpenTransition() {
+    clearTimeout(_gqvrTrHoldTimer); _gqvrTrHoldTimer = null;
+    const tr = document.getElementById('gqvr-transition');
+    if (!tr || tr.hidden) { _gqvrRelaunching = false; return; }
+    tr.classList.remove('gqvr-tr-closed');
+    tr.classList.add('gqvr-tr-opening');
+    setTimeout(_gqvrHideTransition, 700);
+  }
+  function _gqvrHideTransition() {
+    const tr = document.getElementById('gqvr-transition');
+    if (tr) { tr.hidden = true; tr.classList.remove('gqvr-tr-closed', 'gqvr-tr-opening'); }
+    _gqvrRelaunching = false;
+  }
+  // Spectator: the new round's pregame arrived — reveal it (open the lines).
+  window.vsSpectatorOpenGqTransition = function () { _gqvrOpenTransition(); };
+
+  function _gqvrRelaunch(seed) {
+    if (_gqvrRelaunching) return;
+    _gqvrRelaunching = true;
+    const meWon = _gqvrLastOutcome === 'win';
+    // Tell any spectators to play the same transition — canonical host/guest.
+    if (window.VS && window.VS.getMatchId && window.VS.getMatchId() && typeof window.VS.reportGqSpec === 'function') {
+      try {
+        const isHost = window.VS.isHost();
+        const pick = (mine, theirs) => (isHost ? mine : theirs);
+        const myName = localStorage.getItem('playerName') || 'Tú';
+        const oppName = (window._vsOpponent && window._vsOpponent.name) || 'Rival';
+        window.VS.reportGqSpec({
+          kind: 'transition',
+          winnerRole: meWon ? (isHost ? 'host' : 'guest') : (isHost ? 'guest' : 'host'),
+          hostName: pick(myName, oppName), guestName: pick(oppName, myName),
+          hostWins: pick(_gqvrMyWins, _gqvrOppWins), guestWins: pick(_gqvrOppWins, _gqvrMyWins),
+        });
+      } catch (e) {}
+    }
+    _gqvrRunTransition({
+      meWon,
+      meFrom:  Math.max(0, _gqvrMyWins  - (meWon ? 1 : 0)),
+      oppFrom: Math.max(0, _gqvrOppWins - (meWon ? 0 : 1)),
+      meTo: _gqvrMyWins, oppTo: _gqvrOppWins,
+      meName: localStorage.getItem('playerName') || 'Tú',
+      oppName: (window._vsOpponent && window._vsOpponent.name) || 'Rival',
+      onCovered: () => _gqvrDoRelaunch(seed),
+    });
+  }
+
+  function _gqvrPlainSlideOut(onCovered) {
     const screen = document.getElementById('gq-vs-result-screen');
     const box = screen ? screen.querySelector('.gqvr-box') : null;
     if (box) box.classList.add('gqvr-box-out');
@@ -2029,10 +2142,34 @@ window.refreshVsSpectatorBadge = function (n) {
     setTimeout(() => {
       if (screen) screen.style.display = 'none';
       if (box) box.classList.remove('gqvr-box-out');
-      _gqvrDoRelaunch(seed);
+      if (typeof onCovered === 'function') { try { onCovered(); } catch (e) {} }
       _gqvrRelaunching = false;
     }, 420);
   }
+
+  // Spectator: play the round transition (no relaunch — the new round arrives
+  // over the channel). p is already the friend's perspective (spectate.js
+  // filtered by role). Friend = "me" (blue/left).
+  window.vsSpectatorPlayGqTransition = function (p) {
+    if (!p || _gqvrRelaunching) return;
+    _gqvrRelaunching = true;
+    const meWon = p.outcome === 'win';
+    _gqvrRunTransition({
+      meWon,
+      meFrom:  Math.max(0, (p.meWins  || 0) - (meWon ? 1 : 0)),
+      oppFrom: Math.max(0, (p.oppWins || 0) - (meWon ? 0 : 1)),
+      meTo: p.meWins || 0, oppTo: p.oppWins || 0,
+      meName: p.meName || 'Jugador', oppName: p.oppName || 'Rival',
+      holdOpen: true,
+      onCovered: () => {
+        const s = document.getElementById('gq-vs-result-screen');
+        if (s) s.style.display = 'none';
+        // Show the generic spectator loading behind the lines so there's
+        // something when they open if the round is still coming.
+        if (typeof window.vsSpectatorHideResult === 'function') window.vsSpectatorHideResult();
+      },
+    });
+  };
 
   function _gqvrDoRelaunch(seed) {
     // Reset the round-scoped duel state (same fields _launchVersus clears).
@@ -2051,6 +2188,9 @@ window.refreshVsSpectatorBadge = function (n) {
     window._vsActive = true;
     window._vsShowingResult = false;
     if (typeof window._setPlaying === 'function') window._setPlaying(true);
+    // Re-assert the "being spectated" badge (presence sync doesn't fire on its
+    // own during a rematch).
+    if (typeof window.refreshVsSpectatorBadge === 'function') window.refreshVsSpectatorBadge(window._vsSpectatorCount || 0);
     try { window.globequizHardReset?.(); } catch (e) {}
     // New shared country from the new seed, then the standard GloboReto launch
     // (sync gate + 3-2-1 live inside initGlobeQuiz). The VS.on* callbacks from
@@ -2448,6 +2588,7 @@ window.refreshVsSpectatorBadge = function (n) {
     if (!_matchResultRecorded && window._sbUserId && typeof window.sbRecordVersusResult === 'function') {
       _matchResultRecorded = true;
       window.sbRecordVersusResult(window._sbUserId, false).catch(() => {});
+      if (typeof window.sbGrantVersusCurrency === 'function') window.sbGrantVersusCurrency(false);
     }
     if (window.VS && typeof window.VS.abandon === 'function') window.VS.abandon();
     _teardownVsOpponent();
@@ -2460,11 +2601,13 @@ window.refreshVsSpectatorBadge = function (n) {
     // Turn off is_playing NOW (not only on returning to the menu) — without
     // this, the spectate icon on this player's cell in the friends panel
     // stayed visible/clickable for the WHOLE time they sit looking at their
-    // own result screen, even though the match already ended (matches.status
-    // is also advanced below, with VS.finish() — same reason, two different
-    // flags to turn off at once). Called on BOTH clients (not just host):
-    // each turns off its OWN is_playing, not the opponent's.
-    if (typeof window._setPlaying === 'function') window._setPlaying(false);
+    // own result screen, even though the match already ended. Called on BOTH
+    // clients — each turns off its OWN is_playing.
+    // GloboReto EXCEPTION: the two stay on the result screen with a live
+    // channel for a possible rematch — is_playing must stay TRUE so the
+    // "being spectated" badge doesn't vanish and a new spectator can still
+    // discover the match. It's turned off for real on leaving (quitToMenu).
+    if (_vsCurrentMode !== 'globequiz' && typeof window._setPlaying === 'function') window._setPlaying(false);
     // Tell a possible spectator the final result — this never happened
     // before (reportPostgame() was defined in vs.js but nobody called it for
     // versus, see the old comment right there), so the spectator was left
@@ -2502,9 +2645,11 @@ window.refreshVsSpectatorBadge = function (n) {
       // owner that already had write permission in _vsReturnToMenu, the
       // criterion isn't duplicated.
       // GloboReto: DON'T finish the match here — the two players stay on the
-      // result screen with a live channel so they can rematch (see
-      // _gqvrConfirm/_gqvrRelaunch). It's finished for real in _vsReturnToMenu
-      // when someone actually leaves. Every other mode finishes now.
+      // result screen with a live channel so they can rematch, AND the match
+      // row must stay 'active' so an external spectator can still discover it
+      // (openSpectatorForFriend filters by status='active'). It's finished for
+      // real in _vsReturnToMenu when someone leaves. Every other mode finishes
+      // now (single round, no rematch).
       if (isHost && !_endedByAbandon && _vsCurrentMode !== 'globequiz'
           && typeof window.VS.finish === 'function') {
         try { window.VS.finish(); } catch (e) {}
@@ -2528,6 +2673,8 @@ window.refreshVsSpectatorBadge = function (n) {
         && typeof window.sbRecordVersusResult === 'function') {
       _matchResultRecorded = true;
       window.sbRecordVersusResult(window._sbUserId, outcome === 'win').catch(() => {});
+      // Coins/XP for this versus round (server caps at 10/day).
+      if (typeof window.sbGrantVersusCurrency === 'function') window.sbGrantVersusCurrency(outcome === 'win');
     }
     const T = (k, d) => (typeof t === 'function' ? t(k) : d);
     const screen = document.getElementById('vs-result-screen');
@@ -2675,6 +2822,53 @@ window.refreshVsSpectatorBadge = function (n) {
   window.vsSpectatorHideResult = function () {
     const screen = document.getElementById('vs-result-screen');
     if (screen) screen.style.display = 'none';
+    const gq = document.getElementById('gq-vs-result-screen');
+    if (gq) { gq.style.display = 'none'; gq.classList.remove('gqvr-vr-out'); }
+  };
+
+  // GloboReto duel result for a spectator — the same cream #gq-vs-result-screen
+  // the players see, read-only. `p` is already the friend's perspective
+  // (spectate.js filtered by role): p.me* = the friend, p.opp* = their rival.
+  window.vsSpectatorShowGqResult = function (p) {
+    if (!p) return;
+    const screen = document.getElementById('gq-vs-result-screen');
+    if (!screen) return;
+    screen.querySelector('.gqvr-box')?.classList.remove('gqvr-box-out');
+    screen.classList.remove('gqvr-vr-out');
+    const setTxt = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+    const meWon = p.outcome === 'win';
+    const flag = document.getElementById('gqvr-flag');
+    const flagUrl = (p.iso2 && window.flagUrlForCountryCode) ? window.flagUrlForCountryCode(p.iso2) : '';
+    if (flag) { flag.style.display = flagUrl ? 'block' : 'none'; flag.src = flagUrl || ''; }
+    setTxt('gqvr-country-name', p.countryName || '');
+    setTxt('gqvr-time', window.formatGqCardTime ? window.formatGqCardTime(p.time || 0) : String(p.time || 0));
+    setTxt('gqvr-me-lbl', p.meName || 'Jugador');
+    setTxt('gqvr-opp-lbl', p.oppName || 'Rival');
+    setTxt('gqvr-me-att', p.meAtt != null ? p.meAtt : '—');
+    setTxt('gqvr-opp-att', p.oppAtt != null ? p.oppAtt : '—');
+    setTxt('gqvr-me-name', p.meName || 'Jugador');
+    setTxt('gqvr-opp-name', p.oppName || 'Rival');
+    setTxt('gqvr-me-win', String(p.meWins || 0));
+    setTxt('gqvr-opp-win', String(p.oppWins || 0));
+    const mePic  = document.getElementById('gqvr-me-pic');
+    const oppPic = document.getElementById('gqvr-opp-pic');
+    if (mePic)  mePic.src  = p.meAvatar  || 'images/profilepic/ppdefault.png';
+    if (oppPic) oppPic.src = p.oppAvatar || 'images/profilepic/ppdefault.png';
+    window.CustomizeAssets?.applyFrame(document.getElementById('gqvr-me-pic-wrap'), p.meFrame || '0001');
+    window.CustomizeAssets?.applyFrame(document.getElementById('gqvr-opp-pic-wrap'), p.oppFrame || '0001');
+    document.getElementById('gqvr-me-side')?.classList.toggle('gqvr-winner', meWon);
+    document.getElementById('gqvr-opp-side')?.classList.toggle('gqvr-winner', !meWon);
+    // Read-only: no rematch handshake for a spectator. Hide the whole button
+    // row + the loading/handshake bits; the spectator leaves via the mini HUD.
+    ['gqvr-me-bubble', 'gqvr-opp-bubble', 'gqvr-me-check', 'gqvr-opp-check', 'gqvr-loading', 'gqvr-btns', 'gqvr-msg']
+      .forEach(id => { const el = document.getElementById(id); if (el) el.hidden = true; });
+    document.getElementById('gqvr-btns')?.setAttribute('hidden', '');
+    document.getElementById('gqvr-opp-side')?.classList.remove('gqvr-dc');
+    document.getElementById('gqvr-opp-pic-wrap')?.querySelector('.lb-disconnected-icon')?.remove();
+    const shared = document.getElementById('vs-result-screen');
+    if (shared) shared.style.display = 'none';
+    screen.style.display = 'flex';
+    try { if (typeof playMusic === 'function' && typeof sfxPostgame !== 'undefined') playMusic(sfxPostgame); } catch (e) {}
   };
 
   // ── Start versus match ────────────────────────────────────────────────────
@@ -2780,6 +2974,35 @@ window.refreshVsSpectatorBadge = function (n) {
     if (typeof window._hideVsWaitSpinner === 'function') window._hideVsWaitSpinner();
     _setupVsOpponent(match);
 
+    // GloboReto: hand a spectator BOTH players' identity in canonical
+    // host/guest form (a stranger's `profiles` row is usually not readable to
+    // the spectator — RLS friends only — so the opponent card stayed blank).
+    // Each player knows itself + _vsOpponent, so either broadcast is complete.
+    if ((match.mode || 'flags') === 'globequiz' && typeof window.VS.reportGqSpec === 'function') {
+      const _isHost = window.VS.isHost();
+      const _o = window._vsOpponent || {};
+      const _me = {
+        name: localStorage.getItem('playerName') || 'Jugador',
+        avatar: localStorage.getItem('profilePhoto') || '',
+        frame: (function(){ try { return window._sbProfile?.frame_code || localStorage.getItem('cust_frame_code') || '0001'; } catch(e){ return '0001'; } })(),
+        card: (function(){ try { return window._sbProfile?.card_code || localStorage.getItem('cust_card_code') || '0001'; } catch(e){ return '0001'; } })(),
+      };
+      const _r = { name: _o.name || 'Rival', avatar: _o.avatar || '', frame: _o.frameCode || '0001', card: _o.cardCode || '0001' };
+      const _host  = _isHost ? _me : _r;
+      const _guest = _isHost ? _r : _me;
+      const _sendId = () => {
+        try {
+          window.VS.reportGqSpec({
+            kind: 'identity',
+            hostName: _host.name, hostAvatar: _host.avatar, hostFrame: _host.frame, hostCard: _host.card,
+            guestName: _guest.name, guestAvatar: _guest.avatar, guestFrame: _guest.frame, guestCard: _guest.card,
+          });
+        } catch (e) {}
+      };
+      _sendId();
+      setTimeout(_sendId, 2000); // once the channel is surely subscribed
+    }
+
     window.VS.onOppLeft(_onOpponentAbandoned);
     // The opponent announced THEIR timer hit 0 (see reportGameEnd) — if I've
     // also finished mine, now the result can be shown.
@@ -2850,6 +3073,11 @@ window.refreshVsSpectatorBadge = function (n) {
     }
 
     window.VS.onEnd(() => {
+      // GloboReto never marks the row 'finished' from the result screen (see
+      // _showVsResult) — so if this fires for globequiz it's a real leave
+      // (_vsReturnToMenu), which already runs its own teardown. Skip the
+      // duplicate here so a stray echo can't wipe a live rematch's state.
+      if (mode === 'globequiz') return;
       _restoreRandom();
       _teardownVsOpponent();
     });

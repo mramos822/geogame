@@ -58,6 +58,7 @@
   let guesses = [];               // [{name, km, dir, color}]
   let animatedGuessNames = new Set(); // rows that already played the entrance animation
   let solved = false;
+  let _gqSuggestion = null;       // { country, forNorm } — pending "Did you mean X?" (see showSuggestion)
 
   function normalize(s) {
     return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
@@ -1341,6 +1342,7 @@
     guesses = [];
     solved = false;
     animatedGuessNames = new Set();
+    _gqSuggestion = null;
   }
 
   function saveState() { /* no persistence for now */ }
@@ -1743,9 +1745,10 @@
   }
 
   // Shows a clickable "Did you mean \"X\"?" in the same place as the hint
-  // ("hotter/colder" etc.) — on click, fills the input with that country and
-  // retries the guess (this time it matches exactly).
-  function showSuggestion(country) {
+  // ("hotter/colder" etc.) — on click OR a second Enter on the same text, it
+  // fills the input with that country and retries the guess (matches exactly).
+  function showSuggestion(country, forNorm) {
+    _gqSuggestion = { country: country, forNorm: forNorm };
     const el = document.getElementById('gq-hint');
     if (!el) return;
     el.innerHTML = '';
@@ -1757,6 +1760,7 @@
     link.addEventListener('click', () => {
       const input = document.getElementById('gq-guess-input');
       if (input) input.value = label;
+      _gqSuggestion = null;
       submitGuess();
     });
     el.appendChild(link);
@@ -1772,11 +1776,20 @@
     const norm = normalize(raw);
     const country = countryByName.get(norm);
     if (!country) {
+      // Enter (or re-submit) on the SAME near-miss that already has a
+      // "Did you mean X?" showing → accept it, same as clicking the name.
+      if (_gqSuggestion && _gqSuggestion.forNorm === norm && _gqSuggestion.country) {
+        input.value = displayName(_gqSuggestion.country);
+        _gqSuggestion = null;
+        submitGuess();
+        return;
+      }
       const suggestion = findSuggestion(norm);
-      if (suggestion) showSuggestion(suggestion);
+      if (suggestion) showSuggestion(suggestion, norm);
       else if (hintEl) hintEl.textContent = t('globequiz.notFound');
       return;
     }
+    _gqSuggestion = null;
     if (guesses.find(g => g.name === country.name) || (dailyCountry && country.name === dailyCountry.name && solved)) {
       if (hintEl) hintEl.textContent = t('globequiz.alreadyGuessed');
       return;
@@ -1839,7 +1852,9 @@
         gqEndgameTimeout = setTimeout(() => {
           gqEndgameTimeout = null;
           if (typeof window._vsShowGqWinResult === 'function') window._vsShowGqWinResult(gqFinalElapsedMs);
-          if (typeof window._setPlaying === 'function') window._setPlaying(false);
+          // NOT _setPlaying(false) here: GloboReto VS keeps the session alive
+          // on the result screen for a possible rematch (badge + spectator
+          // discovery). It's turned off for real on leaving (quitToMenu).
         }, GQ_VS_ANIM_MS);
         return;
       }
@@ -1877,12 +1892,12 @@
     const g = { name: country.name, km, dir, color: distColor(km) };
     guesses.push(g);
     if (typeof window._specReportAnswer === 'function') {
-      // VS 1v1: only km/dir, NEVER the typed country name (it would spoil the
-      // area the opponent is trying) — the solo/spectator mode does get the
-      // full detail (rebuilds the row with flag and all).
-      const detail = window._vsActive
-        ? { km: g.km, dir: g.dir }
-        : { name: g.name, km: g.km, dir: g.dir, color: g.color };
+      // Full detail (incl. the typed country name) so a spectator can render
+      // the friend's guess list with flags. The OPPONENT's own client reads
+      // ONLY `km` from this broadcast (globequizSetVsOpponentGuess in vs.js),
+      // so the name never reaches honest opponent play — it's just there for
+      // whoever is watching.
+      const detail = { name: g.name, km: g.km, dir: g.dir, color: g.color };
       // In VS, `score` travels to VS.reportScore and is persisted as-is in
       // the match row's host_score/guest_score (see _vsReportAnswer) —
       // GlobeQuiz has no numeric score, so sending guesses.length there
@@ -2614,6 +2629,9 @@
   let _gqSpecTimerInterval = null;
   let _gqSpecCardInterval = null;
   let _gqSpecStartedAt = 0;
+  // VS spectator: best (closest) km each side reached, for the two cards.
+  let _gqSpecFriendBestKm = Infinity;
+  let _gqSpecOppBestKm = Infinity;
 
   function _gqSpecResetPanel() {
     if (_gqSpecCardInterval) { clearInterval(_gqSpecCardInterval); _gqSpecCardInterval = null; }
@@ -2626,8 +2644,20 @@
     // format is only for the small card, formatGqCardTime).
     const timerEl = document.getElementById('gq-timer-number');
     if (timerEl) timerEl.textContent = '0';
-    const cardTimeEl = document.getElementById('gq-lb-player-time');
-    if (cardTimeEl) cardTimeEl.textContent = '0:00';
+    // Friend card time — the two-line VS layout (globequizSpectatorSetOpponent)
+    // keeps its child spans; only the value/km reset, never wipe the container.
+    const meVal = document.getElementById('gq-lb-player-time-val');
+    if (meVal) meVal.textContent = '0:00';
+    else { const c = document.getElementById('gq-lb-player-time'); if (c) c.textContent = '0:00'; }
+    const meKm = document.getElementById('gq-lb-player-km');
+    if (meKm) meKm.textContent = '—';
+    // Rival row — carry it across rounds (same opponent), just reset its values.
+    const oTime = document.getElementById('gq-lb-vsopp-time');
+    if (oTime) oTime.textContent = '0:00';
+    const oKm = document.getElementById('gq-lb-vsopp-km');
+    if (oKm) oKm.textContent = '—';
+    _gqSpecFriendBestKm = Infinity;
+    _gqSpecOppBestKm = Infinity;
     // Same reset as the real player's loadState() (guesses/solved) plus
     // dailyCountry null — the spectator never knows it until they win (see
     // globequizSpectatorResolvePick), so drawTexture()/updateOutlines() must
@@ -2636,6 +2666,9 @@
     solved = false;
     animatedGuessNames = new Set();
     dailyCountry = null;
+    // Clear a leftover game-over overlay (globequizSpectatorShowLoss).
+    const _go = document.getElementById('powerquit-overlay');
+    if (_go) { _go.style.display = 'none'; _go.classList.remove('timeup-in', 'timeup-out'); }
     if (sphere) {
       sphere.rotation.x = BASE_ROT_X; sphere.rotation.y = BASE_ROT_Y;
       zoomZ = BASE_Z;
@@ -2772,8 +2805,52 @@
     });
   };
 
+  // VS spectator: the rival's row (name + avatar + shared time + best km),
+  // and convert the friend's own card to the same two-line time/km layout the
+  // real players use.
+  window.globequizSpectatorSetOpponent = function (name, avatar, cardCode) {
+    const bar = document.getElementById('gq-friends-bar');
+    const playerEl = document.getElementById('gq-lb-player');
+    if (!bar || !playerEl) return;
+    let el = document.getElementById('gq-lb-vsopp');
+    if (!el) {
+      _gqSpecFriendBestKm = Infinity;
+      _gqSpecOppBestKm = Infinity;
+      el = document.createElement('div');
+      el.className = 'lb-entry lb-vsopp';
+      el.id = 'gq-lb-vsopp';
+      el.innerHTML = '<div class="lb-avatar"><img class="lb-avatar-img" id="gq-lb-vsopp-avatar" src="images/profilepic/ppdefault.png"></div>'
+        + '<span class="lb-name" id="gq-lb-vsopp-name"></span>'
+        + '<span class="lb-score gq-lb-vs-score" id="gq-lb-vsopp-score">' + gqVsScoreInnerHtml('gq-lb-vsopp-time', 'gq-lb-vsopp-km') + '</span>';
+      bar.appendChild(el);
+      el.style.top = ((GQ_LB_WINDOW - 2) * GQ_LB_ROW_H_CQMIN) + 'cqmin';
+    }
+    document.getElementById('gq-lb-vsopp-name').textContent = name || 'Rival';
+    document.getElementById('gq-lb-vsopp-avatar').src = avatar || 'images/profilepic/ppdefault.png';
+    if (window.CustomizeAssets) window.CustomizeAssets.applyCard(el, cardCode || '0001');
+    // Friend card → same two-line layout (only once).
+    const myScoreEl = document.getElementById('gq-lb-player-time');
+    if (myScoreEl && !document.getElementById('gq-lb-player-time-val')) {
+      myScoreEl.classList.add('gq-lb-vs-score');
+      myScoreEl.innerHTML = gqVsScoreInnerHtml('gq-lb-player-time-val', 'gq-lb-player-km');
+    }
+  };
+  window.globequizSpectatorSetOppGuess = function (km) {
+    if (typeof km === 'number' && isFinite(km)) _gqSpecOppBestKm = Math.min(_gqSpecOppBestKm, km);
+    const el = document.getElementById('gq-lb-vsopp-km');
+    if (el) el.textContent = isFinite(_gqSpecOppBestKm) ? Math.round(_gqSpecOppBestKm) + ' km' : '—';
+  };
+  window.globequizSpectatorSetFriendGuess = function (km) {
+    if (typeof km === 'number' && isFinite(km)) _gqSpecFriendBestKm = Math.min(_gqSpecFriendBestKm, km);
+    const el = document.getElementById('gq-lb-player-km');
+    if (el) el.textContent = isFinite(_gqSpecFriendBestKm) ? Math.round(_gqSpecFriendBestKm) + ' km' : '—';
+  };
+
   window.globequizSpectatorExit = function (switchingMode) {
     if (!switchingMode) window._isSpectating = false;
+    document.getElementById('gq-lb-vsopp')?.remove();
+    const _go2 = document.getElementById('powerquit-overlay');
+    if (_go2) { _go2.style.display = 'none'; _go2.classList.remove('timeup-in', 'timeup-out'); }
     if (_gqSpecTimerInterval) { clearInterval(_gqSpecTimerInterval); _gqSpecTimerInterval = null; }
     if (_gqSpecCardInterval) { clearInterval(_gqSpecCardInterval); _gqSpecCardInterval = null; }
     // The globe now genuinely runs for the spectator (auto-rotation +
@@ -2861,10 +2938,14 @@
     // the normal player.
     if (_gqSpecCardInterval) clearInterval(_gqSpecCardInterval);
     const cardTick = () => {
-      const cardTimeEl = document.getElementById('gq-lb-player-time');
-      if (cardTimeEl && typeof formatGqCardTime === 'function') {
-        cardTimeEl.textContent = formatGqCardTime(Math.max(0, Date.now() - _gqSpecStartedAt));
-      }
+      if (typeof formatGqCardTime !== 'function') return;
+      const t = formatGqCardTime(Math.max(0, Date.now() - _gqSpecStartedAt));
+      // Two-line VS layout (globequizSpectatorSetOpponent) or the plain card.
+      const meVal = document.getElementById('gq-lb-player-time-val') || document.getElementById('gq-lb-player-time');
+      if (meVal) meVal.textContent = t;
+      // The rival shares the same clock (both started by the same 3-2-1).
+      const oppTime = document.getElementById('gq-lb-vsopp-time');
+      if (oppTime) oppTime.textContent = t;
     };
     cardTick();
     _gqSpecCardInterval = setInterval(cardTick, 30);
@@ -2903,8 +2984,13 @@
       // (see gqCardEl.textContent = formatGqCardTime(gqFinalElapsedMs) in
       // submitGuess) instead of leaving it at whatever cardTick last
       // painted.
-      const cardTimeEl = document.getElementById('gq-lb-player-time');
-      if (cardTimeEl && typeof formatGqCardTime === 'function') cardTimeEl.textContent = formatGqCardTime(payload.elapsedMs || 0);
+      if (typeof formatGqCardTime === 'function') {
+        const _f = formatGqCardTime(payload.elapsedMs || 0);
+        const meVal2 = document.getElementById('gq-lb-player-time-val') || document.getElementById('gq-lb-player-time');
+        if (meVal2) meVal2.textContent = _f;
+        const oTime2 = document.getElementById('gq-lb-vsopp-time');
+        if (oTime2) oTime2.textContent = _f;
+      }
       // solved/dailyCountry are the SAME module variables the real player
       // uses — with these set, drawTexture()/updateOutlines() already paint
       // the correct country green with its outline, and showWin() builds
@@ -2923,9 +3009,44 @@
     }
     const country = countryByName.get(normalize(payload.name || ''));
     guesses.push({ name: payload.name, km: payload.km, dir: payload.dir, color: payload.color });
+    if (typeof payload.km === 'number' && typeof window.globequizSpectatorSetFriendGuess === 'function') {
+      window.globequizSpectatorSetFriendGuess(payload.km);
+    }
     drawTexture();
     renderGuessList();
     if (country) focusOnCountry(country);
+  };
+
+  // The spectated friend LOST — the RIVAL guessed right first. Mirrors
+  // globequizVsShowLoss (the real loser's path): reveal the country WITHOUT
+  // the win celebration + the same game-over overlay the real loser sees.
+  // payload carries countryName/iso2 (from the rival's win broadcast).
+  window.globequizSpectatorShowLoss = function (payload) {
+    if (solved) return;
+    solved = true;
+    stopAutoRotate();
+    if (_gqSpecTimerInterval) { clearInterval(_gqSpecTimerInterval); _gqSpecTimerInterval = null; }
+    if (_gqSpecCardInterval) { clearInterval(_gqSpecCardInterval); _gqSpecCardInterval = null; }
+    dailyCountry = countryByName.get(normalize((payload && payload.countryName) || ''));
+    drawTexture();
+    renderGuessList();
+    if (dailyCountry) focusOnCountry(dailyCountry);
+    if (typeof playMusic === 'function') playMusic(null);
+    if (typeof sfxTimesUp !== 'undefined' && typeof sfxPlay === 'function') { sfxTimesUp.currentTime = 0; sfxPlay(sfxTimesUp); }
+    // Same game-over overlay + timing the real loser gets (_handleGqOpponentWin
+    // in vs.js) before the result panel comes in ~2s later.
+    const animMs = window._GQ_VS_ANIM_MS || 2000;
+    const goOverlay = document.getElementById('powerquit-overlay');
+    if (goOverlay) {
+      goOverlay.style.display = 'flex';
+      goOverlay.classList.remove('timeup-out');
+      goOverlay.classList.add('timeup-in');
+      setTimeout(() => {
+        goOverlay.classList.remove('timeup-in');
+        goOverlay.classList.add('timeup-out');
+        setTimeout(() => { goOverlay.style.display = 'none'; goOverlay.classList.remove('timeup-out'); }, 400);
+      }, Math.max(0, animMs - 400));
+    }
   };
 
   // Resend (not live) of ALL guesses already made — arrives on joining
