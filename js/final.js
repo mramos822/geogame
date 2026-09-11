@@ -307,10 +307,12 @@ async function _guestRankPosition(total) {
   if (!window.sb) return null;
   try {
     const { data } = await window.sb.from('profiles')
-      .select('hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total')
+      .select('hs_total')
       .eq('hidden_from_rankings', false);
     if (!data) return null;
-    const scores = data.map(p => Math.max(p.hs_total || 0, (p.hs_flags||0)+(p.hs_shapes||0)+(p.hs_cities||0)+(p.hs_monuments||0)));
+    // Same stat as rankings-panel.js _totalScore: the best Gira Mundial
+    // (campaign) result, not the sum of each mode's own best game.
+    const scores = data.map(p => p.hs_total || 0);
     return { pos: scores.filter(s => s > total).length + 1, total: scores.length + 1 };
   } catch (e) { return null; }
 }

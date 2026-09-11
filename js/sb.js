@@ -373,9 +373,8 @@ window.sbGetFriends = async function(userId) {
     return {
       id:     p.id,
       name:   p.username,
-      // The player's single best game, not the sum of the 4 modes' highscores
-      // (hs_total is a campaign-run sum, a different stat — see rankings-panel.js).
-      score:  Math.max(p.hs_flags||0, p.hs_shapes||0, p.hs_cities||0, p.hs_monuments||0),
+      // Best Gira Mundial (campaign) result — see rankings-panel.js _totalScore.
+      score:  p.hs_total || 0,
       avatar: p.avatar_url || 'images/profilepic/ppdefault.png',
     };
   });
@@ -490,9 +489,8 @@ window.sbLoadSocialData = async function(userId) {
     return {
       friendshipId: row.id,
       id: p.id, name: p.username || '?',
-      // The player's single best game, not the sum of the 4 modes' highscores
-      // (hs_total is a campaign-run sum, a different stat — see rankings-panel.js).
-      score: Math.max(p.hs_flags||0, p.hs_shapes||0, p.hs_cities||0, p.hs_monuments||0),
+      // Best Gira Mundial (campaign) result — see rankings-panel.js _totalScore.
+      score: p.hs_total || 0,
       avatar: p.avatar_url || 'images/profilepic/ppdefault.png',
       hs_flags: p.hs_flags||0, hs_shapes: p.hs_shapes||0,
       hs_cities: p.hs_cities||0, hs_monuments: p.hs_monuments||0,

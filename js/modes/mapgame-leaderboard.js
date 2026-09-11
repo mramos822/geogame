@@ -16,8 +16,9 @@ let mockPlayers = buildFriendPlayers();
 // ★ best entry uses that total, not an individual mode's highscore.
 function getTotalHighscore() {
   if (window._sbProfile && window._accountLoggedIn) {
-    const p = window._sbProfile;
-    return (p.hs_flags||0) + (p.hs_shapes||0) + (p.hs_cities||0) + (p.hs_monuments||0);
+    // hs_total, not a sum of each mode's own best game — those can come from
+    // 4 different sessions never actually played together as one campaign.
+    return window._sbProfile.hs_total || 0;
   }
   return parseInt(localStorage.getItem('totalHighscore') || '0', 10) || 0;
 }

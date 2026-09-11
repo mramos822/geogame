@@ -27,11 +27,14 @@
 
   const SEL = 'id, username, avatar_url, hs_flags, hs_shapes, hs_cities, hs_monuments, hs_total, play_count, vs_wins, vs_losses, is_supporter, avg_sum_flags, avg_sum_shapes, avg_sum_cities, avg_sum_monuments, play_count_flags, play_count_shapes, play_count_cities, play_count_monuments, country_code, is_founder, cell_code, frame_code, panel_code, last_active, is_playing, is_practicing';
 
-  // The ranking score is the player's single best game, not the sum of the 4
-  // modes' highscores (hs_total is a campaign-run sum, a different stat — see
-  // js/results.js TOTAL_HS_KEY — and must not leak into this ranking).
+  // The ranking score is the best Gira Mundial (campaign) result: hs_flags/
+  // hs_shapes/hs_cities/hs_monuments are each mode's own best game, which can
+  // come from 4 different sessions never actually played together — summing
+  // them would fabricate a total that was never really scored. hs_total is
+  // the real sum from one completed campaign run (see js/results.js and
+  // add_game_score in sb.js), so it's the only valid source for this stat.
   function _totalScore(p) {
-    return Math.max(p.hs_flags||0, p.hs_shapes||0, p.hs_cities||0, p.hs_monuments||0);
+    return p.hs_total || 0;
   }
   function _toRow(p) {
     return {

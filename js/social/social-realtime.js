@@ -135,10 +135,8 @@ function _subscribeFriendStatuses(friendIds) {
         }
       }
       // Update score if it changed (friend finished a game). The score is the
-      // friend's single best game, not the sum of the 4 modes' highscores —
-      // same formula as toEntry() (sb.js) — hs_total is a campaign-run sum, a
-      // different stat that must not leak into this display.
-      const newScore = Math.max(updated.hs_flags||0, updated.hs_shapes||0, updated.hs_cities||0, updated.hs_monuments||0);
+      // friend's best Gira Mundial (campaign) result — same as toEntry() (sb.js).
+      const newScore = updated.hs_total || 0;
       if (newScore !== f.score) {
         f.score       = newScore;
         f.hs_flags    = updated.hs_flags    || 0;
