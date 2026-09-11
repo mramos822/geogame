@@ -250,7 +250,9 @@ window.refreshProfileStats = function () {
   });
   const rankEl = document.getElementById('loading-games-rank');
   if (rankEl && typeof getRank === 'function') {
-    const totalHs = flagsHs + shapesHs + playHs + monumentsHs;
+    // Rank/"total" shown here is the single best game across the 4 modes, not
+    // their sum — same as the rankings panel and the friends/social score.
+    const totalHs = Math.max(flagsHs, shapesHs, playHs, monumentsHs);
     const totalEl = document.getElementById('loading-games-total');
     if (totalEl) totalEl.textContent = totalHs.toLocaleString();
     const rk = getRank(totalHs);

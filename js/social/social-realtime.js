@@ -134,15 +134,11 @@ function _subscribeFriendStatuses(friendIds) {
           if (pcEl) pcEl.textContent = tn('profile.friendPlayed', f.play_count);
         }
       }
-      // Update score if it changed (friend finished a game).
-      // The hs_total column is never set server-side for some accounts (stays 0
-      // even when hs_flags/hs_shapes/hs_cities/hs_monuments have real scores) —
-      // same fallback as toEntry() (sb.js) and the helper below (Math.max).
-      // Without this fallback HERE, any friend profile UPDATE (is_playing,
-      // avatar, anything — score need not change) overwrote the correct value
-      // with 0 until the next full refetch — the reported "data flipping
-      // between 0 and the current detail".
-      const newScore = updated.hs_total || ((updated.hs_flags||0)+(updated.hs_shapes||0)+(updated.hs_cities||0)+(updated.hs_monuments||0));
+      // Update score if it changed (friend finished a game). The score is the
+      // friend's single best game, not the sum of the 4 modes' highscores —
+      // same formula as toEntry() (sb.js) — hs_total is a campaign-run sum, a
+      // different stat that must not leak into this display.
+      const newScore = Math.max(updated.hs_flags||0, updated.hs_shapes||0, updated.hs_cities||0, updated.hs_monuments||0);
       if (newScore !== f.score) {
         f.score       = newScore;
         f.hs_flags    = updated.hs_flags    || 0;

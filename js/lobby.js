@@ -1003,7 +1003,8 @@ window.Lobby = (() => {
             id: p.id,
             name: p.username || m.name,
             avatar: p.avatar_url || m.avatar || 'images/profilepic/ppdefault.png',
-            score: p.hs_total || ((p.hs_flags||0)+(p.hs_shapes||0)+(p.hs_cities||0)+(p.hs_monuments||0)),
+            // Single best game, not the sum of the 4 modes' highscores (see rankings-panel.js).
+            score: Math.max(p.hs_flags||0, p.hs_shapes||0, p.hs_cities||0, p.hs_monuments||0),
             play_count: p.play_count || 0,
             vs_wins: p.vs_wins || 0,
             vs_losses: p.vs_losses || 0,
