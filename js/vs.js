@@ -1,6 +1,11 @@
 // ── VERSUS MODE ───────────────────────────────────────────────────────────────
 // Matchmaking, Realtime channel, and 1v1 match logic.
 let _vsCurrentMode = 'flags';
+// GloboReto has two duel variants ('globequiz' = por rapidez, 'globequiz_turns'
+// = por turnos) that share the exact same engine/seed/UI plumbing — this
+// helper is the single place that treats them as "the same underlying mode"
+// wherever the difference doesn't matter.
+function _isGqMode(m) { return m === 'globequiz' || m === 'globequiz_turns'; }
 function _startSeededRandom(seed, mode) {
   _vsCurrentMode = mode || 'flags';
   if (_vsCurrentMode === 'shapes') {
@@ -9,7 +14,7 @@ function _startSeededRandom(seed, mode) {
     window.citiesSetSeed?.(seed);
   } else if (_vsCurrentMode === 'monuments') {
     window.monumentsSetSeed?.(seed);
-  } else if (_vsCurrentMode === 'globequiz') {
+  } else if (_isGqMode(_vsCurrentMode)) {
     window.globequizSetSeed?.(seed);
   } else {
     if (typeof window.flagsSetSeed === 'function') window.flagsSetSeed(seed);
@@ -22,7 +27,7 @@ function _restoreRandom() {
     window.citiesClearSeed?.();
   } else if (_vsCurrentMode === 'monuments') {
     window.monumentsClearSeed?.();
-  } else if (_vsCurrentMode === 'globequiz') {
+  } else if (_isGqMode(_vsCurrentMode)) {
     window.globequizClearSeed?.();
   } else {
     if (typeof window.flagsClearSeed === 'function') window.flagsClearSeed();
@@ -49,6 +54,8 @@ window.VS = (() => {
   let _onRematch = null; // cb() — GloboReto result screen: opponent clicked "Jugar de nuevo".
   let _onResultLeave = null; // cb() — GloboReto result screen: opponent left it (Exit / tab close).
   let _onRematchGo = null; // cb({seed}) — GloboReto rematch: host published the new round's seed.
+  let _onGqTurnGuess = null; // cb({role, name, km, dir, color, iso2}) — GloboReto "por turnos": opponent's wrong guess + turn pass.
+  let _onGqTyping = null; // cb({role, text}) — GloboReto "por turnos": live preview of what the active player is typing.
   // cb(status) — the Realtime channel NEVER got authorized (typically a
   // broken RLS policy on the server, see the sep-2026 one: an invalid cast
   // made ANY attempt to join 'match-{id}'/'solo-{id}' throw CHANNEL_ERROR).
@@ -196,6 +203,14 @@ window.VS = (() => {
       .on('broadcast', { event: 'rematchgo' }, ({ payload }) => {
         if (payload && payload.role === _role) return;
         if (_onRematchGo && payload) _onRematchGo(payload);
+      })
+      // GloboReto "por turnos": the wrong guess that just passed the turn.
+      .on('broadcast', { event: 'gqturnguess' }, ({ payload }) => {
+        if (_onGqTurnGuess && payload) _onGqTurnGuess(payload);
+      })
+      // GloboReto "por turnos": live preview of what the active player is typing.
+      .on('broadcast', { event: 'gqtyping' }, ({ payload }) => {
+        if (_onGqTyping && payload) _onGqTyping(payload);
       })
       // Presence: detects tab close / connection loss of the opponent.
       .on('presence', { event: 'leave' }, ({ key }) => {
@@ -437,6 +452,31 @@ window.VS = (() => {
   function reportRematchGo(seed) {
     if (_channel && _role) { try { _channel.send({ type: 'broadcast', event: 'rematchgo', payload: { role: _role, seed } }); } catch (e) {} }
   }
+  // GloboReto "por turnos": the roulette is about to spin — HOST ONLY sends
+  // this (both clients would otherwise fire it near-simultaneously and a
+  // spectator could get retriggered mid-animation). starterRole is enough
+  // for a spectator to run the exact same deterministic animation (its
+  // OUTCOME doesn't need transmitting beyond that, same as real players
+  // deriving it locally from the seed).
+  function reportGqRouletteStart(starterRole) {
+    if (_channel && _role) { try { _channel.send({ type: 'broadcast', event: 'gqroulette', payload: { role: _role, starterRole } }); } catch (e) {} }
+  }
+  // GloboReto "por turnos": this client just missed — carries the full guess
+  // (name/km/dir/color/iso2) so the opponent can mirror it into their own
+  // guess list, and passes them the turn. Cached for _resendStateTo (see
+  // below) — a spectator joining well after the match started needs to know
+  // WHEN the current turn began to run its own countdown in sync, not just
+  // the original round's startedAt (the reported "the timer shows something
+  // different from the real one" for a late-joining spectator).
+  function reportGqTurnGuess(payload) {
+    _lastGqTurnGuess = { role: _role, ...(payload || {}) };
+    if (_channel && _role) { try { _channel.send({ type: 'broadcast', event: 'gqturnguess', payload: _lastGqTurnGuess }); } catch (e) {} }
+  }
+  // GloboReto "por turnos": live preview of what I'm typing, while it's my
+  // turn — throttled on the sender's side (globequiz.js), fire-and-forget.
+  function reportGqTyping(text) {
+    if (_channel && _role) { try { _channel.send({ type: 'broadcast', event: 'gqtyping', payload: { role: _role, text: text || '' } }); } catch (e) {} }
+  }
   // GloboReto: rich data for a spectator's own #gq-vs-result-screen + rematch
   // transition (kind: 'result' | 'transition'). Both players broadcast their
   // own; the spectator keeps only the one matching the friend's side.
@@ -538,6 +578,7 @@ window.VS = (() => {
   let _lastGqSpecResult  = null;
   let _lastGqGuesses     = null;
   let _lastGqIdentity    = null;
+  let _lastGqTurnGuess   = null; // "Por turnos": the last turn hand-off (guess or timeout) — see reportGqTurnGuess/_resendStateTo
 
   // Saves a full SNAPSHOT of the current state (phase + round + pregame +
   // postgame) into host_state/guest_state — this used to live ONLY in THIS
@@ -607,6 +648,14 @@ window.VS = (() => {
     if (_lastRoundPayload) reportRound(_lastRoundPayload);
     if (_lastTick != null) reportTick(_lastTick);
     if (_lastGqGuesses && _channel) { try { _channel.send({ type: 'broadcast', event: 'gqguesses', payload: _lastGqGuesses }); } catch (e) {} }
+    // "Por turnos": a spectator joining well after the match started needs
+    // the CURRENT turn's actual start time, not the original round's (which
+    // is all `reportRound` above carries) — sent as its own event
+    // ('gqturnsync', not 'gqturnguess') so an ALREADY-connected spectator
+    // receiving this same resend doesn't re-push a duplicate guess into
+    // their already-correct list (see onGqTurnGuess vs onGqTurnSync in
+    // spectate.js — this is resync-only, no list/card side effects).
+    if (_lastGqTurnGuess && _channel) { try { _channel.send({ type: 'broadcast', event: 'gqturnsync', payload: _lastGqTurnGuess }); } catch (e) {} }
     _resendGqIdentity();
   }
   function _resendGqIdentity() {
@@ -628,10 +677,11 @@ window.VS = (() => {
     if (!_channel || !_role) return;
     _lastPhase = 'pregame';
     _lastPregamePayload = payload || {};
-    // A new round is starting — the previous round's GloboReto result/guesses
-    // are no longer what a late joiner should see.
+    // A new round is starting — the previous round's GloboReto result/guesses/
+    // turn state are no longer what a late joiner should see.
     _lastGqSpecResult = null;
     _lastGqGuesses = null;
+    _lastGqTurnGuess = null;
     try { _channel.send({ type: 'broadcast', event: 'pregame', payload: { role: _role, ...(payload || {}) } }); } catch (e) {}
     _persistLiveState();
   }
@@ -658,7 +708,7 @@ window.VS = (() => {
     // GloboReto logs one 'versus' analytics event PER ROUND (see
     // _showGqVsResult) since it can rematch on the same match row — don't
     // also log here on the final leave.
-    if (m.mode !== 'globequiz' && window.Analytics && typeof window.Analytics.logVersus === 'function') {
+    if (!_isGqMode(m.mode) && window.Analytics && typeof window.Analytics.logVersus === 'function') {
       window.Analytics.logVersus(m.mode || null);
     }
   }
@@ -685,7 +735,7 @@ window.VS = (() => {
     _oppFinishedGameEnd = false;
     _matchId = _role = _match = null;
     _onStart = _onScore = _onEnd = _onOppLeft = _onWrong = _onGameEnd = _onAnswer = _onReady = _onGqAbort = _onGqPhase = null;
-    _onRematch = _onResultLeave = _onRematchGo = null;
+    _onRematch = _onResultLeave = _onRematchGo = _onGqTurnGuess = _onGqTyping = null;
     _started = false;
     _lastPhase = null;
     _lastRoundPayload = null;
@@ -695,6 +745,7 @@ window.VS = (() => {
     _lastGqSpecResult = null;
     _lastGqGuesses = null;
     _lastGqIdentity = null;
+    _lastGqTurnGuess = null;
     _restoreRandom();
   }
 
@@ -715,6 +766,9 @@ window.VS = (() => {
     reportRematch,
     reportResultLeave,
     reportRematchGo,
+    reportGqRouletteStart,
+    reportGqTurnGuess,
+    reportGqTyping,
     reportGqSpec,
     reportGqGuesses,
     cancelMatchNoResult,
@@ -754,6 +808,8 @@ window.VS = (() => {
     onRematch: cb => { _onRematch = cb; },
     onResultLeave: cb => { _onResultLeave = cb; },
     onRematchGo: cb => { _onRematchGo = cb; },
+    onGqTurnGuess: cb => { _onGqTurnGuess = cb; },
+    onGqTyping: cb => { _onGqTyping = cb; },
     onSubscribeError: cb => { _onSubscribeError = cb; },
     getMatch: () => _match,
     getRole:  () => _role,
@@ -837,6 +893,7 @@ window.refreshVsSpectatorBadge = function (n) {
   const TIMEOUT_MS = 30000;
   let _resultShown = false;    // prevents showing the result screen twice
   let _gqLoseHandled = false;  // GloboReto: prevents processing the opponent's win broadcast twice
+  let _vsGqTurnsVariant = false; // GloboReto "por turnos" (vs. the default "por rapidez")
   let _matchResultRecorded = false; // prevents counting the same match in vs_wins/vs_losses twice
   let _endedByAbandon = false; // the match ended by opponent abandonment
   // Waits for BOTH players to finish their own timer before showing the
@@ -1056,9 +1113,41 @@ window.refreshVsSpectatorBadge = function (n) {
       _sendInvite(guestId, guestName, guestAvatar, 'monuments');
     } else if (e.target.closest('#vs-mode-btn-globequiz')) {
       msel.style.display = 'none';
-      _sendInvite(guestId, guestName, guestAvatar, 'globequiz');
+      _showGqVariantSelector(guestId, guestName, guestAvatar);
     } else if (e.target.closest('#vs-mode-cancel')) {
       msel.style.display = 'none';
+    }
+  });
+
+  // ── GloboReto variant selector (por rapidez / por turnos) ─────────────────
+  function _showGqVariantSelector(guestId, guestName, guestAvatar) {
+    const pop = document.getElementById('vs-gq-variant-popup');
+    if (!pop) { _sendInvite(guestId, guestName, guestAvatar, 'globequiz'); return; }
+    document.getElementById('vs-gq-variant-name').textContent = guestName;
+    document.getElementById('vs-gq-variant-pic').src = guestAvatar || 'images/profilepic/ppdefault.png';
+    const guestFriend = (typeof getFriends === 'function') ? getFriends().find(f => f.id === guestId) : null;
+    window.CustomizeAssets?.applyFrame(document.getElementById('vs-gq-variant-pic-wrap'), guestFriend?.frameCode || '0001');
+    pop.style.display = 'flex';
+    pop.dataset.guestId     = guestId;
+    pop.dataset.guestName   = guestName;
+    pop.dataset.guestAvatar = guestAvatar || '';
+  }
+
+  document.addEventListener('click', e => {
+    const vpop = document.getElementById('vs-gq-variant-popup');
+    if (!vpop || vpop.style.display === 'none') return;
+    const guestId     = vpop.dataset.guestId;
+    const guestName   = vpop.dataset.guestName;
+    const guestAvatar = vpop.dataset.guestAvatar;
+    if (e.target.closest('#vs-gq-variant-btn-speed')) {
+      vpop.style.display = 'none';
+      _sendInvite(guestId, guestName, guestAvatar, 'globequiz');
+    } else if (e.target.closest('#vs-gq-variant-btn-turns')) {
+      vpop.style.display = 'none';
+      _sendInvite(guestId, guestName, guestAvatar, 'globequiz_turns');
+    } else if (e.target.closest('#vs-gq-variant-back')) {
+      vpop.style.display = 'none';
+      _showModeSelector(guestId, guestName, guestAvatar);
     }
   });
 
@@ -1247,7 +1336,7 @@ window.refreshVsSpectatorBadge = function (n) {
     mode = mode || 'flags';
     // GloboReto → begin the three.js download while we wait for the guest to
     // accept (see the preload note in _scheduleVersusStart).
-    if (mode === 'globequiz' && typeof window.preloadGlobeQuiz === 'function') {
+    if (_isGqMode(mode) && typeof window.preloadGlobeQuiz === 'function') {
       try { window.preloadGlobeQuiz(); } catch (e) {}
     }
     const guestFriend = (typeof getFriends === 'function') ? getFriends().find(f => f.id === guestId) : null;
@@ -1298,7 +1387,7 @@ window.refreshVsSpectatorBadge = function (n) {
   function _showIncomingPopup(match) {
     // GloboReto invite → start the three.js download while the guest is still
     // deciding whether to accept (see the preload note in _scheduleVersusStart).
-    if (match && match.mode === 'globequiz' && typeof window.preloadGlobeQuiz === 'function') {
+    if (match && _isGqMode(match.mode) && typeof window.preloadGlobeQuiz === 'function') {
       try { window.preloadGlobeQuiz(); } catch (e) {}
     }
     // Look up the host's data in the friends list
@@ -1328,6 +1417,7 @@ window.refreshVsSpectatorBadge = function (n) {
            : match.mode === 'cities'    ? T('vs.challengedCities',    'te retó a City Blitz 1v1')
            : match.mode === 'monuments' ? T('vs.challengedMonuments', 'te retó a Landmark Loco 1v1')
            : match.mode === 'globequiz' ? T('vs.challengedGlobequiz', 'te retó a GloboReto 1v1')
+           : match.mode === 'globequiz_turns' ? T('vs.challengedGlobequizTurns', 'te retó a GloboReto (por turnos)')
            : T('vs.challengedYou', 'te retó a Suitcase Shuffle 1v1'),
         onAccept: async () => {
           if (typeof window.removeVersusNotif === 'function') window.removeVersusNotif(match.id);
@@ -1732,7 +1822,7 @@ window.refreshVsSpectatorBadge = function (n) {
       // The duel already ended and we're sitting on the GloboReto result
       // screen — the opponent left THAT screen (tab close, in case the
       // 'resultleave' broadcast was lost). Reflect it there instead.
-      if (_vsCurrentMode === 'globequiz') _gqvrOnOpponentLeft();
+      if (_isGqMode(_vsCurrentMode)) _gqvrOnOpponentLeft();
       return;
     }
     window._hideVsWaitSpinner();
@@ -1745,7 +1835,7 @@ window.refreshVsSpectatorBadge = function (n) {
     // GlobeQuiz: snapshot the duel summary BEFORE globequizHardReset() below
     // wipes dailyCountry/guesses — the cream end panel needs the country and
     // both attempt counts.
-    const _gqAbandonSummary = _vsCurrentMode === 'globequiz'
+    const _gqAbandonSummary = _isGqMode(_vsCurrentMode)
       ? (window.globequizGetVsSummary?.() || {}) : null;
     // Mark the VS result as visible so the hardResets don't clean assets
     window._vsShowingResult = true;
@@ -1755,7 +1845,7 @@ window.refreshVsSpectatorBadge = function (n) {
       if (typeof window.shapesHardReset === 'function') { try { window.shapesHardReset(); } catch(e) {} }
     } else if (_vsCurrentMode === 'cities' || _vsCurrentMode === 'monuments') {
       (_vsCurrentMode === 'monuments' ? window.monumentsHardReset : window.citiesHardReset)?.();
-    } else if (_vsCurrentMode === 'globequiz') {
+    } else if (_isGqMode(_vsCurrentMode)) {
       window.globequizHardReset?.();
     } else {
       if (typeof window.flagsHardReset === 'function') { try { window.flagsHardReset(); } catch(e) {} }
@@ -1775,7 +1865,7 @@ window.refreshVsSpectatorBadge = function (n) {
     const oppScore = isHost ? (m.guest_score || 0) : (m.host_score || 0);
     // GlobeQuiz uses its own cream end-of-duel panel (opponent abandoned →
     // count it as a win); every other mode keeps the shared W/L screen.
-    if (_vsCurrentMode === 'globequiz') {
+    if (_isGqMode(_vsCurrentMode)) {
       const summary = _gqAbandonSummary || {};
       _showGqVsResult('win', {
         myTime: summary.elapsedMs || 0,
@@ -1847,7 +1937,7 @@ window.refreshVsSpectatorBadge = function (n) {
     // (both need an account). Kept for an abandonment win too — same as every
     // other mode's vs_wins.
     if (window._sbUserId && opp.id) {
-      try { window.sbRecordVersusH2H?.(opp.id, 'globequiz', outcome === 'win'); } catch (e) {}
+      try { window.sbRecordVersusH2H?.(opp.id, _vsCurrentMode, outcome === 'win'); } catch (e) {}
     }
     const mePic  = document.getElementById('gqvr-me-pic');
     const oppPic = document.getElementById('gqvr-opp-pic');
@@ -1909,7 +1999,7 @@ window.refreshVsSpectatorBadge = function (n) {
     // profile W/L + head-to-head are recorded per round in _showVsResult / above.
     if (reason !== 'abandon' && window.VS && window.VS.isHost && window.VS.isHost()
         && window.Analytics && typeof window.Analytics.logVersus === 'function') {
-      try { window.Analytics.logVersus('globequiz'); } catch (e) {}
+      try { window.Analytics.logVersus(_vsCurrentMode); } catch (e) {}
     }
 
     // Feed a spectator's own copy of this panel — CANONICAL host/guest form
@@ -2078,8 +2168,19 @@ window.refreshVsSpectatorBadge = function (n) {
     }, 780);
 
     if (o.holdOpen) {
-      // Spectator: hold closed until the new round arrives (fallback at 8s).
-      _gqvrTrHoldTimer = setTimeout(_gqvrOpenTransition, 8000);
+      // Spectator: hold closed until the new round arrives. "Por turnos"
+      // needs a longer fallback than "por rapidez" — the roulette alone
+      // (GQ_GO_DELAY_MS + spin + reveal-hold + pop-out, see
+      // GQ_ROULETTE_SPIN_MS/GQ_ROULETTE_REVEAL_HOLD_MS/GQ_ROULETTE_POPOUT_MS
+      // above) already eats ~6s of the real players' own time between the
+      // lines closing and their 3-2-1 actually starting, on top of the
+      // ready-sync handshake's own network round-trip — with the old flat
+      // 8s fallback this raced ahead of the real 'pregame' under perfectly
+      // normal latency, forcing the lines open over an empty/mid-roulette
+      // screen (then doing nothing when the real 'pregame' arrived after,
+      // since the transition was already marked hidden) — the reported "the
+      // lines don't clear the way real players see it, in turns mode".
+      _gqvrTrHoldTimer = setTimeout(_gqvrOpenTransition, _vsGqTurnsVariant ? 16000 : 8000);
       return;
     }
     setTimeout(() => { tr.classList.remove('gqvr-tr-closed'); tr.classList.add('gqvr-tr-opening'); }, 2050);
@@ -2195,10 +2296,23 @@ window.refreshVsSpectatorBadge = function (n) {
     // New shared country from the new seed, then the standard GloboReto launch
     // (sync gate + 3-2-1 live inside initGlobeQuiz). The VS.on* callbacks from
     // the first _launchVersus are still registered (only cleanup() drops them).
-    _startSeededRandom(seed, 'globequiz');
+    // IMPORTANT: pass _vsCurrentMode (not a hardcoded 'globequiz') — a
+    // 'globequiz_turns' rematch must stay 'globequiz_turns', or the "por
+    // turnos" variant/roulette/turn-lock silently turn off after "Jugar de
+    // nuevo".
+    _startSeededRandom(seed, _vsCurrentMode);
+    // Re-derive who starts THIS round from the new seed (same trick as the
+    // first launch, see _launchVersus).
+    if (_vsGqTurnsVariant) window._gqAmIStarter = (window.VS.isHost() === (seed % 2 === 0));
     const gqScreen = document.getElementById('globequiz-screen');
     if (gqScreen) gqScreen.style.display = 'block';
     if (typeof window.letterboxRefresh === 'function') window.letterboxRefresh();
+    // Order matters: globequizVsPrepareOpponentRow() builds the two-line
+    // score card and its initial text depends on _gqTurnsVariant already
+    // being current (see gqVsScoreInnerHtml in globequiz.js) — set the
+    // variant FIRST or a rematch that switches variant (it can't today, but
+    // this stays correct regardless) would build the row from a stale flag.
+    window.globequizSetTurnsMode?.(_vsGqTurnsVariant);
     window.globequizVsPrepareOpponentRow?.();
     _gqReadySetup();
     window.VS.onGqAbort(() => _handleGqSyncFailed(true, { code: 'GLB-04', msg: 'El rival no pudo conectarse al duelo' }));
@@ -2320,6 +2434,128 @@ window.refreshVsSpectatorBadge = function (n) {
     if (sub) sub.textContent = T('vs.duelAccepted', '¡Duelo aceptado! Redirigiéndote a la partida…');
     _hideDuelAcceptedPopup();
   }
+  // ── GloboReto "por turnos": roulette that decides who starts ──────────────
+  // Purely cosmetic — the winner is already known (see window._gqAmIStarter,
+  // derived from the shared seed, no broadcast). Each client spins its own
+  // wheel independently and lands on the SAME answer (who starts), exactly
+  // like the daily country is picked without transmitting it — only WHICH of
+  // the 5 same-owner seats it lands on is picked locally at random, since
+  // that part is purely decorative (both seats show the same avatar either
+  // way, so there's nothing to desync).
+  const GQ_ROULETTE_SEAT_COUNT = 10; // 5 mine + 5 the opponent's, alternating
+  const GQ_ROULETTE_SEAT_DEG = 360 / GQ_ROULETTE_SEAT_COUNT;
+  const GQ_ROULETTE_SPINS = 6; // extra full turns, just for a longer spin
+  const GQ_ROULETTE_POPIN_MS = 450;  // back-in entrance, must match .gq-roulette-in's CSS duration
+  const GQ_ROULETTE_SPIN_MS = 3700; // +1.5s over the original 2200ms, so it brakes more realistically
+  const GQ_ROULETTE_REVEAL_HOLD_MS = 900;
+  const GQ_ROULETTE_POPOUT_MS = 350; // back-out exit, must match .gq-roulette-out's CSS duration
+  // identity: optional override for a spectator watching (not playing) the
+  // duel — the spectator has no "me", so it passes the FRIEND's own
+  // name/avatar in myName/myAvatar instead (see globequizSpectatorShowRoulette
+  // in spectate.js). Real players never pass this — they keep reading their
+  // own localStorage photo + the opponent identity, as before.
+  function _showGqRoulette(amIStarter, onDone, identity) {
+    const overlay = document.getElementById('gq-roulette-overlay');
+    const content = document.getElementById('gq-roulette-content');
+    const wheel   = document.getElementById('gq-roulette-wheel');
+    const seatsEl = document.getElementById('gq-roulette-seats');
+    const resultEl = document.getElementById('gq-roulette-result');
+    if (!overlay || !content || !wheel || !seatsEl) { onDone(); return; }
+    const myAvatar  = (identity && identity.myAvatar) || localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png';
+    const oppAvatar = (identity && identity.oppAvatar) || _pendingOppAvatar || (window._vsOpponent && window._vsOpponent.avatar) || 'images/profilepic/ppdefault.png';
+    const myName  = (identity && identity.myName) || T('vs.syncYou', 'Tú');
+    const oppName = (identity && identity.oppName) || _pendingOppName || (window._vsOpponent && window._vsOpponent.name) || 'Rival';
+    // Seat i sits at i * 36° clockwise from the top (matches ruleta1.png's
+    // 10 equal wedges, which are centered exactly on 0/36/72.../324° — see
+    // the pixel sampling that shaped this). Even seats are mine, odd are the
+    // opponent's — 5 and 5, alternating one to one.
+    seatsEl.innerHTML = '';
+    for (let i = 0; i < GQ_ROULETTE_SEAT_COUNT; i++) {
+      const isMe = (i % 2 === 0);
+      const seat = document.createElement('div');
+      seat.className = 'gq-roulette-seat';
+      // Radius ~58% of the wheel's half-width — centered in the colored
+      // wedge itself (clear of the center hub logo AND the outer rim),
+      // instead of sitting low/close to the hub.
+      seat.style.transform = `rotate(${i * GQ_ROULETTE_SEAT_DEG}deg) translateY(-22cqmin)`;
+      seat.innerHTML = `<img src="${isMe ? myAvatar : oppAvatar}" alt="" draggable="false" oncontextmenu="return false">`
+        + `<span class="gq-roulette-seat-name">${isMe ? myName : oppName}</span>`;
+      seatsEl.appendChild(seat);
+    }
+    // Pick any seat whose owner matches the real winner (which exact one of
+    // the 5 doesn't matter — both show the same avatar).
+    const matching = [];
+    for (let i = 0; i < GQ_ROULETTE_SEAT_COUNT; i++) { if ((i % 2 === 0) === !!amIStarter) matching.push(i); }
+    const targetIndex = matching[Math.floor(Math.random() * matching.length)];
+    // More realistic stop: a real wheel doesn't always brake dead-center on
+    // a wedge, and the number of full turns varies a bit too — jitter is
+    // capped well inside the wedge's half-width (18°) so it's never close
+    // enough to a boundary to look ambiguous.
+    const spins = GQ_ROULETTE_SPINS + Math.floor(Math.random() * 2); // 6 or 7 full turns
+    const jitterDeg = (Math.random() * 2 - 1) * (GQ_ROULETTE_SEAT_DEG * 0.35);
+    // Rotating the wheel by R moves the seat that was at angle (i*36°) to
+    // (i*36° + R) mod 360 — we want that to land near 0° (under the fixed
+    // pointer at the top, ± the jitter above), so R ≡ jitterDeg - targetIndex*36° (mod 360).
+    const targetDeg = spins * 360 + jitterDeg - targetIndex * GQ_ROULETTE_SEAT_DEG;
+    if (resultEl) resultEl.textContent = '';
+    wheel.style.transition = 'none';
+    wheel.style.transform = 'rotate(0deg)';
+    content.classList.remove('gq-roulette-in', 'gq-roulette-out');
+
+    overlay.style.display = 'flex';
+    // Force a reflow before adding the classes below — without it, the
+    // opacity-0→1 (backdrop) and the pop-in animation (content) can start
+    // from an uncommitted state and just snap straight to their end values
+    // instead of animating (the same "batched recalc" issue as the wheel's
+    // reset/spin below).
+    void overlay.offsetWidth;
+    overlay.classList.add('gq-roulette-visible'); // backdrop fade-in, 0.25s (CSS)
+    content.classList.add('gq-roulette-in');      // wheel/text back-in pop, 0.45s (CSS)
+
+    setTimeout(() => {
+      content.classList.remove('gq-roulette-in');
+      // Only NOW does it start spinning ("recién ahí empieza a girar de a
+      // poquito") — cubic-bezier(0.45,0,0.15,1) is slow at both ends (eases
+      // into the spin, then eases out to land), not an instant full-speed
+      // start.
+      void wheel.offsetWidth; // commit the rotate(0) reset before animating
+      wheel.style.transition = `transform ${GQ_ROULETTE_SPIN_MS}ms cubic-bezier(0.45, 0, 0.15, 1)`;
+      wheel.style.transform = `rotate(${targetDeg}deg)`;
+
+      setTimeout(() => {
+        if (resultEl) {
+          // A spectator has no "you" — always name whoever actually starts
+          // (myName here is the FRIEND's own name when `identity` is set).
+          resultEl.textContent = (identity)
+            ? T('gq.rouletteOppStarts', '{name} arranca').replace('{name}', amIStarter ? myName : oppName)
+            : (amIStarter
+              ? T('gq.rouletteYouStart', '¡Arrancás vos!')
+              : T('gq.rouletteOppStarts', '{name} arranca').replace('{name}', _pendingOppName || (window._vsOpponent && window._vsOpponent.name) || 'Rival'));
+          // Pops in instead of just appearing — reset+reflow+add so the
+          // animation restarts even on a rematch reusing the same element.
+          resultEl.classList.remove('gq-roulette-result-in');
+          void resultEl.offsetWidth;
+          resultEl.classList.add('gq-roulette-result-in');
+        }
+        setTimeout(() => {
+          // The whole reveal exits with a back-out, and ONLY THEN does the
+          // 3-2-1 start (onDone, below).
+          content.classList.add('gq-roulette-out');
+          overlay.classList.remove('gq-roulette-visible'); // backdrop fade-out, 0.25s (CSS)
+          setTimeout(() => {
+            overlay.style.display = 'none';
+            content.classList.remove('gq-roulette-out');
+            onDone();
+          }, GQ_ROULETTE_POPOUT_MS);
+        }, GQ_ROULETTE_REVEAL_HOLD_MS);
+      }, GQ_ROULETTE_SPIN_MS);
+    }, GQ_ROULETTE_POPIN_MS);
+  }
+  // Reused by a spectator (spectate.js/globequizSpectatorShowRoulette) to
+  // mirror the exact same animation with the FRIEND's identity standing in
+  // for "me" — see the `identity` param above.
+  window._vsShowGqRouletteFor = _showGqRoulette;
+
   function _gqSyncAllReady() {
     _gqMyProg = _gqOppProg = 1;
     _gqSyncSetState('vs-sync-me-state', 'vs.syncReady', true);
@@ -2428,7 +2664,19 @@ window.refreshVsSpectatorBadge = function (n) {
     // start too (their _gqMaybeStart already has _gqReadyMe by then).
     try { window.VS.reportReady(); } catch (e) {}
     _gqSyncAllReady();
-    setTimeout(() => { _hideGqSyncPanel(); cb(); }, GQ_GO_DELAY_MS);
+    setTimeout(() => {
+      _hideGqSyncPanel();
+      // "Por turnos": a roulette decides who starts before the 3-2-1. Both
+      // real clients spin independently and land on the same math answer
+      // (see window._gqAmIStarter in _launchVersus) — no broadcast needed
+      // for THEM. A spectator, though, isn't running any of this locally —
+      // the host alone (avoids a double-send near-simultaneously from both
+      // sides) tells it when to run its own mirrored animation.
+      if (_vsGqTurnsVariant) {
+        if (window.VS.isHost()) { try { window.VS.reportGqRouletteStart(window._gqAmIStarter ? 'host' : 'guest'); } catch (e) {} }
+        _showGqRoulette(window._gqAmIStarter, cb);
+      } else cb();
+    }, GQ_GO_DELAY_MS);
   }
   // Cutoff (abandonment/quitToMenu while waiting) — without this, a stale
   // timeout could fire the 3-2-1 over a screen that already returned to the
@@ -2574,7 +2822,7 @@ window.refreshVsSpectatorBadge = function (n) {
     if (_vsCurrentMode === 'cities' || _vsCurrentMode === 'monuments') {
       return Math.round((typeof state !== 'undefined' && state && typeof state.score === 'number') ? state.score : 0);
     }
-    if (_vsCurrentMode === 'globequiz') return 0; // no numeric score — see _patchGqResultScores
+    if (_isGqMode(_vsCurrentMode)) return 0; // no numeric score — see _patchGqResultScores
     return Math.round(typeof flagsScore !== 'undefined' ? flagsScore : 0);
   }
 
@@ -2607,7 +2855,7 @@ window.refreshVsSpectatorBadge = function (n) {
     // channel for a possible rematch — is_playing must stay TRUE so the
     // "being spectated" badge doesn't vanish and a new spectator can still
     // discover the match. It's turned off for real on leaving (quitToMenu).
-    if (_vsCurrentMode !== 'globequiz' && typeof window._setPlaying === 'function') window._setPlaying(false);
+    if (!_isGqMode(_vsCurrentMode) && typeof window._setPlaying === 'function') window._setPlaying(false);
     // Tell a possible spectator the final result — this never happened
     // before (reportPostgame() was defined in vs.js but nobody called it for
     // versus, see the old comment right there), so the spectator was left
@@ -2650,7 +2898,7 @@ window.refreshVsSpectatorBadge = function (n) {
       // (openSpectatorForFriend filters by status='active'). It's finished for
       // real in _vsReturnToMenu when someone leaves. Every other mode finishes
       // now (single round, no rematch).
-      if (isHost && !_endedByAbandon && _vsCurrentMode !== 'globequiz'
+      if (isHost && !_endedByAbandon && !_isGqMode(_vsCurrentMode)
           && typeof window.VS.finish === 'function') {
         try { window.VS.finish(); } catch (e) {}
       }
@@ -2717,7 +2965,7 @@ window.refreshVsSpectatorBadge = function (n) {
     if (gqScreen) gqScreen.style.display = 'none';
     // Leaving GlobeQuiz for good — free its WebGL contexts (globe + starfield)
     // so the next Gira Mundial doesn't stack on top of them on iOS.
-    if (_vsCurrentMode === 'globequiz' && typeof window.globequizReleaseGL === 'function') {
+    if (_isGqMode(_vsCurrentMode) && typeof window.globequizReleaseGL === 'function') {
       try { window.globequizReleaseGL(); } catch (e) {}
     }
     // Record the match as finished in the DB (normal matches only; an
@@ -2927,7 +3175,7 @@ window.refreshVsSpectatorBadge = function (n) {
     // match start — start that download NOW, during the "duel accepted"
     // popup, so neither side is waiting on a cold CDN fetch when the 3D globe
     // sync gate kicks in. Idempotent (checks its own cache).
-    if ((match.mode || 'flags') === 'globequiz' && typeof window.preloadGlobeQuiz === 'function') {
+    if (_isGqMode(match.mode || 'flags') && typeof window.preloadGlobeQuiz === 'function') {
       try { window.preloadGlobeQuiz(); } catch (e) {}
     }
     setTimeout(() => { _vsStartScheduled = false; _launchVersus(match); }, VS_START_DELAY_MS);
@@ -2983,7 +3231,7 @@ window.refreshVsSpectatorBadge = function (n) {
     // host/guest form (a stranger's `profiles` row is usually not readable to
     // the spectator — RLS friends only — so the opponent card stayed blank).
     // Each player knows itself + _vsOpponent, so either broadcast is complete.
-    if ((match.mode || 'flags') === 'globequiz' && typeof window.VS.reportGqSpec === 'function') {
+    if (_isGqMode(match.mode || 'flags') && typeof window.VS.reportGqSpec === 'function') {
       const _isHost = window.VS.isHost();
       const _o = window._vsOpponent || {};
       const _me = {
@@ -3035,7 +3283,7 @@ window.refreshVsSpectatorBadge = function (n) {
         window.citiesSetVsOpponentScore?.(oppScore);
       } else if (mode === 'monuments') {
         window.monumentsSetVsOpponentScore?.(oppScore);
-      } else if (mode === 'globequiz') {
+      } else if (_isGqMode(mode)) {
         // No-op — GlobeQuiz has no numeric score, the opponent's progress
         // travels via the 'answer' broadcast (see VS.onAnswer below).
       } else {
@@ -3051,7 +3299,7 @@ window.refreshVsSpectatorBadge = function (n) {
         window.citiesTriggerOpponentWrong?.();
       } else if (mode === 'monuments') {
         window.monumentsTriggerOpponentWrong?.();
-      } else if (mode === 'globequiz') {
+      } else if (_isGqMode(mode)) {
         // No-op — GlobeQuiz has no "wrong" concept with a flash, only guesses
         // closer/farther (see VS.onAnswer).
       } else {
@@ -3061,7 +3309,7 @@ window.refreshVsSpectatorBadge = function (n) {
 
     // GlobeQuiz: opponent progress (km/dir) and instant win — see
     // "GlobeQuiz: instant win" above in this file.
-    if (mode === 'globequiz') {
+    if (_isGqMode(mode)) {
       window.VS.onAnswer(payload => {
         if (!payload) return;
         // The 'answer' broadcast also comes back to whoever sent it (echo
@@ -3073,7 +3321,30 @@ window.refreshVsSpectatorBadge = function (n) {
         const myRole = window.VS.isHost() ? 'host' : 'guest';
         if (payload.role === myRole) return;
         if (payload.win) _handleGqOpponentWin(payload);
-        else if (typeof payload.km === 'number') window.globequizSetVsOpponentGuess?.(payload.km);
+        // "Por turnos" doesn't use this km-progress side channel at all — its
+        // opponent-progress travels exclusively over 'gqturnguess' below, so
+        // this stays speed-mode-only (double-counted the opponent's attempts
+        // otherwise, since both handlers would fire for the same guess).
+        else if (mode === 'globequiz' && typeof payload.km === 'number') window.globequizSetVsOpponentGuess?.(payload.km);
+      });
+    }
+    // "Por turnos" only: the opponent's wrong guess is mirrored into MY
+    // guess list (so both players see the same "already tried" column) and
+    // passes the turn back to me.
+    if (mode === 'globequiz_turns') {
+      window.VS.onGqTurnGuess(payload => {
+        if (!payload) return;
+        const myRole = window.VS.isHost() ? 'host' : 'guest';
+        if (payload.role === myRole) return;
+        window.globequizReceiveOpponentTurnGuess?.(payload);
+      });
+      // Live preview of what the active player (the opponent, from my side)
+      // is typing — see reportGqTyping in globequiz.js.
+      window.VS.onGqTyping(payload => {
+        if (!payload) return;
+        const myRole = window.VS.isHost() ? 'host' : 'guest';
+        if (payload.role === myRole) return;
+        window.globequizShowOpponentTyping?.(payload.text || '');
       });
     }
 
@@ -3082,7 +3353,7 @@ window.refreshVsSpectatorBadge = function (n) {
       // _showVsResult) — so if this fires for globequiz it's a real leave
       // (_vsReturnToMenu), which already runs its own teardown. Skip the
       // duplicate here so a stray echo can't wipe a live rematch's state.
-      if (mode === 'globequiz') return;
+      if (_isGqMode(mode)) return;
       _restoreRandom();
       _teardownVsOpponent();
     });
@@ -3096,9 +3367,18 @@ window.refreshVsSpectatorBadge = function (n) {
       if (typeof startGame === 'function') startGame();
     } else if (mode === 'monuments') {
       if (typeof startGame === 'function') startGame();
-    } else if (mode === 'globequiz') {
+    } else if (_isGqMode(mode)) {
       document.getElementById('globequiz-screen').style.display = 'block';
       if (typeof window.letterboxRefresh === 'function') window.letterboxRefresh();
+      // "Por turnos": who starts is derived from the shared seed itself (same
+      // trick as the daily country — no broadcast needed, both clients get
+      // the same answer independently), see _showGqRoulette in _gqMaybeStart.
+      _vsGqTurnsVariant = (mode === 'globequiz_turns');
+      window._gqAmIStarter = _vsGqTurnsVariant ? (window.VS.isHost() === (seed % 2 === 0)) : null;
+      // Set the variant BEFORE building the opponent row — its initial HTML
+      // (gqVsScoreInnerHtml in globequiz.js) reads _gqTurnsVariant to decide
+      // what the two lines start showing (km/attempts vs. time/km).
+      window.globequizSetTurnsMode?.(_vsGqTurnsVariant);
       window.globequizVsPrepareOpponentRow?.();
       // Registered BEFORE initGlobeQuiz() (which triggers the async load of
       // three.js/GeoJSON) — see _gqReadySetup, so the 'ready' listener is

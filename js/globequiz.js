@@ -1824,6 +1824,9 @@
     const input = document.getElementById('gq-guess-input');
     const hintEl = document.getElementById('gq-hint');
     if (!input || solved) return;
+    // "Por turnos": the input is disabled while it isn't my turn (see
+    // globequizSetMyTurn), this is just a defensive backstop.
+    if (window._vsActive && _gqTurnsVariant && !window._gqMyTurn) return;
     const raw = input.value;
     if (!raw.trim()) return;
     const norm = normalize(raw);
@@ -1844,7 +1847,9 @@
     }
     _gqSuggestion = null;
     if (guesses.find(g => g.name === country.name) || (dailyCountry && country.name === dailyCountry.name && solved)) {
-      if (hintEl) hintEl.textContent = t('globequiz.alreadyGuessed');
+      // "Por turnos": the list can hold the OPPONENT's attempts too, so "ya
+      // LO intentaste" (implying it was me) would be wrong when it was them.
+      if (hintEl) hintEl.textContent = t(_gqTurnsVariant ? 'globequiz.alreadyGuessedShared' : 'globequiz.alreadyGuessed');
       return;
     }
     input.value = '';
@@ -1856,6 +1861,7 @@
       // displayed time.
       gqFinalElapsedMs = Math.max(0, Date.now() - gqTimerStart);
       stopTimer();
+      _gqStopTurnTimer();
       // Repaints the card with the same frozen value the game-over panel
       // will use — otherwise the last paint of the 30ms interval
       // (gqCardInterval, already stopped in stopTimer) can be up to 30ms
@@ -1942,7 +1948,13 @@
     }
     const km = minBorderDistance(country, dailyCountry);
     const dir = bearingArrow(bearing(country.centroid, dailyCountry.centroid));
-    const g = { name: country.name, km, dir, color: distColor(km) };
+    // role travels with the guess (harmless extra field, nothing else reads
+    // it) purely so a spectator's synced list (see reportGqGuesses/
+    // globequizSpectatorSyncGuesses) can tell the two sides' guesses apart —
+    // the real players themselves never needed it, the shared list is a
+    // single pool regardless of who tried what.
+    const myRole = window._vsActive && window.VS?.isHost ? (window.VS.isHost() ? 'host' : 'guest') : undefined;
+    const g = { name: country.name, km, dir, color: distColor(km), role: myRole };
     guesses.push(g);
     if (typeof window._specReportAnswer === 'function') {
       // Full detail (incl. the typed country name) so a spectator can render
@@ -1974,6 +1986,20 @@
     renderGuessList();
     updateHint();
     focusOnCountry(country);
+    // "Por turnos": this attempt was mine and it was wrong — pass the turn
+    // to the opponent (mirrors my guess into their guess list via a new
+    // broadcast, see globequizReceiveOpponentTurnGuess in vs.js's handler).
+    // (_gqTurnsMyGuessCount itself is incremented inside
+    // globequizVsUpdateOwnGuess above, the single place that already runs
+    // once per own guess in both variants.)
+    if (window._vsActive && _gqTurnsVariant) {
+      _gqMySkipStreak = 0; // a real answer — my timeout streak resets
+      const turnStartedAt = Date.now();
+      if (typeof window.VS !== 'undefined' && window.VS && typeof window.VS.reportGqTurnGuess === 'function') {
+        window.VS.reportGqTurnGuess({ name: g.name, km: g.km, dir: g.dir, color: g.color, turnStartedAt });
+      }
+      window.globequizSetMyTurn?.(false, turnStartedAt);
+    }
   }
 
   // VS 1v1: the opponent guessed first — called from vs.js
@@ -1986,6 +2012,7 @@
     if (solved) return;
     solved = true;
     stopTimer();
+    _gqStopTurnTimer();
     stopAutoRotate();
     const input = document.getElementById('gq-guess-input');
     const btn = document.getElementById('gq-guess-btn');
@@ -2026,18 +2053,18 @@
       return;
     }
     if (guesses.length === 0) {
-      el.textContent = t('globequiz.hintFirst');
+      el.textContent = t(_gqTurnsVariant ? 'globequiz.hintFirstShared' : 'globequiz.hintFirst');
       return;
     }
     const last = guesses[guesses.length - 1];
     const lastCountry = countryByName.get(normalize(last.name));
     const label = lastCountry ? displayName(lastCountry) : last.name;
     if (last.km === 0) {
-      el.textContent = t('globequiz.hintBorders', { name: label });
+      el.textContent = t(_gqTurnsVariant ? 'globequiz.hintBordersShared' : 'globequiz.hintBorders', { name: label });
       return;
     }
     if (guesses.length === 1) {
-      el.textContent = t('globequiz.hintStart');
+      el.textContent = t(_gqTurnsVariant ? 'globequiz.hintStartShared' : 'globequiz.hintStart');
       return;
     }
     const prev = guesses[guesses.length - 2];
@@ -2106,9 +2133,18 @@
   function updateTimerDisplay() {
     const elapsedMs = Date.now() - gqTimerStart;
     const wholeSec = Math.floor(elapsedMs / 1000);
-    const el = document.getElementById('gq-timer-number');
-    if (el) el.textContent = String(wholeSec);
-    pulseCountdown();
+    // "Por turnos" owns #gq-timer-number for its own 15→0 per-turn countdown
+    // (see _gqPaintTurnTimer) — writing the elapsed-seconds-up count here too
+    // would just race it on the same element every second.
+    if (!_gqTurnsVariant) {
+      const el = document.getElementById('gq-timer-number');
+      if (el) el.textContent = String(wholeSec);
+      // "Por turnos" pulses this from _gqTickTurnTimer instead, exactly when
+      // ITS second actually changes — this generic 1s interval isn't synced
+      // to that wall-clock-driven tick, so pulsing from here too made the
+      // glow flash on its own independent schedule instead of the real one.
+      pulseCountdown();
+    }
     // GlobeQuiz has no real countdown 'tick' (the timer counts UP with no
     // limit), but the spectator's idle watchdog (_resetIdleWatchdog in
     // spectate.js) needs SOMETHING 1x/sec confirming the player is still in
@@ -2129,12 +2165,16 @@
     const cardEl = document.getElementById('gq-lb-player-time');
     if (!cardEl) return;
     const elapsedMs = Date.now() - gqTimerStart;
-    // VS 1v1: both cards (mine and the opponent's) run the SAME shared
-    // timer (above, see globequizVsSetTime) — the km below is overwritten
-    // separately by globequizVsUpdateOwnGuess/globequizSetVsOpponentGuess per
-    // guess. No time-based reorder here (that's only for the daily friends
-    // bar, see positionGqLeaderboard below).
-    if (window._vsActive) { globequizVsSetTime(elapsedMs); return; }
+    // VS 1v1 "por rapidez": both cards (mine and the opponent's) run the SAME
+    // shared timer (above, see globequizVsSetTime) — the km below is
+    // overwritten separately by globequizVsUpdateOwnGuess/
+    // globequizSetVsOpponentGuess per guess. No time-based reorder here
+    // (that's only for the daily friends bar, see positionGqLeaderboard
+    // below).
+    // "Por turnos" doesn't race a clock — both lines show km/attempts
+    // instead (see globequizVsUpdateOwnGuess/globequizReceiveOpponentTurnGuess),
+    // so the shared-clock line is skipped entirely here.
+    if (window._vsActive) { if (!_gqTurnsVariant) globequizVsSetTime(elapsedMs); return; }
     const wholeSec = Math.floor(elapsedMs / 1000);
     const centis = Math.floor((elapsedMs % 1000) / 10);
     cardEl.textContent = wholeSec + ':' + String(centis).padStart(2, '0');
@@ -2191,6 +2231,16 @@
     const playerEl = document.getElementById('gq-lb-player');
     if (!bar || !playerEl) return;
     bar.querySelectorAll('.lb-entry[data-gq-friend]').forEach(el => el.remove());
+    // Defensive: this is the one guaranteed entry point for the SOLO bar, so
+    // a leftover VS opponent card (normally removed by globequizHardReset()
+    // on the way out) never survives into a solo match no matter what path
+    // got here — the reported "sale aun la carta de mi contrincante".
+    document.getElementById('gq-lb-vsopp')?.remove();
+    const playerTimeEl = document.getElementById('gq-lb-player-time');
+    if (playerTimeEl && playerTimeEl.classList.contains('gq-lb-vs-score')) {
+      playerTimeEl.classList.remove('gq-lb-vs-score');
+      playerTimeEl.textContent = '0:00';
+    }
     const todayStr = dateKey(new Date());
     const friends = (typeof getFriends === 'function' ? getFriends() : [])
       .filter(f => f.gqStreakLastDate === todayStr && typeof f.gqTodayTimeMs === 'number');
@@ -2243,6 +2293,146 @@
   // failed guesses + the final correct one) from the loser's (only their
   // failed ones, never guessed right), see globequizGetVsSummary.
   let gqVsWon = false;
+  // "Por turnos" variant (vs. the default "por rapidez") — see
+  // globequizSetTurnsMode/globequizSetMyTurn, called from vs.js.
+  let _gqTurnsVariant = false;
+  // My own attempt count in turns mode — `guesses` mirrors BOTH players'
+  // wrong guesses there (shared "already tried" column), so guesses.length
+  // alone can't tell my attempts from the opponent's any more (see
+  // globequizGetVsSummary).
+  let _gqTurnsMyGuessCount = 0;
+  let _gqTypingSendTimer = null; // throttles the live-typing broadcast (see the input listener in initGlobeQuiz)
+
+  // ── "Por turnos": per-turn countdown (15s → 0) + AFK auto-kick ────────────
+  const GQ_TURN_TIME_SECONDS = 15;
+  let _gqTurnTimerInterval = null;
+  let _gqTurnSecondsLeft = GQ_TURN_TIME_SECONDS;
+  // Wall-clock moment the CURRENT turn started — shared between both clients
+  // (carried in the turn-pass payload, see submitGuess/_gqHandleMyTimeout/
+  // globequizReceiveOpponentTurnGuess) so both compute the countdown from the
+  // SAME reference instant instead of each starting its own 15s the moment
+  // ITS side found out — that used to skew the waiting side's clock by
+  // however long the broadcast took to arrive.
+  let _gqTurnStartedAt = 0;
+  // My own consecutive timeouts (no real guess submitted before the clock hit
+  // 0) — reset to 0 on any real guess of mine (see submitGuess). Two in a row
+  // and I'M considered AFK (see _gqHandleMyTimeout): this only ever compares
+  // MY OWN streak, never the opponent's — each side detects its own AFK-ness
+  // locally and leaves via the normal abandon flow, which the other side
+  // already knows how to react to (_onOpponentAbandoned).
+  let _gqMySkipStreak = 0;
+
+  function _gqPaintTurnTimer() {
+    const el = document.getElementById('gq-timer-number');
+    if (el) el.textContent = String(Math.max(0, _gqTurnSecondsLeft));
+  }
+  // Blue (globecountdown.png) normally, red (globecountdownred.png) with 5s
+  // or less left — same badge, hue-shifted to match the countdownred.png
+  // family already used elsewhere.
+  function _gqSetCountdownIconRed(isRed) {
+    const img = document.querySelector('.gq-countdown-widget img');
+    if (img) img.src = isRed ? 'images/globecountdownred.png' : 'images/globecountdown.png';
+  }
+  function _gqTickTurnTimer() {
+    const elapsedSec = Math.floor((Date.now() - _gqTurnStartedAt) / 1000);
+    const secondsLeft = Math.max(0, GQ_TURN_TIME_SECONDS - elapsedSec);
+    if (secondsLeft === _gqTurnSecondsLeft) return; // no change since the last poll
+    _gqTurnSecondsLeft = secondsLeft;
+    _gqPaintTurnTimer();
+    // The glow pulse now fires from THIS exact tick (the real, wall-clock
+    // second passing) instead of the generic 1s interval in
+    // updateTimerDisplay(), which used to run on its own unrelated schedule
+    // in turns mode.
+    pulseCountdown();
+    // From 5s down to 1s inclusive: red icon + a tick EVERY second (not
+    // just once at the 5s mark).
+    if (secondsLeft > 0 && secondsLeft <= 5) {
+      _gqSetCountdownIconRed(true);
+      if (typeof sfxTickdown !== 'undefined' && typeof sfxPlay === 'function') { sfxTickdown.currentTime = 0; sfxPlay(sfxTickdown); }
+    }
+    if (secondsLeft <= 0) {
+      _gqStopTurnTimer();
+      if (typeof sfxTimesUp !== 'undefined' && typeof sfxPlay === 'function') { sfxTimesUp.currentTime = 0; sfxPlay(sfxTimesUp); }
+      // Only the side whose turn it actually IS declares its own timeout —
+      // the waiting side's identical countdown is purely visual.
+      if (window._gqMyTurn) _gqHandleMyTimeout();
+    }
+  }
+  // Called every time the turn changes (see globequizSetMyTurn). `startedAt`
+  // (shared wall-clock ms) is optional — falls back to "now" for the very
+  // first turn of a round, whose simultaneity already comes from the 3-2-1
+  // GO itself (see the sync-gate comments in vs.js).
+  function _gqStartTurnTimer(startedAt) {
+    _gqStopTurnTimer();
+    _gqTurnStartedAt = startedAt || Date.now();
+    _gqTurnSecondsLeft = GQ_TURN_TIME_SECONDS + 1; // force the first poll to paint
+    _gqSetCountdownIconRed(false);
+    _gqTickTurnTimer();
+    // Polls actual elapsed wall-clock time every 250ms (finer than 1s) so the
+    // displayed second changes right when it's truly due, not accumulating
+    // setInterval's own drift over 15 ticks.
+    _gqTurnTimerInterval = setInterval(_gqTickTurnTimer, 250);
+  }
+  function _gqStopTurnTimer() {
+    if (_gqTurnTimerInterval) clearInterval(_gqTurnTimerInterval);
+    _gqTurnTimerInterval = null;
+  }
+  // "Por turnos": aviso de skip por tiempo, EN cqmin dentro de
+  // #globequiz-screen (no un toast de pantalla completa) — mismo fade
+  // show/hide que .gqvr-toast en vs.js.
+  let _gqTurnNoticeFadeT = null, _gqTurnNoticeHideT = null;
+  function _gqShowTurnNotice(text) {
+    const el = document.getElementById('gq-turn-notice');
+    if (!el) return;
+    clearTimeout(_gqTurnNoticeFadeT); clearTimeout(_gqTurnNoticeHideT);
+    el.textContent = text;
+    el.hidden = false;
+    requestAnimationFrame(() => el.classList.add('gq-turn-notice-show'));
+    _gqTurnNoticeFadeT = setTimeout(() => {
+      el.classList.remove('gq-turn-notice-show');
+      _gqTurnNoticeHideT = setTimeout(() => { el.hidden = true; }, 320);
+    }, 2200);
+  }
+  // "Por turnos" ONLY: same notice box a real player sees when either side
+  // (them or the opponent) misses the 15s clock — reused as-is for a
+  // spectator (see spectate.js's onGqTurnGuess), just with whichever name
+  // applies already baked into `text`.
+  window.globequizSpectatorShowTurnNotice = function (text) { _gqShowTurnNotice(text); };
+  let _gqAfkPopupWired = false;
+  // Lives OUTSIDE #globequiz-screen on purpose (see play/index.html) — we
+  // kick to the menu FIRST, then show this over the menu, so it must survive
+  // quitToMenu() hiding the game screen instead of disappearing with it.
+  function _gqShowAfkPopup() {
+    const pop = document.getElementById('gq-afk-popup');
+    if (!pop) return;
+    if (!_gqAfkPopupWired) {
+      _gqAfkPopupWired = true;
+      document.getElementById('gq-afk-ok')?.addEventListener('click', () => {
+        pop.style.display = 'none';
+      });
+    }
+    pop.style.display = 'flex';
+  }
+  // My own turn's clock hit 0 without me answering — skip it (pass the turn,
+  // same as a wrong guess but with no country), or if this is my SECOND skip
+  // in a row, I'm AFK: leave the match right away (same as any quit — the
+  // opponent finds out and wins via the existing abandon flow), THEN show a
+  // small panel over the menu explaining why I got kicked.
+  function _gqHandleMyTimeout() {
+    if (solved || !window._vsActive || !_gqTurnsVariant || !window._gqMyTurn) return;
+    _gqMySkipStreak++;
+    if (_gqMySkipStreak >= 2) {
+      if (typeof window.quitToMenu === 'function') window.quitToMenu();
+      _gqShowAfkPopup();
+      return;
+    }
+    const turnStartedAt = Date.now();
+    if (typeof window.VS !== 'undefined' && window.VS && typeof window.VS.reportGqTurnGuess === 'function') {
+      window.VS.reportGqTurnGuess({ timeout: true, turnStartedAt });
+    }
+    window.globequizSetMyTurn?.(false, turnStartedAt);
+    _gqShowTurnNotice(t('gq.youTimedOut'));
+  }
 
   function formatGqKm(km) {
     return (km == null || !isFinite(km)) ? '—' : Math.round(km) + ' km';
@@ -2251,9 +2441,17 @@
   // of its own lines (gq-lb-vs-score, see style.css) instead of the single
   // value the solo/campaign mode uses. No closer/farther arrow (removed by
   // request: the raw km is enough).
+  // "Por turnos" flips what each line means (no shared clock to race): TOP
+  // = closest km so far, BOTTOM = attempt count — see globequizVsUpdateOwnGuess
+  // (mine) and globequizReceiveOpponentTurnGuess (the opponent's).
+  // Relies on globequizSetTurnsMode() having already run for THIS match
+  // before this is called (see the call order in vs.js's _launchVersus/
+  // _gqvrDoRelaunch) so _gqTurnsVariant isn't stale from the previous match.
   function gqVsScoreInnerHtml(timeId, kmId) {
-    return '<span class="gq-lb-vs-time" id="' + timeId + '">0:00</span>'
-      + '<span class="gq-lb-vs-km" id="' + kmId + '">—</span>';
+    const topDefault = _gqTurnsVariant ? '—' : '0:00';
+    const bottomDefault = _gqTurnsVariant ? '0' : '—';
+    return '<span class="gq-lb-vs-time" id="' + timeId + '">' + topDefault + '</span>'
+      + '<span class="gq-lb-vs-km" id="' + kmId + '">' + bottomDefault + '</span>';
   }
 
   window.globequizVsPrepareOpponentRow = function () {
@@ -2265,6 +2463,8 @@
     gqVsMyBestKm = Infinity;
     gqVsWon = false;
     gqVsOppGuessCount = 0;
+    _gqTurnsMyGuessCount = 0;
+    _gqMySkipStreak = 0;
     const opp = window._vsOpponent || {};
     let el = document.getElementById('gq-lb-vsopp');
     if (!el) {
@@ -2298,16 +2498,32 @@
   // up at the top of the bar instead of the bottom (the reported "they went
   // to the middle", since .gq-friends-bar centers its content).
   function positionGqVsLeaderboard(animate) {
-    const playerEl = gqLbElements.player, oppEl = gqLbElements.vsopp;
+    _gqPositionTwoCards(gqLbElements.player, gqLbElements.vsopp, gqVsMyBestKm, gqVsOppBestKm, animate);
+  }
+  // Shared by the real player's positionGqVsLeaderboard (above, using its own
+  // gqVsMyBestKm/gqVsOppBestKm) AND the spectator's own equivalent
+  // (_gqSpecPositionVsLeaderboard below, using its own tracked km) — same
+  // "reorder by whoever's closest" reshuffle, just fed different state
+  // depending on who's watching.
+  function _gqPositionTwoCards(playerEl, oppEl, myKm, oppKm, animate) {
     if (!playerEl || !oppEl) return;
-    const all = [{ id: 'player', km: gqVsMyBestKm }, { id: 'vsopp', km: gqVsOppBestKm }];
+    const all = [{ el: playerEl, km: myKm }, { el: oppEl, km: oppKm }];
     all.sort((a, b) => a.km - b.km);
     const bottomOffset = (GQ_LB_WINDOW - all.length) * GQ_LB_ROW_H_CQMIN;
     if (!animate) { [playerEl, oppEl].forEach(el => { el.style.transition = 'none'; }); }
-    all.forEach((p, rank) => { gqLbElements[p.id].style.top = (rank * GQ_LB_ROW_H_CQMIN + bottomOffset) + 'cqmin'; });
+    all.forEach((p, rank) => { p.el.style.top = (rank * GQ_LB_ROW_H_CQMIN + bottomOffset) + 'cqmin'; });
     if (!animate) {
       requestAnimationFrame(() => { [playerEl, oppEl].forEach(el => { el.style.transition = ''; }); });
     }
+  }
+  // Spectator equivalent of positionGqVsLeaderboard — the real player's
+  // version reads gqVsMyBestKm/gqVsOppBestKm (never set for a spectator, who
+  // never runs submitGuess()), so without this the two cards' relative
+  // ORDER (not just their km/attempts text, already fixed) never updated —
+  // the reported "the position of the cards doesn't update live like the
+  // real players see".
+  function _gqSpecPositionVsLeaderboard(animate) {
+    _gqPositionTwoCards(gqLbElements.player, gqLbElements.vsopp, _gqSpecFriendBestKm, _gqSpecOppBestKm, animate);
   }
 
   // Shared tick (see updateCardTime): both cards run the SAME timer (started
@@ -2327,12 +2543,22 @@
   // of the last attempt).
   window.globequizVsUpdateOwnGuess = function (km) {
     gqVsMyBestKm = Math.min(gqVsMyBestKm, km);
-    const el = document.getElementById('gq-lb-player-km');
-    // Shows the BEST km so far, not the just-typed guess's — otherwise a
-    // guess worse than an earlier one "visually replaced" the closest
-    // already achieved (the reported "it has to stay with the closest, not
-    // whatever you pick next").
-    if (el) el.textContent = formatGqKm(gqVsMyBestKm);
+    if (_gqTurnsVariant) {
+      // "Por turnos": TOP line = closest km, BOTTOM line = my attempt count
+      // (there's no shared clock to show, see updateCardTime).
+      _gqTurnsMyGuessCount++;
+      const timeEl = document.getElementById('gq-lb-player-time-val');
+      const attEl  = document.getElementById('gq-lb-player-km');
+      if (timeEl) timeEl.textContent = formatGqKm(gqVsMyBestKm);
+      if (attEl)  attEl.textContent  = String(_gqTurnsMyGuessCount);
+    } else {
+      const el = document.getElementById('gq-lb-player-km');
+      // Shows the BEST km so far, not the just-typed guess's — otherwise a
+      // guess worse than an earlier one "visually replaced" the closest
+      // already achieved (the reported "it has to stay with the closest, not
+      // whatever you pick next").
+      if (el) el.textContent = formatGqKm(gqVsMyBestKm);
+    }
     positionGqVsLeaderboard(true);
   };
 
@@ -2357,10 +2583,125 @@
       bestKm: isFinite(gqVsMyBestKm) ? gqVsMyBestKm : null,
       countryName: dailyCountry ? displayName(dailyCountry) : null,
       iso2: dailyCountry ? dailyCountry.iso2 : null,
-      guessCount: guesses.length + (gqVsWon ? 1 : 0),
+      guessCount: (_gqTurnsVariant ? _gqTurnsMyGuessCount : guesses.length) + (gqVsWon ? 1 : 0),
       oppGuessCount: gqVsOppGuessCount,
       elapsedMs: gqFinalElapsedMs || (gqTimerStart ? Math.max(0, Date.now() - gqTimerStart) : 0),
     };
+  };
+
+  // ── "Por turnos" variant (called from vs.js) ──────────────────────────────
+
+  // Called once per launch/relaunch, right BEFORE globequizVsPrepareOpponentRow
+  // (see the call order in vs.js). Hides the countdown widget right away —
+  // it only reappears once the 3-2-1-GO ends (see initGlobeQuiz's onDone),
+  // showing the 15s per-turn clock instead of sitting there empty/idle
+  // through the sync wait + roulette + countdown.
+  window.globequizSetTurnsMode = function (isTurns) {
+    _gqTurnsVariant = !!isTurns;
+    if (_gqTurnsVariant) {
+      document.querySelector('.gq-countdown-widget')?.style.setProperty('display', 'none');
+    }
+  };
+
+  // Enables/locks my own input depending on whose turn it is. Reuses the same
+  // disable/enable pair showWin()/globequizVsShowLoss() already use, and also
+  // hides the confirm button entirely while it's not my turn (no point
+  // showing a button I can't press). No separate "Tu turno" chip any more:
+  // - #gq-hint shows a fixed "Esperando respuesta de {name}..." while waiting,
+  //   and goes back to the normal contextual hint (updateHint()) once it's mine.
+  // - the input's OWN placeholder shows the opponent's live keystrokes (see
+  //   globequizShowOpponentTyping), replacing "Escribe un país..." in place.
+  window.globequizSetMyTurn = function (mine, startedAt) {
+    const wasMine = window._gqMyTurn;
+    window._gqMyTurn = !!mine;
+    const input = document.getElementById('gq-guess-input');
+    const btn = document.getElementById('gq-guess-btn');
+    const row = document.querySelector('.gq-guess-row');
+    if (input) input.disabled = !mine;
+    if (btn) btn.classList.toggle('gq-disabled', !mine);
+    if (row) row.classList.toggle('gq-locked', !mine);
+    // Every hand-off restarts the 15s clock, for BOTH sides (see
+    // _gqStartTurnTimer) — whether it's now mine or the opponent's.
+    // `startedAt` (shared wall-clock ms, when the caller has it) keeps both
+    // clients counting down from the exact same instant.
+    if (_gqTurnsVariant) _gqStartTurnTimer(startedAt);
+    if (mine) {
+      // A disabled input can't hold focus — re-focus it now that it's mine,
+      // so I can start typing (and Enter-to-submit works) without having to
+      // click into the field again first.
+      if (input) { input.focus(); input.placeholder = t('globequiz.inputPh'); }
+      updateHint();
+      // "Your turn" cue — only on a real hand-off (skips the very first
+      // silent call some flows may make before anything else has happened).
+      if (!wasMine && typeof sfxCheck !== 'undefined' && typeof sfxPlay === 'function') {
+        sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+      }
+    } else {
+      const hintEl = document.getElementById('gq-hint');
+      const oppName = (window._vsOpponent && window._vsOpponent.name) || 'Rival';
+      if (hintEl) hintEl.textContent = t('gq.waitingTurnFor', { name: oppName });
+      // Placeholder starts back at the default ("Escribe un país...") — it's
+      // replaced live by whatever the opponent types, see
+      // globequizShowOpponentTyping below.
+      if (input) input.placeholder = t('globequiz.inputPh');
+    }
+  };
+
+  // Called from vs.js (VS.onGqTurnGuess) with the opponent's wrong guess —
+  // mirrors it into MY OWN guess list (the shared "already tried" column)
+  // and passes me the turn. Also spins the globe to their guess (same
+  // focusOnCountry the spectator UI already uses for a watched friend's
+  // guesses), so it's visible even though I'm not the one typing.
+  window.globequizReceiveOpponentTurnGuess = function (g) {
+    if (!g) return;
+    // Whoever's turn it was just answered (or ran out the clock) — the
+    // auto-rotate stops on BOTH sides, not just the one who typed
+    // (submitGuess() already does it locally for the answering side).
+    stopAutoRotate();
+    if (g.timeout) {
+      // They ran out of their 15s without answering — no country to show,
+      // just pass the turn back to me.
+      window.globequizSetMyTurn?.(true, g.turnStartedAt);
+      _gqShowTurnNotice(t('gq.oppTimedOut', { name: (window._vsOpponent && window._vsOpponent.name) || 'Rival' }));
+      return;
+    }
+    if (!g.name) return;
+    guesses.push({ name: g.name, km: g.km, dir: g.dir, color: g.color, role: g.role });
+    gqVsOppGuessCount++;
+    if (_gqTurnsVariant && typeof g.km === 'number') {
+      gqVsOppBestKm = Math.min(gqVsOppBestKm, g.km);
+      const oppVal = document.getElementById('gq-lb-vsopp-time');
+      const oppAtt = document.getElementById('gq-lb-vsopp-km');
+      if (oppVal) oppVal.textContent = formatGqKm(gqVsOppBestKm);
+      if (oppAtt) oppAtt.textContent = String(gqVsOppGuessCount);
+      positionGqVsLeaderboard(true);
+    }
+    saveState();
+    drawTexture();
+    renderGuessList();
+    updateHint();
+    if (typeof sfxSelect !== 'undefined' && typeof sfxPlay === 'function') { sfxSelect.currentTime = 0; sfxPlay(sfxSelect); }
+    const country = countryByName.get(normalize(g.name));
+    if (country) focusOnCountry(country);
+    window.globequizSetMyTurn?.(true, g.turnStartedAt);
+    // "Por turnos": a spectator's shared guess list is otherwise only
+    // resynced when I submit MY OWN next guess (see _specReportGqGuesses in
+    // submitGuess) — without this it lagged a full half-turn behind, only
+    // showing the opponent's move once I also answered.
+    if (typeof window._specReportGqGuesses === 'function') window._specReportGqGuesses(guesses.slice());
+  };
+
+  // Called from vs.js (VS.onGqTyping) with a live preview of what the
+  // opponent is currently typing, while it's THEIR turn — shown INSIDE the
+  // (disabled) input itself, replacing its placeholder ("Escribe un
+  // país...") with their live text, instead of a separate message elsewhere.
+  // #gq-hint above keeps its own fixed "Esperando respuesta de {name}...".
+  window.globequizShowOpponentTyping = function (text) {
+    if (window._gqMyTurn) return; // stale echo / already my turn again
+    const input = document.getElementById('gq-guess-input');
+    if (!input) return;
+    const trimmed = (text || '').trim();
+    input.placeholder = trimmed || t('globequiz.inputPh');
   };
 
   // Sorts by ascending time (lower time = better place) and places each card
@@ -2456,6 +2797,16 @@
     stopAutoRotate();
     stopInertia();
     abortGqPregameCountdown();
+    // Cuts any GlobeQuiz sfx that could still be mid-play the instant this
+    // runs — quitToMenu()'s own sfx stop-list doesn't cover sfxCheck/
+    // sfxSelect (they're generic UI blips used all over, not GlobeQuiz-
+    // specific), and this also fires from paths that DON'T go through
+    // quitToMenu() at all (e.g. globequizVsShowLoss). Matters most for
+    // "por turnos": whoever abandons/gets AFK-kicked mid-turn can have the
+    // 5s tick, timesup, or a turn-notification sfx still playing.
+    [sfxTickdown, sfxTimesUp, sfxCheck, sfxSelect].forEach(s => {
+      if (s) { try { s.pause(); s.currentTime = 0; } catch (e) {} }
+    });
     if (typeof window.stopGlobeQuizEndgameTimer === 'function') window.stopGlobeQuizEndgameTimer();
     stopGqEndgameCountdown();
     if (gqEndgameTimeout) { clearTimeout(gqEndgameTimeout); gqEndgameTimeout = null; }
@@ -2476,6 +2827,36 @@
     const myScoreEl = document.getElementById('gq-lb-player-time');
     if (myScoreEl) { myScoreEl.classList.remove('gq-lb-vs-score'); myScoreEl.textContent = '0:00'; }
     document.getElementById('gq-lb-vsopp')?.remove();
+    // "Por turnos" leftovers — a rematch calls globequizSetTurnsMode() again
+    // right after this, so this is only load-bearing on a real exit/abandon.
+    _gqTurnsVariant = false;
+    _gqTurnsMyGuessCount = 0;
+    _gqMySkipStreak = 0;
+    _gqStopTurnTimer();
+    _gqSetCountdownIconRed(false);
+    document.querySelector('.gq-countdown-widget')?.style.removeProperty('display');
+    document.getElementById('gq-afk-popup')?.style.setProperty('display', 'none');
+    clearTimeout(_gqTurnNoticeFadeT); clearTimeout(_gqTurnNoticeHideT);
+    const _turnNotice = document.getElementById('gq-turn-notice');
+    if (_turnNotice) { _turnNotice.hidden = true; _turnNotice.classList.remove('gq-turn-notice-show'); }
+    window._gqMyTurn = null;
+    window._gqAmIStarter = null;
+    document.getElementById('gq-roulette-overlay')?.style.setProperty('display', 'none');
+    // globequizSetMyTurn()/globequizShowOpponentTyping() write straight into
+    // #gq-hint's textContent ("Esperando respuesta…"/live preview) — without
+    // this, a turns-mode duel that ends mid-wait left that text FROZEN there,
+    // and the next match (even a plain solo one) opened showing that stale
+    // line until the player's first guess (the reported "seguía con los
+    // datos antiguos"). guesses/solved/dailyCountry are already reset above,
+    // so this recomputes the correct default ("Coloca el nombre...").
+    updateHint();
+    // Re-enable the input/button too — globequizSetMyTurn(false) can leave
+    // them disabled if the match ended while it wasn't my turn.
+    const _hintInput = document.getElementById('gq-guess-input');
+    const _hintBtn = document.getElementById('gq-guess-btn');
+    if (_hintInput) { _hintInput.disabled = false; _hintInput.placeholder = t('globequiz.inputPh'); }
+    if (_hintBtn) _hintBtn.classList.remove('gq-disabled');
+    document.querySelector('.gq-guess-row')?.classList.remove('gq-locked');
   }
   window.globequizHardReset = globequizHardReset;
   window.gameStoppers = window.gameStoppers || [];
@@ -2531,7 +2912,7 @@
     window.pendingGameMode = 'globequiz';
     window._setPlaying(true);
     Promise.resolve().then(() => {
-      if (typeof window._specReportSplash === 'function') window._specReportSplash({ mode: 'globequiz' });
+      if (typeof window._specReportSplash === 'function') window._specReportSplash({ mode: _gqTurnsVariant ? 'globequiz_turns' : 'globequiz' });
     });
     // Menu music is cut as soon as you enter (no need to wait for the
     // 3-2-1-GO to finish for this, only gamemusic waits for onDone).
@@ -2571,6 +2952,16 @@
       const playCheckSfx = () => { if (typeof sfxCheck !== 'undefined' && typeof sfxPlay === 'function') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); } };
       if (btn2) btn2.addEventListener('click', () => { playCheckSfx(); submitGuess(); });
       if (input2) input2.addEventListener('keydown', (e) => { if (e.key === 'Enter') { playCheckSfx(); submitGuess(); } });
+      // "Por turnos": broadcast a live preview of what I'm typing while it's
+      // my turn. Sent on every keystroke, no debounce — a broadcast message
+      // is cheap and a delay here just reads as lag on the opponent's screen
+      // for fast typers.
+      if (input2) {
+        input2.addEventListener('input', () => {
+          if (!(window._vsActive && _gqTurnsVariant && window._gqMyTurn)) return;
+          window.VS?.reportGqTyping?.(input2.value);
+        });
+      }
       // End-of-game panel confirm: same exit path as power (tear
       // everything down + the menu's typical entrance animation), just
       // without going through the "are you sure you want to quit?" popup
@@ -2640,7 +3031,7 @@
         // runGqPregameCountdown, which the spectator now also calls to SHOW
         // the countdown, not to re-broadcast it.
         if (typeof window._specReportPregame === 'function') {
-          window._specReportPregame({ mode: 'globequiz', startedAt: Date.now() });
+          window._specReportPregame({ mode: _gqTurnsVariant ? 'globequiz_turns' : 'globequiz', startedAt: Date.now() });
         }
         // Music only starts when the 3-2-1-GO ends, same as the rest of the
         // modes (see runPregameCountdown in js/modes/mapgame-play.js).
@@ -2649,12 +3040,27 @@
           if (hintEl2) hintEl2.style.display = '';
           if (canvasEl) canvasEl.style.pointerEvents = '';
           if (typeof playMusic === 'function' && typeof sfxGameMusic !== 'undefined') playMusic(sfxGameMusic);
+          // "Por turnos": only the player the roulette picked gets to guess
+          // first (see window._gqAmIStarter, set in vs.js before the
+          // roulette). Every other case (solo, "por rapidez") leaves both
+          // sides free, same as before.
+          if (window._vsActive && _gqTurnsVariant) {
+            document.querySelector('.gq-countdown-widget')?.style.removeProperty('display');
+            window.globequizSetMyTurn?.(!!window._gqAmIStarter, Date.now());
+          }
           startTimer();
           // A single "round" per session (no repeated rounds) — the target
           // country is never sent, only when the timer started, so the
           // spectator doesn't see the answer before the player.
           if (typeof window._specReportRound === 'function') {
-            window._specReportRound({ mode: 'globequiz', startedAt: gqTimerStart });
+            const roundPayload = { mode: _gqTurnsVariant ? 'globequiz_turns' : 'globequiz', startedAt: gqTimerStart };
+            // Lets a spectator work out who starts without a broadcast of its
+            // own: whichever role sent this 'round' says whether ITS OWN
+            // client is the starter (both host and guest compute this
+            // independently from the same seed, see window._gqAmIStarter in
+            // vs.js) — the other role is the starter otherwise.
+            if (window._vsActive && _gqTurnsVariant) roundPayload.amIStarter = !!window._gqAmIStarter;
+            window._specReportRound(roundPayload);
           }
         });
       };
@@ -2743,18 +3149,27 @@
     if (timerEl) timerEl.textContent = '0';
     // Friend card time — the two-line VS layout (globequizSpectatorSetOpponent)
     // keeps its child spans; only the value/km reset, never wipe the container.
+    // "Por turnos" flips what each line means (see gqVsScoreInnerHtml) — TOP
+    // is the closest km so far ('—' with none yet), BOTTOM is the attempt
+    // count ('0') — resetting to the "por rapidez" defaults ('0:00'/'—')
+    // here regardless of variant left the wrong text sitting there at the
+    // start of every single round (the reported "the cards don't update
+    // right"), until the first guess happened to overwrite it.
+    const topDefault = _gqTurnsVariant ? '—' : '0:00';
+    const bottomDefault = _gqTurnsVariant ? '0' : '—';
     const meVal = document.getElementById('gq-lb-player-time-val');
-    if (meVal) meVal.textContent = '0:00';
-    else { const c = document.getElementById('gq-lb-player-time'); if (c) c.textContent = '0:00'; }
+    if (meVal) meVal.textContent = topDefault;
+    else { const c = document.getElementById('gq-lb-player-time'); if (c) c.textContent = topDefault; }
     const meKm = document.getElementById('gq-lb-player-km');
-    if (meKm) meKm.textContent = '—';
+    if (meKm) meKm.textContent = bottomDefault;
     // Rival row — carry it across rounds (same opponent), just reset its values.
     const oTime = document.getElementById('gq-lb-vsopp-time');
-    if (oTime) oTime.textContent = '0:00';
+    if (oTime) oTime.textContent = topDefault;
     const oKm = document.getElementById('gq-lb-vsopp-km');
-    if (oKm) oKm.textContent = '—';
+    if (oKm) oKm.textContent = bottomDefault;
     _gqSpecFriendBestKm = Infinity;
     _gqSpecOppBestKm = Infinity;
+    _gqSpecPositionVsLeaderboard(false);
     // Same reset as the real player's loadState() (guesses/solved) plus
     // dailyCountry null — the spectator never knows it until they win (see
     // globequizSpectatorResolvePick), so drawTexture()/updateOutlines() must
@@ -2925,6 +3340,13 @@
     document.getElementById('gq-lb-vsopp-name').textContent = name || 'Rival';
     document.getElementById('gq-lb-vsopp-avatar').src = avatar || 'images/profilepic/ppdefault.png';
     if (window.CustomizeAssets) window.CustomizeAssets.applyCard(el, cardCode || '0001');
+    // Same shared bookkeeping the real player's globequizVsPrepareOpponentRow
+    // sets up for its own two cards — without this, _gqSpecPositionVsLeaderboard
+    // had no elements to reorder (the reported "the cards' position never
+    // updates"), since this is a completely separate DOM build path from the
+    // real player's.
+    gqLbElements = { player: playerEl, vsopp: el };
+    _gqSpecPositionVsLeaderboard(false);
     // Friend card → same two-line layout (only once).
     const myScoreEl = document.getElementById('gq-lb-player-time');
     if (myScoreEl && !document.getElementById('gq-lb-player-time-val')) {
@@ -2936,11 +3358,13 @@
     if (typeof km === 'number' && isFinite(km)) _gqSpecOppBestKm = Math.min(_gqSpecOppBestKm, km);
     const el = document.getElementById('gq-lb-vsopp-km');
     if (el) el.textContent = isFinite(_gqSpecOppBestKm) ? Math.round(_gqSpecOppBestKm) + ' km' : '—';
+    _gqSpecPositionVsLeaderboard(true);
   };
   window.globequizSpectatorSetFriendGuess = function (km) {
     if (typeof km === 'number' && isFinite(km)) _gqSpecFriendBestKm = Math.min(_gqSpecFriendBestKm, km);
     const el = document.getElementById('gq-lb-player-km');
     if (el) el.textContent = isFinite(_gqSpecFriendBestKm) ? Math.round(_gqSpecFriendBestKm) + ' km' : '—';
+    _gqSpecPositionVsLeaderboard(true);
   };
 
   window.globequizSpectatorExit = function (switchingMode) {
@@ -2950,6 +3374,7 @@
     if (_go2) { _go2.style.display = 'none'; _go2.classList.remove('timeup-in', 'timeup-out'); }
     if (_gqSpecTimerInterval) { clearInterval(_gqSpecTimerInterval); _gqSpecTimerInterval = null; }
     if (_gqSpecCardInterval) { clearInterval(_gqSpecCardInterval); _gqSpecCardInterval = null; }
+    _gqStopTurnTimer();
     // The globe now genuinely runs for the spectator (auto-rotation +
     // release inertia, see initThreeScene) — without stopping them here they
     // stayed alive in the background (rAF loop) with the screen already
@@ -2982,8 +3407,76 @@
     }
   };
 
+  // "Por turnos" ONLY: reuses the REAL per-turn countdown machinery
+  // (_gqStartTurnTimer/_gqTickTurnTimer, same closure) for a spectator too —
+  // it already no-ops the "declare my own timeout" branch since
+  // window._gqMyTurn is never true for a spectator, so nothing else needs
+  // changing. Also unhides the countdown widget, which globequizSetTurnsMode
+  // hid on mount (real players only unhide it themselves once THEIR 3-2-1
+  // ends, a spectator never runs that code path).
+  window.globequizSpectatorStartTurnTimer = function (startedAt) {
+    document.querySelector('.gq-countdown-widget')?.style.removeProperty('display');
+    _gqStartTurnTimer(startedAt);
+  };
+  window.globequizSpectatorStopTurnTimer = function () {
+    _gqStopTurnTimer();
+  };
+
+  // "Por turnos" ONLY: mirrors the real players' roulette (see
+  // _showGqRoulette in vs.js, reused here via window._vsShowGqRouletteFor)
+  // for a spectator — the friend's own identity stands in for "me" since a
+  // spectator has no side of their own.
+  window.globequizSpectatorShowRoulette = function (friendStarts, friendName, friendAvatar, oppName, oppAvatar) {
+    if (typeof window._vsShowGqRouletteFor !== 'function') return;
+    window._vsShowGqRouletteFor(!!friendStarts, () => {}, {
+      myName: friendName || 'Jugador', myAvatar: friendAvatar || 'images/profilepic/ppdefault.png',
+      oppName: oppName || 'Rival', oppAvatar: oppAvatar || 'images/profilepic/ppdefault.png',
+    });
+  };
+
+  // "Por turnos" ONLY: whose turn it is right now, for a spectator (the real
+  // players never see this text — they get the turn-lock disable/enable +
+  // #gq-hint's "Esperando respuesta de..." instead, see globequizSetMyTurn).
+  // Shown at the TOP of the screen (#gq-spec-turn, see style.css) — the
+  // bottom is reserved for the locked input mirroring live typing instead
+  // (see globequizSpectatorSetupTurnsUI/globequizSpectatorShowTyping).
+  window.globequizSpectatorSetTurn = function (text) {
+    const el = document.getElementById('gq-spec-turn');
+    if (!el) return;
+    el.textContent = text || '';
+    el.classList.toggle('gq-spec-turn-show', !!text);
+  };
+
+  // "Por turnos" ONLY: resets the turn banner + typing bubble for a
+  // spectator — hides both. Called on mount (see _enterRealUIIfPossible in
+  // spectate.js, still during the roulette/3-2-1 — neither belongs on
+  // screen until gameplay actually starts, see onRound there) and again
+  // whenever the match ends (win/loss).
+  window.globequizSpectatorSetupTurnsUI = function () {
+    window.globequizSpectatorSetTurn('');
+    const el = document.getElementById('gq-spec-typing');
+    if (el) { el.classList.remove('gq-spec-typing-show'); el.textContent = ''; }
+  };
+
+  // "Por turnos" ONLY: live preview of whichever side is currently typing —
+  // same live-typing broadcast the real (waiting) opponent sees inside their
+  // own disabled input (placeholder swapped for their live keystrokes, see
+  // globequizShowOpponentTyping) — shown here as a standalone "speech
+  // bubble" below the turn banner instead, since a spectator has no input of
+  // their own to repurpose. Unlike the real opponent's input, this bubble
+  // never hides: with no text yet (nobody typed this turn, or it's a fresh
+  // turn) it just falls back to the same placeholder.
+  window.globequizSpectatorShowTyping = function (text) {
+    const el = document.getElementById('gq-spec-typing');
+    if (!el) return;
+    const trimmed = (text || '').trim();
+    el.textContent = trimmed || t('globequiz.inputPh');
+    el.classList.add('gq-spec-typing-show');
+  };
+
   window.globequizSpectatorShowPregame = function (payload) {
     if (_gqSpecTimerInterval) { clearInterval(_gqSpecTimerInterval); _gqSpecTimerInterval = null; }
+    _gqStopTurnTimer();
     _gqSpecResetPanel();
     // The real player cuts the menu music as soon as they enter and stays
     // silent through the whole 3-2-1 (see initGlobeQuiz, playMusic(null)
@@ -3015,37 +3508,46 @@
     _gqSpecResetPanel();
     _gqSpecStartedAt = (payload && typeof payload.startedAt === 'number') ? payload.startedAt : Date.now();
     if (_gqSpecTimerInterval) clearInterval(_gqSpecTimerInterval);
-    // #gq-timer-number is the BIG timer — the real player paints it with
-    // updateTimerDisplay() as whole seconds (String(wholeSec)), never "S:CC"
-    // (that's only the small leaderboard card's format, formatGqCardTime).
-    // Using formatGqCardTime here showed something like "142:15" instead of
-    // "142" (the reported bug).
-    const tick = () => {
-      const elapsedMs = Math.max(0, Date.now() - _gqSpecStartedAt);
-      const el = document.getElementById('gq-timer-number');
-      if (el) el.textContent = String(Math.floor(elapsedMs / 1000));
-    };
-    tick();
-    _gqSpecTimerInterval = setInterval(tick, 1000);
-    // Small card (#gq-lb-player-time, "S:CC" format): the real player runs
-    // it on ITS OWN 30ms interval (gqCardInterval), separate from the big
-    // 1s timer — so it's actually seen running in hundredths instead of
-    // jumping by whole seconds. It's on its own interval here too (not
-    // inside `tick`, which only runs 1x/sec) so it behaves the SAME as in
-    // the normal player.
     if (_gqSpecCardInterval) clearInterval(_gqSpecCardInterval);
-    const cardTick = () => {
-      if (typeof formatGqCardTime !== 'function') return;
-      const t = formatGqCardTime(Math.max(0, Date.now() - _gqSpecStartedAt));
-      // Two-line VS layout (globequizSpectatorSetOpponent) or the plain card.
-      const meVal = document.getElementById('gq-lb-player-time-val') || document.getElementById('gq-lb-player-time');
-      if (meVal) meVal.textContent = t;
-      // The rival shares the same clock (both started by the same 3-2-1).
-      const oppTime = document.getElementById('gq-lb-vsopp-time');
-      if (oppTime) oppTime.textContent = t;
-    };
-    cardTick();
-    _gqSpecCardInterval = setInterval(cardTick, 30);
+    // "Por turnos" repurposes #gq-timer-number for its own 15→0 per-turn
+    // countdown (see _gqTickTurnTimer) and the small card for km/attempts
+    // (not time) — this elapsed-race clock doesn't apply and would overwrite
+    // both with the wrong kind of value. The turn indicator
+    // (globequizSpectatorSetTurn) covers what a "Por turnos" spectator needs
+    // to know instead; a live per-turn countdown mirror is deliberately
+    // skipped here (same cosmetic/low-value call as the roulette animation).
+    if (!_gqTurnsVariant) {
+      // #gq-timer-number is the BIG timer — the real player paints it with
+      // updateTimerDisplay() as whole seconds (String(wholeSec)), never "S:CC"
+      // (that's only the small leaderboard card's format, formatGqCardTime).
+      // Using formatGqCardTime here showed something like "142:15" instead of
+      // "142" (the reported bug).
+      const tick = () => {
+        const elapsedMs = Math.max(0, Date.now() - _gqSpecStartedAt);
+        const el = document.getElementById('gq-timer-number');
+        if (el) el.textContent = String(Math.floor(elapsedMs / 1000));
+      };
+      tick();
+      _gqSpecTimerInterval = setInterval(tick, 1000);
+      // Small card (#gq-lb-player-time, "S:CC" format): the real player runs
+      // it on ITS OWN 30ms interval (gqCardInterval), separate from the big
+      // 1s timer — so it's actually seen running in hundredths instead of
+      // jumping by whole seconds. It's on its own interval here too (not
+      // inside `tick`, which only runs 1x/sec) so it behaves the SAME as in
+      // the normal player.
+      const cardTick = () => {
+        if (typeof formatGqCardTime !== 'function') return;
+        const t = formatGqCardTime(Math.max(0, Date.now() - _gqSpecStartedAt));
+        // Two-line VS layout (globequizSpectatorSetOpponent) or the plain card.
+        const meVal = document.getElementById('gq-lb-player-time-val') || document.getElementById('gq-lb-player-time');
+        if (meVal) meVal.textContent = t;
+        // The rival shares the same clock (both started by the same 3-2-1).
+        const oppTime = document.getElementById('gq-lb-vsopp-time');
+        if (oppTime) oppTime.textContent = t;
+      };
+      cardTick();
+      _gqSpecCardInterval = setInterval(cardTick, 30);
+    }
     // The real gameloop only starts when the 3-2-1-GO ends (onDone of
     // runGqPregameCountdown) — this 'round' is exactly that signal (a single
     // round per session, always after the pregame), so here is the right
@@ -3061,6 +3563,14 @@
   // the target, it's what makes watching the list live interesting).
   window.globequizSpectatorResolvePick = function (payload) {
     if (!payload) return;
+    // "Por turnos": a wrong guess (either side) already arrives through the
+    // 'gqguesses' full-resync (globequizSpectatorSyncGuesses, which ALSO now
+    // does the live focus/sfx/card-update work — see there) — this 'answer'
+    // broadcast fires for wrong guesses too (both variants), but for turns
+    // it would just duplicate the same entry a second time. The WIN case
+    // below is untouched: it's the only thing turns mode still needs from
+    // this path (the shared list has no notion of "who won").
+    if (_gqTurnsVariant && !payload.win) return;
     // The real player plays sfxCheck on EVERY submit (confirm click/Enter,
     // see playCheckSfx in initGlobeQuiz) — not just on the final correct one.
     if (typeof sfxCheck !== 'undefined' && typeof sfxPlay === 'function') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
@@ -3070,23 +3580,32 @@
     if (payload.win) {
       if (_gqSpecTimerInterval) { clearInterval(_gqSpecTimerInterval); _gqSpecTimerInterval = null; }
       if (_gqSpecCardInterval) { clearInterval(_gqSpecCardInterval); _gqSpecCardInterval = null; }
+      _gqStopTurnTimer();
       // Same moment as the real player's submitGuess(): cuts the gameloop
       // (silence) and plays sfxBonus — sfxPostgame only comes in 2s later,
       // with globequizSpectatorShowPostgame's banner.
       if (typeof playMusic === 'function') playMusic(null);
       if (typeof sfxBonus !== 'undefined' && typeof sfxPlay === 'function') { sfxBonus.currentTime = 0; sfxPlay(sfxBonus); }
-      const timerEl = document.getElementById('gq-timer-number');
-      if (timerEl) timerEl.textContent = String(Math.floor((payload.elapsedMs || 0) / 1000));
-      // Freezes the small card at the same final value as the real player
-      // (see gqCardEl.textContent = formatGqCardTime(gqFinalElapsedMs) in
-      // submitGuess) instead of leaving it at whatever cardTick last
-      // painted.
-      if (typeof formatGqCardTime === 'function') {
-        const _f = formatGqCardTime(payload.elapsedMs || 0);
-        const meVal2 = document.getElementById('gq-lb-player-time-val') || document.getElementById('gq-lb-player-time');
-        if (meVal2) meVal2.textContent = _f;
-        const oTime2 = document.getElementById('gq-lb-vsopp-time');
-        if (oTime2) oTime2.textContent = _f;
+      // The match is over — the turn banner/locked input have nothing left
+      // to say.
+      if (_gqTurnsVariant) window.globequizSpectatorSetupTurnsUI?.(false);
+      // "Por turnos" doesn't use the elapsed-race clock at all (#gq-timer-number
+      // is its 15→0 per-turn countdown, the small card shows km/attempts) —
+      // painting it here would show a meaningless race time.
+      if (!_gqTurnsVariant) {
+        const timerEl = document.getElementById('gq-timer-number');
+        if (timerEl) timerEl.textContent = String(Math.floor((payload.elapsedMs || 0) / 1000));
+        // Freezes the small card at the same final value as the real player
+        // (see gqCardEl.textContent = formatGqCardTime(gqFinalElapsedMs) in
+        // submitGuess) instead of leaving it at whatever cardTick last
+        // painted.
+        if (typeof formatGqCardTime === 'function') {
+          const _f = formatGqCardTime(payload.elapsedMs || 0);
+          const meVal2 = document.getElementById('gq-lb-player-time-val') || document.getElementById('gq-lb-player-time');
+          if (meVal2) meVal2.textContent = _f;
+          const oTime2 = document.getElementById('gq-lb-vsopp-time');
+          if (oTime2) oTime2.textContent = _f;
+        }
       }
       // solved/dailyCountry are the SAME module variables the real player
       // uses — with these set, drawTexture()/updateOutlines() already paint
@@ -3106,7 +3625,10 @@
     }
     const country = countryByName.get(normalize(payload.name || ''));
     guesses.push({ name: payload.name, km: payload.km, dir: payload.dir, color: payload.color });
-    if (typeof payload.km === 'number' && typeof window.globequizSpectatorSetFriendGuess === 'function') {
+    // "Por rapidez" ONLY — see the matching comment in spectate.js's onAnswer
+    // for why this is skipped for "Por turnos" (that bottom slot holds the
+    // attempts count there, not a km distance).
+    if (!_gqTurnsVariant && typeof payload.km === 'number' && typeof window.globequizSpectatorSetFriendGuess === 'function') {
       window.globequizSpectatorSetFriendGuess(payload.km);
     }
     drawTexture();
@@ -3124,6 +3646,10 @@
     stopAutoRotate();
     if (_gqSpecTimerInterval) { clearInterval(_gqSpecTimerInterval); _gqSpecTimerInterval = null; }
     if (_gqSpecCardInterval) { clearInterval(_gqSpecCardInterval); _gqSpecCardInterval = null; }
+    _gqStopTurnTimer();
+    // The match is over — the turn banner/locked input have nothing left to
+    // say.
+    if (_gqTurnsVariant) window.globequizSpectatorSetupTurnsUI?.(false);
     dailyCountry = countryByName.get(normalize((payload && payload.countryName) || ''));
     drawTexture();
     renderGuessList();
@@ -3146,19 +3672,115 @@
     }
   };
 
-  // Resend (not live) of ALL guesses already made — arrives on joining
-  // mid-match (see reportGqGuesses in spectate.js), unlike
-  // globequizSpectatorResolvePick which is the LIVE route (one guess at a
-  // time, with sfxCheck/camera focus). Replaces the whole `guesses` at once
-  // and repaints silently — without this, someone connecting mid-match only
-  // saw the countries the player typed FROM THEN ON, not the ones already
-  // placed (the reported bug).
-  window.globequizSpectatorSyncGuesses = function (list) {
+  // "Por turnos" ONLY: recomputes the friend/opponent km+attempts cards
+  // straight from the (role-tagged) shared guesses list — the authoritative
+  // source, instead of separate running counters, so a spectator joining
+  // mid-match or catching a resync is never out of step with what the real
+  // players see on their own cards.
+  // "Por turnos" ONLY: bumps one side's card straight from the live
+  // 'gqturnguess' broadcast (see spectate.js) the instant a guess happens —
+  // independent of (and faster than) the full-list resync
+  // (_gqSpecUpdateTurnsCards/globequizSpectatorSyncGuesses below), which
+  // still runs too and stays the authoritative source for someone joining
+  // mid-match. Skipped on a timeout (no km to record, no extra attempt).
+  function _gqSpecBumpTurnCard(isFriend, km) {
+    const kmEl = document.getElementById(isFriend ? 'gq-lb-player-time-val' : 'gq-lb-vsopp-time')
+      || (isFriend ? document.getElementById('gq-lb-player-time') : null);
+    const attEl = document.getElementById(isFriend ? 'gq-lb-player-km' : 'gq-lb-vsopp-km');
+    if (isFriend) {
+      if (typeof km === 'number') _gqSpecFriendBestKm = Math.min(_gqSpecFriendBestKm, km);
+      if (kmEl) kmEl.textContent = formatGqKm(isFinite(_gqSpecFriendBestKm) ? _gqSpecFriendBestKm : null);
+      if (attEl) attEl.textContent = String((parseInt(attEl.textContent, 10) || 0) + 1);
+    } else {
+      if (typeof km === 'number') _gqSpecOppBestKm = Math.min(_gqSpecOppBestKm, km);
+      if (kmEl) kmEl.textContent = formatGqKm(isFinite(_gqSpecOppBestKm) ? _gqSpecOppBestKm : null);
+      if (attEl) attEl.textContent = String((parseInt(attEl.textContent, 10) || 0) + 1);
+    }
+    // The real players reorder their two cards by whoever's currently
+    // closest (see positionGqVsLeaderboard) on every guess — without this,
+    // the spectator's numbers updated but the cards never swapped places to
+    // match (the reported "the position of the cards doesn't update").
+    _gqSpecPositionVsLeaderboard(true);
+  }
+  window.globequizSpectatorBumpTurnCard = function (isFriend, km) { _gqSpecBumpTurnCard(!!isFriend, km); };
+
+  // "Por turnos" ONLY: the single LIVE source of truth for a spectator — a
+  // real guess (never a timeout) from either side, straight off the
+  // 'gqturnguess' broadcast (see spectate.js's onGqTurnGuess). Pushes it
+  // into the shared list AND bumps the card in the same call, instead of
+  // waiting on the separate 'gqguesses' full-resync (which arrives a beat
+  // later over its own broadcast and, if it's ever dropped/delayed, left
+  // both the list and the cards stuck — the reported "the cards don't
+  // update live like the real players see"). 'gqguesses' still runs (see
+  // globequizSpectatorSyncGuesses) but now only matters for someone joining
+  // mid-match, not for keeping already-connected spectators in sync.
+  window.globequizSpectatorReceiveTurnGuess = function (payload, isFriend) {
+    if (!payload || !payload.name) return;
+    guesses.push({ name: payload.name, km: payload.km, dir: payload.dir, color: payload.color, role: payload.role });
+    if (guesses.length > 0) stopAutoRotate();
+    drawTexture();
+    renderGuessList();
+    const country = countryByName.get(normalize(payload.name || ''));
+    if (country) focusOnCountry(country);
+    // Same submit sfx the real player hears on every guess (see
+    // globequizSpectatorResolvePick for "por rapidez") — this variant's live
+    // route never went through resolvePick at all, so it never played.
+    if (typeof sfxCheck !== 'undefined' && typeof sfxPlay === 'function') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+    if (typeof sfxSelect !== 'undefined' && typeof sfxPlay === 'function') { sfxSelect.currentTime = 0; sfxPlay(sfxSelect); }
+    _gqSpecBumpTurnCard(!!isFriend, payload.km);
+  };
+
+  function _gqSpecUpdateTurnsCards(friendIsHost) {
+    let friendBestKm = Infinity, oppBestKm = Infinity, friendCount = 0, oppCount = 0;
+    guesses.forEach(g => {
+      if (!g || !g.role) return; // no role = guess made before this field existed (shouldn't happen live)
+      const isFriend = (g.role === 'host') === !!friendIsHost;
+      if (isFriend) { friendCount++; if (typeof g.km === 'number') friendBestKm = Math.min(friendBestKm, g.km); }
+      else { oppCount++; if (typeof g.km === 'number') oppBestKm = Math.min(oppBestKm, g.km); }
+    });
+    const friendKmEl = document.getElementById('gq-lb-player-time-val') || document.getElementById('gq-lb-player-time');
+    const friendAttEl = document.getElementById('gq-lb-player-km');
+    const oppKmEl = document.getElementById('gq-lb-vsopp-time');
+    const oppAttEl = document.getElementById('gq-lb-vsopp-km');
+    if (friendKmEl) friendKmEl.textContent = formatGqKm(isFinite(friendBestKm) ? friendBestKm : null);
+    if (friendAttEl) friendAttEl.textContent = String(friendCount);
+    if (oppKmEl) oppKmEl.textContent = formatGqKm(isFinite(oppBestKm) ? oppBestKm : null);
+    if (oppAttEl) oppAttEl.textContent = String(oppCount);
+    // Keep the shared best-km vars (read by _gqSpecPositionVsLeaderboard,
+    // also used by the live _gqSpecBumpTurnCard path) in step with this
+    // from-scratch recompute — otherwise a resync could correct the TEXT
+    // while the cards' relative ORDER kept reflecting stale numbers.
+    _gqSpecFriendBestKm = friendBestKm;
+    _gqSpecOppBestKm = oppBestKm;
+    _gqSpecPositionVsLeaderboard(true);
+  }
+
+  // Resend of ALL guesses already made — arrives on joining mid-match (see
+  // reportGqGuesses in spectate.js) AND, for "Por turnos", on every single
+  // guess too (see the _specReportGqGuesses calls in submitGuess/
+  // globequizReceiveOpponentTurnGuess) since that variant's shared list has
+  // no other live route once globequizSpectatorResolvePick bows out for it
+  // (see the guard there). "Por rapidez" still only ever gets this on join —
+  // its live guesses keep going through resolvePick as before, so the
+  // isNewGuess focus/sfx below never fires for it.
+  window.globequizSpectatorSyncGuesses = function (list, friendIsHost) {
     if (!Array.isArray(list) || solved) return; // already won — postgame/win rules, don't overwrite with a stale list
+    const isNewGuess = _gqTurnsVariant && list.length > guesses.length;
     guesses = list.slice();
     if (guesses.length > 0) stopAutoRotate();
     drawTexture();
     renderGuessList();
+    if (isNewGuess) {
+      // Mirrors what globequizSpectatorResolvePick does live for "Por
+      // rapidez" — without this the globe never re-centered on whichever
+      // country was just tried (the reported "the globe doesn't position
+      // itself when someone submits an input").
+      const last = guesses[guesses.length - 1];
+      const country = last && countryByName.get(normalize(last.name || ''));
+      if (country) focusOnCountry(country);
+      if (typeof sfxSelect !== 'undefined' && typeof sfxPlay === 'function') { sfxSelect.currentTime = 0; sfxPlay(sfxSelect); }
+    }
+    if (_gqTurnsVariant && typeof friendIsHost === 'boolean') _gqSpecUpdateTurnsCards(friendIsHost);
   };
 
   window.globequizSpectatorShowPostgame = function (payload) {

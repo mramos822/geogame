@@ -365,6 +365,7 @@ window.Spectate = (() => {
   let _onAnswer   = null; // cb({ role, index, correct }) — a player's exact selection
   let _onWrong    = null; // cb(role)
   let _onEnd      = null; // cb(reason) — 'finished' | 'abandoned' | 'gone'
+  let _onResultLeave = null; // cb(role) — GloboReto VS: someone left the post-round result screen (Exit button/tab close) — see VS.reportResultLeave. Unlike onEnd (driven by the matches row's status column), this fires immediately: leaving the result screen doesn't always flip that column (VS.finish() is host-gated and may never run if the guest is the one who left).
   let _onRound    = null; // cb({ role, index, country/label, correctSlot, options })
   let _onTick     = null; // cb(timeLeft) — the player's real time remaining
   let _onTimesUp  = null; // cb() — the game round's time ran out
@@ -377,6 +378,10 @@ window.Spectate = (() => {
   let _onSpectatorCount = null; // cb(n) — how many spectators are watching (this one included), see watchSolo
   let _onGqGuesses = null; // cb(list) — GlobeQuiz: ALL guesses already made, resent to whoever joins mid-match (see reportGqGuesses)
   let _onGqSpec = null; // cb(payload) — GloboReto VS ONLY: rich data for the spectator's #gq-vs-result-screen + rematch transition (see VS.reportGqSpec)
+  let _onGqTurnGuess = null; // cb(payload) — GloboReto "Por turnos" ONLY: one turn's guess or timeout (see VS.reportGqTurnGuess)
+  let _onGqTurnSync = null; // cb(payload) — GloboReto "Por turnos" ONLY: resend-on-join ECHO of the last turn hand-off (see _resendStateTo in vs.js) — turn banner/timer only, no list/card mutation (that would duplicate an already-known guess for an ALREADY-connected spectator receiving the same resend)
+  let _onGqRoulette = null; // cb(payload) — GloboReto "Por turnos" ONLY: the roulette is about to spin (see VS.reportGqRouletteStart)
+  let _onGqTyping = null; // cb(payload) — GloboReto "Por turnos" ONLY: live preview of what the current typer is writing (see VS.reportGqTyping)
 
   function _myId() { return window._sbUserId || null; }
 
@@ -436,6 +441,11 @@ window.Spectate = (() => {
       .on('broadcast', { event: 'gameend' }, ({ payload }) => { if (payload && _onGameEnd) _onGameEnd(payload); })
       .on('broadcast', { event: 'gqguesses' }, ({ payload }) => { if (payload && _onGqGuesses) _onGqGuesses(payload.list, payload.role); })
       .on('broadcast', { event: 'gqspec' }, ({ payload }) => { if (payload && _onGqSpec) _onGqSpec(payload); })
+      .on('broadcast', { event: 'gqturnguess' }, ({ payload }) => { if (payload && _onGqTurnGuess) _onGqTurnGuess(payload); })
+      .on('broadcast', { event: 'gqturnsync' }, ({ payload }) => { if (payload && _onGqTurnSync) _onGqTurnSync(payload); })
+      .on('broadcast', { event: 'gqroulette' }, ({ payload }) => { if (payload && _onGqRoulette) _onGqRoulette(payload); })
+      .on('broadcast', { event: 'gqtyping' }, ({ payload }) => { if (payload && _onGqTyping) _onGqTyping(payload); })
+      .on('broadcast', { event: 'resultleave' }, ({ payload }) => { if (_onResultLeave) _onResultLeave(payload && payload.role); })
       // Spectator counter — same mechanism as watchSolo() (see that long
       // comment), but it was missing entirely here: a VERSUS spectator never
       // learned how many others were watching them too, so the eye+counter
@@ -627,6 +637,11 @@ window.Spectate = (() => {
     onSpectatorCount: cb => { _onSpectatorCount = cb; },
     onGqGuesses: cb => { _onGqGuesses = cb; },
     onGqSpec:   cb => { _onGqSpec = cb; },
+    onGqTurnGuess: cb => { _onGqTurnGuess = cb; },
+    onGqTurnSync: cb => { _onGqTurnSync = cb; },
+    onGqRoulette: cb => { _onGqRoulette = cb; },
+    onGqTyping: cb => { _onGqTyping = cb; },
+    onResultLeave: cb => { _onResultLeave = cb; },
     getMatch:   () => _match,
     getMatchId: () => _matchId,
     isSolo:     () => _isSolo,
@@ -1761,6 +1776,26 @@ window.GroupSpectate = (() => {
       setPlayerCard: 'globequizSpectatorSetPlayerCard',
     },
   };
+  // "Por turnos" reuses the exact same spectator screen/functions as
+  // "Por rapidez" — the turn-lock-specific bits (whose turn it is, the
+  // shared guess list) are layered on top via the 'gqturnguess' handler
+  // below, not a separate REAL_UI_MODES entry.
+  REAL_UI_MODES.globequiz_turns = REAL_UI_MODES.globequiz;
+
+  // Mirrors vs.js's _isGqMode(m) — both GlobeQuiz variants share almost all
+  // spectator behavior; only genuinely turns-exclusive bits (the shared
+  // guess list, whose-turn indicator) branch off _mode === 'globequiz_turns'.
+  function _isGqMode(m) { return m === 'globequiz' || m === 'globequiz_turns'; }
+
+  // "Por turnos" spectator turn indicator text — friendTurn=true means the
+  // spectated friend is the one who gets to guess right now.
+  function _gqSpecTurnText(friendTurn) {
+    const friendName = _friendName || (typeof t === 'function' ? t('spectator.defaultPlayer') : 'El jugador');
+    const oppName = _oppName || 'Rival';
+    return friendTurn
+      ? ((typeof t === 'function') ? t('gq.specFriendTurn', { name: friendName }) : `Le toca a ${friendName}`)
+      : ((typeof t === 'function') ? t('gq.specOppTurn', { name: oppName }) : `Le toca a ${oppName}`);
+  }
 
   function _label(val) {
     return (typeof tCountry === 'function') ? tCountry(val) : val;
@@ -1797,7 +1832,7 @@ window.GroupSpectate = (() => {
     }
     // GloboReto has no numeric score row — build the rival's own row instead
     // (name/avatar/km), see globequizSpectatorSetOpponent.
-    if (_mode === 'globequiz' && !window.Spectate.isSolo() && _oppName
+    if (_isGqMode(_mode) && !window.Spectate.isSolo() && _oppName
         && typeof window.globequizSpectatorSetOpponent === 'function') {
       window.globequizSpectatorSetOpponent(_oppName, _oppAvatar, _oppCardCode);
     }
@@ -1822,7 +1857,23 @@ window.GroupSpectate = (() => {
     _usingRealUI = true;
     _activeRealUIMode = mode;
     screen.style.display = 'none';
+    // GloboReto: globequiz.js's own km/attempts card layout (gqVsScoreInnerHtml)
+    // and countdown-widget visibility depend on this flag — the spectator
+    // never went through vs.js's _launchVersus (which sets it for real
+    // players), so without this it stayed stuck as "por rapidez" even while
+    // watching a "por turnos" duel (wrong labels: time/km instead of km/attempts).
+    if (_isGqMode(mode)) window.globequizSetTurnsMode?.(mode === 'globequiz_turns');
     window[fns.enter]();
+    // Resets the turn banner/typing bubble on mount (see
+    // globequizSpectatorSetupTurnsUI in globequiz.js) — the actual live
+    // content arrives via onRound/onGqTurnGuess below, not from here.
+    if (_isGqMode(mode)) window.globequizSpectatorSetupTurnsUI?.(mode === 'globequiz_turns');
+    // "SPECTATING {name}" (#spectator-mini-hud) is anchored at the BOTTOM for
+    // every other mode — "Por turnos" already uses that same bottom strip
+    // for the turn banner + typing bubble (see .gq-spec-turn/.gq-spec-typing
+    // in style.css), so this one mode moves the badge to the very top
+    // instead of overlapping them.
+    miniHud.classList.toggle('gq-spec-mini-top', mode === 'globequiz_turns');
     miniNameEl.textContent = _friendName || 'Jugador';
     if (_friendAvatar) miniAvatarEl.src = _friendAvatar;
     window.CustomizeAssets?.applyFrame(miniAvatarWrap, _friendFrameCode);
@@ -1866,6 +1917,10 @@ window.GroupSpectate = (() => {
     // splash. It's only actually turned off on closing the session
     // (switchingMode falsy, see closeSpectator).
     if (!switchingMode) miniHud.style.display = 'none';
+    // Undo the "Por turnos"-only top position (see _enterRealUIIfPossible) —
+    // whatever comes next (another mode, or closing) uses the normal bottom
+    // spot.
+    miniHud.classList.remove('gq-spec-mini-top');
     _usingRealUI = false;
     _activeRealUIMode = null;
   }
@@ -2223,6 +2278,20 @@ window.GroupSpectate = (() => {
         const isDuplicate = roundKey === _lastRoundKey;
         _lastRoundKey = roundKey;
         if (!isDuplicate && fns && typeof window[fns.showRound] === 'function') window[fns.showRound](payload);
+        // "Por turnos": this 'round' is the FRIEND's own (see the
+        // _isFromFriendSide guard above) — payload.amIStarter says whether
+        // THEIR client is the one the roulette picked to go first (see
+        // window._gqAmIStarter in vs.js/globequiz.js). The roulette ITSELF
+        // already played out earlier via 'gqroulette' (see onGqRoulette
+        // below) — this only starts the first turn's countdown + banner,
+        // the same way the real players' own 3-2-1-GO does locally.
+        if (_mode === 'globequiz_turns' && typeof payload.amIStarter === 'boolean') {
+          window.globequizSpectatorSetTurn?.(_gqSpecTurnText(payload.amIStarter));
+          window.globequizSpectatorStartTurnTimer?.(payload.startedAt);
+          // Gameplay actually starts HERE (the 3-2-1 already ended) — the
+          // typing bubble stays hidden through the roulette/3-2-1 until now.
+          window.globequizSpectatorShowTyping?.('');
+        }
         // The 'tick' broadcast is 1x/sec — without this the counter is blank
         // until the first tick arrives (up to 1s after entering). The round
         // already carries the timeLeft from the moment it started, so we
@@ -2240,7 +2309,7 @@ window.GroupSpectate = (() => {
     window.Spectate.onAnswer(payload => {
       if (_closing) return;
       // GloboReto — the RIVAL's side (not the spectated friend's):
-      if (_mode === 'globequiz' && payload && !_isFromFriendSide(payload.role) && _usingRealUI) {
+      if (_isGqMode(_mode) && payload && !_isFromFriendSide(payload.role) && _usingRealUI) {
         if (payload.win) {
           // The friend LOST — reveal the country + game-over overlay, same as
           // the real loser sees (the result panel follows via 'gqspec').
@@ -2248,7 +2317,12 @@ window.GroupSpectate = (() => {
           if (typeof window.globequizSpectatorShowLoss === 'function') window.globequizSpectatorShowLoss(payload);
           return;
         }
-        if (typeof payload.km === 'number' && typeof window.globequizSpectatorSetOppGuess === 'function') {
+        // "Por rapidez" ONLY: the bottom card slot here holds a km distance —
+        // "Por turnos" reuses that same slot for the attempts COUNT (see
+        // gqVsScoreInnerHtml), which globequizReceiveOpponentTurnGuess (on
+        // the real players' own screens) already paints from the shared
+        // guesses list — writing a km string into it here would corrupt it.
+        if (_mode === 'globequiz' && typeof payload.km === 'number' && typeof window.globequizSpectatorSetOppGuess === 'function') {
           window.globequizSpectatorSetOppGuess(payload.km);
         }
       }
@@ -2302,6 +2376,24 @@ window.GroupSpectate = (() => {
       const msg = (typeof t === 'function')
         ? t(reason === 'finished' ? 'spectator.finished' : 'spectator.left', { name: who })
         : (reason === 'finished' ? `¡${who} terminó la partida!` : `${who} dejó de jugar`);
+      _showEndMessage(msg);
+    });
+    // GloboReto VS: the SPECTATED FRIEND left the post-round result screen
+    // (Exit button/tab close, see reportResultLeave in vs.js) — unlike onEnd
+    // above, this doesn't wait for the matches row's status to flip to
+    // 'finished'/'abandoned' (VS.finish() only runs for the host, and only
+    // once THEY leave — if the guest is the one who left, that column might
+    // never update at all), so without this listener the spectator's POV/eye
+    // badge and "X terminó la partida" message never appeared (the reported
+    // bug). Ignore the OPPONENT leaving the result screen — that's not "the
+    // match ending" from the spectator's point of view, the friend might
+    // still be there waiting on a rematch.
+    window.Spectate.onResultLeave(role => {
+      if (_closing || _suppressGenericEnd) return;
+      if (!_isFromFriendSide(role)) return;
+      clearTimeout(_idleWatchdogId);
+      const who = _friendName || ((typeof t === 'function') ? t('spectator.defaultPlayer') : 'El jugador');
+      const msg = (typeof t === 'function') ? t('spectator.finished', { name: who }) : `¡${who} terminó la partida!`;
       _showEndMessage(msg);
     });
     window.Spectate.onTick((timeLeft, role) => {
@@ -2379,7 +2471,7 @@ window.GroupSpectate = (() => {
       }
       // GloboReto rematch: the new round's 3-2-1 just started behind the
       // still-closed line transition — open it now to reveal it.
-      if (_mode === 'globequiz' && typeof window.vsSpectatorOpenGqTransition === 'function') {
+      if (_isGqMode(_mode) && typeof window.vsSpectatorOpenGqTransition === 'function') {
         setTimeout(window.vsSpectatorOpenGqTransition, 250);
       }
     });
@@ -2430,7 +2522,7 @@ window.GroupSpectate = (() => {
       if (!window.Spectate.isSolo()) {
         // GloboReto has its own cream panel driven by the 'gqspec' broadcast
         // (vsSpectatorShowGqResult) — don't also raise the old neutral one.
-        if (_mode === 'globequiz') return;
+        if (_isGqMode(_mode)) return;
         if (typeof window.vsSpectatorShowResult === 'function') window.vsSpectatorShowResult(payload);
         return;
       }
@@ -2444,16 +2536,103 @@ window.GroupSpectate = (() => {
     // animation/sound (globequizSpectatorSyncGuesses, separate from
     // resolvePick which is the live route).
     window.Spectate.onGqGuesses((list, role) => {
-      if (_closing || _mode !== 'globequiz' || !_usingRealUI) return;
-      if (!_isFromFriendSide(role)) return; // in a duel each player sends their own list
-      if (typeof window.globequizSpectatorSyncGuesses === 'function') window.globequizSpectatorSyncGuesses(list);
+      if (_closing || !_isGqMode(_mode) || !_usingRealUI) return;
+      // "Por rapidez": each side's list is genuinely private (its own
+      // attempts only) — keep just the spectated friend's.
+      // "Por turnos": the list is SHARED (both sides' attempts merged
+      // locally by each real player, see globequizReceiveOpponentTurnGuess)
+      // — either side's resend already carries the complete shared list, so
+      // accept it from BOTH roles instead of filtering to the friend's.
+      if (_mode === 'globequiz' && !_isFromFriendSide(role)) return;
+      if (typeof window.globequizSpectatorSyncGuesses === 'function') window.globequizSpectatorSyncGuesses(list, _friendIsHost);
+    });
+    // "Por turnos" ONLY: the roulette that decides who starts is about to
+    // spin on the real players' screens — mirror the same animation here
+    // (with the friend's identity standing in for "me", see
+    // globequizSpectatorShowRoulette) instead of skipping straight to the
+    // 3-2-1. Mounts the real screen a beat early (normally only onRound/
+    // onPregame do that) since the roulette needs somewhere to overlay onto,
+    // exactly like the real players who are already looking at the (inert)
+    // globe screen underneath their own roulette.
+    window.Spectate.onGqRoulette(payload => {
+      if (_closing || !payload) return;
+      _hideSplashMirror();
+      _mode = 'globequiz_turns';
+      _enterRealUIIfPossible(_mode);
+      _clearIdleWatchdog();
+      _hideLoading(true);
+      // A rematch's "lines" transition (see vsSpectatorPlayGqTransition) was
+      // still being held CLOSED at this point (waiting for the far-later
+      // 'pregame' to open it) — but the REAL players' own lines already
+      // opened on their fixed ~2.75s timer well before their roulette even
+      // finishes spinning (~6s+), so the spectator's roulette was popping up
+      // over a curtain still drawn shut behind it (the reported "the lines
+      // don't clear when the roulette shows again"). Opening it right here
+      // matches that — a no-op if it was never held closed to begin with
+      // (first match, no rematch).
+      if (typeof window.vsSpectatorOpenGqTransition === 'function') window.vsSpectatorOpenGqTransition();
+      const friendStarts = payload.starterRole === (_friendIsHost ? 'host' : 'guest');
+      window.globequizSpectatorShowRoulette?.(friendStarts, _friendName, _friendAvatar, _oppName, _oppAvatar);
+    });
+    // "Por turnos" ONLY: a turn just changed hands (a real guess or a
+    // timeout, see reportGqTurnGuess in vs.js) — the LIVE source of truth for
+    // the shared guess list AND both cards (see
+    // globequizSpectatorReceiveTurnGuess); onGqGuesses above is now only the
+    // mid-match join backfill, not the live route.
+    window.Spectate.onGqTurnGuess(payload => {
+      if (_closing || _mode !== 'globequiz_turns' || !payload) return;
+      // The MOVER's own side (whoever this payload's role belongs to, NOT
+      // the side the turn is about to pass to) — a real guess only, never a
+      // timeout (no km/country to record, no extra attempt for those).
+      if (!payload.timeout) {
+        window.globequizSpectatorReceiveTurnGuess?.(payload, _isFromFriendSide(payload.role));
+      } else {
+        // Same notice a real player sees on either side missing the clock
+        // ("{name} no ha respondido a tiempo") — always named, a spectator
+        // has no "tú"/"rival" of their own.
+        const who = _isFromFriendSide(payload.role) ? (_friendName || 'Jugador') : (_oppName || 'Rival');
+        const msg = (typeof t === 'function') ? t('gq.oppTimedOut', { name: who }) : `${who} no ha respondido a tiempo`;
+        window.globequizSpectatorShowTurnNotice?.(msg);
+      }
+      const friendTurnNext = !_isFromFriendSide(payload.role);
+      window.globequizSpectatorSetTurn?.(_gqSpecTurnText(friendTurnNext));
+      window.globequizSpectatorStartTurnTimer?.(payload.turnStartedAt);
+      // The new typer starts with a blank box, not whatever the previous
+      // typer left behind.
+      window.globequizSpectatorShowTyping?.('');
+    });
+    // "Por turnos" ONLY: resend-on-join echo of the CURRENT turn's actual
+    // state (see reportGqTurnGuess/_resendStateTo in vs.js) — a spectator
+    // connecting well after the match started otherwise only ever received
+    // the ORIGINAL round's startedAt (via 'round', resent as-is on join),
+    // so its countdown ran from the wrong reference instant entirely (the
+    // reported "the time isn't synced, it shows something different from
+    // the real one" for a late joiner). Deliberately does NOT touch the
+    // guess list/cards — those are separately backfilled by 'gqguesses'
+    // (already correct, full-replace) in the very same resend; redoing that
+    // work here (or worse, re-pushing this same guess like onGqTurnGuess
+    // does for a LIVE one) would duplicate it for anyone already watching.
+    window.Spectate.onGqTurnSync(payload => {
+      if (_closing || _mode !== 'globequiz_turns' || !payload) return;
+      const friendTurnNext = !_isFromFriendSide(payload.role);
+      window.globequizSpectatorSetTurn?.(_gqSpecTurnText(friendTurnNext));
+      window.globequizSpectatorStartTurnTimer?.(payload.turnStartedAt);
+      window.globequizSpectatorShowTyping?.('');
+    });
+    // "Por turnos" ONLY: live preview of what the current typer is writing —
+    // same broadcast the real (waiting) opponent sees inside their own
+    // locked input (see globequizShowOpponentTyping); mirrored the same way
+    // in the spectator's locked input (see globequizSpectatorShowTyping).
+    window.Spectate.onGqTyping(payload => {
+      if (_closing || _mode !== 'globequiz_turns' || !payload) return;
+      window.globequizSpectatorShowTyping?.(payload.text || '');
     });
     // GloboReto VS: the friend's #gq-vs-result-screen data + rematch
     // transition + rival identity. Payloads are CANONICAL host/guest (either
     // player's broadcast is complete) — map to me=friend / opp=rival here.
     let _lastGqSpecKey = null;
     window.Spectate.onGqSpec(p => {
-      if (_closing || _mode !== 'globequiz' || !p) return;
+      if (_closing || !_isGqMode(_mode) || !p) return;
       // me = the spectated friend's side.
       const me   = k => _friendIsHost ? p['host'  + k] : p['guest' + k];
       const opp  = k => _friendIsHost ? p['guest' + k] : p['host'  + k];

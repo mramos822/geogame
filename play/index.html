@@ -35,7 +35,7 @@
   <meta name="twitter:description"  content="Identify cities on maps, recognize country flags, match country shapes and name world landmarks. Compete with friends online.">
   <meta name="twitter:image"        content="https://mygeochallenge.com/images/og-preview.png">
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6238929099865050" crossorigin="anonymous"></script>
-  <link rel="stylesheet" href="css/style.css?v=3.6.5">
+  <link rel="stylesheet" href="css/style.css?v=3.6.10">
   <link rel="preload" href="images/characters/men3.png" as="image">
   <link rel="preload" href="images/characters/men4.png" as="image">
   <link rel="preload" href="images/characters/girl3.png" as="image">
@@ -426,7 +426,7 @@
 
     <!-- Popup: selector de modo (antes de enviar el reto) -->
     <div id="vs-mode-select-popup" class="vs-popup-overlay" style="display:none">
-      <div class="vs-popup-box vs-mode-box">
+      <div class="vs-popup-box vs-mode-box vs-cream">
         <div class="vs-popup-pic-wrap" id="vs-mode-sel-pic-wrap"><img class="vs-popup-pic" id="vs-mode-sel-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false"></div>
         <span class="vs-popup-name" id="vs-mode-sel-name"></span>
         <span class="vs-popup-sub" data-i18n="vs.chooseMode">¿Qué modo quieren jugar?</span>
@@ -453,6 +453,34 @@
           </button>
         </div>
         <div class="vs-popup-confirm" id="vs-mode-cancel">
+          <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
+          <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
+        </div>
+      </div>
+    </div>
+
+    <!-- Popup: variante de GloboReto 1v1 (por rapidez / por turnos), segundo
+         paso al elegir GloboReto en #vs-mode-select-popup. -->
+    <div id="vs-gq-variant-popup" class="vs-popup-overlay" style="display:none">
+      <div class="gqvp-box">
+        <div class="gqvp-header">
+          <div class="gqvp-pic-wrap" id="vs-gq-variant-pic-wrap"><img class="gqvp-pic" id="vs-gq-variant-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false"></div>
+          <span class="gqvp-name" id="vs-gq-variant-name"></span>
+        </div>
+        <span class="gqvp-title" data-i18n="vs.chooseGqVariant">¿Cómo quieren jugar GloboReto?</span>
+        <div class="gqvp-cards">
+          <button class="gqvp-card" id="vs-gq-variant-btn-speed" type="button">
+            <img class="gqvp-card-icon" src="images/globe.png" alt="" draggable="false" oncontextmenu="return false">
+            <span class="gqvp-card-title" data-i18n="vs.gqSpeedTitle">Por rapidez</span>
+            <span class="gqvp-card-desc" data-i18n="vs.gqSpeedDesc">El más rápido en adivinar gana</span>
+          </button>
+          <button class="gqvp-card" id="vs-gq-variant-btn-turns" type="button">
+            <img class="gqvp-card-icon" src="images/globe.png" alt="" draggable="false" oncontextmenu="return false">
+            <span class="gqvp-card-title" data-i18n="vs.gqTurnsTitle">Por turnos</span>
+            <span class="gqvp-card-desc" data-i18n="vs.gqTurnsDesc">El primero en adivinar gana</span>
+          </button>
+        </div>
+        <div class="gqvp-back" id="vs-gq-variant-back">
           <img class="loading-play-confirm1" src="images/back1.png" alt="" draggable="false" oncontextmenu="return false">
           <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
         </div>
@@ -493,7 +521,7 @@
 
     <!-- Popup: invitación saliente (host espera) -->
     <div id="vs-outgoing-popup" class="vs-popup-overlay" style="display:none">
-      <div class="vs-popup-box">
+      <div class="vs-popup-box vs-cream">
         <div class="vs-popup-pic-wrap" id="vs-out-pic-wrap"><img class="vs-popup-pic" id="vs-out-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false"></div>
         <span class="vs-popup-name" id="vs-out-name"></span>
         <span class="vs-popup-sub" data-i18n="vs.waitingResponse">Esperando respuesta…</span>
@@ -507,7 +535,7 @@
 
     <!-- Popup: invitación entrante (guest acepta/rechaza) -->
     <div id="vs-incoming-popup" class="vs-popup-overlay" style="display:none">
-      <div class="vs-popup-box">
+      <div class="vs-popup-box vs-cream">
         <div class="vs-popup-pic-wrap" id="vs-in-pic-wrap"><img class="vs-popup-pic" id="vs-in-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false"></div>
         <span class="vs-popup-name" id="vs-in-name"></span>
         <span class="vs-popup-sub">¡Te retó a Gira Competitiva!</span>
@@ -528,7 +556,7 @@
     <!-- Popup: duelo aceptado (se muestra a AMBOS jugadores en el margen entre
          "el guest aceptó" y "arranca el 3-2-1", ver START_DELAY_MS en vs.js) -->
     <div id="vs-duel-accepted-popup" class="vs-popup-overlay" style="display:none">
-      <div class="vs-popup-box">
+      <div class="vs-popup-box vs-cream">
         <div class="vs-popup-pic-wrap" id="vs-duel-accepted-pic-wrap"><img class="vs-popup-pic" id="vs-duel-accepted-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false"></div>
         <span class="vs-popup-name" id="vs-duel-accepted-name"></span>
         <span class="vs-popup-sub" id="vs-duel-accepted-sub" data-i18n="vs.duelAccepted">¡Duelo aceptado! Redirigiéndote a la partida…</span>
@@ -1372,12 +1400,12 @@
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
     </div>
-    <div id="loading-version">Ver. 3.6.9</div>
+    <div id="loading-version">Ver. 3.6.10</div>
   </div>
 
   <!-- Pantalla de resultado versus (W/L) — fuera del loading-screen para verse tras la partida -->
   <div id="vs-result-screen" class="vs-popup-overlay" style="display:none">
-    <div class="vs-popup-box">
+    <div class="vs-popup-box vs-cream">
       <span class="vs-result-title" id="vs-result-title"></span>
       <span class="vs-popup-sub" id="vs-result-sub" style="display:none"></span>
       <div class="vs-result-scores">
@@ -1427,6 +1455,7 @@
         <div class="gqvr-side" id="gqvr-me-side">
           <span class="gqvr-bubble" id="gqvr-me-bubble" data-i18n="gqvr.rematch" hidden>Rematch?</span>
           <div class="gqvr-pic-wrap" id="gqvr-me-pic-wrap">
+            <img class="gqvr-crown" src="images/crown.png" alt="" draggable="false" oncontextmenu="return false">
             <img class="gqvr-pic" id="gqvr-me-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
             <img class="gqvr-check" id="gqvr-me-check" src="images/check.png" alt="" draggable="false" oncontextmenu="return false" hidden>
           </div>
@@ -1436,6 +1465,7 @@
         <div class="gqvr-side" id="gqvr-opp-side">
           <span class="gqvr-bubble" id="gqvr-opp-bubble" data-i18n="gqvr.rematch" hidden>Rematch?</span>
           <div class="gqvr-pic-wrap" id="gqvr-opp-pic-wrap">
+            <img class="gqvr-crown" src="images/crown.png" alt="" draggable="false" oncontextmenu="return false">
             <img class="gqvr-pic" id="gqvr-opp-pic" src="images/profilepic/ppdefault.png" alt="" draggable="false" oncontextmenu="return false">
             <img class="gqvr-check" id="gqvr-opp-check" src="images/check.png" alt="" draggable="false" oncontextmenu="return false" hidden>
           </div>
@@ -1674,6 +1704,35 @@
       </div>
     </div>
     <div class="gq-hint" id="gq-hint" data-i18n="globequiz.hintFirst" style="display:none">Coloca el nombre del país de tu primera opción.</div>
+    <!-- Espectador de "Por turnos" ÚNICAMENTE: quién tiene el turno ahora
+         mismo, centrado entre el countdown y los botones de escribir (ver
+         globequizSpectatorSetTurn en globequiz.js) — los jugadores reales
+         nunca ven esto, ellos tienen el bloqueo de input + #gq-hint en su
+         lugar. Debajo, el globo con lo que esa persona escribe en vivo (ver
+         globequizSpectatorShowTyping). -->
+    <div class="gq-spec-turn" id="gq-spec-turn"></div>
+    <div class="gq-spec-typing" id="gq-spec-typing"></div>
+    <!-- "Por turnos": aviso de skip por tiempo agotado (ver _gqShowTurnNotice
+         en globequiz.js) — en cqmin, dentro del stage, no un toast genérico. -->
+    <div class="gq-turn-notice" id="gq-turn-notice" hidden></div>
+    <!-- Ruleta de inicio (solo VS "por turnos"): decide quién arranca antes
+         del 3-2-1, ver _showGqRoulette en vs.js. ruleta1/2/3.png son el mismo
+         lienzo 1080x1080 (rueda, logo central, flecha) — se apilan en el
+         mismo lugar; ruleta1 (+ los avatares) es lo único que gira. -->
+    <div id="gq-roulette-overlay" style="display:none">
+      <div class="gq-roulette-content" id="gq-roulette-content">
+        <span class="gq-roulette-title" data-i18n="gq.rouletteTitle">¿Quién arranca?</span>
+        <div class="gq-roulette-wheel-wrap">
+          <div class="gq-roulette-wheel" id="gq-roulette-wheel">
+            <img class="gq-roulette-wheel-bg" src="images/ruleta1.png" alt="" draggable="false" oncontextmenu="return false">
+            <div class="gq-roulette-seats" id="gq-roulette-seats"></div>
+          </div>
+          <img class="gq-roulette-hub" src="images/ruleta2.png" alt="" draggable="false" oncontextmenu="return false">
+          <img class="gq-roulette-pointer-img" src="images/ruleta3.png" alt="" draggable="false" oncontextmenu="return false">
+        </div>
+        <span class="gq-roulette-result" id="gq-roulette-result"></span>
+      </div>
+    </div>
     <div id="gq-pregame-countdown" style="display:none">
       <img id="gq-pregame-countdown-img" src="" alt="">
     </div>
@@ -1741,6 +1800,20 @@
          partida del amigo espectado, ver globequizSpectatorShowPostgame en
          globequiz.js. -->
     <div id="gq-spec-postgame-banner" style="display:none"></div>
+  </div>
+
+  <!-- "Por turnos": panel al kickear por 2 skips seguidos (AFK), ver
+       _gqHandleMyTimeout en globequiz.js. Vive FUERA de #globequiz-screen a
+       propósito — se manda a menú primero (quitToMenu) y este panel debe
+       seguir visible sobre el menú, no desaparecer con la pantalla del juego. -->
+  <div id="gq-afk-popup" style="display:none">
+    <div class="ingame-quit-box">
+      <span class="ingame-quit-text" data-i18n="gq.afkKicked">Te desconectamos automáticamente por inactividad.</span>
+      <div class="gq-afk-confirm" id="gq-afk-ok">
+        <img class="gq-guess-btn1" src="images/confirm1.png" alt="" draggable="false" oncontextmenu="return false">
+        <img class="gq-guess-btn2" src="images/confirm2.png" alt="" draggable="false" oncontextmenu="return false">
+      </div>
+    </div>
   </div>
 
   <div id="splash-screen" class="game-bg-screen" style="display:none">
@@ -2220,7 +2293,7 @@
 
   <!-- ── Layout / entorno / i18n ─────────────────────────────────────────── -->
   <script src="js/letterbox.js?v=3.5.65"></script>
-  <script src="js/i18n.js?v=3.6.4"></script>
+  <script src="js/i18n.js?v=3.6.10"></script>
   <script src="js/i18n-data.js?v=3.5.65"></script>
 
   <!-- ── Core (audio, helpers UI, campaña) ───────────────────────────────── -->
@@ -2264,15 +2337,15 @@
   <script src="js/modes/practice-panel.js?v=3.5.65"></script>
 
   <!-- ── Multijugador (versus / espectador / lobby / chat) ───────────────── -->
-  <script src="js/vs.js?v=3.6.3"></script>
-  <script src="js/spectate.js?v=3.6.1"></script>
+  <script src="js/vs.js?v=3.6.10"></script>
+  <script src="js/spectate.js?v=3.6.10"></script>
   <script src="js/lobby.js?v=3.6.9"></script>
   <script src="js/chat.js?v=3.6.2"></script>
 
   <!-- ── Otros modos ─────────────────────────────────────────────────────── -->
   <script src="js/flags.js?v=3.5.65"></script>
   <script src="js/shapes.js?v=3.5.65"></script>
-  <script src="js/globequiz.js?v=3.6.6"></script>
+  <script src="js/globequiz.js?v=3.6.10"></script>
 
   <!-- ── Launchers del menú + IIFEs de UI global ─────────────────────────── -->
   <script src="js/menu/menu-launchers.js?v=3.6.5"></script>
