@@ -900,14 +900,26 @@ function buildTabsNav(){
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 async function callStats(user, pass, range){
-  const res = await fetch(FN_URL, {
-    method:'POST',
-    headers:{ 'Content-Type':'application/json', 'apikey':ANON, 'Authorization':'Bearer '+ANON },
-    body: JSON.stringify({ user, pass, range: range || currentRange }),
-  });
-  if(res.status === 401) throw new Error('Usuario o contraseña incorrectos');
+  let res;
+  try {
+    res = await fetch(FN_URL, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'apikey':ANON, 'Authorization':'Bearer '+ANON },
+      body: JSON.stringify({ user, pass, range: range || currentRange }),
+    });
+  } catch(networkErr) {
+    // fetch() itself throwing (offline, DNS hiccup, the mobile connection
+    // dropping mid-request switching wifi/celular, a backgrounded tab
+    // getting the request killed) is NOT "wrong password" — the caller
+    // (the "sesión recordada" boot block) checks isAuthError to decide
+    // whether to keep the saved creds or wipe them.
+    const e = new Error('Sin conexión — reintentando');
+    e.isAuthError = false;
+    throw e;
+  }
+  if(res.status === 401){ const e = new Error('Usuario o contraseña incorrectos'); e.isAuthError = true; throw e; }
   const json = await res.json().catch(()=>({}));
-  if(!res.ok) throw new Error(json.error || ('Error '+res.status));
+  if(!res.ok){ const e = new Error(json.error || ('Error '+res.status)); e.isAuthError = false; throw e; }
   return json;
 }
 
@@ -2115,20 +2127,43 @@ document.addEventListener('click', (e)=>{
 });
 
 // ── Sesión recordada ──────────────────────────────────────────────────────────
-(async function(){
+// Reported on mobile: "tengo que poner la contraseña cada tanto como si se
+// olvidara". The bug was here — ANY failure (a network blip switching
+// wifi/celular, the tab getting backgrounded mid-request, a transient 500)
+// wiped the saved creds exactly like a real wrong-password rejection, kicking
+// back to the login screen. Now only a genuine 401 (isAuthError, see
+// callStats) clears them; everything else retries with backoff and keeps the
+// creds, so a flaky connection no longer means logging in again by hand.
+async function _bootSavedSession(){
   const saved = localStorage.getItem('_admin_creds');
   if(!saved) return;
   $('skeleton').style.display = 'block';
   $('main').style.display = 'none';
-  try {
-    creds = JSON.parse(saved);
-    const data = await callStats(creds.user, creds.pass, currentRange);
-    enterDashboard(data);
-  } catch(e){
-    $('skeleton').style.display = 'none';
-    localStorage.removeItem('_admin_creds'); creds = null;
+  creds = JSON.parse(saved);
+  const MAX_ATTEMPTS = 5;
+  for(let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++){
+    try {
+      const data = await callStats(creds.user, creds.pass, currentRange);
+      enterDashboard(data);
+      return;
+    } catch(e){
+      if(e.isAuthError){
+        $('skeleton').style.display = 'none';
+        localStorage.removeItem('_admin_creds'); creds = null;
+        return;
+      }
+      if(attempt === MAX_ATTEMPTS){
+        // Give up retrying automatically, but KEEP the creds — a manual
+        // "Refrescar" (or just reopening the page once back online) picks
+        // up right where it left off instead of demanding the password again.
+        $('skeleton').innerHTML = '<div class="spin"></div>No se pudo conectar. Revisá tu conexión — <a href="#" onclick="location.reload();return false;">reintentar</a>.';
+        return;
+      }
+      await new Promise(r => setTimeout(r, Math.min(1500 * attempt, 6000)));
+    }
   }
-})();
+}
+_bootSavedSession();
 </script>
 </body>
 </html>
