@@ -1444,7 +1444,7 @@ let guestsFilter = 'all';
 let guestsSortKey = 'last_seen';
 const GUESTS_FILTERS = [
   ['all','Todos'], ['online','🟢 En línea ahora'], ['candidates','🔗 Con candidato'], ['flagged','🚩 Flagueados'],
-  ['campaigns','🌍 Giras completas'], ['recent','🕐 Últimas 24h'], ['noname','Sin nombre'],
+  ['campaigns','🌍 Giras completas'], ['globequiz','🌎 Jugó GloboReto'], ['recent','🕐 Últimas 24h'], ['noname','Sin nombre'],
 ];
 const GUESTS_SORTS = [
   ['last_seen','Más reciente'], ['campaignCoins','Más monedas'], ['campaigns','Más Giras'],
@@ -1507,6 +1507,7 @@ function applyGuestsView(){
     if(guestsFilter==='candidates') return (g.candidates||[]).length>0;
     if(guestsFilter==='flagged') return g.flagged;
     if(guestsFilter==='campaigns') return g.campaigns>0;
+    if(guestsFilter==='globequiz') return (g.globequiz||0)>0;
     if(guestsFilter==='noname') return !g.guest_name;
     if(guestsFilter==='recent') return (Date.now()-new Date(g.last_seen).getTime()) < 86400000;
     return true;
@@ -1524,7 +1525,13 @@ function applyGuestsView(){
   const grid = $('guests-grid');
   if(!rows.length){ grid.innerHTML = '<div class="empty">Sin invitados que coincidan.</div>'; return; }
   grid.innerHTML = rows.map((g,i)=>{
-    const vid = escapeHtml(g.visitor_id.slice(0,20)) + '…';
+    // Antes se cortaba siempre a 20 chars + '…' aunque el id completo entrara
+    // (formato real "v-<ts36>-<rand36>" suele superar eso) — el admin nunca
+    // podía ver/copiar el visitor_id entero desde acá. El CSS ya recorta
+    // visualmente con ellipsis (.guest-card-vid), así que acá va completo y
+    // el title= permite verlo/copiarlo entero al pasar el mouse.
+    const vidFull = escapeHtml(g.visitor_id);
+    const vid = `<span title="${vidFull}">${vidFull}</span>`;
     const name = g.guest_name ? escapeHtml(g.guest_name) : 'Sin nombre puesto';
     const nameCls = g.guest_name ? '' : ' noname';
     const candidatesHtml = (g.candidates||[]).map(c=>{
@@ -1540,7 +1547,7 @@ function applyGuestsView(){
     }).join('');
     const historyRows = (g.history||[]).slice(0,50).map(h=>{
       const fecha = new Date(h.created_at).toLocaleString('es');
-      const tipo = h.type==='campaign' ? '🌍 Gira Mundial' : (MODE_LABELS[h.mode]||h.mode||'—');
+      const tipo = h.type==='campaign' ? '🌍 Gira Mundial' : h.type==='globequiz' ? '🌎 GlobeQuiz' : (MODE_LABELS[h.mode]||h.mode||'—');
       return `<tr><td>${fecha}</td><td>${tipo}</td><td class="n">${h.score!=null?h.score.toLocaleString('es'):'—'}</td></tr>`;
     }).join('');
     return `<div class="guest-card${g.flagged?' flagged':''}" data-idx="${i}">
@@ -1556,6 +1563,7 @@ function applyGuestsView(){
         <span>👁 <b>${g.visits}</b></span>
         <span>🌍 <b>${g.campaigns}</b></span>
         <span>🎮 <b>${g.games}</b></span>
+        <span>🌎 <b>${g.globequiz||0}</b></span>
         <span>🕐 <b>${timeAgo(g.last_seen)}</b></span>
       </div>
       <div class="guest-card-coins">🪙 ${g.campaignCoins.toLocaleString('es')} monedas · ✨ ${g.campaignXp.toLocaleString('es')} XP (si se registra)</div>

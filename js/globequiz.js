@@ -125,7 +125,7 @@
   // touching the embedded geojson, so the filter stays in one readable place.
   // The names are the EN dataset ones (see globequiz-countries-data.js).
   const EXCLUDED_COUNTRIES = new Set([
-    'St-Barthélemy', 'St-Martin', 'Sint Maarten', 'Curaçao', 'Aruba',
+    'St-Barthélemy', 'St-Martin', 'Sint Maarten',
     'Cayman Is.', 'Turks and Caicos Is.', 'British Virgin Is.', 'U.S. Virgin Is.',
     'Saint Helena', // British territory, not a sovereign country
     'Falkland Is.', // Islas Malvinas — disputed territory, not a sovereign country

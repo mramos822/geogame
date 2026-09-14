@@ -804,7 +804,7 @@ Deno.serve(async (req) => {
     const guestMap: Record<string, {
       visitor_id: string; country_code: string | null; guest_name: string | null;
       first_seen: string; last_seen: string;
-      visits: number; campaigns: number; games: number;
+      visits: number; campaigns: number; games: number; globequiz: number;
       campaignCoins: number; campaignXp: number;
       history: { type: string; mode: string | null; score: number | null; created_at: string }[];
     }> = {};
@@ -812,7 +812,7 @@ Deno.serve(async (req) => {
       const g = guestMap[visitorId] = guestMap[visitorId] || {
         visitor_id: visitorId, country_code: countryCode, guest_name: null,
         first_seen: createdAt, last_seen: createdAt,
-        visits: 0, campaigns: 0, games: 0, campaignCoins: 0, campaignXp: 0, history: [],
+        visits: 0, campaigns: 0, games: 0, globequiz: 0, campaignCoins: 0, campaignXp: 0, history: [],
       };
       if (countryCode && !g.country_code) g.country_code = countryCode;
       // Se queda con el nombre más reciente que se haya puesto (pudo
@@ -840,6 +840,22 @@ Deno.serve(async (req) => {
       g.campaignCoins += 10 + steps;
       g.campaignXp += 50 + steps * 3;
       g.history.push({ type: 'campaign', mode: null, score: r.score ?? null, created_at: r.created_at });
+    }
+    // GloboReto (GlobeQuiz standalone) — faltaba este loop por completo: un
+    // invitado que SOLO jugó GloboReto (sin visitar/campaña/heartbeat de
+    // presencia registrados) nunca entraba a guestMap y no aparecía en el
+    // panel de Invitados. Misma fórmula que logGlobequizCurrency en
+    // js/analytics.js (base 10 monedas / 20 xp, x1.15 cada 10 días de racha,
+    // tope en 10 aplicaciones) para que la estimación "si se registra" sea
+    // consistente con lo que realmente otorgaría el server.
+    for (const r of globequizRows as any[]) {
+      if (r.user_id || !r.visitor_id) continue;
+      const mult = Math.pow(1.15, Math.min(Math.floor((r.streak || 0) / 10), 10));
+      const g = touchGuest(r.visitor_id, r.created_at, r.country_code, r.guest_name);
+      g.globequiz++;
+      g.campaignCoins += 10 * mult;
+      g.campaignXp += 20 * mult;
+      g.history.push({ type: 'globequiz', mode: 'globequiz', score: r.score ?? null, created_at: r.created_at });
     }
     // Nombre en vivo (ver query de guest_presence más arriba): no suma a
     // visits/games/campaigns (no es un evento de esos), solo actualiza
