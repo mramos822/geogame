@@ -815,6 +815,25 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="econ-modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="econ-modal-title">Detalle de cuenta</h3>
+      <button class="modal-close" id="econ-modal-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="insights" id="econ-modal-summary" style="margin-bottom:14px"></div>
+      <div class="modal-subtitle">📋 Historial completo (currency_ledger) <span id="econ-modal-count"></span></div>
+      <div class="table-scroll">
+        <table id="tbl-econ-modal">
+          <thead><tr><th>Fecha</th><th>Fuente</th><th style="text-align:right">Monedas</th><th style="text-align:right">XP</th></tr></thead>
+          <tbody id="econ-modal-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 const FN_URL = 'https://xituwurshmaqsnnnrdhx.supabase.co/functions/v1/admin-stats';
 const ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhpdHV3dXJzaG1hcXNubm5yZGh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyMjU0OTUsImV4cCI6MjA5NjgwMTQ5NX0.jlT6O8dkuYXc8F3fOK_QXgH4Sqw6dAbhi2EIkvcS7Mk';
@@ -1238,7 +1257,44 @@ function openDayPanel(rawKey, granularity){
 function closeDayPanel(){ $('day-modal').style.display = 'none'; }
 $('day-modal-close').addEventListener('click', closeDayPanel);
 $('day-modal').addEventListener('click', (e)=>{ if(e.target.id === 'day-modal') closeDayPanel(); });
-document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeDayPanel(); });
+document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') { closeDayPanel(); closeEconDetail(); } });
+
+// ── Detalle de una fila de "Cálculo en vivo por cuenta" (Economía) ─────────
+// Se abre al hacer click en el pill de estado (OK / ⚠️ sin explicar) — antes
+// la alerta no daba más contexto que el número; acá se ve el desglose
+// completo (esperado vs. ledger real) + CADA evento de currency_ledger de
+// esa cuenta, y si está marcada sospechosa se puede verificar ahí mismo
+// (mismo verify_account que ya usa Integridad) sin tener que ir a buscarla
+// en esa otra pestaña.
+function openEconDetail(idx){
+  const r = (window._econRetroData || [])[idx];
+  if(!r) return;
+  $('econ-modal-title').textContent = r.username || '—';
+  const cards = [
+    ['⭐', r.level, 'Nivel (según XP esperado)'],
+    ['✨', r.totalXp.toLocaleString('es'), 'XP esperado (historial real)'],
+    ['🪙', r.totalCoins.toLocaleString('es'), 'Monedas esperadas (gameplay + bonus de nivel)'],
+    ['📒', r.ledgerActualCoins.toLocaleString('es'), 'Monedas reales en currency_ledger'],
+  ].map(([icon,v,l])=>`<div class="insight-card"><b>${icon} ${v}</b><br>${l}</div>`).join('');
+  const alertCard = r.suspicious
+    ? `<div class="insight-card crit">🚨 <b>+${r.suspiciousCoins.toLocaleString('es')}</b> monedas en el ledger real que la fórmula no explica — revisar el historial de abajo evento por evento. Si al revisarlo está todo bien, marcala como verificada.<br><br><button class="guest-link-btn" id="econ-verify-btn">✅ Verificar cuenta</button></div>`
+    : r.verified
+      ? `<div class="insight-card ok">✔ Esta cuenta fue marcada como verificada a mano — no vuelve a alertar aunque el número se desfase.<br><br><button class="btn" id="econ-unverify-btn">Quitar verificación</button></div>`
+      : `<div class="insight-card ok">✅ El ledger real coincide con lo esperado (dentro del margen de redondeo). Nada que revisar.</div>`;
+  $('econ-modal-summary').innerHTML = cards + alertCard;
+  document.getElementById('econ-verify-btn')?.addEventListener('click', ()=>verifyAccount(r.username, true));
+  document.getElementById('econ-unverify-btn')?.addEventListener('click', ()=>verifyAccount(r.username, false));
+  const hist = r.history || [];
+  $('econ-modal-count').textContent = `(${hist.length})`;
+  const body = $('econ-modal-body');
+  body.innerHTML = hist.length
+    ? hist.map(h=>`<tr><td style="white-space:nowrap">${new Date(h.created_at).toLocaleString('es')}</td><td>${ECONOMY_REASON_LABELS[h.reason]||escapeHtml(h.reason)}</td><td class="n">${h.coins.toLocaleString('es')}</td><td class="n">${h.xp.toLocaleString('es')}</td></tr>`).join('')
+    : '<tr><td class="empty" colspan="4">Sin eventos en currency_ledger.</td></tr>';
+  $('econ-modal').style.display = 'flex';
+}
+function closeEconDetail(){ const m = $('econ-modal'); if(m) m.style.display = 'none'; }
+$('econ-modal-close')?.addEventListener('click', closeEconDetail);
+$('econ-modal')?.addEventListener('click', (e)=>{ if(e.target.id === 'econ-modal') closeEconDetail(); });
 
 function timeAgo(iso){
   if(!iso) return '—';
@@ -1414,16 +1470,20 @@ function renderEconomy(e, rl){
   const tbRetro = $('tbl-economy-retro');
   const retroAll = e.retroactive || [];
   const retro = retroAll.filter(r => r.totalXp > 0 || r.ledgerActualCoins > 0);
-  const suspiciousCount = retroAll.filter(r => r.suspicious).length;
+  window._econRetroData = retro; // read by openEconDetail(idx) below
+  const suspiciousCount = retro.filter(r => r.suspicious).length;
   if(!retro.length){ tbRetro.innerHTML = '<tr><td class="empty">Ninguna cuenta tiene actividad todavía.</td></tr>'; }
   else {
     tbRetro.innerHTML = '<tr><th>Jugador</th><th style="text-align:right">Nivel</th><th style="text-align:right">XP esperado</th><th style="text-align:right">Monedas esperadas</th><th style="text-align:right">Ledger real (monedas)</th><th>Estado</th></tr>' +
-      retro.map(r=>{
+      retro.map((r,i)=>{
         const statusCell = r.suspicious
           ? `<span class="status-pill churned"><span class="dotstat"></span>⚠️ +${r.suspiciousCoins.toLocaleString('es')} sin explicar</span>`
-          : `<span class="status-pill active"><span class="dotstat"></span>OK</span>`;
-        return `<tr${r.suspicious?' style="background:rgba(255,122,122,.08)"':''}><td>${escapeHtml(r.username||'—')}</td><td class="n">${r.level}</td><td class="n">${r.totalXp.toLocaleString('es')}</td><td class="n">${r.totalCoins.toLocaleString('es')}</td><td class="n">${r.ledgerActualCoins.toLocaleString('es')}</td><td>${statusCell}</td></tr>`;
+          : `<span class="status-pill active"><span class="dotstat"></span>${r.verified?'✔ OK (verificada)':'OK'}</span>`;
+        return `<tr${r.suspicious?' style="background:rgba(255,122,122,.08)"':''}><td>${escapeHtml(r.username||'—')}</td><td class="n">${r.level}</td><td class="n">${r.totalXp.toLocaleString('es')}</td><td class="n">${r.totalCoins.toLocaleString('es')}</td><td class="n">${r.ledgerActualCoins.toLocaleString('es')}</td><td><span class="econ-status-click" data-idx="${i}" style="cursor:pointer" title="Ver detalle">${statusCell}</span></td></tr>`;
       }).join('');
+    tbRetro.querySelectorAll('.econ-status-click').forEach(el=>{
+      el.addEventListener('click', ()=>openEconDetail(parseInt(el.dataset.idx,10)));
+    });
   }
   if(suspiciousCount > 0){
     $('economy-status').innerHTML += `<div class="insight-card crit">🚨 <b>${suspiciousCount}</b> cuenta${suspiciousCount===1?'':'s'} con más monedas en currency_ledger de las que la fórmula explica — revisar en la tabla de abajo.</div>`;
@@ -1488,8 +1548,8 @@ function renderVerifiedAccounts(list){
 async function verifyAccount(username, verify){
   if(!username) return;
   if(!confirm(verify
-    ? `¿Marcar a "${username}" como cuenta verificada? Va a dejar de aparecer en Partidas flagueadas.`
-    : `¿Quitarle la verificación a "${username}"? Puede volver a aparecer en Partidas flagueadas si su patrón sigue viéndose raro.`)) return;
+    ? `¿Marcar a "${username}" como cuenta verificada? Deja de aparecer como sospechosa en Integridad y en Economía.`
+    : `¿Quitarle la verificación a "${username}"? Puede volver a aparecer como sospechosa si su patrón sigue viéndose raro.`)) return;
   try {
     const res = await fetch(FN_URL, {
       method:'POST',
@@ -1498,6 +1558,7 @@ async function verifyAccount(username, verify){
     });
     const json = await res.json().catch(()=>({}));
     if(!res.ok || !json.ok) throw new Error(json.error || 'Error');
+    closeEconDetail();
     refresh();
   } catch(e){
     alert('No se pudo actualizar: ' + (e.message||e));

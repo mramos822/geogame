@@ -1117,10 +1117,17 @@ Deno.serve(async (req) => {
       u.coins += r.coins || 0; u.xp += r.xp || 0;
     }
     const actualLedgerByUser: Record<string, { coins: number; xp: number }> = {};
+    // Historial COMPLETO (no recortado por rango, como el resto de este
+    // cálculo retroactivo) por cuenta — alimenta el detalle que se ve al
+    // hacer click en la alerta de "sin explicar" en el panel.
+    const allLedgerHistoryByUser: Record<string, { reason: string; coins: number; xp: number; ref_value: number | null; created_at: string }[]> = {};
     for (const r of (allCurrencyLedgerRes.data || []) as any[]) {
       if (!r.user_id) continue;
       const u = actualLedgerByUser[r.user_id] = actualLedgerByUser[r.user_id] || { coins: 0, xp: 0 };
       u.coins += r.coins || 0; u.xp += r.xp || 0;
+      (allLedgerHistoryByUser[r.user_id] = allLedgerHistoryByUser[r.user_id] || []).push({
+        reason: r.reason || 'otro', coins: r.coins || 0, xp: r.xp || 0, ref_value: r.ref_value ?? null, created_at: r.created_at,
+      });
     }
     const xpRetroactive = Object.entries(expectedByUser)
       .map(([uid, exp]) => {
@@ -1132,13 +1139,20 @@ Deno.serve(async (req) => {
         // acumulado es la parte "gameplay" — cualquier cosa por encima de
         // eso (con un margen chico por redondeos) es sospechosa.
         const suspiciousCoins = Math.max(0, actual.coins - exp.coins);
+        // Una cuenta VERIFICADA a mano (ver verify_account) nunca vuelve a
+        // mostrarse como sospechosa acá, aunque suspiciousCoins siga siendo
+        // >5 por algún desfasaje de redondeo — el admin ya la revisó.
+        const verified = verifiedUserIds.has(uid);
         return {
           username: usernameById[uid] || uid,
           totalXp: exp.xp, level,
           gameplayCoins: exp.coins, levelBonusCoins: levelBonus, totalCoins: exp.coins + levelBonus,
           ledgerActualCoins: actual.coins, ledgerActualXp: actual.xp,
-          suspicious: suspiciousCoins > 5, // margen chico por redondeo entre eventos
-          suspiciousCoins,
+          suspicious: suspiciousCoins > 5 && !verified, // margen chico por redondeo entre eventos
+          suspiciousCoins, verified,
+          history: (allLedgerHistoryByUser[uid] || [])
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            .slice(0, 80),
         };
       })
       .sort((a, b) => b.totalXp - a.totalXp);
