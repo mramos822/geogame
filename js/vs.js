@@ -838,7 +838,13 @@ window.refreshVsSpectatorBadge = function (n) {
   const otherBadge = document.getElementById(isFlags ? 'vs-spectator-badge' : 'flags-vs-spectator-badge');
   if (otherBadge) otherBadge.style.display = 'none';
   if (!badge) return;
-  const show = n > 0 && window._isPlaying;
+  // Practice sessions now DO open a solo spectate channel (so the dev account
+  // can watch them, see js/core/campaign.js/js/menu/rankings-panel.js), but
+  // the "someone is watching you" eye badge itself should stay invisible to
+  // a practicing player regardless — it's a dev tool, not something meant to
+  // be noticed by the person practicing.
+  const isPracticing = !!(window.practiceConfig && window.practiceConfig.active);
+  const show = n > 0 && window._isPlaying && !isPracticing;
   badge.style.display = show ? 'flex' : 'none';
   if (countEl) countEl.textContent = n;
 };

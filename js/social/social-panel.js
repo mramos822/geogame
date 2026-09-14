@@ -413,7 +413,7 @@ function renderSocialFriends(filter = '') {
         `<span class="loading-social-status"><span class="dot ${st.cls}"></span>${socialStatusText(f)}</span>` +
       `</div>` +
       `<div class="loading-social-score">` +
-        (st.cls === 'playing' && !f.is_practicing ? `<img class="social-spectate-eye" src="images/spectate.png" alt="" draggable="false" oncontextmenu="return false" title="Ver partida">` : '') +
+        (st.cls === 'playing' && (!f.is_practicing || window._sbUserId === window.DEV_UID) ? `<img class="social-spectate-eye" src="images/spectate.png" alt="" draggable="false" oncontextmenu="return false" title="Ver partida">` : '') +
         `<img class="loading-social-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">` +
         `<span class="loading-social-score-val">${f.score.toLocaleString()}</span>` +
       `</div>` +

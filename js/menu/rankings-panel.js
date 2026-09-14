@@ -229,6 +229,17 @@
         return;
       }
       const isMe = myId && r.id === myId;
+      // Dev-only (window.DEV_UID, see js/sb.js): spectate ANY playing player
+      // from Rankings, not just friends — including practice sessions, which
+      // regular players never see an eye for anywhere (see the is_practicing
+      // exceptions in js/social/social-panel.js / js/social/social-realtime.js
+      // and the SoloSpectate.start() call in js/core/campaign.js, which now
+      // opens its channel during practice too). Goes straight to
+      // openSpectatorSolo — no matches/lobby lookup like
+      // openSpectatorForFriend, since those tables' RLS is friends-only and
+      // this needs to work for non-friends; fine here because practice/solo
+      // games never have a matches/lobby row anyway.
+      const canDevSpectate = !isMe && r.is_playing && window._sbUserId === window.DEV_UID;
       el.className = 'loading-social-row' + (isMe ? ' is-me-row' : '') + (window.CUSTOMIZE_CELL_LIGHT_TEXT?.has(r.cellCode) ? ' cell-light-text' : '');
       el.style.setProperty('--cust-cell', `url('${window.CustomizeAssets.cellUrl(r.cellCode)}')`);
       el.innerHTML =
@@ -237,11 +248,19 @@
         `<div class="loading-social-info"><span class="loading-social-name">${r.name}</span></div>` +
         `<div class="loading-social-score">` +
           (flagUrl ? `<img class="loading-social-flag" src="${flagUrl}" alt="" draggable="false" oncontextmenu="return false">` : '') +
+          (canDevSpectate ? `<img class="rankings-spectate-eye" src="images/spectate.png" alt="" draggable="false" oncontextmenu="return false" title="Ver partida (dev)">` : '') +
           `<img class="loading-social-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">` +
           `<span class="loading-social-score-val">${r.score.toLocaleString()}</span>` +
         `</div>` +
         `<span class="loading-social-rankname">${rk.name}</span>` +
         `<img class="loading-social-emote" src="${rk.img}" alt="" draggable="false" oncontextmenu="return false">`;
+      if (canDevSpectate) {
+        el.querySelector('.rankings-spectate-eye')?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+          if (typeof window.openSpectatorSolo === 'function') window.openSpectatorSolo(r.id, r);
+        });
+      }
       el.addEventListener('click', async () => {
         const myId = window._sbProfile?.id;
         if (myId && r.id === myId) {

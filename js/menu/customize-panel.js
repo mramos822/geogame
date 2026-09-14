@@ -23,7 +23,7 @@
   // Catalog of available items per category. Add each new code here as art
   // lands and the shop grows (founderOnly, price, etc.).
   const CATALOG = {
-    photo:       [{ code: '0001', founderOnly: false }, { code: '0002', founderOnly: true }],
+    photo:       [{ code: '0001', founderOnly: false }, { code: '0002', founderOnly: true }, { code: '0003', top1Only: true }],
     leaderboard: [{ code: '0001', founderOnly: false }, { code: '0002', founderOnly: true }],
     table:       [{ code: '0001', founderOnly: false }, { code: '0002', founderOnly: true }],
     cell:        [{ code: '0001', founderOnly: false }, { code: '0002', founderOnly: true }],
@@ -168,13 +168,33 @@
     const photo = localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png';
     const name  = localStorage.getItem('playerName') || 'John';
     if (cat === 'photo') {
-      const frameInset = window.CUSTOMIZE_FRAME_INSET[code] || '-14.5%';
+      const insetPct = parseFloat(window.CUSTOMIZE_FRAME_INSET[code] || '-14.5%');
+      const frameOffsetY = window.CUSTOMIZE_FRAME_OFFSET_Y[code] || '0px';
+      // Same conversion as CustomizeAssets._applyFrameStars in js/sb.js — kept
+      // in sync there in case the star point list ever changes.
+      const points = window.CUSTOMIZE_FRAME_STARS[code];
+      let starsHtml = '';
+      if (points) {
+        const insetFraction = Math.abs(insetPct) / 100;
+        const scale = 1 + 2 * insetFraction;
+        const cycle = window.CUSTOMIZE_FRAME_STAR_CYCLE_S;
+        const scales = window.CUSTOMIZE_FRAME_STAR_SCALES;
+        const curves = ['a', 'b', 'c'];
+        starsHtml = `<div class="cust-frame-stars">` + points.map(([fx, fy], i) => {
+          const x = (-insetFraction + fx * scale) * 100;
+          const y = (-insetFraction + fy * scale) * 100;
+          const starScale = scales[i % scales.length];
+          const delay = -(Math.random() * cycle).toFixed(2);
+          const anim = `cust-frame-star-twinkle-${curves[i % curves.length]}`;
+          return `<span class="cust-frame-star" style="left:${x}%;top:${y}%;--star-scale:${starScale};--star-delay:${delay}s;--star-duration:${cycle}s;--star-anim:${anim}"></span>`;
+        }).join('') + `</div>`;
+      }
       // Fixed size in cqmin, NOT % — the swatch has padding-bottom (room for
       // the label) so its content width and height aren't equal; a %
       // width/height on that box gives an oval, not a circle. cqmin is relative
       // to the outer container (same for both dimensions), always a real square.
-      return `<div class="customize-preview-avatar-wrap cust-frame-wrap" style="width:7.5cqmin;height:7.5cqmin;--cust-frame:url('${CA.frameUrl(code)}');--cust-frame-inset:${frameInset}">`
-        + `<img src="${photo}"></div>`;
+      return `<div class="customize-preview-avatar-wrap cust-frame-wrap" style="width:7.5cqmin;height:7.5cqmin;--cust-frame:url('${CA.frameUrl(code)}');--cust-frame-inset:${insetPct}%;--cust-frame-offset-y:${frameOffsetY}">`
+        + `<img src="${photo}">` + starsHtml + `</div>`;
     }
     if (cat === 'leaderboard') {
       // transform:scale (not width%) so the text shrinks proportionally with
@@ -214,6 +234,13 @@
     // that click only UNLOCKS, it doesn't equip anything; only then can they
     // choose to wear it here like any other item.
     const isFounder = !!(p && p.is_founder && p.founder_popup_seen);
+    // Same "unlock, don't auto-equip" split as Founder: is_top1 alone isn't
+    // enough, the congrats popup must be confirmed first (top1_popup_seen,
+    // see showTop1WelcomePopup in js/profile/profile-account.js). Whoever
+    // currently holds #1 (see recompute_top1 in the DB) — dynamic, unlike
+    // Founder, so this can flip back to false at any time (see
+    // top1_lost_pending / the DB trigger that reverts frame_code).
+    const isTop1 = !!(p && p.is_top1 && p.top1_popup_seen);
     const field = CATS[cat].field;
     const currentCode = p?.[field] || '0001';
     grid.innerHTML = '';
@@ -224,12 +251,17 @@
       // — no point showing something locked that can never be unlocked.
       // Achievement/shop items ARE shown locked (with 🔒) to create incentive.
       if (item.founderOnly && !isFounder) return;
+      // Top 1 is dynamic (see isTop1 above) but hidden the same way while not
+      // held: showing it locked would advertise a frame most players will
+      // never legitimately equip at any given moment anyway.
+      if (item.top1Only && !isTop1) return;
       const locked   = item.locked && !item.unlocked;
       const selected = currentCode === item.code;
       const sw = document.createElement('div');
       sw.className = 'customize-swatch' + (selected ? ' selected' : '') + (locked ? ' locked' : '');
+      sw.dataset.code = item.code;
       sw.innerHTML = _swatchPreview(cat, item.code)
-        + `<span class="customize-swatch-label">${item.code === '0001' ? t('customize.optDefault') : (item.code === '0002' ? t('customize.frameFounder') : item.code)}</span>`
+        + `<span class="customize-swatch-label">${item.code === '0001' ? t('customize.optDefault') : (item.code === '0002' ? t('customize.frameFounder') : (item.code === '0003' ? t('customize.frameExclusive') : item.code))}</span>`
         + (locked ? `<span class="customize-swatch-lock">🔒</span>` : `<div class="customize-swatch-check">✓</div>`);
       if (locked) sw.title = t('customize.locked');
       else sw.addEventListener('click', () => _selectOption(cat, item.code));

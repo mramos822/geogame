@@ -605,6 +605,7 @@
     if (window._sbUserId && typeof window.sbSetPlayingMode === 'function') window.sbSetPlayingMode(window._sbUserId, null).catch(() => {});
     if (window.LB?.getId?.()) { try { await window.LB.leave(); } catch (e) {} }
     window.sbStopSessionGuard?.();
+    window.sbStopTop1Watch?.();
     localStorage.removeItem('_sbSessionToken');
     if (_friendRealtimeChannel)  { window.sb.removeChannel(_friendRealtimeChannel);  _friendRealtimeChannel = null; }
     if (_friendshipsChannel)     { window.sb.removeChannel(_friendshipsChannel);     _friendshipsChannel = null; }
@@ -902,6 +903,19 @@ async function _onSessionReady(userId) {
     if (profile.is_founder && !profile.founder_popup_seen && (profile.campaigns_completed || 0) > 0) {
       setTimeout(() => { if (typeof window.showFounderWelcomePopup === 'function') window.showFounderWelcomePopup(); }, 800);
     }
+    // Top 1 popups: no campaigns_completed gate like Founder — is_top1 can
+    // only ever be true because a score was already submitted, so there's
+    // nothing to wait for. Mutually exclusive (never both at once, see the
+    // recompute_top1 DB function clearing top1_lost_pending on promotion).
+    if (profile.is_top1 && !profile.top1_popup_seen) {
+      setTimeout(() => { if (typeof window.showTop1WelcomePopup === 'function') window.showTop1WelcomePopup(); }, 800);
+    } else if (profile.top1_lost_pending) {
+      setTimeout(() => { if (typeof window.showTop1LostPopup === 'function') window.showTop1LostPopup(); }, 800);
+    }
+    // Live watch: is_top1/top1_lost_pending can flip from ANOTHER player's
+    // game at any moment this session is open, not just from this account's
+    // own actions — see sbStartTop1Watch in js/sb.js.
+    if (typeof window.sbStartTop1Watch === 'function') window.sbStartTop1Watch(userId);
   } catch(e) {}
   _subscribeFriendshipChanges(userId);
   _startSocialListPoll();
@@ -1152,6 +1166,136 @@ function showFounderWelcomePopup() {
   }
 }
 window.showFounderWelcomePopup = showFounderWelcomePopup;
+
+// Realtime handler for the logged-in user's OWN profile row (see
+// sbStartTop1Watch in js/sb.js, started from _onSessionReady above) —
+// is_top1/top1_lost_pending can flip from ANOTHER player's game finishing,
+// not just from this account's own actions, so this can fire at any time.
+// profiles has default REPLICA IDENTITY (primary key only), so payload.old
+// only ever has {id: ...} — NOT the previous field values — hence no
+// old-vs-new diffing here. Fires on every UPDATE of this row (e.g. the
+// periodic last_active heartbeat too, not just is_top1 changes), which is
+// harmless: showTop1WelcomePopup/showTop1LostPopup both no-op if already
+// visible, and once acked the DB value itself goes false so later events
+// stop matching — EXCEPT there's a real race there: clicking confirm updates
+// window._sbProfile optimistically and fires the ack write, but doesn't wait
+// for it: if the periodic last_active heartbeat (js/sb.js, every 25s) lands
+// an UPDATE before that ack has actually committed, its payload still carries
+// the pre-ack DB row (top1_popup_seen still false) — which used to reopen an
+// already-dismissed popup. Fixed by only reacting to an actual FALSE→TRUE
+// transition (comparing against window._sbProfile as it stood right before
+// this merge, not the DB's raw booleans): once the optimistic update lands,
+// it stays true/false as far as this handler is concerned, so later stale
+// deliveries of the same not-yet-committed state no longer look "new".
+window._onOwnProfileRealtimeUpdate = function(newRow) {
+  if (!newRow) return;
+  const wasTop1        = window._sbProfile ? window._sbProfile.is_top1 : undefined;
+  const wasLostPending  = window._sbProfile ? window._sbProfile.top1_lost_pending : undefined;
+  if (window._sbProfile) Object.assign(window._sbProfile, newRow);
+  // Picks up a server-side reverted frame_code (recompute_top1 forces it back
+  // if 0003 was equipped) so the avatar/leaderboard art updates immediately
+  // instead of waiting for the next full profile refresh.
+  if (typeof window._applyFounderFrame === 'function') window._applyFounderFrame();
+  if (newRow.is_top1 && !newRow.top1_popup_seen && wasTop1 === false) {
+    if (typeof window.showTop1WelcomePopup === 'function') window.showTop1WelcomePopup();
+  } else if (newRow.top1_lost_pending && wasLostPending === false) {
+    if (typeof window.showTop1LostPopup === 'function') window.showTop1LostPopup();
+  }
+};
+
+// Welcome popup for whoever currently holds #1 (highest hs_total, see
+// recompute_top1 in the DB) — same unlock-not-equip split as Founder
+// (showFounderWelcomePopup above): frame 0003 is granted (becomes selectable
+// in Customize, see isTop1 in _renderGrid/js/menu/customize-panel.js) only on
+// confirming here, never auto-equipped. Unlike Founder this is NOT
+// permanent: losing #1 to another player revokes it again (see
+// showTop1LostPopup below) and reclaiming the spot re-shows this popup.
+// Must NEVER interrupt an active game (a match, VS, or a lobby room) — under
+// no circumstance, per explicit product requirement. Both popup functions
+// below check this FIRST and bail out silently if true; nothing is lost, the
+// underlying DB flag (top1_popup_seen/top1_lost_pending) stays pending, so
+// the next retrigger — the realtime handler above fires again on every
+// profile UPDATE, including the periodic last_active heartbeat every 25s
+// (see _onOwnProfileRealtimeUpdate), or the immediate re-check in js/final.js
+// on returning to the menu after a Gira Mundial — shows it once truly safe.
+function _top1PopupsBlocked() {
+  return !!(window._isPlaying || window._lobbyActive || window._vsActive);
+}
+
+function showTop1WelcomePopup() {
+  if (_top1PopupsBlocked()) return;
+  const popup    = document.getElementById('top1-popup');
+  const confirmW = document.getElementById('top1-popup-confirm');
+  if (!popup || popup.classList.contains('visible')) return;
+  // Mutually exclusive with the "lost" popup — is_top1 flipping true again
+  // while that one is still up (unacked) would otherwise stack both at the
+  // same z-index, reading as the same message showing twice.
+  document.getElementById('top1-lost-popup')?.classList.remove('visible');
+  const CA = window.CustomizeAssets;
+  if (CA) {
+    const frameImg = document.getElementById('top1-popup-frame-img');
+    if (frameImg) frameImg.src = localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png';
+    CA.applyFrame(document.getElementById('top1-popup-frame'), '0003');
+  }
+  popup.classList.add('visible');
+  if (confirmW) {
+    const onClick = () => {
+      try { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); } catch (e) {}
+      confirmW.classList.add('confirm-pressed');
+      setTimeout(() => {
+        confirmW.classList.remove('confirm-pressed');
+        popup.classList.remove('visible');
+      }, 120);
+      confirmW.removeEventListener('click', onClick);
+      if (window._sbProfile) window._sbProfile.top1_popup_seen = true;
+      if (window._sbUserId && typeof window.sbAckTop1Popup === 'function') {
+        window.sbAckTop1Popup(window._sbUserId).catch(() => {});
+      }
+    };
+    confirmW.addEventListener('click', onClick);
+  }
+}
+window.showTop1WelcomePopup = showTop1WelcomePopup;
+
+// Notice shown when the account loses #1 to another player (top1_lost_pending,
+// set by recompute_top1 in the DB, which also reverts frame_code back to
+// whatever was equipped before if 0003 was on) — encourages playing again;
+// reclaiming #1 brings the whole flow (and the frame) back.
+function showTop1LostPopup() {
+  if (_top1PopupsBlocked()) return;
+  const popup    = document.getElementById('top1-lost-popup');
+  const confirmW = document.getElementById('top1-lost-popup-confirm');
+  if (!popup || popup.classList.contains('visible')) return;
+  // Mutually exclusive with the welcome popup — see the matching comment in
+  // showTop1WelcomePopup above.
+  document.getElementById('top1-popup')?.classList.remove('visible');
+  const CA = window.CustomizeAssets;
+  if (CA) {
+    const frameImg = document.getElementById('top1-lost-popup-frame-img');
+    if (frameImg) frameImg.src = localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png';
+    // Still the 0003 art (grayed out via .top1-lost-frame in style.css) —
+    // showing what they no longer have, not the frame they fell back to.
+    CA.applyFrame(document.getElementById('top1-lost-popup-frame'), '0003');
+  }
+  popup.classList.add('visible');
+  if (confirmW) {
+    const onClick = () => {
+      try { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); } catch (e) {}
+      confirmW.classList.add('confirm-pressed');
+      setTimeout(() => {
+        confirmW.classList.remove('confirm-pressed');
+        popup.classList.remove('visible');
+      }, 120);
+      confirmW.removeEventListener('click', onClick);
+      if (window._sbProfile) window._sbProfile.top1_lost_pending = false;
+      if (window._sbUserId && typeof window.sbAckTop1Lost === 'function') {
+        window.sbAckTop1Lost(window._sbUserId).catch(() => {});
+      }
+    };
+    confirmW.addEventListener('click', onClick);
+  }
+}
+window.showTop1LostPopup = showTop1LostPopup;
 
 function _updateProfileBtnLabel() {
   const el = document.getElementById('profile-btn-label');

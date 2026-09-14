@@ -5,6 +5,13 @@ const _SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 const sb = supabase.createClient(_SB_URL, _SB_ANON);
 window.sb = sb;
 
+// Shared dev/admin account id (BlueLite) — same account as
+// ADMIN_GUEST_RANKINGS_UID in js/menu/rankings-panel.js. Used to gate
+// developer-only features (e.g. spectating ANY player's practice session,
+// see the eye icon in js/menu/rankings-panel.js and the is_practicing
+// exceptions in js/social/social-panel.js / js/social/social-realtime.js).
+window.DEV_UID = '530cb816-8562-4e7e-a538-15c6713fcc8d';
+
 // ── CUSTOMIZATION (items by code, ready for the future shop) ─────────────────
 // images/customize/{frames,cards,panels,emotes,cells}/<code>.png — '0001' is
 // the free default for everyone. frame_code/card_code/panel_code/cell_code live
@@ -34,12 +41,57 @@ window.sb = sb;
 //     (~77.5%) → inset -14.5%.
 //   0002.png (152×148, Founder): inner radius ~47.5 of 74 (~64.2%) → minimum
 //     -27.9%, bumped to -30% on request (a touch bigger).
+//   0003.png (161×161, BlueLite exclusive, laurel wreath): median inner
+//     radius ~47 of 80.5 half-canvas (~58.4%) → -35.6% measured, adjusted to
+//     -33% on request (visual fit against the circular photo).
 // If a new frame code is added, measure its ring inner radius the same way and
 // add its entry here — don't reuse another asset's value.
 window.CUSTOMIZE_FRAME_INSET = {
   '0001': '-14.5%',
   '0002': '-30%',
+  '0003': '-33%',
 };
+
+// Fine per-code vertical nudge (px), for a ring that sits visually 1-2px off
+// from the circular photo even after the inset is right — see the
+// translateY(var(--cust-frame-offset-y)) on .cust-frame-wrap::after in
+// style.css. Only add an entry here if a code actually needs it; everything
+// else defaults to 0 (untouched).
+window.CUSTOMIZE_FRAME_OFFSET_Y = {
+  '0003': '1px',
+};
+
+// Twinkling star particles scattered "on the laurel" for 0003 — each pair is
+// [x,y] as a fraction (0-1) of the RAW PNG canvas, sampled by radially
+// averaging the opaque (leaf) pixels at 16 angles around the wreath and
+// dropping the 2 nearest the bottom globe badge (images/customize/frames/
+// 0003.png is 161×161). Only codes listed here get stars — everything else
+// renders with no overlay, same opt-in pattern as CUSTOMIZE_FRAME_OFFSET_Y.
+window.CUSTOMIZE_FRAME_STARS = {
+  '0003': [
+    [0.864, 0.569], [0.698, 0.795], [0.298, 0.793], [0.136, 0.569],
+    [0.185, 0.289], [0.433, 0.175], [0.706, 0.203], [0.867, 0.424],
+  ],
+};
+
+// Each star loops the same CUSTOMIZE_FRAME_STAR_CYCLE_S-long animation but
+// only flashes for a short ACTIVE_FRACTION of it right at the start (see the
+// cust-frame-star-twinkle-* keyframes in style.css — 0 to ACTIVE_FRACTION,
+// dark the rest of the loop) — a quick blink, not a lingering glow. Every
+// star gets its OWN random negative animation-delay (assigned in
+// _applyFrameStars/_swatchPreview, not here) so the blinks land at
+// unpredictable moments instead of a fixed rhythm; with an 8% active window
+// out of 8 stars, more than 2-3 overlapping at once is rare by construction
+// (random, not guaranteed) — good enough for a decorative sparkle, not worth
+// a stricter scheduler. Don't change ACTIVE_FRACTION without checking the
+// keyframes' 8% mark stays in sync.
+window.CUSTOMIZE_FRAME_STAR_CYCLE_S = 8;
+window.CUSTOMIZE_FRAME_STAR_ACTIVE_FRACTION = 0.08;
+// Per-star size variety (multiplier on the CSS base size, applied via
+// --star-scale) and which of the 3 fade-curve keyframes (a/b/c — quick pop,
+// slow build, soft glow) it uses, for visual variety without touching the
+// timing math above (every star keeps the same active-window length).
+window.CUSTOMIZE_FRAME_STAR_SCALES = [1.3, 0.8, 1.55, 0.7, 1.1, 1.4, 0.85, 1.2];
 
 // Cells (images/customize/cells/<code>.png) in "dark mode": a background dark
 // or "busy" enough (texture, gradient) that the position/name text in its
@@ -128,7 +180,46 @@ window.CustomizeAssets = {
     if (!el) return;
     el.classList.add('cust-frame-wrap');
     el.style.setProperty('--cust-frame', `url('${this.frameUrl(code)}')`);
-    el.style.setProperty('--cust-frame-inset', window.CUSTOMIZE_FRAME_INSET[code] || '-14.5%');
+    const insetPct = parseFloat(window.CUSTOMIZE_FRAME_INSET[code] || '-14.5%'); // e.g. -33
+    el.style.setProperty('--cust-frame-inset', `${insetPct}%`);
+    el.style.setProperty('--cust-frame-offset-y', window.CUSTOMIZE_FRAME_OFFSET_Y[code] || '0px');
+    this._applyFrameStars(el, code, insetPct);
+  },
+  // Twinkling star particles for codes listed in CUSTOMIZE_FRAME_STARS (see
+  // definition above). One child .cust-frame-stars holding a positioned span
+  // per point — points are stored as a fraction of the raw PNG canvas, so
+  // here they're converted into the wrap's own coordinate space: the ::after
+  // ring art is a box bigger than the wrap by the same inset (see
+  // .cust-frame-wrap::after in style.css), so a canvas fraction `f` lands at
+  // wrap-fraction `-insetFraction + f * (1 + 2*insetFraction)`.
+  _applyFrameStars(el, code, insetPct) {
+    el.querySelector(':scope > .cust-frame-stars')?.remove();
+    const points = window.CUSTOMIZE_FRAME_STARS[code];
+    if (!points) return;
+    const insetFraction = Math.abs(insetPct) / 100;
+    const scale = 1 + 2 * insetFraction;
+    const wrap = document.createElement('div');
+    wrap.className = 'cust-frame-stars';
+    const cycle = window.CUSTOMIZE_FRAME_STAR_CYCLE_S;
+    const scales = window.CUSTOMIZE_FRAME_STAR_SCALES;
+    const curves = ['a', 'b', 'c'];
+    points.forEach(([fx, fy], i) => {
+      const x = (-insetFraction + fx * scale) * 100;
+      const y = (-insetFraction + fy * scale) * 100;
+      const star = document.createElement('span');
+      star.className = 'cust-frame-star';
+      star.style.left = `${x}%`;
+      star.style.top = `${y}%`;
+      star.style.setProperty('--star-scale', scales[i % scales.length]);
+      // Random negative delay (not a fixed per-index slot): each star blinks
+      // at its own unpredictable moment in the loop instead of a visible
+      // one-by-one rhythm around the ring.
+      star.style.setProperty('--star-delay', `${-(Math.random() * cycle).toFixed(2)}s`);
+      star.style.setProperty('--star-duration', `${cycle}s`);
+      star.style.setProperty('--star-anim', `cust-frame-star-twinkle-${curves[i % curves.length]}`);
+      wrap.appendChild(star);
+    });
+    el.appendChild(wrap);
   },
   applyCard(el, code) {
     if (!el) return;
@@ -313,6 +404,37 @@ window.sbClaimFounderPack = async function(userId) {
   const { data, error } = await sb.rpc('claim_founder_pack', { p_user_id: userId });
   if (error) throw error;
   return !!data;
+};
+
+// Top 1 popup acks — plain sbUpdateProfile is safe here (unlike is_founder/
+// is_top1 themselves): these two flags only gate which popup shows, they
+// don't grant anything by themselves (see protect_top1 in the DB, which only
+// guards is_top1/frame_code_before_top1/frame_code='0003').
+window.sbAckTop1Popup = async function(userId) {
+  await sb.from('profiles').update({ top1_popup_seen: true }).eq('id', userId);
+};
+window.sbAckTop1Lost = async function(userId) {
+  await sb.from('profiles').update({ top1_lost_pending: false }).eq('id', userId);
+};
+
+// Realtime watch on the logged-in user's OWN profile row for is_top1/
+// top1_lost_pending flips — these can happen at any time from ANOTHER
+// player's game (recompute_top1 trigger in the DB), not just this session's
+// own actions, so polling window._sbProfile on session start alone would miss
+// them. Started once from _onSessionReady (js/profile/profile-account.js);
+// window._sbUserId isn't set yet when this module loads, so it's a function,
+// not a top-level subscribe.
+let _top1WatchCh = null;
+window.sbStartTop1Watch = function(uid) {
+  window.sbStopTop1Watch();
+  _top1WatchCh = sb.channel('top1-' + uid)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${uid}` }, payload => {
+      if (typeof window._onOwnProfileRealtimeUpdate === 'function') window._onOwnProfileRealtimeUpdate(payload.new, payload.old);
+    })
+    .subscribe();
+};
+window.sbStopTop1Watch = function() {
+  if (_top1WatchCh) { try { sb.removeChannel(_top1WatchCh); } catch (e) {} _top1WatchCh = null; }
 };
 
 window.sbSaveScores = async function(userId, scores, sessionId) {

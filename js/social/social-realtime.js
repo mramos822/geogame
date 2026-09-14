@@ -51,7 +51,7 @@ function _patchFriendStatusInDOM(friendId) {
     // points.png, see CSS) rather than next to the name.
     const scoreBox = row.querySelector('.loading-social-score');
     if (scoreBox) {
-      const shouldShowEye = st.cls === 'playing' && !f.is_practicing;
+      const shouldShowEye = st.cls === 'playing' && (!f.is_practicing || window._sbUserId === window.DEV_UID);
       let eyeEl = scoreBox.querySelector('.social-spectate-eye');
       if (shouldShowEye && !eyeEl) {
         eyeEl = document.createElement('img');

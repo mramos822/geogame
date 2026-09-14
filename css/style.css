@@ -2755,6 +2755,10 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 .customize-swatch:hover { transform: scale(1.04); }
 .customize-swatch.selected { border-color: #f4a800; box-shadow: 0 0 0.6cqmin 0.2cqmin #ffd700; }
 .customize-swatch.locked { cursor: not-allowed; opacity: 0.55; }
+/* Frame 0003 (Top 1, BlueLite-exclusive, see CATALOG in
+   js/menu/customize-panel.js) — a golden-yellow tile background so it reads
+   as special at a glance in the grid, matching the swatch's own gold ring. */
+.customize-swatch[data-code="0003"] { background: linear-gradient(160deg, #fff6d8, #ffe17a); border-color: #e8b800; }
 .customize-swatch-label {
   position: absolute;
   bottom: 0; left: 0; right: 0;
@@ -2952,6 +2956,9 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
      puntaje (position:absolute, arranca ~43cqmin de la fila). */
   max-width: 26cqmin;
 }
+/* Rankings-only nudge (not Friends/Groups, which share .loading-social-name
+   too) — see #loading-rankings-list in renderRankings, js/menu/rankings-panel.js. */
+#loading-rankings-list .loading-social-name { position: relative; left: 5px; }
 .loading-social-status {
   font-size: 1.8cqmin;
   color: #8a7a3a;
@@ -3101,6 +3108,25 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   z-index: 5;
 }
 .social-spectate-eye:hover { transform: scale(1.55); }
+/* Same eye, but for Rankings rows (dev-only, see canDevSpectate in
+   js/menu/rankings-panel.js) — needs its OWN position because Rankings rows
+   already have .loading-social-flag sitting at left:-6cqmin in this same
+   box (Friends rows don't show a flag, so .social-spectate-eye's position
+   never collided with anything there). Pushed further left, past the flag. */
+.rankings-spectate-eye {
+  position: absolute;
+  left: -10.5cqmin;
+  top: 50%;
+  margin-top: -1.7cqmin;
+  width: 3.4cqmin;
+  height: 3.4cqmin;
+  border-radius: 50%;
+  cursor: pointer;
+  transform: scale(1.35);
+  transition: transform 0.15s;
+  z-index: 5;
+}
+.rankings-spectate-eye:hover { transform: scale(1.55); }
 
 /* Mismo ojo (círculo rojo + óvalo blanco + pupila) pero para el indicador de
    espectadores en el HUD del jugador — versión chica, tamaños en px fijos
@@ -3870,7 +3896,7 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 .loading-customize-btn {
   position: absolute;
   top: calc(50% - 27cqmin);
-  left: calc(50% + 47cqmin);
+  left: calc(50% + 49cqmin);
   transform: translate(-50%, -50%);
   width: 8cqmin;
   height: auto;
@@ -3931,6 +3957,73 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   background-repeat: no-repeat;
   pointer-events: none;
   z-index: 4;
+  /* Per-code fine nudge (e.g. 0003's wreath sitting 1px high against the
+     circular photo) — see CUSTOMIZE_FRAME_OFFSET_Y/applyFrame() in js/sb.js.
+     Defaults to 0 so every other code is untouched. */
+  transform: translateY(var(--cust-frame-offset-y, 0px));
+}
+/* Twinkling white star particles scattered over the laurel (frame 0003) —
+   see CUSTOMIZE_FRAME_STARS/applyFrame()/_applyFrameStars in js/sb.js
+   (real avatars) and _swatchPreview in js/menu/customize-panel.js (grid
+   tile). One .cust-frame-star per leaf cluster, positioned with left/top %
+   already converted into the wrap's own coordinate space. z-index above the
+   ring (4) so stars aren't hidden under the art. */
+.cust-frame-stars { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+.cust-frame-star {
+  position: absolute;
+  /* % of the wrap's OWN box (.cust-frame-stars fills it via inset:0), not
+     cqmin — cqmin resolves against the nearest container-query ancestor,
+     which for small rows (Friends/Rankings/group cells, tiny avatars) is a
+     much bigger panel, so the star ended up close to its max-width
+     regardless of how small that particular avatar actually is. % scales
+     with the real rendered size of each wrap instead. */
+  width: 15%;
+  height: 15%;
+  min-width: 4px;
+  min-height: 4px;
+  max-width: 15px;
+  max-height: 15px;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0);
+  background: #fff;
+  clip-path: polygon(50% 0%, 63% 38%, 100% 50%, 63% 62%, 50% 100%, 37% 62%, 0% 50%, 37% 38%);
+  filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 4px #ffffffaa);
+  /* linear timing-function: the curve itself lives in the keyframes' own
+     percentages (a slow ease-in fade, a hold, a fade-out), not in the
+     easing — animation-timing-function would re-warp that curve on top.
+     --star-anim picks one of the 3 fade shapes below (a/b/c) for variety;
+     --star-delay/--star-duration are set per star in JS so that, across all
+     8 stars sharing one cycle, at most 3 are ever in their active window at
+     once — see CUSTOMIZE_FRAME_STAR_CYCLE_S/_applyFrameStars in js/sb.js. */
+  animation: var(--star-anim, cust-frame-star-twinkle-a) var(--star-duration, 8s) linear var(--star-delay, 0s) infinite;
+}
+/* 3 quick-blink shapes (pop, build, glow — differ only in how the rise leans)
+   so the 8 stars don't all flash identically. ALL three keep the same active
+   window — opacity > 0 only within the first 8% of the cycle (a blink, gone
+   almost as soon as it appears — see CUSTOMIZE_FRAME_STAR_ACTIVE_FRACTION) —
+   changing that fraction here without updating the JS constant desyncs them.
+   Each multiplies the per-star --star-scale (size variety) so bigger/smaller
+   stars keep their relative size through the whole animation. */
+@keyframes cust-frame-star-twinkle-a { /* pop */
+  0%    { opacity: 0; transform: translate(-50%, -50%) scale(0); }
+  3%    { opacity: 1; transform: translate(-50%, -50%) scale(calc(var(--star-scale, 1) * 1.1)); }
+  5%    { opacity: 1; transform: translate(-50%, -50%) scale(var(--star-scale, 1)); }
+  8%    { opacity: 0; transform: translate(-50%, -50%) scale(0); }
+  100%  { opacity: 0; transform: translate(-50%, -50%) scale(0); }
+}
+@keyframes cust-frame-star-twinkle-b { /* build */
+  0%    { opacity: 0; transform: translate(-50%, -50%) scale(0); }
+  4%    { opacity: 0.7; transform: translate(-50%, -50%) scale(calc(var(--star-scale, 1) * 0.7)); }
+  6%    { opacity: 1; transform: translate(-50%, -50%) scale(calc(var(--star-scale, 1) * 1.08)); }
+  8%    { opacity: 0; transform: translate(-50%, -50%) scale(0); }
+  100%  { opacity: 0; transform: translate(-50%, -50%) scale(0); }
+}
+@keyframes cust-frame-star-twinkle-c { /* glow */
+  0%    { opacity: 0; transform: translate(-50%, -50%) scale(0); }
+  2.5%  { opacity: 0.6; transform: translate(-50%, -50%) scale(calc(var(--star-scale, 1) * 0.6)); }
+  5%    { opacity: 1; transform: translate(-50%, -50%) scale(var(--star-scale, 1)); }
+  8%    { opacity: 0; transform: translate(-50%, -50%) scale(0); }
+  100%  { opacity: 0; transform: translate(-50%, -50%) scale(0); }
 }
 
 .loading-profile-pic-overlay {
@@ -4987,6 +5080,38 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 }
 .founder-popup-confirm:hover .founder-popup-confirm2 { opacity: 1; }
 .founder-popup-confirm.confirm-pressed .founder-popup-confirm2 { opacity: 0; }
+
+/* Top 1 popups (welcome + lost) — same box/item/confirm classes as
+   #founder-popup above, only the outer id differs (position/display/z-index)
+   so the visual language matches without duplicating the whole ruleset. See
+   showTop1WelcomePopup/showTop1LostPopup in js/profile/profile-account.js. */
+#top1-popup, #top1-lost-popup {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 262;
+}
+#top1-popup.visible, #top1-lost-popup.visible { display: flex; }
+/* Gold accent on the Top 1 welcome box specifically (not the "lost" one) to
+   echo the frame's own gold ring/swatch background (see
+   .customize-swatch[data-code="0003"]). */
+#top1-popup .founder-popup-box { border-color: #e8b800; background: linear-gradient(180deg, #fffbe6, #fff3c4); }
+/* cup1.png replaces the logo (see the HTML) — same reasoning as cup2.png on
+   #top1-lost-popup below: a cup icon reads smaller than the square logo at
+   the same width. */
+#top1-popup .founder-popup-logo { width: 15cqmin; }
+/* "Lost" popup: cup2.png replaces the logo (see the HTML) — a bit bigger
+   since a cup icon reads smaller than the square logo at the same width.
+   The frame preview below is grayscale + dimmed, showing it left the stock
+   (the real frame_code already reverted server-side — this is just visual). */
+#top1-lost-popup .founder-popup-logo { width: 15cqmin; }
+.top1-lost-frame { filter: grayscale(1) brightness(0.85); opacity: 0.7; }
+/* No twinkling on a grayed-out "you don't have this anymore" preview — the
+   sparkle reads as celebratory, which contradicts the message here. */
+.top1-lost-frame .cust-frame-stars { display: none; }
 
 /* ── POPUP DE BIENVENIDA ─────────────────────────────── */
 #welcome-popup {

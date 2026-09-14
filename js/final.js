@@ -294,6 +294,22 @@ document.getElementById('final-confirm-back-wrap')?.addEventListener('click', ()
       setTimeout(() => window.showFounderWelcomePopup(), 500);
     }
   }
+  // Top 1 popups: no "pending" flag gate like Founder — is_top1/
+  // top1_lost_pending are already correct by the time we're here (fresh
+  // window._sbProfile from the results save), and both show functions
+  // themselves refuse to fire while in-game (_top1PopupsBlocked in
+  // js/profile/profile-account.js), so calling unconditionally on every
+  // return to menu is safe — they no-op if there's nothing pending or the
+  // popup is already up. This is also the realtime handler's normal retry
+  // path if a promotion/loss happened while a game was in progress.
+  {
+    const p = window._sbProfile;
+    if (p && p.is_top1 && !p.top1_popup_seen && typeof window.showTop1WelcomePopup === 'function') {
+      setTimeout(() => window.showTop1WelcomePopup(), 500);
+    } else if (p && p.top1_lost_pending && typeof window.showTop1LostPopup === 'function') {
+      setTimeout(() => window.showTop1LostPopup(), 500);
+    }
+  }
 });
 document.getElementById('final-confirm-back-wrap')?.addEventListener('mouseenter', () => { if (typeof playSelect === 'function') playSelect(); });
 document.getElementById('final-confirm-back-wrap')?.addEventListener('mouseleave', () => { if (typeof playSelect === 'function') playSelect(); });

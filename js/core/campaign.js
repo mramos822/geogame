@@ -38,8 +38,6 @@ window._setPlaying = function(playing) {
     // _vsActive/_lobbyActive a few lines after calling _setPlaying(true) in the
     // SAME synchronous function — deciding here would always see those flags
     // still false and open a "solo" spectator channel even for a versus/lobby.
-    // Opening the channel makes no sense in practice mode either: there's no eye
-    // to click (is_practicing hides it) and the session isn't a "real" game.
     Promise.resolve().then(() => {
       // sbSetPlayingMode goes FIRST in its own try/catch: if SoloSpectate.start()
       // below throws, it must not cut this off midway (that's exactly what
@@ -51,8 +49,15 @@ window._setPlaying = function(playing) {
           window.Analytics.guestSetPlaying(true, _computePlayingLabel(isPracticing));
         }
       } catch (e) {}
+      // Practice sessions DO open the channel too (used to be skipped — "no
+      // eye to click, not a real game") — the dev account (window.DEV_UID)
+      // can now spectate ANY player's practice session, from Rankings, not
+      // just friends (see the eye icon there and the is_practicing exceptions
+      // in js/social/social-panel.js / js/social/social-realtime.js). Regular
+      // players still never see an eye for a practicing friend, so this is
+      // otherwise invisible to everyone else.
       try {
-        if (window._isPlaying && !window._vsActive && !window._lobbyActive && !isPracticing && typeof window.SoloSpectate !== 'undefined') {
+        if (window._isPlaying && !window._vsActive && !window._lobbyActive && typeof window.SoloSpectate !== 'undefined') {
           window.SoloSpectate.start();
         }
       } catch (e) {}
