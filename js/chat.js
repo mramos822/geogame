@@ -16,6 +16,15 @@ window.Chat = (() => {
   let _rtChannel = null;
   let _inboxLoading = false;
   let _panelOpen = false;
+  // ── Anti-spam cooldown ────────────────────────────────────────────────────
+  // Sending messages way too fast (someone mashing Enter) gets a 10s cooldown
+  // once the pattern is detected, instead of flooding direct_messages/the
+  // other person's inbox indefinitely.
+  let _sendTimestamps = []; // last CHAT_SPAM_COUNT send times (ms epoch)
+  let _cooldownUntil = 0;   // ms epoch until sends are blocked; 0 = no cooldown
+  const CHAT_SPAM_COUNT = 7;        // this many sends...
+  const CHAT_SPAM_WINDOW_MS = 5000; // ...within this window counts as "rapid fire"
+  const CHAT_SPAM_COOLDOWN_MS = 10000;
 
   function _myId() { return window._sbUserId || null; }
   function _T(k, d, vars) { return (typeof t === 'function') ? t(k, vars) : d; }
@@ -324,10 +333,36 @@ window.Chat = (() => {
     _view = 'inbox';
     refreshInbox();
   }
+  // Returns true (and blocks the send) only if still under an already-active
+  // cooldown. Otherwise lets THIS send through and records it — if it's the
+  // 7th send landing within CHAT_SPAM_WINDOW_MS, arms the cooldown so the
+  // NEXT ones (not this one) get blocked.
+  function _spamCooldownActive() {
+    const now = Date.now();
+    if (now < _cooldownUntil) {
+      const secs = Math.ceil((_cooldownUntil - now) / 1000);
+      if (typeof window.showGlobalToast === 'function') {
+        window.showGlobalToast(_T('chat.cooldown', `Estás enviando mensajes muy rápido, esperá ${secs}s`, { secs }));
+      }
+      return true;
+    }
+    _sendTimestamps.push(now);
+    if (_sendTimestamps.length > CHAT_SPAM_COUNT) _sendTimestamps.shift();
+    if (_sendTimestamps.length === CHAT_SPAM_COUNT && (now - _sendTimestamps[0]) < CHAT_SPAM_WINDOW_MS) {
+      _cooldownUntil = now + CHAT_SPAM_COOLDOWN_MS;
+      _sendTimestamps = []; // reset so it doesn't re-trigger every tick once the cooldown is already armed
+      if (typeof window.showGlobalToast === 'function') {
+        window.showGlobalToast(_T('chat.cooldownStart', 'Estás enviando mensajes muy rápido, esperá 10s antes del próximo'));
+      }
+    }
+    return false;
+  }
+
   async function sendMessage(text) {
     const uid = _myId();
     const content = (text || '').trim();
     if (!uid || !_activeFriend || !content || !window.sb) return;
+    if (_spamCooldownActive()) return;
     const tempId = 'tmp-' + Date.now();
     const optimistic = {
       id: tempId, sender_id: uid, receiver_id: _activeFriend.id,
