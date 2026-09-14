@@ -123,6 +123,32 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: true, linked_events: (n1 || 0) + (n2 || 0) }), { headers: CORS });
     }
 
+    // ── Acción manual: marcar/desmarcar una cuenta como "verificada" ──────
+    // El admin confirma a ojo que el patrón de juego es legítimo (ej. alguien
+    // rápido de verdad, no un bot) — desde ese momento integrityFlags deja de
+    // alertar sobre ESA cuenta, sin importar qué tan fuera de rango siga
+    // pareciendo el score. No borra el historial ni cambia nada del juego,
+    // solo silencia la heurística para este username puntual.
+    if (action === 'verify_account' || action === 'unverify_account') {
+      if (!target_username) {
+        return new Response(JSON.stringify({ error: 'missing_params' }), { status: 400, headers: CORS });
+      }
+      const { data: targetProfile, error: profileErr } = await sb
+        .from('profiles').select('id').eq('username', target_username).single();
+      if (profileErr || !targetProfile) {
+        return new Response(JSON.stringify({ error: 'account_not_found' }), { status: 404, headers: CORS });
+      }
+      if (action === 'verify_account') {
+        const { error: upErr } = await sb.from('verified_accounts')
+          .upsert({ user_id: targetProfile.id, verified_at: new Date().toISOString() }, { onConflict: 'user_id' });
+        if (upErr) return new Response(JSON.stringify({ error: String(upErr.message || upErr) }), { status: 500, headers: CORS });
+      } else {
+        const { error: delErr } = await sb.from('verified_accounts').delete().eq('user_id', targetProfile.id);
+        if (delErr) return new Response(JSON.stringify({ error: String(delErr.message || delErr) }), { status: 500, headers: CORS });
+      }
+      return new Response(JSON.stringify({ ok: true }), { headers: CORS });
+    }
+
     // ── Acción manual: mandar un mensaje del creador (pop-up en el menú) ──
     // Escribe en guest_messages con el service role (bypassa RLS, que no deja
     // INSERT a nadie). Destino segun target_kind: 'account' (a una cuenta por
@@ -249,6 +275,7 @@ Deno.serve(async (req) => {
       allCampaignsForXpRes, allGlobequizForXpRes, allCurrencyLedgerRes,
       visitorUserBridgeRes,
       onlineGuestsRes, guestPresenceHistoryRes,
+      verifiedAccountsRes,
     ] = await Promise.all([
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true })),
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true }).gte('last_active', onlineISO)),
@@ -381,6 +408,10 @@ Deno.serve(async (req) => {
       sb.from('guest_presence')
         .select('visitor_id, last_active, guest_name, country_code')
         .gte('last_active', windowISO).limit(50000),
+      // ── Cuentas marcadas "verificadas" a mano (ver acción verify_account
+      // más arriba) — integrityFlags las salta más abajo aunque su patrón de
+      // juego siga viéndose estadísticamente raro.
+      sb.from('verified_accounts').select('user_id, verified_at'),
     ]);
 
     const regRows      = profilesRes.data || [];
@@ -696,6 +727,10 @@ Deno.serve(async (req) => {
     }
     const MIN_SAMPLE = 8; // no confiar en el z-score con muy pocos datos
     const integrityFlags: { username: string; type: string; mode: string | null; score: number | null; reason: string; created_at: string; severity: 'warn' | 'crit' }[] = [];
+    const verifiedUserIds = new Set((verifiedAccountsRes.data || []).map((r: any) => r.user_id));
+    function isVerified(r: { user_id?: string | null }): boolean {
+      return !!(r.user_id && verifiedUserIds.has(r.user_id));
+    }
 
     // A) Score de un modo suelto muy por encima del promedio de ESE modo
     // (posible trampa client-side, ej. editar el score antes de mandarlo).
@@ -708,7 +743,7 @@ Deno.serve(async (req) => {
     for (const [mode, arr] of Object.entries(scoresByMode)) modeStats[mode] = meanStd(arr);
     for (const r of singleRows as any[]) {
       const identity = identityOf(r);
-      if (r.score == null || !identity) continue;
+      if (r.score == null || !identity || isVerified(r)) continue;
       const mode = r.mode || 'otro';
       const st = modeStats[mode];
       if (!st || st.std === 0 || scoresByMode[mode].length < MIN_SAMPLE) continue;
@@ -729,7 +764,7 @@ Deno.serve(async (req) => {
     if (campaignScores.length >= MIN_SAMPLE && campaignStats.std > 0) {
       for (const r of campaignRows as any[]) {
         const identity = identityOf(r);
-        if (r.score == null || !identity) continue;
+        if (r.score == null || !identity || isVerified(r)) continue;
         const z = (r.score - campaignStats.mean) / campaignStats.std;
         if (z > 4) {
           integrityFlags.push({
@@ -746,7 +781,7 @@ Deno.serve(async (req) => {
     // segundo para ser un humano tipeando/clickeando.
     for (const r of globequizRows as any[]) {
       const identity = identityOf(r);
-      if (!identity || r.duration_ms == null) continue;
+      if (!identity || r.duration_ms == null || isVerified(r)) continue;
       const attempts = r.score || 1;
       const seconds = r.duration_ms / 1000;
       if (r.duration_ms < 3000) {
@@ -773,7 +808,7 @@ Deno.serve(async (req) => {
     const campaignsByKeyForBot: Record<string, any[]> = {};
     for (const r of campaignRows as any[]) {
       const key = groupKey(r);
-      if (!key) continue;
+      if (!key || isVerified(r)) continue;
       (campaignsByKeyForBot[key] = campaignsByKeyForBot[key] || []).push(r);
     }
     for (const rows of Object.values(campaignsByKeyForBot)) {
@@ -792,6 +827,11 @@ Deno.serve(async (req) => {
     }
 
     integrityFlags.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    // Lista chica para el panel "Cuentas verificadas" (des-verificar desde ahí).
+    const verifiedAccounts = ((verifiedAccountsRes.data || []) as any[])
+      .map((r: any) => ({ username: usernameById[r.user_id] || r.user_id, verified_at: r.verified_at }))
+      .sort((a: any, b: any) => new Date(b.verified_at).getTime() - new Date(a.verified_at).getTime());
 
     // ── Invitados: gente jugando SIN cuenta, para tener registro/alerta de
     // ellos aunque nunca se registren. Junta todo lo que dejan (visitas,
@@ -1002,6 +1042,10 @@ Deno.serve(async (req) => {
     const currencyRows = (currencyLedgerRes.data || []) as any[];
     const currencyByReason: Record<string, { count: number; coins: number; xp: number }> = {};
     const currencyByUser: Record<string, { coins: number; xp: number }> = {};
+    // Per-account ledger detail (date, reason/mode, coins, xp) — feeds the
+    // expandable row under "Top acumulado por cuenta" so an admin can see
+    // WHERE each account's total came from, not just the sum.
+    const currencyHistoryByUser: Record<string, { reason: string; coins: number; xp: number; ref_value: number | null; created_at: string }[]> = {};
     let currencyTotalCoins = 0, currencyTotalXp = 0;
     for (const r of currencyRows) {
       const reason = r.reason || 'otro';
@@ -1011,12 +1055,24 @@ Deno.serve(async (req) => {
       if (r.user_id) {
         const u = currencyByUser[r.user_id] = currencyByUser[r.user_id] || { coins: 0, xp: 0 };
         u.coins += r.coins || 0; u.xp += r.xp || 0;
+        (currencyHistoryByUser[r.user_id] = currencyHistoryByUser[r.user_id] || []).push({
+          reason, coins: r.coins || 0, xp: r.xp || 0, ref_value: r.ref_value ?? null, created_at: r.created_at,
+        });
       }
     }
     const currencyTopEarners = Object.entries(currencyByUser)
-      .map(([uid, v]) => ({ username: usernameById[uid] || uid, coins: v.coins, xp: v.xp }))
+      .map(([uid, v]) => ({
+        username: usernameById[uid] || uid, coins: v.coins, xp: v.xp,
+        history: (currencyHistoryByUser[uid] || [])
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+          .slice(0, 50),
+      }))
       .sort((a, b) => b.coins - a.coins)
       .slice(0, 15);
+    // Tope duro de nivel (ver levelFromXp más abajo) — se manda acá para que
+    // el panel lo muestre como referencia fija, en vez de tenerlo hardcodeado
+    // por separado en dos lugares que podrían desincronizarse.
+    const LEVEL_CAP = 100;
 
     // ── Retroactivo EN VIVO + detección de manipulación ───────────────────
     // Mismas fórmulas que js/analytics.js (coinsFromScore/xpFromScore para
@@ -1029,7 +1085,7 @@ Deno.serve(async (req) => {
     // "esperado" (este cálculo) contra lo que currency_ledger tiene
     // realmente acumulado, cualquier exceso es sospechoso.
     function levelFromXp(xp: number): number {
-      return Math.min(Math.floor((25 + Math.sqrt(625 + 100 * xp)) / 50), 100);
+      return Math.min(Math.floor((25 + Math.sqrt(625 + 100 * xp)) / 50), LEVEL_CAP);
     }
     function levelUpBonusCoins(level: number): number {
       let total = 0;
@@ -1110,6 +1166,7 @@ Deno.serve(async (req) => {
       totalCoins: currencyTotalCoins,
       totalXp: currencyTotalXp,
       eventCount: currencyRows.length,
+      levelCap: LEVEL_CAP,
       byReason: currencyByReason,
       versusCurrency,
       topEarners: currencyTopEarners,
@@ -1195,6 +1252,7 @@ Deno.serve(async (req) => {
       social,
       economy,
       integrityFlags,
+      verifiedAccounts,
       guests,
       topCountries,
       topSources,

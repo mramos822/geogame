@@ -670,6 +670,12 @@
         </h2>
         <div class="table-scroll"><table id="tbl-integrity"><tbody></tbody></table></div>
       </div>
+      <div class="box wide" id="verified-accounts-box" style="display:none">
+        <h2>✅ Cuentas verificadas
+          <span class="sub">nunca más aparecen en "Partidas flagueadas", aunque el patrón siga viéndose raro</span>
+        </h2>
+        <div class="table-scroll"><table id="tbl-verified"><tbody></tbody></table></div>
+      </div>
     </section>
 
     <!-- ── INVITADOS (sin cuenta) ── -->
@@ -1008,6 +1014,7 @@ function render(data){
   renderVersusModes(data.versusByMode||{});
   renderVersusFunnel(data.versusFunnel||{}, rl);
   renderVersusTop((data.leaderboards||{}).versus||[]);
+  renderVerifiedAccounts(data.verifiedAccounts||[]);
   renderSocial(data.social||{});
   renderEconomy(data.economy||{}, rl);
   renderIntegrity(data.integrityFlags||[], rl);
@@ -1364,6 +1371,7 @@ function renderEconomy(e, rl){
     ['🪙', totalCoins.toLocaleString('es'), `Monedas acumuladas (${rl})`],
     ['✨', totalXp.toLocaleString('es'), `XP acumulado (${rl})`],
     ['📋', events.toLocaleString('es'), `Eventos registrados (${rl})`],
+    ['🏔️', (e.levelCap||100), 'Nivel máximo (tope duro)'],
     ['⚔️', (vc.grants||0).toLocaleString('es'), `Rondas versus premiadas (${vc.wins||0} W / ${vc.losses||0} L)`],
     ['🪙', (vc.coins||0).toLocaleString('es'), `Monedas por versus (${rl})`],
     ['✨', (vc.xp||0).toLocaleString('es'), `XP por versus — tope 10/día · ${vc.capHitUserDays||0} tope alcanzado`],
@@ -1383,8 +1391,24 @@ function renderEconomy(e, rl){
   const top = e.topEarners || [];
   if(!top.length){ tbT.innerHTML = '<tr><td class="empty">Sin datos todavía.</td></tr>'; }
   else {
-    tbT.innerHTML = '<tr><th>#</th><th>Jugador</th><th style="text-align:right">Monedas</th><th style="text-align:right">XP</th></tr>' +
-      top.map((r,i)=>`<tr><td><span class="rank-badge ${rankClass(i)}">${i+1}</span></td><td>${escapeHtml(r.username||'—')}</td><td class="n">${r.coins.toLocaleString('es')}</td><td class="n">${r.xp.toLocaleString('es')}</td></tr>`).join('');
+    tbT.innerHTML = '<tr><th></th><th>#</th><th>Jugador</th><th style="text-align:right">Monedas</th><th style="text-align:right">XP</th></tr>' +
+      top.map((r,i)=>{
+        const hist = r.history||[];
+        const rows = `<tr class="acc-row" data-idx="eco-${i}"><td><span class="caret">▶</span></td><td><span class="rank-badge ${rankClass(i)}">${i+1}</span></td><td>${escapeHtml(r.username||'—')}</td><td class="n">${r.coins.toLocaleString('es')}</td><td class="n">${r.xp.toLocaleString('es')}</td></tr>`;
+        const inner = hist.length
+          ? `<table><tr><th>Fecha</th><th>Fuente</th><th style="text-align:right">Monedas</th><th style="text-align:right">XP</th></tr>` +
+            hist.map(h=>`<tr><td style="white-space:nowrap">${new Date(h.created_at).toLocaleString('es')}</td><td>${ECONOMY_REASON_LABELS[h.reason]||escapeHtml(h.reason)}</td><td class="n">${h.coins.toLocaleString('es')}</td><td class="n">${h.xp.toLocaleString('es')}</td></tr>`).join('') +
+            `</table>`
+          : '<div class="empty">Sin detalle en este período.</div>';
+        const detail = `<tr class="acc-games" id="eco-games-eco-${i}"><td colspan="5"><div class="acc-games-inner table-scroll">${inner}</div></td></tr>`;
+        return rows + detail;
+      }).join('');
+    tbT.querySelectorAll('.acc-row').forEach(row=>{
+      row.addEventListener('click', ()=>{
+        row.classList.toggle('open');
+        document.getElementById('eco-games-'+row.dataset.idx)?.classList.toggle('open');
+      });
+    });
   }
 
   const tbRetro = $('tbl-economy-retro');
@@ -1428,15 +1452,56 @@ function renderIntegrity(flags, rl){
   }
   const tb = $('tbl-integrity');
   if(!flags.length){ tb.innerHTML = '<tr><td class="empty">Sin partidas flagueadas.</td></tr>'; return; }
-  tb.innerHTML = '<tr><th>Fecha</th><th>Jugador</th><th>Tipo</th><th style="text-align:right">Score</th><th>Motivo</th><th>Severidad</th></tr>' +
+  // Invitados (username tipo "Invitado (xxxx…)") no son una cuenta real —
+  // no hay nada que verify_account pueda marcar para ellos (busca por
+  // profiles.username), así que el botón solo se ofrece a cuentas reales.
+  const isGuestLabel = (u) => /^Invitado \(/.test(u||'');
+  tb.innerHTML = '<tr><th>Fecha</th><th>Jugador</th><th>Tipo</th><th style="text-align:right">Score</th><th>Motivo</th><th>Severidad</th><th></th></tr>' +
     flags.map(f=>{
       const fecha = new Date(f.created_at).toLocaleString('es');
       const tipo = INTEGRITY_TYPE_LABELS[f.type] || f.type;
       const sevPill = f.severity==='crit'
         ? '<span class="status-pill churned"><span class="dotstat"></span>🔴 Crítico</span>'
         : '<span class="status-pill stale"><span class="dotstat"></span>🟡 Revisar</span>';
-      return `<tr${f.severity==='crit'?' style="background:rgba(255,122,122,.08)"':''}><td style="white-space:nowrap">${fecha}</td><td>${escapeHtml(f.username||'—')}</td><td>${tipo}</td><td class="n">${f.score!=null?f.score.toLocaleString('es'):'—'}</td><td style="white-space:normal">${escapeHtml(f.reason)}</td><td>${sevPill}</td></tr>`;
+      const verifyBtn = isGuestLabel(f.username) ? '' :
+        `<button class="guest-link-btn verify-account-btn" data-username="${escapeHtml(f.username)}" title="Marcar esta cuenta como legítima — deja de aparecer acá">✅ Verificar</button>`;
+      return `<tr${f.severity==='crit'?' style="background:rgba(255,122,122,.08)"':''}><td style="white-space:nowrap">${fecha}</td><td>${escapeHtml(f.username||'—')}</td><td>${tipo}</td><td class="n">${f.score!=null?f.score.toLocaleString('es'):'—'}</td><td style="white-space:normal">${escapeHtml(f.reason)}</td><td>${sevPill}</td><td style="white-space:nowrap">${verifyBtn}</td></tr>`;
     }).join('');
+  tb.querySelectorAll('.verify-account-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>verifyAccount(btn.dataset.username, true));
+  });
+}
+
+function renderVerifiedAccounts(list){
+  const box = $('verified-accounts-box');
+  const tb = $('tbl-verified');
+  if(!list || !list.length){ box.style.display = 'none'; return; }
+  box.style.display = '';
+  tb.innerHTML = '<tr><th>Usuario</th><th>Verificada</th><th></th></tr>' +
+    list.map(v=>`<tr><td>${escapeHtml(v.username||'—')}</td><td>${v.verified_at?new Date(v.verified_at).toLocaleString('es'):'—'}</td>` +
+      `<td style="text-align:right"><button class="btn unverify-account-btn" data-username="${escapeHtml(v.username)}">Quitar verificación</button></td></tr>`).join('');
+  tb.querySelectorAll('.unverify-account-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>verifyAccount(btn.dataset.username, false));
+  });
+}
+
+async function verifyAccount(username, verify){
+  if(!username) return;
+  if(!confirm(verify
+    ? `¿Marcar a "${username}" como cuenta verificada? Va a dejar de aparecer en Partidas flagueadas.`
+    : `¿Quitarle la verificación a "${username}"? Puede volver a aparecer en Partidas flagueadas si su patrón sigue viéndose raro.`)) return;
+  try {
+    const res = await fetch(FN_URL, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'apikey':ANON, 'Authorization':'Bearer '+ANON },
+      body: JSON.stringify({ user:creds.user, pass:creds.pass, action: verify?'verify_account':'unverify_account', target_username: username }),
+    });
+    const json = await res.json().catch(()=>({}));
+    if(!res.ok || !json.ok) throw new Error(json.error || 'Error');
+    refresh();
+  } catch(e){
+    alert('No se pudo actualizar: ' + (e.message||e));
+  }
 }
 
 let guestsData = [];

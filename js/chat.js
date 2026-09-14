@@ -26,6 +26,37 @@ window.Chat = (() => {
   const CHAT_SPAM_WINDOW_MS = 5000; // ...within this window counts as "rapid fire"
   const CHAT_SPAM_COOLDOWN_MS = 10000;
 
+  // ── Profanity filter ──────────────────────────────────────────────────────
+  // Common Spanish/English swear words (and a few inflections) get replaced
+  // with asterisks — applied BEFORE storing (so direct_messages itself never
+  // has to hold the raw word) and again on render (covers anything already
+  // in the DB from before this filter existed).
+  const _PROFANITY_WORDS = [
+    // English
+    'fuck(?:ing|ed|er|s)?', 'shit(?:ty|s)?', 'bitch(?:es)?', 'assholes?', 'bastards?',
+    'cunts?', 'dick(?:head)?s?', 'pussy|pussies', 'niggers?', 'faggots?',
+    'sluts?', 'whores?', 'motherfuckers?', 'piss(?:ed|ing)?',
+    // Spanish (accented + unaccented variants, since \b doesn't reliably
+    // split on accented letters in JS regex)
+    'mierdas?', 'put[oa]s?', 'pendej[oa]s?', 'cabr[oó]n(?:es)?a?s?',
+    'vergas?', 'ching(?:ar|ando|ada|ado|on|ón|adera)', 'co[ñn]os?', 'jod(?:er|ido|ida|iendo)',
+    'gilipollas', 'maric[oó]n(?:es)?a?s?', 'culeros?', 'pinches?', 'carajos?',
+    'hijueputas?', 'hijos? de putas?', 'chingada madre',
+  ];
+  // Word boundary via lookaround instead of \b: \b in JS is based on \w,
+  // which does NOT include accented Latin letters (ñ, ó...) — a plain \b
+  // pattern would "split" inside words like "canción" and both under- and
+  // over-match. This custom boundary treats the full Latin-1 letter range as
+  // "word", so it only matches whole words.
+  const _WORD_CHARS = 'A-Za-zÀ-ÖØ-öø-ÿ';
+  const _PROFANITY_RE = new RegExp(
+    `(?<![${_WORD_CHARS}])(${_PROFANITY_WORDS.join('|')})(?![${_WORD_CHARS}])`,
+    'gi',
+  );
+  function censorProfanity(text) {
+    return String(text == null ? '' : text).replace(_PROFANITY_RE, (m) => '*'.repeat(m.length));
+  }
+
   function _myId() { return window._sbUserId || null; }
   function _T(k, d, vars) { return (typeof t === 'function') ? t(k, vars) : d; }
   function _fmtTime(iso) {
@@ -139,7 +170,7 @@ window.Chat = (() => {
     const statusTxt = _statusText(friend);
     const flagUrl = window.flagUrlForCountryCode?.(friend.country_code);
     const previewHtml = last
-      ? `<span class="loading-messages-preview">${_escapeHtml(last.sender_id === uid ? _T('chat.you', 'Tú: ') + last.content : last.content)}</span>`
+      ? `<span class="loading-messages-preview">${_escapeHtml(censorProfanity(last.sender_id === uid ? _T('chat.you', 'Tú: ') + last.content : last.content))}</span>`
       : `<span class="loading-messages-preview loading-messages-preview-empty">${_T('chat.noPreview', 'Sin mensajes todavía')}</span>`;
     row.innerHTML =
       `<div class="versus-friend-avatar-wrap"><img class="versus-friend-avatar" src="${friend.avatar || 'images/profilepic/ppdefault.png'}" draggable="false" oncontextmenu="return false"></div>` +
@@ -211,7 +242,7 @@ window.Chat = (() => {
       const mine = m.sender_id === uid;
       const cls = 'chat-bubble' + (m._pending ? ' is-pending' : '') + (m._failed ? ' is-failed' : '');
       return `<div class="chat-bubble-row ${mine ? 'mine' : 'theirs'}">` +
-        `<div class="${cls}">${_escapeHtml(m.content)}<span class="chat-bubble-time">${_fmtTime(m.created_at)}</span></div>` +
+        `<div class="${cls}">${_escapeHtml(censorProfanity(m.content))}<span class="chat-bubble-time">${_fmtTime(m.created_at)}</span></div>` +
       `</div>`;
     }).join('');
   }
@@ -342,7 +373,7 @@ window.Chat = (() => {
     if (now < _cooldownUntil) {
       const secs = Math.ceil((_cooldownUntil - now) / 1000);
       if (typeof window.showGlobalToast === 'function') {
-        window.showGlobalToast(_T('chat.cooldown', `Estás enviando mensajes muy rápido, esperá ${secs}s`, { secs }));
+        window.showGlobalToast(_T('chat.cooldown', `Demasiados mensajes, esperá ${secs}s`, { secs }));
       }
       return true;
     }
@@ -352,7 +383,7 @@ window.Chat = (() => {
       _cooldownUntil = now + CHAT_SPAM_COOLDOWN_MS;
       _sendTimestamps = []; // reset so it doesn't re-trigger every tick once the cooldown is already armed
       if (typeof window.showGlobalToast === 'function') {
-        window.showGlobalToast(_T('chat.cooldownStart', 'Estás enviando mensajes muy rápido, esperá 10s antes del próximo'));
+        window.showGlobalToast(_T('chat.cooldownStart', 'Demasiados mensajes seguidos, esperá 10s'));
       }
     }
     return false;
@@ -360,7 +391,10 @@ window.Chat = (() => {
 
   async function sendMessage(text) {
     const uid = _myId();
-    const content = (text || '').trim();
+    // Censored BEFORE it ever reaches _messages/direct_messages — so the raw
+    // word never round-trips through realtime to the other person's screen
+    // even for the instant before a render pass would have caught it.
+    const content = censorProfanity((text || '').trim());
     if (!uid || !_activeFriend || !content || !window.sb) return;
     if (_spamCooldownActive()) return;
     const tempId = 'tmp-' + Date.now();
