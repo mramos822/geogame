@@ -142,7 +142,22 @@ function showFinalScreen() {
 function buildFriendClouds(ranking, playerPos) {
   const container = document.getElementById('final-clouds5');
   if (!container) return;
+  // Invalidates any run from a PREVIOUS game still in flight (see the
+  // generation check in loop() below) — leaving mid-animation (common with a
+  // low rank: nothing to see, people bail before the ~10.5s trail finishes)
+  // used to leave this container's transition/rAF loop from that old run
+  // still live for the next game's clouds to inherit.
+  const myGen = (container._cloudsGen = (container._cloudsGen || 0) + 1);
   container.innerHTML = '';
+  // Snap back to "no transition" before setting anything below — if the
+  // previous run's `transform ANIM_DURms ease-out` transition (set further
+  // down) never got to finish (player hit "back" mid-flight, or mid-flight
+  // between games in the campaign), it was still attached to this SAME
+  // element. Without this reset, the very next line's transform assignment
+  // silently animated too, over the interrupted transition instead of
+  // jumping straight there — throwing off the whole entrance sequence for
+  // the next game (reported: "se reinicia mal" after a low-rank game).
+  container.style.transition = 'none';
   const CQW = window.STAGE_W / 100; // 1cqw in px (19.2 in the 1920 design)
   const STEP_X = 22 * CQW;  // px per position
   const STEP_Y = -11 * CQW; // px per position (2:1)
@@ -227,6 +242,7 @@ function buildFriendClouds(ranking, playerPos) {
   let loopActive = false;
   let loopStart  = null;
   function loop(ts) {
+    if (container._cloudsGen !== myGen) return; // superseded by a newer game's clouds
     if (!loopStart) loopStart = ts;
     const f = Math.min(1, (ts - loopStart) / ANIM_DUR);
     checkPassMath(easeOutQ(f));
@@ -236,11 +252,13 @@ function buildFriendClouds(ranking, playerPos) {
 
   // rAF so iOS commits the initial transform before the transition is added
   requestAnimationFrame(() => {
+    if (container._cloudsGen !== myGen) return;
     const tid = setTimeout(() => {
+      if (container._cloudsGen !== myGen) return;
       container.style.transition = `transform ${ANIM_DUR}ms ease-out`;
       container.style.transform  = `translate(${endX}px, ${endY}px)`;
       container.addEventListener('transitionend', () => {
-        container.style.transition = '';
+        if (container._cloudsGen === myGen) container.style.transition = '';
       }, { once: true });
       loopActive = true;
       requestAnimationFrame(loop);
@@ -258,6 +276,11 @@ function hideFinalScreen() {
   document.getElementById('final-confirm-back-wrap')?.classList.remove('visible');
   const c = document.getElementById('final-clouds5');
   if (c && c._animTid) { clearTimeout(c._animTid); c._animTid = null; }
+  // Invalidate this run's loop()/transitionend right away (see the
+  // generation check in buildFriendClouds) instead of waiting for the next
+  // game's buildFriendClouds call to do it — leaving mid-animation shouldn't
+  // keep a stray rAF loop chewing frames in the background.
+  if (c) c._cloudsGen = (c._cloudsGen || 0) + 1;
 }
 
 document.getElementById('final-confirm-back-wrap')?.addEventListener('click', () => {

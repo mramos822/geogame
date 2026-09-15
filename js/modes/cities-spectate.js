@@ -336,10 +336,16 @@ window.citiesSpectatorShowPregame = function (payload) {
     state.displayedScore = payload.campaignBaseAtStart;
     scoreValueEl.textContent = payload.campaignBaseAtStart.toLocaleString();
   }
-  let elapsedMs = (payload && typeof payload.startedAt === 'number') ? (Date.now() - payload.startedAt) : 0;
-  // Same clamp as flags/shapes: without it, clock skew or a late resend could
-  // inflate elapsedMs past the total 3-2-1 duration and jump STRAIGHT to onDone
-  // showing none of the count.
+  // Corrected by window._specClockOffsetMs() (see spectate.js): `startedAt`
+  // is stamped on the PLAYER's own clock, which two random devices routinely
+  // disagree on by whole seconds, not just network latency — without this,
+  // a spectator whose clock ran behind the player's saw the 3-2-1 skip
+  // straight to "1-GO" (reported: watching someone in Singapore).
+  const _specClockOffset = typeof window._specClockOffsetMs === 'function' ? window._specClockOffsetMs() : 0;
+  let elapsedMs = (payload && typeof payload.startedAt === 'number') ? (Date.now() - payload.startedAt + _specClockOffset) : 0;
+  // Same clamp as flags/shapes: without it, a late resend or a clock-offset
+  // estimate that's still off could inflate elapsedMs past the total 3-2-1
+  // duration and jump STRAIGHT to onDone showing none of the count.
   const _pregameTotalMs = PREGAME_STEPS.reduce((s, x) => s + x.hold, 0);
   if (elapsedMs > _pregameTotalMs - 400) elapsedMs = Math.max(0, _pregameTotalMs - 400);
   runPregameCountdown(() => {

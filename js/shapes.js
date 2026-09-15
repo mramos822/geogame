@@ -334,13 +334,17 @@ window.shapesSpectatorShowPregame = function (payload) {
   // If the spectator joined mid 3-2-1 (e.g. the real player is already on "1"),
   // payload.startedAt lets us compute how much passed and start right there
   // (number AND audio), instead of always showing "3" from zero.
-  let elapsedMs = (payload && typeof payload.startedAt === 'number') ? (Date.now() - payload.startedAt) : 0;
-  // Safeguard against clock skew between the real player's machine and this
-  // client's (Date.now() isn't guaranteed synced between two different
-  // computers) or against a late resend pushing the calc past the total 3-2-1
-  // duration — without this clamp, an inflated elapsedMs made runShapesPregame
-  // jump STRAIGHT to onDone showing none of the count (the reported
-  // "3-2-1-GO doesn't show").
+  // Corrected by window._specClockOffsetMs() (see spectate.js): `startedAt`
+  // is stamped on the PLAYER's own clock, which two random devices routinely
+  // disagree on by whole seconds, not just network latency — without this,
+  // a spectator whose clock ran behind the player's saw the 3-2-1 skip
+  // straight to "1-GO" (reported: watching someone in Singapore).
+  const _specClockOffset = typeof window._specClockOffsetMs === 'function' ? window._specClockOffsetMs() : 0;
+  let elapsedMs = (payload && typeof payload.startedAt === 'number') ? (Date.now() - payload.startedAt + _specClockOffset) : 0;
+  // Safeguard against a late resend pushing the calc past the total 3-2-1
+  // duration, or a clock-offset estimate that's still off — without this
+  // clamp, an inflated elapsedMs made runShapesPregame jump STRAIGHT to
+  // onDone showing none of the count (the reported "3-2-1-GO doesn't show").
   const _pregameTotalMs = (typeof SHAPES_PREGAME_STEPS !== 'undefined')
     ? SHAPES_PREGAME_STEPS.reduce((s, x) => s + x.hold, 0) : 3350;
   if (elapsedMs > _pregameTotalMs - 400) elapsedMs = Math.max(0, _pregameTotalMs - 400);

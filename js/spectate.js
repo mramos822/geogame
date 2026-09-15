@@ -43,6 +43,15 @@ window.SoloSpectate = (() => {
       .on('presence', { event: 'join' }, ({ key }) => {
         if (key && key.indexOf('spectator-') === 0) setTimeout(_resendStateTo, 150);
       })
+      // A spectator's clock-offset probe (see window.Spectate.watchSolo) —
+      // echo our own clock reading so they can work out the offset between
+      // our device's clock and theirs, instead of assuming they agree (they
+      // routinely don't, by whole seconds) when placing our 3-2-1-GO
+      // `startedAt` on their own timeline.
+      .on('broadcast', { event: 'specclocksync' }, ({ payload }) => {
+        if (!payload) return;
+        try { _channel.send({ type: 'broadcast', event: 'specclockpong', payload: { t0: payload.t0, t1: Date.now() } }); } catch (e) {}
+      })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') { try { await _channel.track({ t: Date.now() }); } catch (e) {} }
       });
@@ -323,6 +332,16 @@ window._specReportPregame = function (payload) {
     window.SoloSpectate.reportPregame(payload);
   }
 };
+// How far ahead (positive) or behind (negative) the SPECTATED device's clock
+// is from ours, in ms — see the _clockOffsetMs comment in window.Spectate.
+// Every mode's showPregame (globequizSpectatorShowPregame and friends) adds
+// this to `Date.now() - payload.startedAt` so the 3-2-1-GO starts at the
+// right step regardless of clock drift between the two devices, not just
+// network latency. 0 (no correction) before the first ping reply lands, or
+// for a lobby/group match (not wired up yet — same gap as before there).
+window._specClockOffsetMs = function () {
+  return (window.Spectate && typeof window.Spectate.getClockOffsetMs === 'function') ? window.Spectate.getClockOffsetMs() : 0;
+};
 window._specReportPostgame = function (payload) {
   if (window._vsActive && !window._lobbyActive && typeof window._vsReportPostgame === 'function') {
     window._vsReportPostgame(payload);
@@ -383,6 +402,47 @@ window.Spectate = (() => {
   let _onGqRoulette = null; // cb(payload) — GloboReto "Por turnos" ONLY: the roulette is about to spin (see VS.reportGqRouletteStart)
   let _onGqTyping = null; // cb(payload) — GloboReto "Por turnos" ONLY: live preview of what the current typer is writing (see VS.reportGqTyping)
 
+  // ── Clock-offset probe ──────────────────────────────────────────────────
+  // Every mode's `startedAt` in a 'pregame'/'round' payload is stamped with
+  // the PLAYED-BY device's own Date.now() — fine for that device's own
+  // animation, but a spectator on a different device computing
+  // `Date.now() - startedAt` is really computing (true elapsed) MINUS
+  // (however far the two devices' clocks disagree). Two random devices'
+  // clocks routinely disagree by whole seconds (not just network latency),
+  // which showed up as the 3-2-1-GO skipping straight to "1-GO" for a
+  // spectator watching someone whose clock ran ahead (reported: watching
+  // someone in Singapore). _clockOffsetMs estimates that disagreement via a
+  // tiny NTP-style ping/pong on the same channel (see _sendClockPings/
+  // _onClockPong) so callers (globequizSpectatorShowPregame and friends) can
+  // correct for it — see window._specClockOffsetMs below.
+  let _clockOffsetMs = 0;
+  let _clockOffsetBestRtt = Infinity;
+  function _resetClockOffset() { _clockOffsetMs = 0; _clockOffsetBestRtt = Infinity; }
+  function _onClockPong(payload) {
+    if (!payload || typeof payload.t0 !== 'number' || typeof payload.t1 !== 'number') return;
+    const now = Date.now();
+    const rtt = now - payload.t0;
+    if (rtt < 0 || rtt > 10000) return; // clock went backwards mid-flight, or a stale reply — discard
+    // Keep only the lowest-RTT sample: the tighter the round trip, the less
+    // room for asymmetric network delay to bias the estimate.
+    if (rtt < _clockOffsetBestRtt) {
+      _clockOffsetBestRtt = rtt;
+      _clockOffsetMs = payload.t1 - (payload.t0 + rtt / 2);
+    }
+  }
+  // 3 samples, a little spread out — takes the best (lowest-RTT) of them in
+  // _onClockPong. Fired right after the channel subscribes; by the time the
+  // real player's first 'pregame' arrives (they still have to get through
+  // their own splash screen first) at least one reply has usually landed.
+  function _sendClockPings(channel) {
+    for (let i = 0; i < 3; i++) {
+      setTimeout(() => {
+        if (!channel) return;
+        try { channel.send({ type: 'broadcast', event: 'specclocksync', payload: { t0: Date.now() } }); } catch (e) {}
+      }, i * 350);
+    }
+  }
+
   function _myId() { return window._sbUserId || null; }
 
   // Fetches the match. The RLS policy "matches_select_friends" decides
@@ -402,10 +462,12 @@ window.Spectate = (() => {
     _matchId = matchId;
     _match   = match;
     _watchOpts = opts || null;
+    _resetClockOffset();
 
     const uid = _myId();
     _channel = window.sb
       .channel('match-' + matchId, { config: { presence: { key: 'spectator-' + (uid || Math.random().toString(36).slice(2)) } } }) // not private — see vs.js _subscribe
+      .on('broadcast', { event: 'specclockpong' }, ({ payload }) => _onClockPong(payload))
       .on('postgres_changes', {
         event: 'UPDATE', schema: 'public', table: 'matches',
         filter: 'id=eq.' + matchId,
@@ -487,6 +549,7 @@ window.Spectate = (() => {
         if (status === 'SUBSCRIBED') {
           try { await _channel.track({ t: Date.now() }); } catch (e) {}
           if (_onSnapshot) _onSnapshot(_match);
+          _sendClockPings(_channel);
         }
       });
   }
@@ -520,10 +583,12 @@ window.Spectate = (() => {
     _isSolo  = true;
     _matchId = userId;
     _match   = { mode: null, score: 0, solo: true };
+    _resetClockOffset();
 
     const uid = _myId();
     _channel = window.sb
       .channel('solo-' + userId, { config: { presence: { key: 'spectator-' + (uid || Math.random().toString(36).slice(2)) } } }) // not private — see vs.js _subscribe; app-level _isFriendOf() still gates access
+      .on('broadcast', { event: 'specclockpong' }, ({ payload }) => _onClockPong(payload))
       // Same channel the real player sees (owner of 'solo-{userId}') — the
       // spectator also receives these presence events, so it can show how
       // many people are watching (this one included) without needing a
@@ -569,6 +634,7 @@ window.Spectate = (() => {
         if (status === 'SUBSCRIBED') {
           try { await _channel.track({ t: Date.now() }); } catch (e) {}
           if (_onSnapshot) _onSnapshot(_match);
+          _sendClockPings(_channel);
           // There's no DB snapshot for solo matches: if a few seconds in the
           // channel owner hasn't appeared in presence, they're not actually
           // playing (stale badge) — notify and close.
@@ -620,6 +686,7 @@ window.Spectate = (() => {
     watch,
     watchSolo,
     stop,
+    getClockOffsetMs: () => _clockOffsetMs,
     onSnapshot: cb => { _onSnapshot = cb; },
     onScore:    cb => { _onScore = cb; },
     onAnswer:   cb => { _onAnswer = cb; },

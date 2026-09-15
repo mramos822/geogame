@@ -212,6 +212,18 @@ window.VS = (() => {
       .on('broadcast', { event: 'gqtyping' }, ({ payload }) => {
         if (_onGqTyping && payload) _onGqTyping(payload);
       })
+      // A spectator's clock-offset probe (see window.Spectate in spectate.js):
+      // echo back OUR OWN clock reading so they can work out how far ahead/
+      // behind our device's clock is from theirs. Needed because the 3-2-1-GO
+      // `startedAt` a spectator gets is stamped with OUR Date.now(), and two
+      // random devices' clocks routinely disagree by whole seconds — without
+      // this a far-away spectator (reported: watching someone in Singapore)
+      // could see the countdown skip straight to "1-GO" even though it just
+      // started.
+      .on('broadcast', { event: 'specclocksync' }, ({ payload }) => {
+        if (!payload) return;
+        try { _channel.send({ type: 'broadcast', event: 'specclockpong', payload: { t0: payload.t0, t1: Date.now() } }); } catch (e) {}
+      })
       // Presence: detects tab close / connection loss of the opponent.
       .on('presence', { event: 'leave' }, ({ key }) => {
         // A spectator disconnecting (key 'spectator-{uid}', see

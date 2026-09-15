@@ -3497,8 +3497,14 @@
     // payload.startedAt is the same instant the real player started THEIR
     // countdown (see _specReportPregame in initGlobeQuiz) — if the spectator
     // connects mid-way, it starts at the right number instead of always
-    // from "3" (same criterion as citiesSpectatorShowPregame).
-    let elapsedMs = (payload && typeof payload.startedAt === 'number') ? Date.now() - payload.startedAt : 0;
+    // from "3" (same criterion as citiesSpectatorShowPregame). Corrected by
+    // window._specClockOffsetMs() since `startedAt` is stamped on the
+    // PLAYER's own clock, which doesn't necessarily agree with ours (see the
+    // long comment on _clockOffsetMs in spectate.js) — without it, a
+    // spectator whose clock ran behind the player's saw the 3-2-1 skip
+    // straight to "1-GO".
+    const offset = typeof window._specClockOffsetMs === 'function' ? window._specClockOffsetMs() : 0;
+    let elapsedMs = (payload && typeof payload.startedAt === 'number') ? (Date.now() - payload.startedAt + offset) : 0;
     if (elapsedMs < 0) elapsedMs = 0;
     runGqPregameCountdown(() => {}, elapsedMs);
   };

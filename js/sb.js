@@ -410,11 +410,28 @@ window.sbClaimFounderPack = async function(userId) {
 // is_top1 themselves): these two flags only gate which popup shows, they
 // don't grant anything by themselves (see protect_top1 in the DB, which only
 // guards is_top1/frame_code_before_top1/frame_code='0003').
+// Both callers (js/profile/profile-account.js) fire these off without
+// awaiting the result (the popup already closed optimistically by then) —
+// a single lost write used to leave the DB flag stuck true forever, so the
+// same "you lost Top 1" message resurfaced on a later, unrelated trigger
+// (login, or finishing a Gira Mundial — see final.js) even though it had
+// already been confirmed once (reported: "received it twice"). 3 attempts
+// with a short backoff covers a transient blip without adding real latency
+// to the common case (first attempt almost always succeeds).
+async function _sbRetryUpdate(userId, patch, attempts) {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const { error } = await sb.from('profiles').update(patch).eq('id', userId);
+      if (!error) return;
+    } catch (e) {}
+    if (i < attempts - 1) await new Promise(r => setTimeout(r, 500 * (i + 1)));
+  }
+}
 window.sbAckTop1Popup = async function(userId) {
-  await sb.from('profiles').update({ top1_popup_seen: true }).eq('id', userId);
+  await _sbRetryUpdate(userId, { top1_popup_seen: true }, 3);
 };
 window.sbAckTop1Lost = async function(userId) {
-  await sb.from('profiles').update({ top1_lost_pending: false }).eq('id', userId);
+  await _sbRetryUpdate(userId, { top1_lost_pending: false }, 3);
 };
 
 // Realtime watch on the logged-in user's OWN profile row for is_top1/
