@@ -1262,7 +1262,7 @@ function showCountryShape(country, ext1, ext2, startDelay) {
   clip.appendChild(img2);
 
 
-  const clipFadeTimeout = setTimeout(() => { clip.style.opacity = '1'; }, 3000 + startDelay);
+  const clipFadeTimeout = setTimeout(() => { clip.style.opacity = '1'; }, 2500 + startDelay);
   shapesCurrentImg = img; shapesCurrentImg2 = img2; shapesCurrentClip = clip;
   shapesCurrentClipFadeTimeout = clipFadeTimeout;
 
@@ -1326,7 +1326,7 @@ function showCountryShape(country, ext1, ext2, startDelay) {
     img.style.transform  = 'translate(-50%,-50%) rotate(-3.5deg) scaleX(1.072) scaleY(1.01) scale(0.52)';
     img2.style.transform = 'translate(-50%,-50%) scale(0.52)';
     shapesCurrentAnimTimeout = null;
-  }, 6000 + startDelay) : null;
+  }, 4000 + startDelay) : null;
   shapesCurrentAnimTimeout = animTimeout;
 
   const tagConfigs = [

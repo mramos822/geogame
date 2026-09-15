@@ -205,14 +205,14 @@ function slideTagIn(cityName, countryCode) {
 
   const dispCity = (typeof tCity === 'function') ? tCity(cityName) : cityName;
   setTagText(dispCity);
-  // Visual hint: after 5s with no answer, the country is revealed. It no longer
+  // Visual hint: after 3s with no answer, the country is revealed. It no longer
   // penalizes the score (see hintMult removed from the calc below) — just a
   // help, not a punishment.
   if (countryCode) {
     slideTagIn._countryTimer = setTimeout(() => {
       const countryName = (typeof getCityCountryName === 'function') ? getCityCountryName(countryCode) : countryCode;
       setTagText(`${dispCity}, ${countryName}`);
-    }, 5000);
+    }, 3000);
   }
 
   cityTagEl.style.visibility = 'hidden';
