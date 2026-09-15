@@ -104,6 +104,7 @@ const FLAG_COUNTRY_CONTINENT = {
   'Antigua y Barbuda':'america','Dominica':'america','Granada':'america',
   'San Cristóbal y Nieves':'america','Santa Lucía':'america',
   'San Vicente y las Granadinas':'america','Puerto Rico':'america',
+  'Groenlandia':'america',
   'Aruba':'america','Curazao':'america','Bermudas':'america','Islas Caimán':'america',
   'Islas Vírgenes Estadounidenses':'america','Islas Vírgenes Británicas':'america',
   'Montserrat':'america','Anguila':'america','Islas Turcas y Caicos':'america',

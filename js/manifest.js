@@ -570,6 +570,7 @@ window.ASSET_MANIFEST = {
     "images/flags/ghana.png",
     "images/flags/gibraltar.png",
     "images/flags/greece.png",
+    "images/flags/greenland.png",
     "images/flags/grenada.png",
     "images/flags/guam.png",
     "images/flags/guatemala.png",
