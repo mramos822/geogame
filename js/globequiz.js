@@ -2303,8 +2303,8 @@
   let _gqTurnsMyGuessCount = 0;
   let _gqTypingSendTimer = null; // throttles the live-typing broadcast (see the input listener in initGlobeQuiz)
 
-  // ── "Por turnos": per-turn countdown (15s → 0) + AFK auto-kick ────────────
-  const GQ_TURN_TIME_SECONDS = 15;
+  // ── "Por turnos": per-turn countdown (20s → 0) + AFK auto-kick ────────────
+  const GQ_TURN_TIME_SECONDS = 20;
   let _gqTurnTimerInterval = null;
   let _gqTurnSecondsLeft = GQ_TURN_TIME_SECONDS;
   // Wall-clock moment the CURRENT turn started, on THIS client's own clock.
@@ -2315,7 +2315,7 @@
   // other, so a multi-second clock skew between the two devices showed up
   // directly as a multi-second gap between the two displayed counters
   // (reported: "a mí me dan 13s, a mi rival 18s"). Each side now just starts
-  // its own 15s the moment IT learns the turn changed — the only remaining
+  // its own 20s the moment IT learns the turn changed — the only remaining
   // skew is real network latency (well under a second normally), not clock
   // drift.
   let _gqTurnStartedAt = 0;
@@ -2400,7 +2400,7 @@
     }, 2200);
   }
   // "Por turnos" ONLY: same notice box a real player sees when either side
-  // (them or the opponent) misses the 15s clock — reused as-is for a
+  // (them or the opponent) misses the 20s clock — reused as-is for a
   // spectator (see spectate.js's onGqTurnGuess), just with whichever name
   // applies already baked into `text`.
   window.globequizSpectatorShowTurnNotice = function (text) { _gqShowTurnNotice(text); };
@@ -2600,7 +2600,7 @@
   // Called once per launch/relaunch, right BEFORE globequizVsPrepareOpponentRow
   // (see the call order in vs.js). Hides the countdown widget right away —
   // it only reappears once the 3-2-1-GO ends (see initGlobeQuiz's onDone),
-  // showing the 15s per-turn clock instead of sitting there empty/idle
+  // showing the 20s per-turn clock instead of sitting there empty/idle
   // through the sync wait + roulette + countdown.
   window.globequizSetTurnsMode = function (isTurns) {
     _gqTurnsVariant = !!isTurns;
@@ -2626,7 +2626,7 @@
     if (input) input.disabled = !mine;
     if (btn) btn.classList.toggle('gq-disabled', !mine);
     if (row) row.classList.toggle('gq-locked', !mine);
-    // Every hand-off restarts the 15s clock, for BOTH sides (see
+    // Every hand-off restarts the 20s clock, for BOTH sides (see
     // _gqStartTurnTimer) — whether it's now mine or the opponent's. Always
     // from THIS client's own Date.now(); `startedAt` (the remote clock's
     // value, when the caller has it) is no longer used — see the comment on
@@ -2666,7 +2666,7 @@
     // (submitGuess() already does it locally for the answering side).
     stopAutoRotate();
     if (g.timeout) {
-      // They ran out of their 15s without answering — no country to show,
+      // They ran out of their 20s without answering — no country to show,
       // just pass the turn back to me.
       window.globequizSetMyTurn?.(true, g.turnStartedAt);
       _gqShowTurnNotice(t('gq.oppTimedOut', { name: (window._vsOpponent && window._vsOpponent.name) || 'Rival' }));
