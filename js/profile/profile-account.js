@@ -236,11 +236,11 @@
     closeModal();
     // Manual login (not session restore on reload, that goes through
     // _onSessionReady): if the account already qualified before (founder with at
-    // least 1 COMPLETE Gira Mundial — campaigns_completed, GlobeQuiz doesn't
-    // count), show it as soon as this modal closes onto the menu — same rule as
-    // _onSessionReady.
+    // least 1 COMPLETE Gira Mundial — campaigns_completed — or at least 1
+    // GloboReto — gq_streak_count), show it as soon as this modal closes onto
+    // the menu — same rule as _onSessionReady.
     const p = window._sbProfile;
-    if (p && p.is_founder && !p.founder_popup_seen && (p.campaigns_completed || 0) > 0) {
+    if (p && p.is_founder && !p.founder_popup_seen && ((p.campaigns_completed || 0) > 0 || (p.gq_streak_count || 0) > 0)) {
       setTimeout(() => { if (typeof window.showFounderWelcomePopup === 'function') window.showFounderWelcomePopup(); }, 500);
     }
   });
@@ -893,14 +893,16 @@ async function _onSessionReady(userId) {
     if (typeof loadFriends === 'function') loadFriends();  // populate the ingame bar with real friends
     _updateProfileBtnLabel();
     // Founder popup: does NOT fire on login alone — needs at least 1 COMPLETE
-    // Gira Mundial played (campaigns_completed > 0; GlobeQuiz does NOT count).
-    // If the account already qualified before (played before this popup
-    // existed), it shows here on reaching the menu. With 0 Giras Mundiales it
-    // doesn't show here — eligibility begins on finishing the first Gira
-    // Mundial and returning to the menu (see window._pendingFounderPopupCheck,
+    // Gira Mundial played (campaigns_completed > 0) OR at least 1 GloboReto
+    // played ever (gq_streak_count > 0 — set the first time updateStreak()
+    // runs in js/globequiz.js, never reset back to 0). If the account already
+    // qualified before (played before this popup existed), it shows here on
+    // reaching the menu. With neither, it doesn't show here — eligibility
+    // begins on finishing the first Gira Mundial (window._pendingFounderPopupCheck,
     // set in the campaign-complete branch of this file and consumed in
-    // js/final.js on return to the menu).
-    if (profile.is_founder && !profile.founder_popup_seen && (profile.campaigns_completed || 0) > 0) {
+    // js/final.js) or the first GloboReto (checked in quitToMenu(), js/modes/
+    // mapgame-core.js) and returning to the menu.
+    if (profile.is_founder && !profile.founder_popup_seen && ((profile.campaigns_completed || 0) > 0 || (profile.gq_streak_count || 0) > 0)) {
       setTimeout(() => { if (typeof window.showFounderWelcomePopup === 'function') window.showFounderWelcomePopup(); }, 800);
     }
     // Top 1 popups: no campaigns_completed gate like Founder — is_top1 can

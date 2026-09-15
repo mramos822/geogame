@@ -124,6 +124,17 @@ function quitToMenu() {
   if (typeof window.replayEntranceAnimations === 'function') window.replayEntranceAnimations();
   if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
   if (typeof window.refreshIngamePower === 'function') window.refreshIngamePower();
+  // Founder popup: the Gira Mundial path is checked in js/final.js
+  // (window._pendingFounderPopupCheck). This is the equivalent for GlobeQuiz
+  // (GloboReto), which returns to the menu through here instead — eligibility
+  // is gq_streak_count > 0 (set by updateStreak() in js/globequiz.js the first
+  // time a match is finished, see the shared gate in js/profile/profile-account.js).
+  {
+    const p = window._sbProfile;
+    if (p && p.is_founder && !p.founder_popup_seen && (p.gq_streak_count || 0) > 0 && typeof window.showFounderWelcomePopup === 'function') {
+      setTimeout(() => window.showFounderWelcomePopup(), 500);
+    }
+  }
 }
 window.quitToMenu = quitToMenu;
 

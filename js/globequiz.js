@@ -2307,12 +2307,17 @@
   const GQ_TURN_TIME_SECONDS = 15;
   let _gqTurnTimerInterval = null;
   let _gqTurnSecondsLeft = GQ_TURN_TIME_SECONDS;
-  // Wall-clock moment the CURRENT turn started — shared between both clients
-  // (carried in the turn-pass payload, see submitGuess/_gqHandleMyTimeout/
-  // globequizReceiveOpponentTurnGuess) so both compute the countdown from the
-  // SAME reference instant instead of each starting its own 15s the moment
-  // ITS side found out — that used to skew the waiting side's clock by
-  // however long the broadcast took to arrive.
+  // Wall-clock moment the CURRENT turn started, on THIS client's own clock.
+  // A `turnStartedAt` used to be carried across the wire (see submitGuess/
+  // _gqHandleMyTimeout/globequizReceiveOpponentTurnGuess) so both sides would
+  // count down from the "same" instant — but that instant was measured on
+  // whichever device sent it, and phone/PC clocks aren't synced to each
+  // other, so a multi-second clock skew between the two devices showed up
+  // directly as a multi-second gap between the two displayed counters
+  // (reported: "a mí me dan 13s, a mi rival 18s"). Each side now just starts
+  // its own 15s the moment IT learns the turn changed — the only remaining
+  // skew is real network latency (well under a second normally), not clock
+  // drift.
   let _gqTurnStartedAt = 0;
   // My own consecutive timeouts (no real guess submitted before the clock hit
   // 0) — reset to 0 on any real guess of mine (see submitGuess). Two in a row
@@ -2358,13 +2363,14 @@
       if (window._gqMyTurn) _gqHandleMyTimeout();
     }
   }
-  // Called every time the turn changes (see globequizSetMyTurn). `startedAt`
-  // (shared wall-clock ms) is optional — falls back to "now" for the very
-  // first turn of a round, whose simultaneity already comes from the 3-2-1
-  // GO itself (see the sync-gate comments in vs.js).
-  function _gqStartTurnTimer(startedAt) {
+  // Called every time the turn changes (see globequizSetMyTurn). Always
+  // starts from THIS client's own "now" — see _gqTurnStartedAt above for why
+  // a cross-device timestamp isn't used any more. The `startedAt` argument
+  // some callers still pass along (leftover from the old broadcast payload)
+  // is intentionally ignored.
+  function _gqStartTurnTimer() {
     _gqStopTurnTimer();
-    _gqTurnStartedAt = startedAt || Date.now();
+    _gqTurnStartedAt = Date.now();
     _gqTurnSecondsLeft = GQ_TURN_TIME_SECONDS + 1; // force the first poll to paint
     _gqSetCountdownIconRed(false);
     _gqTickTurnTimer();
@@ -2621,10 +2627,11 @@
     if (btn) btn.classList.toggle('gq-disabled', !mine);
     if (row) row.classList.toggle('gq-locked', !mine);
     // Every hand-off restarts the 15s clock, for BOTH sides (see
-    // _gqStartTurnTimer) — whether it's now mine or the opponent's.
-    // `startedAt` (shared wall-clock ms, when the caller has it) keeps both
-    // clients counting down from the exact same instant.
-    if (_gqTurnsVariant) _gqStartTurnTimer(startedAt);
+    // _gqStartTurnTimer) — whether it's now mine or the opponent's. Always
+    // from THIS client's own Date.now(); `startedAt` (the remote clock's
+    // value, when the caller has it) is no longer used — see the comment on
+    // _gqTurnStartedAt for why.
+    if (_gqTurnsVariant) _gqStartTurnTimer();
     if (mine) {
       // A disabled input can't hold focus — re-focus it now that it's mine,
       // so I can start typing (and Enter-to-submit works) without having to

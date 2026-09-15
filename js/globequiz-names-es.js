@@ -77,6 +77,7 @@ window.GQ_NAMES_ES = {
   'Georgia': 'Georgia',
   'Germany': 'Alemania',
   'Ghana': 'Ghana',
+  'Gibraltar': 'Gibraltar',
   'Greece': 'Grecia',
   'Greenland': 'Groenlandia',
   'Grenada': 'Granada',
