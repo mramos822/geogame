@@ -18,6 +18,22 @@ window.hideGameoverConfirm = function () {
   if (w) w.classList.remove('confirm-ready');
 };
 
+// Closes every menu "table" panel (rankings, social, friend profile,
+// customize, add-friend, blocked, sent-requests) — called right when a 1v1
+// or group match actually starts (_launchVersus in vs.js, and each mode's
+// launch in lobby.js), which is when #loading-screen itself gets hidden.
+// Without this, a panel left open BEHIND the loading screen when the match
+// started stayed open (never closed, since the match teardown/game itself
+// never touches these) and was still there — on top of the main menu — the
+// next time #loading-screen came back after the match ended (reported).
+window.closeAllLoadingPanels = function () {
+  ['loading-table-group', 'loading-customize-group', 'loading-rankings-group',
+   'loading-social-group', 'loading-friend-group', 'loading-addfriend-group',
+   'loading-blocked-group', 'loading-sent-group'].forEach(id => {
+    document.getElementById(id)?.classList.add('table-gone');
+  });
+};
+
 // Show/hide the pre-game splash confirm.
 window.showSplashConfirm = function () {
   const w = document.querySelector('.splash-confirm-wrap');

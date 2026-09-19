@@ -966,7 +966,10 @@ window.refreshVsSpectatorBadge = function (n) {
     amigos:    () => T('versus.subtitle', 'Reta a un amigo conectado'),
     grupo:     () => T('versus.subGroup', 'Sala privada de hasta 10 jugadores'),
     aleatorio: () => T('versus.subRandom', 'Únete a una sala pública'),
-    lobby:     () => T('versus.subLobby', 'Sala de juego'),
+    // Vacío a propósito: el nombre real de la sala (+ ajustes de GloboReto +
+    // botones de renombrar/ajustes) ocupa ese lugar visual, ver
+    // #lobby-name-row en play/index.html / _refreshLobbyName en lobby.js.
+    lobby:     () => '',
   };
   // Navigation stack for the "back" button
   let _versusStack = ['root'];
@@ -2563,6 +2566,18 @@ window.refreshVsSpectatorBadge = function (n) {
           setTimeout(() => {
             overlay.style.display = 'none';
             content.classList.remove('gq-roulette-out');
+            // Guard: this whole chain is ~4-5s of nested setTimeouts
+            // (POPIN+SPIN+HOLD+POPOUT) — if the duel ended (opponent
+            // abandoned, or the match itself finished) WHILE the wheel was
+            // still spinning, teardown/globequizHardReset already ran and
+            // paused sfxCountdown by the time we get here. Calling onDone()
+            // anyway chained straight into runGqPregameCountdown(), which
+            // starts sfxCountdown.play() FRESH — nothing left running to
+            // stop it, so it kept playing right over the menu (the reported
+            // "el countdown no se silencia" after a 1v1 'por turnos' duel).
+            // A spectator (`identity` set) has no window._vsActive of its
+            // own to check, so it's exempt from this guard.
+            if (!identity && !window._vsActive) return;
             onDone();
           }, GQ_ROULETTE_POPOUT_MS);
         }, GQ_ROULETTE_REVEAL_HOLD_MS);
@@ -3219,6 +3234,7 @@ window.refreshVsSpectatorBadge = function (n) {
     document.getElementById('loading-screen').style.display      = 'none';
     document.getElementById('loading-versus-group')?.classList.add('table-gone');
     document.getElementById('loading-versus-group')?.classList.remove('panel-visible');
+    if (typeof window.closeAllLoadingPanels === 'function') window.closeAllLoadingPanels();
     document.getElementById('splash-screen').style.display       = 'none';
     document.getElementById('vs-outgoing-popup').style.display   = 'none';
     document.getElementById('vs-incoming-popup').style.display   = 'none';

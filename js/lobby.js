@@ -92,6 +92,14 @@ window.LB = (() => {
   let _onTimesUp    = null;  // {uid}
   let _onSplash     = null;  // {uid, ...payload} — a member is on the instructions
   let _onAdvancing  = null;  // {uid} — a member confirmed leaving the postgame toward the next mode
+  // Generic pass-through channel for GloboReto's group round protocol (see
+  // globequiz.js) — solved/rank/countdown/nextround, all tagged with
+  // whatever fields that mode needs. Kept generic (not five named events
+  // like sendRound/sendTick/etc above) because this protocol is private to
+  // one mode and doesn't need its own public LB.* surface.
+  let _onGq         = null;  // {t: 'solved'|'rank'|'countdown'|'nextround', ...payload}
+  let _onReadyMember = null; // uid — a member reported ready for the pre-match sync panel
+  let _onLaunchGo    = null; // the host says everyone's accounted for, actually launch now
   let _resubTime    = 0;     // timestamp of the last _subscribe(); guard against false kicks
   const _pendingKicks = new Set(); // members who disconnected during the match
   // uids whose NEXT presence 'leave' is expected/intentional (see
@@ -231,6 +239,18 @@ window.LB = (() => {
       .on('broadcast', { event: 'expectleave' }, ({ payload }) => { if (payload && payload.uid) _expectedLeaves.add(payload.uid); })
       // Synced countdown (ephemeral, doesn't touch the DB)
       .on('broadcast', { event: 'cd' },       ({ payload }) => { if (_onCountdown) _onCountdown(payload || {}); })
+      // Clock-offset probe (see _sendHostClockPings' own comment) — only the
+      // HOST answers a ping, and only the pinger's own pong (matched by
+      // `from`) updates their estimate, so N guests pinging at once never
+      // cross-contaminate each other's offset.
+      .on('broadcast', { event: 'clockping' }, ({ payload }) => {
+        if (payload && typeof payload.t0 === 'number' && window.LB.isHost()) {
+          try { _channel.send({ type: 'broadcast', event: 'clockpong', payload: { t0: payload.t0, from: payload.from, t1: Date.now() } }); } catch (e) {}
+        }
+      })
+      .on('broadcast', { event: 'clockpong' }, ({ payload }) => {
+        if (payload && payload.from === uid) _onHostClockPong(payload);
+      })
       .on('broadcast', { event: 'cancel' },   () => { if (_onCancel) _onCancel(); })
       .on('broadcast', { event: 'notready' }, ({ payload }) => { if (_onNotReady) _onNotReady(payload || {}); })
       .on('broadcast', { event: 'wrong' },      ({ payload }) => { if (_onWrong) _onWrong(payload?.uid || null); })
@@ -246,6 +266,7 @@ window.LB = (() => {
         if (_lobby && payload) {
           if (payload.mode)  _lobby.mode  = payload.mode;
           if (payload.modes !== undefined) _lobby.modes = payload.modes;
+          if (payload.config !== undefined) _lobby.config = payload.config;
         }
         if (_onModes) _onModes(payload?.modes || [payload?.mode || 'flags'], !!payload?.changed);
       })
@@ -276,6 +297,25 @@ window.LB = (() => {
       .on('broadcast', { event: 'timesup' },   ({ payload }) => { if (payload && _onTimesUp) _onTimesUp(payload); })
       .on('broadcast', { event: 'splash' },    ({ payload }) => { if (payload && _onSplash) _onSplash(payload); })
       .on('broadcast', { event: 'advancing' }, ({ payload }) => { if (payload && _onAdvancing) _onAdvancing(payload); })
+      .on('broadcast', { event: 'gq' },        ({ payload }) => { if (payload && _onGq) _onGq(payload); })
+      // A GroupSpectate viewer just connected/switched POV to ME and asked
+      // for my CURRENT state live (see sendStateRequest in spectate.js) —
+      // the persisted live_state their _fetchMembers seeded from is a
+      // fire-and-forget async UPDATE on every sendRound/sendPregame, so it
+      // can still reflect an OLDER round if several passed in quick
+      // succession right as they connected (the reported "players are on
+      // round 3, the spectator shows round 2 until the next round starts").
+      // Re-sending through the normal sendRound/sendPregame/etc functions
+      // both closes that race live AND refreshes the stale DB snapshot for
+      // next time.
+      .on('broadcast', { event: 'staterequest' }, ({ payload }) => { if (payload && payload.targetUid === _myId()) _resendMyState(); })
+      // Pre-match sync panel (see _runLobbySyncGate in lobby.js's Lobby
+      // module) — each member reports 'lready' once their local preload for
+      // the about-to-start mode resolves; the host alone decides 'llaunchgo'
+      // (all ready, or its 15s timeout kicked whoever wasn't) and every
+      // client (host included) waits for THAT before actually launching.
+      .on('broadcast', { event: 'lready' },    ({ payload }) => { if (payload && _onReadyMember) _onReadyMember(payload.uid); })
+      .on('broadcast', { event: 'llaunchgo' }, () => { if (_onLaunchGo) _onLaunchGo(); })
       // Any member change (join/leave/score) → re-query the room. _fetchMembers
       // detects if I was kicked (no longer in the list). We don't filter by
       // lobby_id on the client because the DELETE payload doesn't always carry the columns.
@@ -285,7 +325,13 @@ window.LB = (() => {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lobbies',
         filter: 'id=eq.' + lid }, payload => {
         if (!payload.new) return;
+        // Host migration — the offset probed against the OLD host no longer
+        // means anything once a DIFFERENT client starts stamping `until`.
+        // _hostId updated FIRST — _sendHostClockPings' own isHost() check
+        // must see the NEW host, not the stale one.
+        const _hostChanged = payload.new.host_id !== _hostId;
         _hostId = payload.new.host_id;
+        if (_hostChanged) _sendHostClockPings();
         _lobby  = payload.new;
         // Only launch the game if the seed changed (a host_id change must not relaunch)
         if (payload.new.status === 'active' && _onStart && payload.new.seed !== _seed) { _seed = payload.new.seed; _onStart(payload.new); }
@@ -375,6 +421,7 @@ window.LB = (() => {
       .subscribe(async (status) => {
         if (status !== 'SUBSCRIBED') return;
         try { await _channel.track({ uid: uid, t: Date.now() }); } catch (e) {}
+        _sendHostClockPings();
         // Give 5s for everyone connected to track presence, then purge the absent
         const snapLobbyId = _lobbyId;
         setTimeout(async () => {
@@ -684,7 +731,7 @@ window.LB = (() => {
   function sendFinished(score)  { _bcast('finished', { uid: _myId(), score }); }
   function sendReveal(revealAt, isFinal) { _bcast('reveal', { revealAt, isFinal: !!isFinal }); }
   function sendScore(score)     { _bcast('lbscore',  { uid: _myId(), score }); }
-  function sendModes(modes, changed = true) { _bcast('modes', { modes, mode: modes && modes.length > 1 ? modes.join('+') : ((modes && modes[0]) || 'flags'), changed: !!changed }); }
+  function sendModes(modes, changed = true, config) { _bcast('modes', { modes, mode: modes && modes.length > 1 ? modes.join('+') : ((modes && modes[0]) || 'flags'), config, changed: !!changed }); }
 
   // ── Persisted live state (see group_live_state.sql) ───────────────────────
   // Same mechanism as _persistLiveState in vs.js (1v1): without this, a
@@ -723,6 +770,30 @@ window.LB = (() => {
     };
     window.sb.from('lobby_members').update({ live_state: snapshot }).eq('lobby_id', _lobbyId).eq('user_id', _myId()).then(() => {}, () => {});
   }
+  // Answers a 'staterequest' (see the listener above) by re-broadcasting
+  // whatever phase I'm currently in, live — same criterion/order as
+  // SoloSpectate._resendStateTo (spectate.js), the analogous fix already in
+  // place for the solo/1v1 path.
+  function _resendMyState() {
+    if (_lastPhase === 'postgame' && _lastPostgamePayload) { sendPostgame(_lastPostgamePayload); return; }
+    if (_lastPhase === 'pregame' && _lastPregamePayload) {
+      if (_lastRoundPayload) sendRound(_lastRoundPayload);
+      sendPregame(_lastPregamePayload);
+      return;
+    }
+    if (_lastPhase === 'round' && _lastRoundPayload) { sendRound(_lastRoundPayload); }
+    else if (_lastPhase === 'timesup') { sendTimesUp(); }
+    // GlobeQuiz group only: also resend the CURRENT round's already-made
+    // guesses/win — a spectator who exits and re-enters (or reconnects)
+    // wipes its whole in-memory cache of everyone's progress (see stop() in
+    // spectate.js's GroupSpectate) and had no way to recover it other than
+    // waiting for each member's NEXT live guess (the reported "leaving and
+    // coming back loses the whole record of the rest").
+    if (typeof window._gqGroupSnapshotForResend === 'function') {
+      const snap = window._gqGroupSnapshotForResend();
+      if (snap) sendGqGuesses(snap);
+    }
+  }
 
   // ── Round-by-round broadcast for GroupSpectate (see the _on* above) ───────────
   // Same pattern as VS.reportRound/reportTick/etc (vs.js), but tagged by uid
@@ -753,6 +824,23 @@ window.LB = (() => {
   function sendTimesUp()          { _lastPhase = 'timesup'; _finishedFlag = true; _bcast('timesup', { uid: _myId() }); _persistLiveState(); }
   function sendSplash(payload)    { _lastPhase = 'splash'; _finishedFlag = false; _bcast('splash', { uid: _myId(), ...(payload || {}) }); _persistLiveState(); }
   function sendAdvancing()        { _bcast('advancing', { uid: _myId() }); }
+  function sendGq(payload)        { _bcast('gq', payload || {}); }
+  // Pre-match sync panel (see _runLobbySyncGate) — reported by EVERY member
+  // once their local preload resolves; only the host acts on it (tracks
+  // who's in, kicks stragglers on timeout, decides sendLaunchGo).
+  function sendReady()            { _bcast('lready', { uid: _myId() }); }
+  // Host-only in practice (see _runLobbySyncGate), but not enforced here —
+  // same trust model as sendModes/setGloboretoConfig (host-only by
+  // convention, not by a server-side check).
+  function sendLaunchGo()         { _bcast('llaunchgo', {}); }
+  // Bulk snapshot of GlobeQuiz group's CURRENT round guesses — answers a
+  // 'staterequest' (see _resendMyState) alongside the round/pregame resend,
+  // so a spectator who exits and re-enters (or reconnects) gets caught up
+  // on everything already typed instead of losing it until the next live
+  // guess (the reported "leaving and re-entering spectate loses the whole
+  // record of the rest"). Unlike sendAnswer, this never plays a live
+  // animation/sfx on the receiving end — a pure catch-up snapshot.
+  function sendGqGuesses(snapshot) { _bcast('gqguesses', { uid: _myId(), ...(snapshot || {}) }); }
 
   async function setModes(modes) {
     if (!isHost() || !_lobbyId) return;
@@ -769,6 +857,25 @@ window.LB = (() => {
     if (_lobby) { _lobby.mode = modeEncoded; _lobby.modes = modes; }
     sendModes(modes);
     _sendRoomUpdate({ id: _lobbyId });
+  }
+
+  // GloboReto grupal: variante ('globequiz'/'globequiz_turns') + ajustes del
+  // host (rondas, tiempo de respuesta por turno) — persistidos en la MISMA
+  // fila de lobbies (columna jsonb `config`, ver migration
+  // add_lobbies_config_column) y sincronizados por el mismo broadcast 'modes'
+  // que usan setModes/sendModes (payload.config, ver el listener de arriba).
+  async function setGloboretoConfig(variant, config) {
+    if (!isHost() || !_lobbyId) return;
+    const cfg = { rounds: (config && config.rounds) || 5, turnTime: (config && config.turnTime) || 20 };
+    const { error } = await window.sb.from('lobbies').update({ mode: variant, modes: [variant], config: cfg }).eq('id', _lobbyId);
+    if (error) await window.sb.from('lobbies').update({ mode: variant, config: cfg }).eq('id', _lobbyId);
+    if (_lobby) { _lobby.mode = variant; _lobby.modes = [variant]; _lobby.config = cfg; }
+    sendModes([variant], true, cfg);
+    _sendRoomUpdate({ id: _lobbyId });
+  }
+  function getGloboretoConfig() {
+    const cfg = (_lobby && _lobby.config) || {};
+    return { rounds: cfg.rounds || 5, turnTime: cfg.turnTime || 20 };
   }
 
   function getModes() {
@@ -856,7 +963,7 @@ window.LB = (() => {
     _aloneCalledThisGame = false;
     _lobbyId = _hostId = _lobby = _seed = null;
     _members = [];
-    _onMembers = _onStart = _onClosed = _onCountdown = _onCancel = _onNotReady = _onWrong = _onVisibility = _onName = _onModes = _onFinished = _onScore = _onPlayerGone = _onPlayerBack = _onAlone = null;
+    _onMembers = _onStart = _onClosed = _onCountdown = _onCancel = _onNotReady = _onWrong = _onVisibility = _onName = _onModes = _onFinished = _onScore = _onPlayerGone = _onPlayerBack = _onAlone = _onGq = _onReadyMember = _onLaunchGo = null;
   }
 
   // Releases ONLY this client's realtime connection to the 'lobby-{id}'
@@ -905,8 +1012,9 @@ window.LB = (() => {
   return {
     create, joinByCode, joinById, leave, kick, start, reportScore, listPublic, cleanup, releaseChannel, markExpectedLeave,
     sendCountdown, sendCancel, sendNotReady, sendWrong, sendVisibility, sendName, sendFinished, sendReveal, sendScore, setPublic, isPublic, restoreActive, transferHost, cleanupMine,
-    sendRound, sendTick, sendPregame, sendPostgame, sendAnswer, sendTimesUp, sendSplash, sendAdvancing,
-    sendInvite, listenForInvites, setName, getName, setModes, getModes, sendModes,
+    sendRound, sendTick, sendPregame, sendPostgame, sendAnswer, sendTimesUp, sendSplash, sendAdvancing, sendGq, sendGqGuesses,
+    sendReady, sendLaunchGo,
+    sendInvite, listenForInvites, setName, getName, setModes, getModes, sendModes, setGloboretoConfig, getGloboretoConfig,
     isHost, getMembers, getLobby, getCode, getId, getSeed,
     refreshMembers: () => _fetchMembers(),
     // _subscribe() alone only resumes LISTENING for future changes — it
@@ -960,6 +1068,15 @@ window.LB = (() => {
     onPlayerBack: cb => { _onPlayerBack = cb; },
     onAlone:      cb => { _onAlone = cb; if (cb) _aloneCalledThisGame = false; },
     resetAloneGuard: () => { _aloneCalledThisGame = false; },
+    // Fires _onAlone right away from the real-time lobby_members diff (see
+    // the onMembers handler in _startMode) instead of waiting for the
+    // presence-leave path's ACTIVE_GAME_GRACE_MS timer — same guard so it
+    // still only fires once per match however it gets triggered.
+    triggerAlone: () => {
+      if (_aloneCalledThisGame) return;
+      _aloneCalledThisGame = true;
+      if (_onAlone) _onAlone();
+    },
     onRound:      cb => { _onRound = cb; },
     onTick:       cb => { _onTick = cb; },
     onPregame:    cb => { _onPregame = cb; },
@@ -968,6 +1085,9 @@ window.LB = (() => {
     onTimesUp:    cb => { _onTimesUp = cb; },
     onSplash:     cb => { _onSplash = cb; },
     onAdvancing:  cb => { _onAdvancing = cb; },
+    onGq:         cb => { _onGq = cb; },
+    onReadyMember: cb => { _onReadyMember = cb; },
+    onLaunchGo:    cb => { _onLaunchGo = cb; },
   };
 })();
 
@@ -1161,6 +1281,49 @@ window.Lobby = (() => {
   let _intermediateTimer = null;
   let _pendingModesOrder = []; // picker state before saving
   let _savedLobbyModes  = []; // modes confirmed by broadcast; more reliable than the DB at start
+  let _lastEnteredLobbyId = null; // see enterLobby's own reset guard below
+
+  // ── Clock-offset probe (host ↔ me) ──────────────────────────────────────────
+  // `until` in a 'cd' broadcast (sendCountdown) is stamped with the HOST's own
+  // Date.now() + 10000 — every guest computing `until - Date.now()` against
+  // THEIR OWN clock is really computing (true remaining time) MINUS (however
+  // far their clock disagrees with the host's). Two devices' clocks can
+  // easily disagree by several whole seconds (worse across long distances/
+  // different countries, not really about network latency itself) — this
+  // showed up as the countdown starting from something other than 10
+  // depending on the guest's own clock, and freezing at 0 for a while (their
+  // clock ran BEHIND the host's) or skipping past 0 straight into the match
+  // (their clock ran AHEAD) instead of respecting the full 10s for everyone
+  // (reported: "depende de la ubicacion... Peru Singapur USA, algunos se
+  // quedan en 0 un rato y otros ni llega a 0"). Same NTP-style ping/pong
+  // pattern already used for the exact same reason in spectate.js
+  // (_clockOffsetMs there — "reported: watching someone in Singapore").
+  let _hostClockOffsetMs = 0;
+  let _hostClockOffsetBestRtt = Infinity;
+  function _onHostClockPong(payload) {
+    if (!payload || typeof payload.t0 !== 'number' || typeof payload.t1 !== 'number') return;
+    const now = Date.now();
+    const rtt = now - payload.t0;
+    if (rtt < 0 || rtt > 10000) return;
+    if (rtt < _hostClockOffsetBestRtt) {
+      _hostClockOffsetBestRtt = rtt;
+      _hostClockOffsetMs = payload.t1 - (payload.t0 + rtt / 2);
+    }
+  }
+  // 3 samples, spread out — the host alone answers (see the 'clockping'
+  // listener on _channel), so every guest's estimate is specifically against
+  // the ONE clock that actually stamped `until`. A no-op for the host itself
+  // (isHost() guard) — their own clock IS the reference, nothing to correct.
+  function _sendHostClockPings() {
+    if (!_channel || window.LB.isHost()) return;
+    _hostClockOffsetMs = 0; _hostClockOffsetBestRtt = Infinity;
+    for (let i = 0; i < 3; i++) {
+      setTimeout(() => {
+        if (!_channel) return;
+        try { _channel.send({ type: 'broadcast', event: 'clockping', payload: { t0: Date.now(), from: _myId() } }); } catch (e) {}
+      }, i * 350);
+    }
+  }
 
   // ── Start countdown (10s, cancelable) ────────────────────────────────────────
   let _counting = false;
@@ -1215,7 +1378,10 @@ window.Lobby = (() => {
     _applyCountdownButtons(true);
     clearInterval(_cdInterval);
     _cdTick = () => {
-      const remain = Math.ceil((until - Date.now()) / 1000);
+      // Corrects for the guest's own clock disagreeing with the host's (see
+      // _hostClockOffsetMs's own comment) — a no-op (offset stays 0) for the
+      // host, who IS the reference `until` was stamped against.
+      const remain = Math.ceil((until - (Date.now() + _hostClockOffsetMs)) / 1000);
       const text = T('lobby.starting', 'Empezando en') + ' ' + Math.max(0, remain) + '…';
       const cd = document.getElementById('lobby-countdown');
       if (cd) cd.textContent = text;
@@ -1256,7 +1422,23 @@ window.Lobby = (() => {
   }
 
   function enterLobby() {
-    if (!window.LB.getId()) _savedLobbyModes = []; // reset only if there's no active room
+    // Reset whenever the ROOM ITSELF changed since the last time this ran —
+    // not just "no active room" (that guard alone missed the join-a-
+    // DIFFERENT-room case entirely: leaving one room's waiting screen via
+    // the plain leave button, or switching via an incoming invite, calls
+    // LB.leave()/joinByCode directly, never through _lobbyAbandon, so
+    // _savedLobbyModes from the PREVIOUS room survived untouched). The next
+    // room's _launchLobbyGameNow prefers _savedLobbyModes over the DB the
+    // instant it's non-empty — if the new room's host had already picked
+    // its mode BEFORE I joined (no fresh 'modes' broadcast for me to
+    // overwrite it with), that stale leftover mode is what launched instead
+    // (the reported "joins a new room set to Flags, GloboReto opens again
+    // for some people"). Re-entering the SAME room (mode transitions within
+    // one multi-mode match, returning to its waiting screen) must still
+    // keep it, hence comparing ids instead of resetting unconditionally.
+    const curLobbyId = window.LB.getId();
+    if (curLobbyId !== _lastEnteredLobbyId) { _savedLobbyModes = []; _lobbyModes = []; }
+    _lastEnteredLobbyId = curLobbyId;
     const codeEl = document.getElementById('lobby-code');
     if (codeEl) codeEl.textContent = window.LB.getCode() || '------';
     _updateInviteBtn();
@@ -1271,6 +1453,11 @@ window.Lobby = (() => {
       // If the match hasn't started yet, notify and go back to the list
       if (!window._lobbyActive) {
         _stopCountdown();
+        // Covers being kicked WHILE the pre-match sync panel is still up
+        // (_runLobbySyncGate runs before window._lobbyActive flips true) —
+        // that overlay is its own standalone popup, not necessarily torn
+        // down by _backToVersusFromLobby's screen switch.
+        document.getElementById('lobby-sync-panel')?.style.setProperty('display', 'none');
         _backToVersusFromLobby();
         if (typeof window.showVersusToast === 'function') {
           window.showVersusToast(reason === 'kicked'
@@ -1313,6 +1500,18 @@ window.Lobby = (() => {
     });
     // Re-subscribe the channel in case it disconnected during a previous match
     window.LB.resubscribeChannel?.();
+    // Refreshes the personal 'lobbyinv-{uid}' invite channel every time I
+    // (re)enter a room's waiting screen — it's otherwise only ever
+    // established ONCE, right after login (see profile-account.js), with no
+    // reconnect logic of its own. Sitting in a room's waiting screen is
+    // exactly when another friend's invite to a DIFFERENT room matters most,
+    // and exactly the scenario reported as "never arrives once I'm already
+    // in a group" — the fix isn't provably the channel having dropped by
+    // then, but re-establishing it fresh here costs nothing and directly
+    // covers that report either way.
+    if (window.LB && typeof window.LB.listenForInvites === 'function') {
+      window.LB.listenForInvites(p => { if (typeof window.showLobbyIncomingInvite === 'function') window.showLobbyIncomingInvite(p); });
+    }
     _prevMemberIds = [];
     _memberNameCache = {};
     _renderMembers(window.LB.getMembers()); // immediate render from cache
@@ -1396,8 +1595,138 @@ window.Lobby = (() => {
     });
   }
 
+  // ── Pre-match sync panel ───────────────────────────────────────────────────
+  // Shown once, right before the FIRST mode of a room match actually
+  // launches (never on a mode transition within an already-running match —
+  // everyone's obviously already loaded by then): a row per member with
+  // their card grayscale + a spinner until their client reports 'lready'
+  // (their local asset preload for the about-to-start mode resolved), then
+  // a check mark. The host tracks everyone and, after either all are ready
+  // or LOBBY_SYNC_TIMEOUT_MS elapses (kicking whoever still isn't), sends
+  // 'llaunchgo' — every client (host included) waits for THAT specific
+  // signal before calling through to the real launch, so a slow join can
+  // never leave some clients playing already while others are still
+  // loading.
+  const LOBBY_SYNC_TIMEOUT_MS = 15000;
+  let _syncGateActive = false;
+  function _lobbySyncPreloadFor(mode) {
+    if (_isGloboretoMode(mode) && typeof window._gqGroupPreload === 'function') return window._gqGroupPreload();
+    return Promise.resolve(); // flags/shapes/cities/monuments: already preloaded up front, see manifest.js
+  }
+  function _renderLobbySyncPanel(members) {
+    const list = document.getElementById('lobby-sync-list');
+    if (!list) return;
+    // .lobby-sync-spinner/.lobby-sync-check are SIBLINGS of the avatar-wrap
+    // (inside their own .lobby-sync-slot), not children of it — the frame
+    // (CustomizeAssets.applyFrame) renders as a ::after PSEUDO-ELEMENT on
+    // the avatar-wrap itself (.cust-frame-wrap::after, z-index:4), and
+    // putting the spinner/check INSIDE that same element left them fighting
+    // that pseudo-element's own stacking instead of just sitting cleanly on
+    // top of it (the reported "the loaded check is behind the frame").
+    list.innerHTML = members.map(m => {
+      const row = `<div class="lobby-sync-row" data-member-id="${m.id}">`
+        + `<div class="lobby-sync-slot not-ready">`
+        + `<div class="lobby-sync-avatar-wrap"><img class="lobby-sync-avatar" src="${m.avatar || 'images/profilepic/ppdefault.png'}" draggable="false" oncontextmenu="return false"></div>`
+        + `<div class="lobby-sync-spinner"></div><div class="lobby-sync-check">✓</div>`
+        + `</div>`
+        + `<span class="lobby-sync-name">${m.name || '?'}</span>`
+        + `</div>`;
+      return row;
+    }).join('');
+    list.querySelectorAll('.lobby-sync-row').forEach(row => {
+      const m = members.find(x => x.id === row.dataset.memberId);
+      window.CustomizeAssets?.applyFrame(row.querySelector('.lobby-sync-avatar-wrap'), (m && m.frameCode) || '0001');
+    });
+  }
+  function _markLobbySyncReady(uid) {
+    document.querySelector('.lobby-sync-row[data-member-id="' + uid + '"] .lobby-sync-slot')?.classList.remove('not-ready');
+  }
+  function _hideLobbySyncPanel() {
+    document.getElementById('lobby-sync-panel')?.style.setProperty('display', 'none');
+  }
+  // proceedFn is called EXACTLY once, when it's genuinely time to launch —
+  // after 'llaunchgo' AND my OWN local preload has resolved (whichever
+  // comes last — a slow-loading client must never get waved through before
+  // it's actually ready itself, even if the room-wide go-ahead beats it).
+  function _runLobbySyncGate(mode, proceedFn) {
+    const members = window.LB.getMembers() || [];
+    // Not worth the panel for a lone tester session, and the "everyone
+    // ready" check below would never resolve with just myself in `members`
+    // anyway (isHost()-gated launch decision assumes a real room).
+    if (members.length < 2) { proceedFn(); return; }
+    _syncGateActive = true;
+    const panel = document.getElementById('lobby-sync-panel');
+    if (panel) panel.style.display = 'flex';
+    _renderLobbySyncPanel(members);
+    const readyUids = new Set();
+    const myId = window._sbUserId;
+    let done = false, launchGoReceived = false, myPreloadDone = false;
+    let readyResendTimer = null;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      _syncGateActive = false;
+      clearTimeout(timeoutTimer);
+      clearInterval(readyResendTimer);
+      window.LB.onReadyMember(null);
+      window.LB.onLaunchGo(null);
+      _hideLobbySyncPanel();
+      proceedFn();
+    };
+    const tryFinish = () => { if (launchGoReceived && myPreloadDone) finish(); };
+    window.LB.onLaunchGo(() => { launchGoReceived = true; tryFinish(); });
+    window.LB.onReadyMember(uid => {
+      if (!uid || readyUids.has(uid)) return;
+      readyUids.add(uid);
+      _markLobbySyncReady(uid);
+      // Only the host decides when to actually go — but computes it the
+      // same way on every 'lready' it sees, not just its own.
+      if (window.LB.isHost() && members.every(m => readyUids.has(m.id))) {
+        clearTimeout(timeoutTimer);
+        window.LB.sendLaunchGo();
+      }
+    });
+    _lobbySyncPreloadFor(mode).then(() => {
+      myPreloadDone = true;
+      tryFinish();
+      if (!_syncGateActive) return; // gate already resolved before my own preload finished
+      // Keeps RE-sending 'lready' every 1.5s instead of just once — all 4+
+      // clients enter this gate at slightly different times (each reacts to
+      // its OWN receipt of the room going 'active', real network jitter),
+      // so a client whose preload resolves fast (three.js/countries already
+      // cached in this tab from an earlier match, or the other 4 modes'
+      // near-instant Promise.resolve()) could broadcast its ONE 'lready'
+      // before the HOST had even reached this function and attached its
+      // onReadyMember listener yet — broadcasts aren't persisted/replayed,
+      // so that message was just gone, and the host's 15s timeout later
+      // kicked someone who, from their own side, was ready the whole time
+      // (the reported "starting a match like this kicked everyone out of
+      // the room, some got 'you're left alone'"). A resend within the same
+      // 15s window reliably lands once the host's listener is up.
+      window.LB.sendReady();
+      readyResendTimer = setInterval(() => { if (_syncGateActive) window.LB.sendReady(); }, 1500);
+    });
+    const timeoutTimer = setTimeout(() => {
+      if (!window.LB.isHost()) return; // non-host clients just keep waiting for 'llaunchgo'
+      // Never kick myself even if MY OWN preload is what's still pending —
+      // tryFinish() above already makes sure I don't proceed ahead of my
+      // own readiness regardless of when 'llaunchgo' arrives.
+      members.filter(m => m.id !== myId && !readyUids.has(m.id))
+        .forEach(m => window.LB.kick(m.id));
+      window.LB.sendLaunchGo();
+    }, LOBBY_SYNC_TIMEOUT_MS);
+  }
+
   // ── Launch the flags match in lobby mode ─────────────────────────────────────
   function _launchLobbyGame(seed, modeIdx) {
+    if ((modeIdx || 0) === 0) {
+      const mode = _savedLobbyModes.length ? _savedLobbyModes[0] : (_getActiveModes(window.LB.getLobby())[0] || 'flags');
+      _runLobbySyncGate(mode, () => _launchLobbyGameNow(seed, modeIdx));
+      return;
+    }
+    _launchLobbyGameNow(seed, modeIdx);
+  }
+  function _launchLobbyGameNow(seed, modeIdx) {
     modeIdx = modeIdx !== undefined ? modeIdx : 0;
     _currentModeIdx = modeIdx;
     // ALWAYS clean up, before starting ANY mode (first or next, new game or
@@ -1432,6 +1761,7 @@ window.Lobby = (() => {
     if (_ls) { _ls.style.display = 'none'; _ls.classList.remove('lobby-interim-bg'); }
     document.getElementById('loading-versus-group')?.classList.add('table-gone');
     document.getElementById('loading-versus-group')?.classList.remove('panel-visible');
+    if (typeof window.closeAllLoadingPanels === 'function') window.closeAllLoadingPanels();
     document.getElementById('splash-screen').style.display = 'none';
 
     // Lobby mode state: leaderboard with ALL opponents, seeded RNG.
@@ -1459,10 +1789,35 @@ window.Lobby = (() => {
 
     // When the room's scores change (realtime) → update the leaderboard
     window.LB.onMembers(() => {
+      const prevIds = new Set((window._lobbyMembers || []).map(m => m.id));
       _refreshLobbyOpponents();
-      const scoresFn = mode === 'monuments' ? window.monumentsSetLobbyScores : mode === 'shapes' ? window.shapesSetLobbyScores : mode === 'cities' ? window.citiesSetLobbyScores : window.flagsSetLobbyScores;
+      // Real-time "left the room" detection: this postgres_changes-driven
+      // refresh fires the instant their lobby_members row is deleted (tab
+      // close/unload), well before onPlayerGone's ACTIVE_GAME_GRACE_MS grace
+      // timer (meant to absorb a reconnect blip, not to signal this) — flag
+      // them disconnected (gray + icon) right here so it lands together with
+      // the leaderboard re-sort instead of several seconds later.
+      const currentIds = new Set(window._lobbyMembers.map(m => m.id));
+      prevIds.forEach(id => {
+        if (currentIds.has(id)) return;
+        const goneFn = mode === 'monuments' ? window.monumentsSetLobbyDisconnected : mode === 'shapes' ? window.shapesSetLobbyDisconnected : mode === 'cities' ? window.citiesSetLobbyDisconnected : _isGloboretoMode(mode) ? window.globequizSetLobbyDisconnected : window.flagsSetLobbyDisconnected;
+        if (typeof goneFn === 'function') goneFn(id, true);
+        // GloboReto grupal "por turnos": si a quien se le fue la conexión
+        // era justo quien tenía el turno, pasarlo AL INSTANTE en vez de
+        // esperar a que se le agote el reloj (mismo criterio de tiempo real
+        // que el resto de estos fixes).
+        if (mode === 'globequiz_turns' && typeof window._gqGroupTurnsHandlePlayerGone === 'function') {
+          window._gqGroupTurnsHandlePlayerGone(id);
+        }
+      });
+      const scoresFn = mode === 'monuments' ? window.monumentsSetLobbyScores : mode === 'shapes' ? window.shapesSetLobbyScores : mode === 'cities' ? window.citiesSetLobbyScores : _isGloboretoMode(mode) ? window.globequizSetLobbyScores : window.flagsSetLobbyScores;
       if (typeof scoresFn === 'function') scoresFn(window._lobbyMembers);
       if (_finishedPlayers.size > 0) _checkAllFinished();
+      // Same real-time signal also covers "everyone else already left" —
+      // no need to wait for the presence-leave grace timer to notice it.
+      if (currentIds.size === 0 && (window._lobbyActive || _lobbyInTransition)) {
+        window.LB.triggerAlone?.();
+      }
     });
     // When a member finishes their match → record and check if everyone finished
     window.LB.onFinished((uid, score) => {
@@ -1475,28 +1830,38 @@ window.Lobby = (() => {
     window.LB.onScore((uid, score) => {
       const lm = (window._lobbyMembers || []).find(m => m.id === uid);
       if (lm) lm.score = score;
-      const scoresFn = mode === 'monuments' ? window.monumentsSetLobbyScores : mode === 'shapes' ? window.shapesSetLobbyScores : mode === 'cities' ? window.citiesSetLobbyScores : window.flagsSetLobbyScores;
+      const scoresFn = mode === 'monuments' ? window.monumentsSetLobbyScores : mode === 'shapes' ? window.shapesSetLobbyScores : mode === 'cities' ? window.citiesSetLobbyScores : _isGloboretoMode(mode) ? window.globequizSetLobbyScores : window.flagsSetLobbyScores;
       if (typeof scoresFn === 'function') scoresFn(window._lobbyMembers || []);
     });
     // Someone in the room missed → glow on their specific leaderboard card
     window.LB.onWrong(uid => {
-      const wrongFn = mode === 'monuments' ? window.monumentsSetLobbyWrongFor : mode === 'shapes' ? window.shapesSetLobbyWrongFor : mode === 'cities' ? window.citiesSetLobbyWrongFor : window.flagsTriggerLobbyWrongFor;
+      const wrongFn = mode === 'monuments' ? window.monumentsSetLobbyWrongFor : mode === 'shapes' ? window.shapesSetLobbyWrongFor : mode === 'cities' ? window.citiesSetLobbyWrongFor : _isGloboretoMode(mode) ? window.globequizSetLobbyWrongFor : window.flagsTriggerLobbyWrongFor;
       if (typeof wrongFn === 'function') wrongFn(uid);
     });
     // Someone in the room ran out of time → shake + timer on their card
     // (SAME system as 'wrong', see _applyTimesUpEffect).
+    // GloboReto is EXCLUDED here on purpose: its generic 'timesup' broadcast
+    // means "I WON" (see _specReportTimesUp in _gqGroupSubmitGuess's win
+    // branch, which drives _finishedUids/POV auto-advance for GroupSpectate),
+    // the OPPOSITE of every other mode's 'timesup' — wiring it to
+    // globequizSetLobbyTimesUpFor here showed the clock/shake on the
+    // WINNER's row for every other player (the reported "whoever finishes
+    // first gets the shake, and so does everyone who solves, no matter
+    // what"). GlobeQuiz has its OWN dedicated signal for a genuine timeout
+    // instead (see 'gq' t:'ranout' in _gqGroupHandleGqEvent, globequiz.js).
     window.LB.onTimesUp(payload => {
+      if (_isGloboretoMode(mode)) return;
       const uid = payload && payload.uid;
       const tuFn = mode === 'monuments' ? window.monumentsSetLobbyTimesUpFor : mode === 'shapes' ? window.shapesSetLobbyTimesUpFor : mode === 'cities' ? window.citiesSetLobbyTimesUpFor : window.flagsTriggerLobbyTimesUpFor;
       if (typeof tuFn === 'function') tuFn(uid);
     });
     // Someone lost/regained presence → show/hide the disconnected state on their card
     window.LB.onPlayerGone(uid => {
-      const goneFn = mode === 'monuments' ? window.monumentsSetLobbyDisconnected : mode === 'shapes' ? window.shapesSetLobbyDisconnected : mode === 'cities' ? window.citiesSetLobbyDisconnected : window.flagsSetLobbyDisconnected;
+      const goneFn = mode === 'monuments' ? window.monumentsSetLobbyDisconnected : mode === 'shapes' ? window.shapesSetLobbyDisconnected : mode === 'cities' ? window.citiesSetLobbyDisconnected : _isGloboretoMode(mode) ? window.globequizSetLobbyDisconnected : window.flagsSetLobbyDisconnected;
       if (typeof goneFn === 'function') goneFn(uid, true);
     });
     window.LB.onPlayerBack(uid => {
-      const backFn = mode === 'monuments' ? window.monumentsSetLobbyDisconnected : mode === 'shapes' ? window.shapesSetLobbyDisconnected : mode === 'cities' ? window.citiesSetLobbyDisconnected : window.flagsSetLobbyDisconnected;
+      const backFn = mode === 'monuments' ? window.monumentsSetLobbyDisconnected : mode === 'shapes' ? window.shapesSetLobbyDisconnected : mode === 'cities' ? window.citiesSetLobbyDisconnected : _isGloboretoMode(mode) ? window.globequizSetLobbyDisconnected : window.flagsSetLobbyDisconnected;
       if (typeof backFn === 'function') backFn(uid, false);
     });
     // If I'm alone (everyone else abandoned during the match) → back to the room
@@ -1522,6 +1887,7 @@ window.Lobby = (() => {
       window._lobbyMembers = [];
       if (typeof window._setPlaying === 'function') window._setPlaying(false);
       window.LB.onScore(null);
+      window.LB.onGq(null);
       window.LB.onWrong(null);
       window.LB.onPlayerGone(null);
       window.LB.onPlayerBack(null);
@@ -1567,6 +1933,15 @@ window.Lobby = (() => {
     } else if (mode === 'monuments') {
       if (typeof window.monumentsSetSeed === 'function') window.monumentsSetSeed(modeSeed);
       if (typeof startGame === 'function') startGame();
+    } else if (mode === 'globequiz') {
+      if (typeof window.globequizSetSeed === 'function') window.globequizSetSeed(modeSeed);
+      if (typeof window.showGlobequizGroupMode === 'function') window.showGlobequizGroupMode(window.LB.getGloboretoConfig().rounds, modeSeed);
+    } else if (mode === 'globequiz_turns') {
+      if (typeof window.globequizSetSeed === 'function') window.globequizSetSeed(modeSeed);
+      if (typeof window.showGlobequizGroupTurnsMode === 'function') {
+        const cfg = window.LB.getGloboretoConfig();
+        window.showGlobequizGroupTurnsMode(cfg.rounds, cfg.turnTime, modeSeed);
+      }
     } else {
       if (typeof window.flagsSetSeed === 'function') window.flagsSetSeed(modeSeed);
       if (typeof showFlagsMode === 'function') showFlagsMode();
@@ -1708,6 +2083,9 @@ window.Lobby = (() => {
     } else if (teardownMode === 'monuments') {
       window.monumentsHardReset?.();
       if (typeof window.monumentsClearSeed === 'function') window.monumentsClearSeed();
+    } else if (_isGloboretoMode(teardownMode)) {
+      window.globequizHardReset?.();
+      if (typeof window.globequizClearSeed === 'function') window.globequizClearSeed();
     } else {
       // flagsHardReset cancels all timers/intervals/abort flags; hideFlagsMode alone leaves flagsEndTimeout running
       window.flagsHardReset?.();
@@ -1738,6 +2116,7 @@ window.Lobby = (() => {
     window.LB.resetAloneGuard?.();
     window._lobbyMembers = [];
     window.LB.onScore(null);
+    window.LB.onGq(null);
     window.LB.onWrong(null);
     window.LB.onPlayerGone(null);
     window.LB.onPlayerBack(null);
@@ -1894,6 +2273,7 @@ window.Lobby = (() => {
       window.LB.processPendingKicks?.();
       window.LB.onFinished(null);
       window.LB.onScore(null);
+      window.LB.onGq(null);
       window.LB.onPlayerGone(null);
       window.LB.onPlayerBack(null);
       window.LB.resetToWaiting?.();
@@ -2189,9 +2569,15 @@ window.Lobby = (() => {
 
   function _showLobbyResult(members) {
     _hideLobbyWaiting();
-    // See the long comment in _presentIntermediateResult — same notice,
-    // this time for the room's FINAL ranking.
-    window.LB.sendPostgame({ kind: 'final', members });
+    // GloboReto "por turnos" ONLY: whoever tied into the final tiebreak but
+    // lost it (see window._gqTurnsTiebreakLosers, set in _gqTurnsCloseRound)
+    // — sent along in the SAME postgame payload so every viewer (other
+    // players, the loser's own client, and any spectator, see
+    // _showGroupResultMirror) grays out that row identically, without each
+    // of them needing their own copy of globequiz.js's private tiebreak
+    // state.
+    const tiebreakLosers = window._gqTurnsTiebreakLosers ? Array.from(window._gqTurnsTiebreakLosers) : null;
+    window.LB.sendPostgame({ kind: 'final', members, tiebreakLosers });
     const myId   = window._sbUserId;
     const screen = document.getElementById('lobby-result-screen');
     const list   = document.getElementById('lobby-result-list');
@@ -2211,10 +2597,11 @@ window.Lobby = (() => {
       window.sbGrantVersusCurrency(myRank === 1);
     }
     const medals = ['🥇', '🥈', '🥉'];
+    const tiebreakLoserIds = new Set(tiebreakLosers || (window._gqTurnsTiebreakLosers ? Array.from(window._gqTurnsTiebreakLosers) : []));
     list.innerHTML = '';
     members.forEach((m, i) => {
       const row = document.createElement('div');
-      row.className = 'lobby-result-row' + (m.id === myId ? ' is-me' : '');
+      row.className = 'lobby-result-row' + (m.id === myId ? ' is-me' : '') + (tiebreakLoserIds.has(m.id) ? ' is-tiebreak-loser' : '');
       row.innerHTML =
         `<span class="lobby-result-pos">${medals[i] || (i + 1)}</span>` +
         `<div class="lobby-result-avatar-wrap"><img class="lobby-result-avatar" src="${m.avatar}" draggable="false" oncontextmenu="return false"></div>` +
@@ -2260,6 +2647,16 @@ window.Lobby = (() => {
     _revealAt = null; if (_revealTimer) { clearTimeout(_revealTimer); _revealTimer = null; }
     _currentModeIdx = 0; _lobbyModes = []; _baseSeed = null; _modeAccScore = 0;
     _savedLobbyModes = [];
+    // Unlike _lobbyAbandon (mid-match quit), this normal end-of-match path
+    // never cleared these — window._lobbyActive/_lobbyMembers stayed stuck
+    // from the just-finished room, so buildFriendPlayers() (mapgame-vs.js)
+    // kept returning THAT room's members instead of the real friends list
+    // for whatever mode the player launched next (any other group room, a
+    // 1v1 VS, Gira Mundial or Practice — all reported as "se buguea el
+    // leaderboard").
+    window._lobbyActive = false;
+    window._lobbyMembers = [];
+    window.LB.clearPendingKicks?.();
     if (_origCampaignBase) window.campaignBase = _origCampaignBase; // restore the js/core/campaign.js one (1-player campaign), do NOT destroy it
     clearInterval(_intermediateTimer); _intermediateTimer = null;
     if (_waitingTimeout) { clearTimeout(_waitingTimeout); _waitingTimeout = null; }
@@ -2316,10 +2713,21 @@ window.Lobby = (() => {
     });
     document.getElementById('lobby-leave-btn')?.addEventListener('click', () => {
       if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
-      _stopCountdown();
-      window.LB.leave();
-      if (typeof window.showVersusToast === 'function') window.showVersusToast(T('lobby.leftRoom', 'Has abandonado la sala'));
-      _backToVersusFromLobby();
+      const doLeave = () => {
+        _stopCountdown();
+        window.LB.leave();
+        if (typeof window.showVersusToast === 'function') window.showVersusToast(T('lobby.leftRoom', 'Has abandonado la sala'));
+        _backToVersusFromLobby();
+      };
+      // Only the HOST gets the extra confirm — leaving as host also
+      // reassigns the role (see LB.leave: the earliest-joined remaining
+      // member inherits it), a consequence a regular member leaving doesn't
+      // have.
+      if (window.LB.isHost()) {
+        window.versusConfirm(T('lobby.confirmLeaveHost', '¿Seguro que querés salir? El rol de host pasará a otro miembro.'), doLeave);
+        return;
+      }
+      doLeave();
     });
     // Room name (host): ✎ edit, ✓ confirm (Enter also confirms)
     document.getElementById('lobby-name-edit-btn')?.addEventListener('click', () => {
@@ -2407,13 +2815,36 @@ window.Lobby = (() => {
 
   // Room name: the host edits it with ✎/✓; for everyone else it's live text.
   let _editingName = false;
-  const _MODE_ICONS = { flags: 'images/game1.png', shapes: 'images/game2.png', cities: 'images/game3.png', monuments: 'images/game4.png' };
-  const _MODE_NAMES = { flags: () => T('nav.flags', 'Banderas'), shapes: () => T('nav.shapes', 'Siluetas'), cities: () => T('nav.cities', 'Ciudades'), monuments: () => T('nav.monuments', 'Monumentos') };
+  // GloboReto (globequiz/globequiz_turns) es excluyente: nunca entra en
+  // _ALL_MODES (no se combina con los otros 4 ni participa del orden de
+  // juego), pero SÍ necesita ícono/nombre porque _modeIconsHtml/_MODE_NAMES
+  // se usan también para el nombre de la sala, el toast de "modo guardado"
+  // y el resumen que ve el espectador (sendPostgame, ver más abajo).
+  const _MODE_ICONS = { flags: 'images/game1.png', shapes: 'images/game2.png', cities: 'images/game3.png', monuments: 'images/game4.png', globequiz: 'images/globe.png', globequiz_turns: 'images/globe.png' };
+  // Nombres "de marca" (mismos que vs-mode-select-popup/mode.*.title en
+  // i18n.js) — no los genéricos nav.flags/etc — para que el orden de juego,
+  // el toast de guardado y el tooltip de los íconos digan lo mismo que el
+  // resto de la UI de versus. GloboReto además distingue la variante.
+  const _MODE_NAMES = {
+    flags: () => T('mode.flags.title', 'Suitcase Shuffle'),
+    shapes: () => T('mode.shapes.title', 'Map Mayhem'),
+    cities: () => T('mode.cities.title', 'City Blitz'),
+    monuments: () => T('mode.monuments.title', 'Landmark Loco'),
+    globequiz: () => T('panel2.globequizTitle', 'GloboReto') + ' - ' + T('lobby.gqSpeedName', 'Tiempo Real'),
+    globequiz_turns: () => T('panel2.globequizTitle', 'GloboReto') + ' - ' + T('lobby.gqTurnsName', 'Por Turnos'),
+  };
   const _ALL_MODES  = ['flags', 'shapes', 'cities', 'monuments'];
+  const _isGloboretoMode = m => m === 'globequiz' || m === 'globequiz_turns';
 
-  // Generates the HTML for the mode icons in match order
+  // Generates the HTML for the mode icons in match order. Cada ícono va
+  // envuelto en un <span data-tip> — un tooltip propio (CSS ::after, ver
+  // .lobby-mode-icon-wrap) en vez del title nativo del navegador, para quien
+  // no reconozca el símbolo del ícono solo.
   function _modeIconsHtml(modes, cls = '') {
-    return modes.map(m => `<img ${cls ? `class="${cls}"` : ''} src="${_MODE_ICONS[m] || 'images/game1.png'}" alt="${m}">`).join('');
+    return modes.map(m => {
+      const name = (_MODE_NAMES[m] || (() => m))();
+      return `<span class="lobby-mode-icon-wrap" data-tip="${name}"><img ${cls ? `class="${cls}"` : ''} src="${_MODE_ICONS[m] || 'images/game1.png'}" alt="${m}"></span>`;
+    }).join('');
   }
 
   function _getActiveModes(lobby) {
@@ -2447,11 +2878,29 @@ window.Lobby = (() => {
     }
     if (_editingName && host) return; // don't overwrite while editing
     text.textContent = name;
+    const modes = _getActiveModes(window.LB.getLobby());
     const iconsEl = document.getElementById('lobby-mode-icons');
-    if (iconsEl) {
-      const modes = _getActiveModes(window.LB.getLobby());
-      iconsEl.innerHTML = _modeIconsHtml(modes);
+    if (iconsEl) iconsEl.innerHTML = _modeIconsHtml(modes);
+    // Resumen de ajustes de GloboReto (rondas / tiempo de respuesta) — solo
+    // tiene sentido para ese modo, los otros 4 no tienen ajustes de partida.
+    const gqInfo   = document.getElementById('lobby-gq-info');
+    const gqIsOn   = modes.length === 1 && _isGloboretoMode(modes[0]);
+    if (gqInfo) {
+      if (gqIsOn) {
+        const cfg = window.LB.getGloboretoConfig();
+        const dot = '<span class="lobby-gq-dot-inline">·</span>';
+        const roundsTxt = T('lobby.gqInfoRounds', 'Rondas: {n}').replace('{n}', cfg.rounds);
+        gqInfo.innerHTML = modes[0] === 'globequiz_turns'
+          ? roundsTxt + ' ' + dot + ' ' + T('lobby.gqInfoTurnTime', 'Tiempo: {n}s').replace('{n}', cfg.turnTime)
+          : roundsTxt;
+        gqInfo.style.display = '';
+      } else {
+        gqInfo.style.display = 'none';
+      }
     }
+    // Separador entre los badges de modo y el resumen de GloboReto.
+    const gqDot = document.getElementById('lobby-gq-dot');
+    if (gqDot) gqDot.style.display = gqIsOn ? '' : 'none';
     text.style.display   = '';
     if (input) input.style.display = 'none';
     if (conf)  conf.style.display  = 'none';
@@ -2599,24 +3048,86 @@ window.Lobby = (() => {
   }
 
   function _renderPickerGridBadges() {
+    const globoretoPicked = _pendingModesOrder.length === 1 && _isGloboretoMode(_pendingModesOrder[0]);
     document.querySelectorAll('.lobby-mode-pick-btn').forEach(btn => {
       const mode = btn.dataset.mode;
-      const idx  = _pendingModesOrder.indexOf(mode);
+      // El botón de GloboReto en la grilla representa AMBAS variantes: queda
+      // "seleccionado" si la sala está en cualquiera de las dos.
+      const idx  = mode === 'globequiz' ? (globoretoPicked ? 0 : -1) : _pendingModesOrder.indexOf(mode);
       const numEl = btn.querySelector('.lobby-mode-pick-num');
       btn.classList.toggle('is-selected', idx >= 0);
       if (numEl) {
         numEl.style.display = idx >= 0 ? 'flex' : 'none';
         numEl.textContent   = idx >= 0 ? String(idx + 1) : '';
       }
+      // Los 4 modos combinables quedan visualmente bloqueados mientras GloboReto
+      // está elegido (clickearlos igual los reactiva, ver el handler de click).
+      if (mode !== 'globequiz') btn.classList.toggle('is-locked', globoretoPicked);
     });
+  }
+
+  // ── GloboReto: vista de variante + ajustes, dentro del MISMO panel azul ──────
+  // (no es un popup aparte — ver #lobby-globoreto-config-view en play/index.html)
+  const GQ_ROUNDS_MIN = 1, GQ_ROUNDS_MAX = 30;
+  const GQ_TURNTIME_MIN = 10, GQ_TURNTIME_MAX = 30, GQ_TURNTIME_STEP = 5;
+  let _pickerView    = 'grid'; // 'grid' | 'globoreto'
+  let _pendingGqVariant  = null; // 'globequiz' | 'globequiz_turns' | null (sin elegir aún)
+  let _pendingGqRounds   = 5;
+  let _pendingGqTurnTime = 20;
+
+  function _updatePickerSaveState() {
+    const saveBtn = document.getElementById('lobby-mode-picker-save');
+    if (!saveBtn) return;
+    saveBtn.disabled = _pickerView === 'globoreto' ? !_pendingGqVariant : _pendingModesOrder.length === 0;
+  }
+  function _showGridView() {
+    _pickerView = 'grid';
+    document.getElementById('lobby-mode-picker-title').textContent = T('lobby.pickMode', 'Modos de juego');
+    document.getElementById('lobby-mode-picker-grid-view').style.display = '';
+    document.getElementById('lobby-globoreto-config-view').style.display = 'none';
+    document.getElementById('lobby-globoreto-topback').style.display = 'none';
+    _updatePickerSaveState();
+  }
+  function _renderGqConfigView() {
+    document.getElementById('lobby-mode-picker-title').textContent = T('panel2.globequizTitle', 'GloboReto');
+    document.querySelectorAll('.lobby-gq-variant-btn').forEach(btn => {
+      btn.classList.toggle('is-selected', btn.dataset.variant === _pendingGqVariant);
+    });
+    document.getElementById('lobby-gq-settings').style.display = _pendingGqVariant ? '' : 'none';
+    document.getElementById('lobby-gq-turntime-row').style.display = _pendingGqVariant === 'globequiz_turns' ? '' : 'none';
+    document.getElementById('lobby-gq-rounds-val').textContent = String(_pendingGqRounds);
+    document.getElementById('lobby-gq-turntime-val').textContent = _pendingGqTurnTime + 's';
+    _updatePickerSaveState();
+  }
+  function _showGloboretoConfigView() {
+    _pickerView = 'globoreto';
+    document.getElementById('lobby-mode-picker-grid-view').style.display = 'none';
+    document.getElementById('lobby-globoreto-config-view').style.display = '';
+    document.getElementById('lobby-globoreto-topback').style.display = '';
+    _renderGqConfigView();
   }
 
   function _showModePicker() {
     const pop = document.getElementById('lobby-mode-picker-popup');
     if (!pop) return;
-    _pendingModesOrder = [..._getActiveModes(window.LB.getLobby())];
-    _renderPickerGridBadges();
-    _renderPickerOrderList();
+    const activeModes = _getActiveModes(window.LB.getLobby());
+    if (activeModes.length === 1 && _isGloboretoMode(activeModes[0])) {
+      // La sala ya está en GloboReto: reabrir directo en su vista, con los ajustes actuales.
+      const cfg = window.LB.getGloboretoConfig();
+      _pendingGqVariant = activeModes[0];
+      _pendingGqRounds = cfg.rounds;
+      _pendingGqTurnTime = cfg.turnTime;
+      _pendingModesOrder = [];
+      _showGloboretoConfigView();
+    } else {
+      _pendingModesOrder = [...activeModes];
+      _pendingGqVariant = null;
+      _pendingGqRounds = 5;
+      _pendingGqTurnTime = 20;
+      _renderPickerGridBadges();
+      _renderPickerOrderList();
+      _showGridView();
+    }
     pop.style.display = 'flex';
   }
 
@@ -2634,7 +3145,11 @@ window.Lobby = (() => {
       if (btn && !btn.disabled) {
         if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
         const mode = btn.dataset.mode;
-        const idx  = _pendingModesOrder.indexOf(mode);
+        if (mode === 'globequiz') { _showGloboretoConfigView(); return; }
+        // Elegir un modo combinable mientras GloboReto estaba seleccionado
+        // reemplaza la exclusividad por el sistema normal de multi-selección.
+        if (_pendingModesOrder.length === 1 && _isGloboretoMode(_pendingModesOrder[0])) _pendingModesOrder = [];
+        const idx = _pendingModesOrder.indexOf(mode);
         if (idx >= 0) {
           _pendingModesOrder.splice(idx, 1); // deselect
         } else {
@@ -2642,13 +3157,88 @@ window.Lobby = (() => {
         }
         _renderPickerGridBadges();
         _renderPickerOrderList();
+        _updatePickerSaveState();
         return;
       }
+    });
+
+    // GloboReto config view: pick a variant, tweak rounds/turnTime steppers, go back
+    // _gqStepOnce: the actual +/- logic, shared by a plain tap and every tick
+    // of the press-and-hold repeat below.
+    function _gqStepOnce(stepBtn) {
+      const dir = parseInt(stepBtn.dataset.dir, 10);
+      const setting = stepBtn.closest('.lobby-gq-stepper').dataset.setting;
+      if (setting === 'rounds') {
+        _pendingGqRounds = Math.min(GQ_ROUNDS_MAX, Math.max(GQ_ROUNDS_MIN, _pendingGqRounds + dir));
+      } else if (setting === 'turnTime') {
+        _pendingGqTurnTime = Math.min(GQ_TURNTIME_MAX, Math.max(GQ_TURNTIME_MIN, _pendingGqTurnTime + dir * GQ_TURNTIME_STEP));
+      }
+      _renderGqConfigView();
+    }
+    // Press-and-hold on a stepper +/- button (rounds/turnTime): holding past
+    // GQ_STEP_HOLD_MS auto-repeats the step instead of requiring one tap per
+    // increment — same convenience as a native number input's spinner.
+    // pointerdown/up covers mouse AND touch in one listener; the plain
+    // 'click' case (a tap shorter than the hold delay) is still handled by
+    // the delegated click listener below, guarded by _gqStepperDidHold so
+    // that release doesn't ALSO fire one extra step on top of what the
+    // repeat interval already applied.
+    const GQ_STEP_HOLD_MS = 500, GQ_STEP_REPEAT_MS = 120;
+    let _gqStepperHoldTimer = null, _gqStepperRepeatTimer = null, _gqStepperDidHold = false;
+    function _gqStepperClearHold() {
+      clearTimeout(_gqStepperHoldTimer); _gqStepperHoldTimer = null;
+      clearInterval(_gqStepperRepeatTimer); _gqStepperRepeatTimer = null;
+    }
+    document.getElementById('lobby-globoreto-config-view')?.addEventListener('pointerdown', e => {
+      const stepBtn = e.target.closest('.lobby-gq-stepper-btn');
+      if (!stepBtn) return;
+      _gqStepperDidHold = false;
+      _gqStepperClearHold();
+      _gqStepperHoldTimer = setTimeout(() => {
+        _gqStepperDidHold = true;
+        _gqStepOnce(stepBtn);
+        _gqStepperRepeatTimer = setInterval(() => _gqStepOnce(stepBtn), GQ_STEP_REPEAT_MS);
+      }, GQ_STEP_HOLD_MS);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(evt => {
+      document.getElementById('lobby-globoreto-config-view')?.addEventListener(evt, _gqStepperClearHold);
+    });
+    document.getElementById('lobby-globoreto-config-view')?.addEventListener('click', e => {
+      const variantBtn = e.target.closest('.lobby-gq-variant-btn');
+      if (variantBtn) {
+        if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+        _pendingGqVariant = variantBtn.dataset.variant;
+        _renderGqConfigView();
+        return;
+      }
+      const stepBtn = e.target.closest('.lobby-gq-stepper-btn');
+      if (stepBtn) {
+        if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+        // Already stepped (at least once) by the hold-repeat above — this
+        // trailing click (fired on release) would otherwise double-apply
+        // one extra step on top of whatever the hold already did.
+        if (_gqStepperDidHold) { _gqStepperDidHold = false; return; }
+        _gqStepOnce(stepBtn);
+        return;
+      }
+    });
+    document.getElementById('lobby-globoreto-topback')?.addEventListener('click', () => {
+      if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+      _renderPickerGridBadges();
+      _renderPickerOrderList();
+      _showGridView();
     });
 
     // Save
     document.getElementById('lobby-mode-picker-save')?.addEventListener('click', () => {
       if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+      if (_pickerView === 'globoreto') {
+        if (!_pendingGqVariant) return; // hay que elegir una variante primero
+        window.LB.setGloboretoConfig(_pendingGqVariant, { rounds: _pendingGqRounds, turnTime: _pendingGqTurnTime });
+        document.getElementById('lobby-mode-picker-popup').style.display = 'none';
+        if (typeof window.showVersusToast === 'function') window.showVersusToast((_MODE_NAMES[_pendingGqVariant] || (() => 'GloboReto'))());
+        return;
+      }
       if (_pendingModesOrder.length === 0) return; // at least 1 mode
       window.LB.setModes([..._pendingModesOrder]);
       document.getElementById('lobby-mode-picker-popup').style.display = 'none';
@@ -3051,21 +3641,36 @@ window.Lobby = (() => {
       fromAvatar: payload.fromAvatar || 'images/profilepic/ppdefault.png',
       ts: Date.now()
     });
+    const doJoin = async () => {
+      _removeFromInbox(payload.code);
+      _closeNotifPanel(); // close the inbox if it was open
+      try {
+        await window.LB.joinByCode(payload.code);
+        if (typeof window.showVersusPanel === 'function') window.showVersusPanel();
+        if (typeof window.versusGoTo === 'function') window.versusGoTo('lobby');
+        enterLobby();
+      } catch (e) {
+        const msg = (e && e.message === 'started') ? T('lobby.started', 'La partida ya empezó') : T('lobby.notFound', 'Sala no encontrada');
+        if (typeof window.showVersusToast === 'function') window.showVersusToast(msg);
+      }
+    };
     showInviteNotif({
       name: payload.fromName,
       sub:  T('lobby.invitedYou', 'te invitó a su sala'),
-      onAccept: async () => {
-        _removeFromInbox(payload.code);
-        _closeNotifPanel(); // close the inbox if it was open
-        try {
-          await window.LB.joinByCode(payload.code);
-          if (typeof window.showVersusPanel === 'function') window.showVersusPanel();
-          if (typeof window.versusGoTo === 'function') window.versusGoTo('lobby');
-          enterLobby();
-        } catch (e) {
-          const msg = (e && e.message === 'started') ? T('lobby.started', 'La partida ya empezó') : T('lobby.notFound', 'Sala no encontrada');
-          if (typeof window.showVersusToast === 'function') window.showVersusToast(msg);
+      onAccept: () => {
+        // Already sitting in a DIFFERENT room's waiting room (this invite's
+        // own code isn't necessarily _lobbyId — joining it would still
+        // leave whatever room I'm currently in) — accepting silently
+        // dropped the current room with no warning (the reported "you can
+        // still get invited to another group while already in one"). Once
+        // the match has actually started (window._lobbyActive) the invite
+        // is queued instead (see showInviteNotif's own guard above this
+        // function) and never reaches here mid-match.
+        if (window.LB.getId() && window.LB.getId() !== payload.lobbyId) {
+          window.versusConfirm(T('lobby.confirmSwitchRoom', 'Si te unís a otro grupo, saldrás de este. ¿Estás seguro?'), doJoin);
+          return;
         }
+        doJoin();
       },
       onDecline: () => { _removeFromInbox(payload.code); },
     });

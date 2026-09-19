@@ -195,6 +195,17 @@ document.getElementById('gq-quit-confirm')?.addEventListener('click', () => {
   if (window._vsActive && typeof window._vsAbandon === 'function') {
     try { window._vsAbandon(); } catch (e) {}
   }
+  // Same gap as above, but for GLOBORETO GRUPAL (lobby room match): this
+  // handler never called _lobbyAbandon(), so quitting a group GlobeQuiz
+  // match via this button never left the room — LB.leave() (which deletes
+  // the lobby_members row) never ran, so the DB still listed this player as
+  // a member. The rest of the room kept seeing them in the leaderboard as
+  // if still playing, and the quitter's own "my room" button/state stuck
+  // around too (the reported "quits GlobeQuiz, the room and leaderboard
+  // still act like they're in the match").
+  if (window._lobbyActive && typeof window._lobbyAbandon === 'function') {
+    try { window._lobbyAbandon(); } catch (e) {}
+  }
   window._setPlaying(false);
   // Stop EVERYTHING GlobeQuiz (timer, auto-rotate, music/sfx) — same rule as
   // quitToMenu() for the other modes.

@@ -1359,8 +1359,24 @@
   // submitGuess), and the country itself is only broadcast on winning/
   // finishing (_specReportAnswer win / _specReportPostgame) — none of this
   // depended on the country being predictable by date.
+  // GloboReto grupal: nunca repite un país dentro del mismo match — sin esto,
+  // reseedear con "baseSeed + ronda*7919" y sacar UN solo valor por ronda
+  // podía dar el mismo índice dos rondas seguidas (xorshift32 con un único
+  // draw por seed no garantiza buena dispersión entre seeds tan parecidas).
+  // Redibuja de la MISMA racha de la PRNG (nunca reseedea a mitad de match,
+  // ver _gqGroupBeginRound) hasta encontrar uno nuevo — determinístico e
+  // idéntico en todos los clientes, porque todos llaman pickDailyCountry()
+  // el mismo número de veces en el mismo orden.
   function pickDailyCountry() {
-    const idx = Math.floor(gqRand() * countries.length);
+    let idx = Math.floor(gqRand() * countries.length);
+    if (window._gqGroupActive || window._gqGroupTurnsActive) {
+      let guard = 0;
+      while (_gqGroupUsedCountries.has(countries[idx].name) && guard < 50) {
+        idx = Math.floor(gqRand() * countries.length);
+        guard++;
+      }
+      _gqGroupUsedCountries.add(countries[idx].name);
+    }
     dailyCountry = countries[idx];
   }
 
@@ -1474,6 +1490,11 @@
       setTimeout(() => p.remove(), (duration + 0.2) * 1000);
     }
   }
+  // Exposed for the GroupSpectate "por turnos" mirror (spectate.js) — a
+  // passive external spectator never runs showWin() themselves (they never
+  // guess), so without this they never saw ANY confetti for a round someone
+  // else won.
+  window._gqSpawnConfetti = spawnConfetti;
 
   function showWin() {
     spawnConfetti();
@@ -2135,8 +2156,11 @@
     const wholeSec = Math.floor(elapsedMs / 1000);
     // "Por turnos" owns #gq-timer-number for its own 15→0 per-turn countdown
     // (see _gqPaintTurnTimer) — writing the elapsed-seconds-up count here too
-    // would just race it on the same element every second.
-    if (!_gqTurnsVariant) {
+    // would just race it on the same element every second. Group "tiempo
+    // real" does the same once someone solves and the 20s round-end
+    // countdown starts (see _gqGroupTickCountdown) — before that, this
+    // ascending count is exactly what should show.
+    if (!_gqTurnsVariant && !window._gqGroupTurnsActive && !(window._gqGroupActive && _gqGroupCountdownEndsAt)) {
       const el = document.getElementById('gq-timer-number');
       if (el) el.textContent = String(wholeSec);
       // "Por turnos" pulses this from _gqTickTurnTimer instead, exactly when
@@ -2199,6 +2223,11 @@
   const GQ_LB_PIN_ROW = 1; // how many rows above you it tries to keep visible
   let gqFriendPlayers = [];
   let gqLbElements = {};
+  // Last known score per group member row ('lob'+id) — see _gqGroupPositionLb:
+  // once someone leaves the room, window._lobbyMembers drops them entirely,
+  // so this is what keeps their card counted in the ranking at their last
+  // score instead of vanishing from the position math.
+  let _gqGroupLastScores = {};
   let lastGqPlayerRank = -1;
   // Pending emote setTimeout (see below) — stopTimer() cancels it just like
   // it does gqTimerInterval/gqCardInterval. Without this, leaving the game
@@ -2218,6 +2247,40 @@
   // there.
   window.formatGqCardTime = formatGqCardTime;
 
+  // Puts #gq-friends-bar back to its EXACT static baseline (the single
+  // #gq-lb-player row, same markup as play/index.html) — every mode's own
+  // builder (_gqGroupBuildLeaderboard, _gqTurnsBuildLeaderboard,
+  // globequizVsPrepareOpponentRow, buildGqFriendRows) reshapes this SAME
+  // bar its own way: different classes on the bar itself (vs-active,
+  // gq-turns-mode), different ids inside the player row (some use
+  // #gq-lb-player-time, the group ones don't name it at all), different
+  // inline styles (order for the flex "por turnos" layout, top/transition
+  // for the absolute-positioned ones). globequizVsPrepareOpponentRow/
+  // buildGqFriendRows only ever ADD to or pluck specific rows OUT of
+  // whatever's already there — none of them assumed they might be handed a
+  // bar reshaped by a COMPLETELY different mode, so without a single
+  // "back to a known baseline" step whichever mode ran last left its own
+  // shape/classes/inline styles behind for the next one to trip over (the
+  // reported "los cards de los contrincantes bugueados de posición" playing
+  // 1v1 "por turnos" right after a group "por turnos" match). Called from
+  // globequizHardReset() — the shared teardown every GlobeQuiz variant
+  // (solo/1v1/group) already runs on the way out, abandoned or not.
+  function _gqResetFriendsBar() {
+    const bar = document.getElementById('gq-friends-bar');
+    if (!bar) return;
+    bar.className = 'gq-friends-bar';
+    bar.removeAttribute('style');
+    const myName = (window._sbProfile && window._sbProfile.name) || localStorage.getItem('playerName') || 'Tú';
+    const myAvatar = localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png';
+    bar.innerHTML = '<div class="lb-entry lb-player" id="gq-lb-player">'
+      + '<span class="lb-rank rank-other"></span>'
+      + '<div class="lb-avatar"><img class="lb-avatar-img" id="gq-lb-player-avatar" src="' + myAvatar + '" alt=""></div>'
+      + '<span class="lb-name" id="gq-lb-player-name">' + myName + '</span>'
+      + '<span class="lb-score" id="gq-lb-player-time">0:00</span>'
+      + '</div>';
+    gqLbElements = {};
+  }
+
   // Rebuilds the friend rows from scratch (called when each match starts) —
   // reads the current snapshot of getFriends() (js/friends.js), so if
   // loadFriends() hasn't resolved yet by the time you start the first
@@ -2236,6 +2299,15 @@
     // on the way out) never survives into a solo match no matter what path
     // got here — the reported "sale aun la carta de mi contrincante".
     document.getElementById('gq-lb-vsopp')?.remove();
+    // Same reasoning, for a leftover GROUP "por turnos" leaderboard (its own
+    // .lb-entry rows, id="gq-lb-lob<uid>", plus the gq-turns-mode rotated
+    // layout class on the bar) — launching solo GlobeQuiz straight from the
+    // menu never goes through window.gameStoppers either (see
+    // loading-globequiz-play-wrap in js/menu/menu-launchers.js), so those
+    // never got cleared by _gqGroupTurnsTeardown() (the reported "cards que
+    // no deberían salir" after a group match).
+    bar.querySelectorAll('.lb-entry[id^="gq-lb-lob"]').forEach(el => el.remove());
+    bar.classList.remove('gq-turns-mode');
     const playerTimeEl = document.getElementById('gq-lb-player-time');
     if (playerTimeEl && playerTimeEl.classList.contains('gq-lb-vs-score')) {
       playerTimeEl.classList.remove('gq-lb-vs-score');
@@ -2465,6 +2537,19 @@
     const playerEl = document.getElementById('gq-lb-player');
     if (!bar || !playerEl) return;
     bar.querySelectorAll('.lb-entry[data-gq-friend]').forEach(el => el.remove());
+    // Defensive, same criterion as the [data-gq-friend]/#gq-lb-vsopp cleanup
+    // above/below: a GROUP "por turnos" match's own leaderboard (one
+    // .lb-entry per room member, id="gq-lb-lob<uid>", plus the
+    // vs-active/gq-turns-mode classes it puts on the bar for its rotated
+    // card layout) is normally cleared by _gqGroupTurnsTeardown() — but that
+    // only runs through window.gameStoppers, and a 1v1 duel launched
+    // straight from vs.js's _launchVersus never calls those. Without this,
+    // a 1v1 "por turnos" started right after a group match kept the whole
+    // room's stale cards floating in the bar AND rendered its own
+    // player/opponent rows with the group's rotated layout (the reported
+    // "leaderboard roto, salen cards que no deberían salir").
+    bar.querySelectorAll('.lb-entry[id^="gq-lb-lob"]').forEach(el => el.remove());
+    bar.classList.remove('gq-turns-mode');
     gqVsOppBestKm = Infinity;
     gqVsMyBestKm = Infinity;
     gqVsWon = false;
@@ -2767,8 +2852,9 @@
     // VS 1v1 builds/positions its own row separately
     // (globequizVsPrepareOpponentRow, already called by vs.js before
     // initGlobeQuiz) — don't touch here, avoids overwriting the opponent's
-    // row with the friends-by-time logic below.
-    if (window._vsActive) return;
+    // row with the friends-by-time logic below. Group lobby (up to 10) is
+    // the same idea: _gqGroupBuildLeaderboard/_gqGroupPositionLb own the bar.
+    if (window._vsActive || window._gqGroupActive || window._gqGroupTurnsActive) return;
     buildGqFriendRows();
     lastGqPlayerRank = -1;
     positionGqLeaderboard(0, false);
@@ -2810,8 +2896,13 @@
     // specific), and this also fires from paths that DON'T go through
     // quitToMenu() at all (e.g. globequizVsShowLoss). Matters most for
     // "por turnos": whoever abandons/gets AFK-kicked mid-turn can have the
-    // 5s tick, timesup, or a turn-notification sfx still playing.
-    [sfxTickdown, sfxTimesUp, sfxCheck, sfxSelect].forEach(s => {
+    // 5s tick, timesup, or a turn-notification sfx still playing. Also
+    // covers sfxBonus/sfxCountdown (correct-guess chime / pregame beep) —
+    // missing before, so "quedarse solo" (window.LB.triggerAlone → this
+    // same reset) right after someone had just answered right could leave
+    // that chime ringing over the menu (the reported "any sfx still
+    // playing should get cancelled when going back to the menu").
+    [sfxTickdown, sfxTimesUp, sfxCheck, sfxSelect, sfxBonus, sfxCountdown].forEach(s => {
       if (s) { try { s.pause(); s.currentTime = 0; } catch (e) {} }
     });
     if (typeof window.stopGlobeQuizEndgameTimer === 'function') window.stopGlobeQuizEndgameTimer();
@@ -2828,12 +2919,16 @@
     dailyCountry = null;
     gqVsOppBestKm = Infinity;
     gqVsMyBestKm = Infinity;
-    // Undo the own card's two-line layout (time/km) and remove the
-    // opponent's row — otherwise the next SOLO match (which reuses the same
-    // #gq-lb-player-time) would start with the VS HTML/class stuck on.
-    const myScoreEl = document.getElementById('gq-lb-player-time');
-    if (myScoreEl) { myScoreEl.classList.remove('gq-lb-vs-score'); myScoreEl.textContent = '0:00'; }
-    document.getElementById('gq-lb-vsopp')?.remove();
+    _gqGroupTeardown();
+    _gqGroupTurnsTeardown();
+    // Full reset of #gq-friends-bar back to its static baseline (single
+    // #gq-lb-player row, correct ids, no leftover classes/inline styles) —
+    // supersedes the old piecemeal cleanup that used to live here (undo the
+    // VS two-line score layout, remove the opponent row): those only
+    // patched the ONE known leftover shape from a 1v1 duel, never the group
+    // modes' own differently-shaped rows/ids (see _gqResetFriendsBar's own
+    // comment for the full "cards bugueados de posición" story).
+    _gqResetFriendsBar();
     // "Por turnos" leftovers — a rematch calls globequizSetTurnsMode() again
     // right after this, so this is only load-bearing on a real exit/abandon.
     _gqTurnsVariant = false;
@@ -2868,6 +2963,2332 @@
   window.globequizHardReset = globequizHardReset;
   window.gameStoppers = window.gameStoppers || [];
   window.gameStoppers.push(globequizHardReset);
+
+  // ── GloboReto GRUPAL, variante "tiempo real" (hasta 10 jugadores) ──────────
+  // Cada ronda: todos buscan el mismo país (seed compartida) sin límite de
+  // tiempo; el primero en acertar dispara un contador de 20s COMPARTIDO (ver
+  // .gq-countdown-widget, el mismo widget que "por turnos" reutiliza para su
+  // propio countdown) durante el cual el resto todavía puede acertar. Al
+  // llegar a 0, cada cliente calcula su propio puntaje de la ronda (por
+  // puesto+intentos si acertó, por cercanía+velocidad+intentos si no) y lo
+  // suma al leaderboard grupal (window.LB.reportScore/sendScore, igual que
+  // Banderas/etc). El orden de acierto (quién es 1°, 2°, 3°...) lo arbitra el
+  // HOST (única fuente de verdad — evitar que dos clientes vean un orden
+  // distinto por una simple diferencia de latencia de red) vía el canal
+  // genérico window.LB.sendGq/onGq (ver lobby.js).
+  const GQ_GROUP_COUNTDOWN_MS = 20000;
+  // Ver la conversación de diseño: puesto fijo + bonus por intentos (menos
+  // intentos = más bonus, con piso en 50 para que nunca llegue a 0), y para
+  // quien no llega a tiempo, cercanía(km) + qué tan rápido llegó a esa
+  // cercanía + un bonus de intentos más chico — siempre por debajo del peor
+  // puesto de quien SÍ acertó.
+  // El salto ENTRE CADA PUESTO consecutivo es de 400 (más que el rango
+  // completo del bonus por intentos, que va de 50 a 400 → diferencia máxima
+  // 350) — así standing NUNCA se invierte por intentos: el peor caso del
+  // puesto N (base+50) siempre le gana al mejor caso del puesto N+1
+  // (base+400), para cualquier N. Con la curva vieja un 3° con pocos
+  // intentos podía superar a un 2° con muchos (reportado, "injusto").
+  const GQ_GROUP_RANK_BASE = [3835, 3435, 3035, 2635, 2235, 1835, 1435, 1035, 635, 235];
+  function _gqGroupRankScore(rank, attempts) {
+    const base = GQ_GROUP_RANK_BASE[Math.min(Math.max(rank, 1), 10) - 1];
+    const bonus = Math.max(50, 400 - (attempts - 1) * 40);
+    return base + bonus;
+  }
+  function _gqGroupFailScore(bestKm, bestAtMs, attempts) {
+    if (!attempts) return 0;
+    const prox = 150 * Math.exp(-bestKm / 4000);
+    const speedBonus = Math.max(0, 30 - bestAtMs / 1000);
+    const attBonus = Math.max(10, 40 - (attempts - 1) * 5);
+    return prox + speedBonus + attBonus;
+  }
+
+  window._gqGroupActive = false;
+  let _gqGroupBaseSeed      = 0;
+  let _gqGroupRound         = 1;
+  let _gqGroupRounds        = 1;
+  let _gqGroupTotal         = 0;
+  let _gqGroupAttempts      = 0;
+  let _gqGroupRank          = null;    // my placement this round, once the host confirms it
+  // Whether I MYSELF solved THIS round — separate from the shared `solved`
+  // var (which _gqGroupRenderWatch deliberately repurposes to reflect
+  // whoever I'm watching "on loan" while waiting out the round, see its own
+  // comment). Reading `solved` directly in _gqGroupCloseRound to decide
+  // whether to send the "ran out of time" clock/shake broadcast made a
+  // WINNER who happened to be on loan (watching someone still playing, whose
+  // own `solved` is false) send it too, on THEIR OWN uid — the reported
+  // "the shake shows on everyone, not just those still missing".
+  let _gqGroupIAlreadySolved = false;
+  // Who's currently disconnected (presence lost, not yet actually kicked —
+  // see LB's _pendingKicks/processPendingKicks in lobby.js, which only
+  // removes them for real once the WHOLE match ends) — set by
+  // globequizSetLobbyDisconnected, read by the round-result table so it can
+  // sort them to the bottom as "DESCALIFICADO" instead of by score, same as
+  // their live card going gray (the reported "the card just disappears
+  // instead of turning gray, and disconnecting mid-match should send them
+  // to last place as disqualified").
+  let _gqGroupDisconnectedUids = new Set();
+  let _gqGroupBestKm        = Infinity;
+  let _gqGroupBestAtMs      = 0;
+  let _gqGroupCountdownEndsAt = null;
+  let _gqGroupCountdownTimer  = null;
+  let _gqGroupHostOrder     = [];      // host-only: uids in solve order, this round
+  let _gqGroupRoundScored   = false;   // did MY round score already get added to the total?
+  let _gqGroupRoundClosed   = false;   // did _gqGroupCloseRound already run for this round?
+  let _gqGroupLastSecondsLeft = null;  // last painted countdown value, see _gqGroupTickCountdown
+  let _gqGroupSolvedUids = new Set();  // every uid that solved THIS round (not just me) — who's still playing?
+  let _gqGroupOnLoan = false;          // am I currently spectating someone else while waiting out my own 20s?
+  let _gqGroupResultTimer   = null;    // 10s round-result table countdown (see _gqGroupShowRoundResultTable)
+  let _gqGroupUsedCountries = new Set(); // country names already drawn this MATCH (see pickDailyCountry)
+  let _gqGroupAlertTimer    = null;
+
+  function _gqGroupUpdateRoundBadge() {
+    const el = document.getElementById('gq-group-round-badge');
+    if (!el) return;
+    // "Por turnos" en desempate: "Ronda Final" en vez de "Ronda N/N" — ver
+    // _gqTurnsIsTiebreak, seteado en _gqTurnsCloseRound cuando hay empate
+    // de rondas ganadas al llegar a la última ronda configurada.
+    // window._gqGroupTurnsActive is only ever true on a REAL PLAYER's own
+    // client (set by showGlobequizGroupTurnsMode) — the external spectator
+    // never runs that function, so this guard alone made it fall through to
+    // "Ronda N/N" even with _gqTurnsIsTiebreak correctly set from the
+    // 'pregame' payload (see globequizSpectatorShowPregame), showing
+    // something like "Ronda 3/2" for the extra tiebreak round instead of
+    // "Ronda Final" like real players see (reported). _gqTurnsIsTiebreak by
+    // itself is exclusively a "por turnos" tiebreak flag — never true
+    // outside that context for either a real player or this spectator — so
+    // it's enough on its own.
+    el.textContent = _gqTurnsIsTiebreak
+      ? t('globequiz.finalRoundBadge')
+      : t('globequiz.groupRoundBadge', { round: _gqGroupRound, total: _gqGroupRounds });
+    el.classList.remove('is-visible');
+    el.style.display = '';
+    void el.offsetWidth; // forces reflow so the entrance transition actually plays
+    requestAnimationFrame(() => el.classList.add('is-visible'));
+  }
+  // Exit animation before the 3-2-1-GO overlay itself hides — only reachable
+  // for rounds 2+ (round 1's countdown is owned by initGlobeQuiz/
+  // runGqPregameCountdown internally, so its badge just disappears with the
+  // parent — not worth reaching into that shared function for this).
+  function _gqGroupHideRoundBadge(onDone) {
+    const el = document.getElementById('gq-group-round-badge');
+    if (!el) { onDone(); return; }
+    el.classList.remove('is-visible');
+    setTimeout(() => { el.style.display = 'none'; onDone(); }, 300);
+  }
+  // "Alguien ya adivinó" banner for whoever hasn't solved yet — the generic
+  // window.showVersusToast lives in the versus PANEL, which sits hidden
+  // behind #globequiz-screen during an actual match, so it never rendered
+  // (reported). This one lives inside the globe screen itself.
+  function _gqGroupAlert(text) {
+    const el = document.getElementById('gq-group-alert');
+    if (!el) return;
+    el.textContent = text;
+    el.style.display = 'block';
+    requestAnimationFrame(() => el.classList.add('is-visible'));
+    clearTimeout(_gqGroupAlertTimer);
+    _gqGroupAlertTimer = setTimeout(() => {
+      el.classList.remove('is-visible');
+      setTimeout(() => { el.style.display = 'none'; }, 300);
+    }, 3500);
+  }
+  // Exposed so the EXTERNAL group spectator (spectate.js) can show the same
+  // "{name} ya adivinó el país!" notice real non-solving players see — it's
+  // pure DOM/timer state, no dependency on _gqGroupActive, so it's safe to
+  // reuse as-is for a passive spectator.
+  window.globequizGroupSpectatorAlert = _gqGroupAlert;
+
+  function _gqGroupPaintCountdown(secondsLeft) {
+    const el = document.getElementById('gq-timer-number');
+    if (el) el.textContent = String(Math.max(0, secondsLeft));
+  }
+  // Shared wall-clock target (endsAt comes from the host) — same
+  // self-correcting pattern as the lobby's own start countdown
+  // (window.LB.sendCountdown): every client independently re-derives
+  // "seconds left" from Date.now(), so a slow tab or late timer never drifts
+  // the displayed number, it just catches up.
+  function _gqGroupTickCountdown() {
+    if (!_gqGroupCountdownEndsAt) return;
+    const secondsLeft = Math.ceil((_gqGroupCountdownEndsAt - Date.now()) / 1000);
+    // Only repaint/pulse/tick-sound when the displayed SECOND actually
+    // changes — same guard _gqTickTurnTimer uses. Without it (this ran on
+    // every 250ms poll unconditionally) the countdown icon's glow animation
+    // was restarted 4x/sec instead of once, which read as a constant
+    // flicker (reported) instead of one clean pulse per second.
+    if (secondsLeft === _gqGroupLastSecondsLeft) return;
+    _gqGroupLastSecondsLeft = secondsLeft;
+    _gqGroupPaintCountdown(secondsLeft);
+    if (typeof pulseCountdown === 'function') pulseCountdown();
+    if (secondsLeft > 0 && secondsLeft <= 5) {
+      _gqSetCountdownIconRed(true);
+      if (typeof sfxTickdown !== 'undefined' && typeof sfxPlay === 'function') { sfxTickdown.currentTime = 0; sfxPlay(sfxTickdown); }
+    }
+    // _gqGroupCloseRound() clears _gqGroupCountdownEndsAt itself (first
+    // thing it does) — this guard is what actually stops repeat ticks from
+    // calling it again: without it, if `endsAt` was already in the past by
+    // the time _gqGroupStartCountdown ran (a late 'countdown' broadcast),
+    // its OWN immediate tick fired _gqGroupCloseRound() BEFORE
+    // _gqGroupCountdownTimer had even been assigned — so _gqGroupStopCountdown
+    // found nothing to clear, the interval kept running every 250ms, and
+    // every one of those ticks saw the same still-in-the-past endsAt and
+    // called _gqGroupCloseRound() all over again (reported: the black
+    // times-up flash kept re-firing on a loop).
+    if (secondsLeft <= 0) _gqGroupCloseRound();
+  }
+  function _gqGroupStartCountdown(endsAt) {
+    _gqGroupStopCountdown();
+    _gqGroupCountdownEndsAt = endsAt;
+    _gqGroupLastSecondsLeft = null;
+    _gqSetCountdownIconRed(false);
+    document.querySelector('.gq-countdown-widget')?.style.removeProperty('display');
+    // Timer assigned BEFORE the immediate tick (not after) — see the long
+    // comment in _gqGroupTickCountdown for why this order matters.
+    _gqGroupCountdownTimer = setInterval(_gqGroupTickCountdown, 250);
+    _gqGroupTickCountdown();
+  }
+  function _gqGroupStopCountdown() {
+    if (_gqGroupCountdownTimer) clearInterval(_gqGroupCountdownTimer);
+    _gqGroupCountdownTimer = null;
+  }
+
+  // Adds a round score to my running total EXACTLY once — called either in
+  // real time (the moment the host confirms my rank, right after I solve)
+  // or, as a fallback, when the 20s window closes for whoever never solved.
+  // Reports to the shared leaderboard right away (window.LB.reportScore/
+  // sendScore, same as flags.js) so everyone sees it update live, not just
+  // at the end of the round.
+  function _gqGroupApplyRoundScore(score) {
+    if (_gqGroupRoundScored) return;
+    _gqGroupRoundScored = true;
+    _gqGroupTotal += Math.round(score);
+    // window._lobbyMembers (onScore/onMembers, lobby.js) only ever carries
+    // OPPONENTS' scores — my own row needs this direct call, same as
+    // sortFlagsLeaderboard in flags.js.
+    _gqGroupPositionLb(_gqGroupTotal, true);
+    window.LB.reportScore(_gqGroupTotal);
+    window.LB.sendScore(_gqGroupTotal);
+  }
+
+  // Reuses the shared #timeup-overlay (cities/shapes/monuments' own
+  // end-of-match flash) for the round-end beat — same 1800ms in / 400ms out
+  // timing already used everywhere else.
+  function _gqGroupShowTimesUp(onDone) {
+    const el = document.getElementById('timeup-overlay');
+    if (!el) { onDone(); return; }
+    el.classList.remove('timeup-out');
+    el.classList.add('timeup-in');
+    el.style.display = 'flex';
+    setTimeout(() => {
+      el.classList.remove('timeup-in');
+      el.classList.add('timeup-out');
+      setTimeout(() => {
+        el.style.display = 'none';
+        el.classList.remove('timeup-out');
+        onDone();
+      }, 400);
+    }, 1800);
+  }
+  // Exposed for the GroupSpectate "por turnos" mirror (spectate.js) — see
+  // _specGqTurnsShowRoundResult there, which plays this same flash before
+  // building its own table, just like the real non-winning players do.
+  window._gqShowTimesUpFor = _gqGroupShowTimesUp;
+  // "Por turnos" ONLY: the tiebreak ended by abandonment, not a real
+  // timeout (see soloWin in _gqTurnsCloseRound) — same #powerquit-overlay
+  // (gameover.png)/timing every 1v1 loser already gets
+  // (globequizVsShowLoss/globequizSpectatorShowLoss), reused here instead
+  // of the "TIMES UP" flash, which implied a clock running out that never
+  // actually happened (per request).
+  function _gqGroupShowGameOver(onDone) {
+    const el = document.getElementById('powerquit-overlay');
+    if (!el) { onDone(); return; }
+    el.classList.remove('timeup-out');
+    el.classList.add('timeup-in');
+    el.style.display = 'flex';
+    setTimeout(() => {
+      el.classList.remove('timeup-in');
+      el.classList.add('timeup-out');
+      setTimeout(() => {
+        el.style.display = 'none';
+        el.classList.remove('timeup-out');
+        onDone();
+      }, 400);
+    }, 1800);
+  }
+  // Exposed for the GroupSpectate "por turnos" mirror (spectate.js) — see
+  // the 'tround' handler's soloWin case there.
+  window._gqShowGameOverFor = _gqGroupShowGameOver;
+
+  // Same visual as the multi-mode inter screen (_presentIntermediateResult
+  // in lobby.js — reuses its exact .lobby-result-row/-pos/-avatar/-name/
+  // -score classes, just in GloboReto's own #gq-round-result-screen so as
+  // not to disturb that function's mode-transition-specific logic) — a 10s
+  // ranking of the current totals, THEN the next round starts. No broadcast
+  // needed to advance: same as _presentIntermediateResult's own next-mode
+  // step, every client computes the next round's seed the same deterministic
+  // way and starts it independently once ITS OWN local 10s timer ends.
+  function _gqGroupShowRoundResultTable(onDone) {
+    const screen = document.getElementById('gq-round-result-screen');
+    const list   = document.getElementById('gq-round-result-list');
+    const tag    = document.getElementById('gq-round-result-tag');
+    if (!screen || !list) { onDone(); return; }
+    const myId = window._sbUserId;
+    const all = [{
+      id: myId,
+      name: (window._sbProfile && window._sbProfile.name) || localStorage.getItem('playerName') || 'Tú',
+      avatar: localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png',
+      frameCode: (window._sbProfile && window._sbProfile.frame_code) || '0001',
+      score: _gqGroupTotal,
+    }].concat((window._lobbyMembers || []).map(m => ({
+      id: m.id, name: m.name, avatar: m.avatar, frameCode: m.frameCode || '0001', score: m.score || 0,
+      disconnected: _gqGroupDisconnectedUids.has(m.id),
+    })));
+    // Disconnected members sort to the BOTTOM as disqualified, regardless
+    // of score — same criterion as their card going gray live (the reported
+    // "on disconnect they should drop to last place as disqualified", not
+    // just vanish or stay ranked by a score that stopped updating).
+    all.sort((a, b) => (!!a.disconnected - !!b.disconnected) || (b.score - a.score));
+    // "Por turnos" en desempate: esta tabla muestra el resultado de la
+    // última ronda CONFIGURADA (recién empatada, p.ej. "Ronda 2/2") — el
+    // "Ronda Final" es para la RONDA EXTRA que sigue (su propio 3-2-1-GO,
+    // ver _gqGroupUpdateRoundBadge/_gqTurnsIsTiebreak), no para esta tabla.
+    if (tag) tag.textContent = t('globequiz.groupRoundBadge', { round: _gqGroupRound, total: _gqGroupRounds });
+    // Same "correct country" reveal as the solo/1v1 endgame modal
+    // (.gq-endgame-country/-flag) — dailyCountry is still THIS round's
+    // target here, _gqGroupBeginRound(round+1) only overwrites it after
+    // this table closes.
+    const countryLabel = document.getElementById('gq-round-result-country-label');
+    const countryFlag  = document.getElementById('gq-round-result-flag');
+    if (countryLabel) countryLabel.textContent = dailyCountry ? t('globequiz.hintCorrect', { name: displayName(dailyCountry) }) : '';
+    if (countryFlag) {
+      const flagUrl = dailyCountry && dailyCountry.iso2 && window.flagUrlForCountryCode ? window.flagUrlForCountryCode(dailyCountry.iso2) : '';
+      countryFlag.src = flagUrl || '';
+      countryFlag.style.display = flagUrl ? '' : 'none';
+    }
+    const medals = ['🥇', '🥈', '🥉'];
+    list.innerHTML = '';
+    all.forEach((m, i) => {
+      const row = document.createElement('div');
+      row.className = 'gq-round-result-row' + (m.id === myId ? ' is-me' : '') + (m.disconnected ? ' is-disconnected' : '');
+      const scoreHtml = m.disconnected
+        ? `<span class="gq-round-result-score gq-round-result-dq">${t('lobby.disqualified', 'DESCALIFICADO')}</span>`
+        : `<span class="gq-round-result-score">${Math.round(m.score || 0).toLocaleString()}</span>`;
+      row.innerHTML =
+        `<span class="gq-round-result-pos">${medals[i] || (i + 1)}</span>` +
+        `<div class="gq-round-result-avatar-wrap"><img class="gq-round-result-avatar" src="${m.avatar}" draggable="false" oncontextmenu="return false"></div>` +
+        `<span class="gq-round-result-name">${m.name}${m.id === myId ? ' (' + t('lobby.you') + ')' : ''}</span>` +
+        scoreHtml;
+      window.CustomizeAssets?.applyFrame(row.querySelector('.gq-round-result-avatar-wrap'), m.frameCode || '0001');
+      list.appendChild(row);
+    });
+    screen.style.display = 'flex';
+    if (typeof playMusic === 'function' && typeof sfxPostgame !== 'undefined') playMusic(sfxPostgame);
+    const bar  = document.getElementById('gq-round-result-bar');
+    const cdEl = document.getElementById('gq-round-result-cd');
+    const DURATION_MS = 10000;
+    const start = Date.now();
+    if (bar) { bar.style.transition = 'none'; bar.style.width = '100%'; }
+    if (cdEl) cdEl.textContent = '10';
+    requestAnimationFrame(() => { if (bar) { bar.style.transition = `width ${DURATION_MS}ms linear`; bar.style.width = '0%'; } });
+    clearInterval(_gqGroupResultTimer);
+    _gqGroupResultTimer = setInterval(() => {
+      const remain = Math.ceil((DURATION_MS - (Date.now() - start)) / 1000);
+      if (cdEl) cdEl.textContent = Math.max(0, remain);
+      if (remain <= 0) {
+        clearInterval(_gqGroupResultTimer); _gqGroupResultTimer = null;
+        screen.style.display = 'none';
+        onDone();
+      }
+    }, 200);
+  }
+
+  // My OWN 20s window just closed (whether I solved or not this round).
+  // Guarded with _gqGroupRoundClosed — belt-and-suspenders on top of the
+  // ordering fix in _gqGroupStartCountdown, so this can NEVER run twice for
+  // the same round no matter what re-triggers _gqGroupTickCountdown.
+  function _gqGroupCloseRound() {
+    if (_gqGroupRoundClosed) return;
+    _gqGroupRoundClosed = true;
+    // Back to "player" status for everyone before the times-up flash/table
+    // — see _gqGroupExitLoan (a no-op for anyone who wasn't on loan).
+    _gqGroupExitLoan();
+    _gqGroupStopCountdown();
+    _gqGroupCountdownEndsAt = null;
+    // Stops the ORIGINAL ascending elapsed-timer interval (started by
+    // startTimer() at the top of the round) — updateTimerDisplay() only
+    // skips painting #gq-timer-number WHILE _gqGroupCountdownEndsAt is set;
+    // the instant this round-close nulled it out above, that guard opened
+    // back up and the still-running 1s interval started painting the REAL
+    // elapsed-seconds-since-round-start count over the frozen "0" (reported:
+    // "the counter goes back to 48 49 50"). No reason for that timer to
+    // keep running once the round is over anyway.
+    stopTimer();
+    // gamemusic keeps looping otherwise through the times-up flash and the
+    // round-result table (reported) — same as every other mode's own
+    // end-of-match/end-of-round beat (endFlagsGame/etc all cut it first).
+    if (typeof playMusic === 'function') playMusic(null);
+    const input = document.getElementById('gq-guess-input'), btn = document.getElementById('gq-guess-btn');
+    if (input) input.disabled = true;
+    if (btn) btn.classList.add('gq-disabled');
+    // Safety net: whoever never solved (or, in principle, never got a rank
+    // confirmation back in time) gets scored now — solvers were already
+    // scored live in _gqGroupHandleGqEvent's 'rank' case.
+    if (!_gqGroupRoundScored) {
+      // _gqGroupIAlreadySolved, NOT the shared `solved` — see its own
+      // comment: `solved` gets repurposed to reflect whoever I'm watching
+      // "on loan" while waiting out the round, which is false for a winner
+      // watching a still-playing member (this safety net would otherwise
+      // score them as a fail).
+      _gqGroupApplyRoundScore(_gqGroupIAlreadySolved
+        ? _gqGroupRankScore(_gqGroupRank || 10, _gqGroupAttempts)
+        : _gqGroupFailScore(_gqGroupBestKm, _gqGroupBestAtMs, _gqGroupAttempts));
+    }
+    const isLastRound = _gqGroupRound >= _gqGroupRounds;
+    const afterFlash = () => {
+      if (!window._gqGroupActive) return;
+      if (isLastRound) {
+        // Same generic "I finished this mode" hook every other lobby mode
+        // uses (flags.js/etc) — lobby.js takes it from here (waits for
+        // everyone, shows the final ranking, ends the room).
+        window._lobbyHandleGameEnd(_gqGroupTotal);
+        return;
+      }
+      _gqGroupShowRoundResultTable(() => {
+        if (!window._gqGroupActive) return;
+        _gqGroupBeginRound(_gqGroupRound + 1);
+      });
+    };
+    // The "TIMES UP" flash + sfx ALWAYS plays for everyone when the round
+    // closes — whether it's because time genuinely ran out or everyone
+    // raced to solve before the shared 20s even did ('allsolved'), this is
+    // a room-wide "the round is over" beat, same for solvers and
+    // non-solvers alike (per explicit instruction: don't skip it based on
+    // solved status — an earlier version that did desynced round
+    // transitions between clients). What's genuinely conditional is ONLY
+    // the clock/shake effect on a card — see right below — kept as a
+    // SEPARATE step so the two don't accidentally end up gated by the same
+    // condition again.
+    if (typeof sfxTimesUp !== 'undefined' && typeof sfxPlay === 'function') { sfxTimesUp.currentTime = 0; sfxPlay(sfxTimesUp); }
+    // Clock/shake effect on MY OWN leaderboard row (this same client's
+    // view) + tells everyone else (other real players' friends-bar rows,
+    // and the external spectator's mirrored rows) so it shows there too —
+    // ONLY if I genuinely didn't answer. _gqGroupIAlreadySolved, NOT the
+    // shared `solved` — see its own comment: a WINNER on loan watching
+    // someone still playing has `solved` repurposed to reflect THAT member
+    // (false), which made the winner's own client also send this on THEIR
+    // OWN uid (the reported "the shake still shows on everyone, not just
+    // those still missing"). Separate from the room's generic 'timesup'
+    // broadcast (LB.sendTimesUp), which for GlobeQuiz group means "I WON"
+    // (drives _finishedUids/POV auto-advance, see the win branch above),
+    // the opposite of what this effect is for.
+    if (!_gqGroupIAlreadySolved) {
+      window.globequizSetLobbyTimesUpFor(window._sbUserId);
+      window.LB.sendGq({ t: 'ranout', uid: window._sbUserId, round: _gqGroupRound });
+    }
+    _gqGroupShowTimesUp(afterFlash);
+  }
+
+  // Host-arbitrated round protocol (window.LB.sendGq/onGq, see lobby.js) —
+  // 'solved' (any client, on a correct guess) → host assigns rank + opens
+  // the 20s window on the FIRST one; 'rank' (host → everyone) → the named
+  // uid learns its placement (and, if it's ME, scores right away — see
+  // _gqGroupApplyRoundScore); 'countdown' (host → everyone) → shared endsAt
+  // + an alert for whoever hasn't solved yet. Both tagged with `round` so a
+  // stray/delayed message from a round that already ended is ignored.
+  // Advancing to the NEXT round needs no broadcast at all — see
+  // _gqGroupShowRoundResultTable.
+  function _gqGroupResolveName(uid) {
+    if (uid === window._sbUserId) {
+      return (window._sbProfile && window._sbProfile.name) || localStorage.getItem('playerName') || 'Alguien';
+    }
+    const m = (window._lobbyMembers || []).find(x => x.id === uid);
+    return (m && m.name) || 'Alguien';
+  }
+
+  // Whoever finishes a round early gets bored watching their own already-
+  // solved globe for up to 20s — instead they watch whoever's still
+  // playing's guess list, rotating automatically as those finish too, until
+  // either only one player is left or the round itself closes.
+  //
+  // Deliberately NOT built on GroupSpectate/openSpectatorGroup (the "spectate
+  // on loan" system lobby.js's own _enterGroupWaitAsSpectator uses for the
+  // DIFFERENT "wait for the whole mode to end" case): releasing this
+  // client's own LB channel (needed so GroupSpectate can subscribe to the
+  // same topic) broke the host's ability to arbitrate rank/countdown while
+  // on loan, and skipping closeSpectator()'s teardown left the spectator
+  // UI's own timer running forever (reported: "the counter goes back to
+  // 42 43 44"). My own LB channel now stays connected the whole time
+  // instead — round arbitration keeps working untouched, host included.
+  //
+  // The globe itself IS real, though — dailyCountry is the SAME for every
+  // player in a round (shared seed), so there's nothing to swap there; only
+  // `guesses` and `solved` need to temporarily reflect whoever I'm watching
+  // instead of my own (already-finished) round, painted via the exact same
+  // drawTexture/renderGuessList/focusOnCountry the real board uses. Safe to
+  // repurpose them this way because MY OWN guesses/solved have nothing left
+  // to do until the next round resets them fresh (_gqGroupBeginRound) — the
+  // earlier version avoided this on purpose (to dodge
+  // globequizSpectatorSyncGuesses's `if (solved) return` guard elsewhere)
+  // but that threw out the real globe too; this reimplements just the
+  // painting, without that shared function or its guard.
+  let _gqGroupWatchUid = null;          // uid whose board I'm currently painting, or null
+  let _gqGroupWatchGuesses = new Map(); // uid -> [{name,km,dir,color}], built live from onAnswer
+  let _gqGroupWatchTyping  = new Map(); // uid -> last known typed text, so switching POV shows what's ALREADY there instead of waiting for their next keystroke
+
+  function _gqGroupOnPeerAnswer(payload) {
+    if (!window._gqGroupActive || !payload || !payload.uid || payload.uid === window._sbUserId) return;
+    if (!payload.correct) {
+      const list = _gqGroupWatchGuesses.get(payload.uid) || [];
+      list.push({ name: payload.name, km: payload.km, dir: payload.dir, color: payload.color });
+      _gqGroupWatchGuesses.set(payload.uid, list);
+    }
+    if (_gqGroupOnLoan && _gqGroupWatchUid === payload.uid) _gqGroupRenderWatch();
+  }
+
+  // Everyone in the room still going, in a stable order — recomputed fresh
+  // on every nav action since who's still playing changes as people finish.
+  function _gqGroupStillPlayingList() {
+    return (window._lobbyMembers || []).filter(m => !_gqGroupSolvedUids.has(m.id));
+  }
+
+  // Paints the real globe with whoever I'm watching's guesses so far — same
+  // pipeline the actual player sees (drawTexture colors the tried countries,
+  // renderGuessList builds the side list, focusOnCountry centers the
+  // camera on their latest pick). The camera/drag/zoom stay fully
+  // interactive on MY side independently — this doesn't mirror their exact
+  // viewpoint, just their progress, which is what "seeing their globe live"
+  // actually needs.
+  function _gqGroupRenderWatch() {
+    if (!_gqGroupWatchUid) return;
+    guesses = (_gqGroupWatchGuesses.get(_gqGroupWatchUid) || []).slice();
+    solved = false; // I only ever watch someone still IN the round — see _gqGroupAdvanceWatch
+    drawTexture();
+    renderGuessList();
+    if (guesses.length) {
+      const last = guesses[guesses.length - 1];
+      const c = countryByName.get(normalize(last.name || ''));
+      if (c) focusOnCountry(c);
+    }
+  }
+
+  // Same mini-HUD the real group spectator (other 4 modes, see
+  // openSpectatorGroup/#spectator-mini-hud in spectate.js) uses: "ESPECTANDO"
+  // tag + avatar + name + POV arrows, bottom of the screen — instead of a
+  // one-off banner of our own, so this looks/behaves like every other
+  // group-spectate surface in the game.
+  function _gqGroupShowWatchBanner(member) {
+    const hud       = document.getElementById('spectator-mini-hud');
+    const row       = document.getElementById('spectator-mini-row');
+    const nameEl    = document.getElementById('spectator-mini-name');
+    const avatarEl  = document.getElementById('spectator-mini-avatar');
+    const avatarWrap = document.getElementById('spectator-mini-avatar-wrap');
+    const prevEl    = document.getElementById('spectator-mini-pov-prev');
+    const nextEl    = document.getElementById('spectator-mini-pov-next');
+    if (nameEl) nameEl.textContent = (member && member.name) || 'Jugador';
+    if (avatarEl) avatarEl.src = (member && member.avatar) || 'images/profilepic/ppdefault.png';
+    window.CustomizeAssets?.applyFrame(avatarWrap, (member && member.frameCode) || '0001');
+    if (row) row.classList.add('group-pov');
+    if (prevEl) prevEl.style.display = 'flex';
+    if (nextEl) nextEl.style.display = 'flex';
+    if (hud) hud.style.display = '';
+    // Nothing of MY OWN round is relevant while watching someone else — the
+    // "correct country" hint and the (already-disabled anyway) guess input
+    // row would just be confusing clutter on top of their board.
+    const hintEl = document.getElementById('gq-hint');
+    if (hintEl) hintEl.style.display = 'none';
+    document.querySelector('.gq-guess-row')?.style.setProperty('display', 'none');
+    // Show the locked "what are they typing" bar — prefilled from
+    // _gqGroupWatchTyping's cache (whatever they'd already typed by now),
+    // not left on the default placeholder until their NEXT keystroke.
+    document.getElementById('gq-group-watch-typing-row')?.style.setProperty('display', '');
+    _gqGroupUpdateTypingPreview(_gqGroupWatchTyping.get(_gqGroupWatchUid) || '');
+  }
+  function _gqGroupHideWatchBanner() {
+    const hud = document.getElementById('spectator-mini-hud');
+    const row = document.getElementById('spectator-mini-row');
+    const prevEl = document.getElementById('spectator-mini-pov-prev');
+    const nextEl = document.getElementById('spectator-mini-pov-next');
+    if (hud) hud.style.display = 'none';
+    if (row) row.classList.remove('group-pov');
+    if (prevEl) prevEl.style.display = 'none';
+    if (nextEl) nextEl.style.display = 'none';
+    // Clears the inline overrides from _gqGroupShowWatchBanner — the next
+    // round's own flow (_gqGroupBeginRound) decides real visibility from
+    // here, this just makes sure nothing stays stuck hidden if exit happens
+    // outside that normal path.
+    document.getElementById('gq-hint')?.style.removeProperty('display');
+    document.querySelector('.gq-guess-row')?.style.removeProperty('display');
+    document.getElementById('gq-group-watch-typing-row')?.style.setProperty('display', 'none');
+    _gqGroupUpdateTypingPreview('');
+  }
+  // Live preview of what the currently-watched player is typing — see the
+  // 'typing' broadcast (sent from every keystroke, same "no debounce" rule
+  // the 1v1 turns-mode preview already uses) and its handling in
+  // _gqGroupHandleGqEvent.
+  function _gqGroupUpdateTypingPreview(text) {
+    // Same trick globequizShowOpponentTyping uses for "por turnos" (1v1):
+    // the input stays disabled/empty, its PLACEHOLDER is what shows the
+    // live text — falls back to the normal "Escribe un país..." when empty.
+    const input = document.getElementById('gq-group-watch-typing-input');
+    if (!input) return;
+    input.placeholder = (text || '').trim() || t('globequiz.inputPh');
+  }
+  document.getElementById('spectator-mini-pov-prev')?.addEventListener('click', () => {
+    if (!_gqGroupOnLoan) return;
+    if (typeof sfxCheck !== 'undefined' && typeof sfxPlay === 'function') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+    _gqGroupSwitchWatch(-1);
+  });
+  document.getElementById('spectator-mini-pov-next')?.addEventListener('click', () => {
+    if (!_gqGroupOnLoan) return;
+    if (typeof sfxCheck !== 'undefined' && typeof sfxPlay === 'function') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+    _gqGroupSwitchWatch(1);
+  });
+
+  function _gqGroupEnterLoan() {
+    if (_gqGroupOnLoan || !window._gqGroupActive || solved !== true) return;
+    const stillPlaying = _gqGroupStillPlayingList();
+    if (!stillPlaying.length) return; // nobody left to watch — the round is about to close anyway ('allsolved')
+    _gqGroupOnLoan = true;
+    _gqGroupWatchUid = stillPlaying[0].id;
+    _gqGroupShowWatchBanner(stillPlaying[0]);
+    _gqGroupRenderWatch();
+  }
+
+  // Manual POV switch (prev/next arrows, see #spectator-mini-hud) — wraps
+  // around the current still-playing list.
+  function _gqGroupSwitchWatch(direction) {
+    if (!_gqGroupOnLoan) return;
+    const list = _gqGroupStillPlayingList();
+    if (!list.length) { _gqGroupExitLoan(); return; }
+    let idx = list.findIndex(m => m.id === _gqGroupWatchUid);
+    idx = idx === -1 ? 0 : (idx + direction + list.length) % list.length;
+    _gqGroupWatchUid = list[idx].id;
+    _gqGroupShowWatchBanner(list[idx]);
+    _gqGroupRenderWatch();
+  }
+
+  // Called when whoever I'm currently watching solves too — jump to another
+  // still-playing member, or stop watching if nobody's left (the round is
+  // about to close for everyone via 'allsolved').
+  function _gqGroupAdvanceWatch() {
+    if (!_gqGroupOnLoan) return;
+    const stillPlaying = _gqGroupStillPlayingList();
+    if (!stillPlaying.length) { _gqGroupExitLoan(); return; }
+    _gqGroupWatchUid = stillPlaying[0].id;
+    _gqGroupShowWatchBanner(stillPlaying[0]);
+    _gqGroupRenderWatch();
+  }
+
+  // Back to normal "player" status — called as soon as MY round closes
+  // (whether I was ever on loan or not; a no-op otherwise), so everyone is
+  // off the watch UI before the next round's pregame countdown starts.
+  function _gqGroupExitLoan() {
+    if (!_gqGroupOnLoan) return;
+    _gqGroupOnLoan = false;
+    _gqGroupWatchUid = null;
+    _gqGroupHideWatchBanner();
+  }
+
+  function _gqGroupHandleGqEvent(payload) {
+    if (!window._gqGroupActive || !payload || payload.round !== _gqGroupRound) return;
+    if (payload.t === 'solved') {
+      _gqGroupSolvedUids.add(payload.uid);
+      // check.png pop-in + check.mp3 over their card, stays until the round
+      // ends — for EVERY client that receives this (including MY OWN, via
+      // broadcast.self:true), not host-only.
+      window.globequizSetLobbySolvedFor(payload.uid);
+      // If I'm currently watching this uid on loan, they just finished too
+      // — move on to someone else still playing.
+      if (_gqGroupOnLoan && payload.uid === _gqGroupWatchUid) _gqGroupAdvanceWatch();
+      if (window.LB.isHost()) {
+        if (!_gqGroupHostOrder.includes(payload.uid)) _gqGroupHostOrder.push(payload.uid);
+        const rank = _gqGroupHostOrder.indexOf(payload.uid) + 1;
+        window.LB.sendGq({ t: 'rank', uid: payload.uid, rank, round: _gqGroupRound });
+        const totalPlayers = window.LB.getMembers().length;
+        if (_gqGroupHostOrder.length >= totalPlayers) {
+          // Everyone already solved — end the round right now instead of
+          // making the room wait out the rest of the 20s for nothing. A
+          // dedicated 'allsolved' message (not a 'countdown' with endsAt=now)
+          // so the close happens WITHOUT repainting the counter to 0 first —
+          // it just freezes on whatever second was last shown.
+          window.LB.sendGq({ t: 'allsolved', round: _gqGroupRound });
+        } else if (_gqGroupHostOrder.length === 1) {
+          window.LB.sendGq({ t: 'countdown', endsAt: Date.now() + GQ_GROUP_COUNTDOWN_MS, round: _gqGroupRound, solverUid: payload.uid });
+        }
+      }
+      return;
+    }
+    if (payload.t === 'rank') {
+      if (payload.uid === window._sbUserId) {
+        _gqGroupRank = payload.rank;
+        _gqGroupApplyRoundScore(_gqGroupRankScore(payload.rank, _gqGroupAttempts));
+      }
+      return;
+    }
+    if (payload.t === 'countdown') {
+      if (!solved) _gqGroupAlert(t('globequiz.groupSomeoneSolved', { name: _gqGroupResolveName(payload.solverUid) }));
+      _gqGroupStartCountdown(payload.endsAt);
+      return;
+    }
+    if (payload.t === 'allsolved') { _gqGroupCloseRound(); return; }
+    // Someone else's round genuinely ran out without them answering (see
+    // the matching broadcast in _gqGroupCloseRound) — shows the clock/shake
+    // effect on THEIR row in every other real player's own friends-bar
+    // leaderboard (the external spectator gets the same signal separately,
+    // see the 'gq' handler in spectate.js).
+    if (payload.t === 'ranout') { window.globequizSetLobbyTimesUpFor(payload.uid); return; }
+    if (payload.t === 'typing') {
+      // Cached regardless of who I'm currently watching — so switching POV
+      // to this uid later shows whatever they'd ALREADY typed by then,
+      // instead of staying on the default placeholder until their next
+      // keystroke (reported).
+      _gqGroupWatchTyping.set(payload.uid, payload.text || '');
+      if (_gqGroupOnLoan && payload.uid === _gqGroupWatchUid) _gqGroupUpdateTypingPreview(payload.text);
+      return;
+    }
+  }
+
+  // Answers lobby.js's 'staterequest' (see _resendMyState/sendGqGuesses
+  // there) with MY current round's guesses/win, for a GlobeQuiz GROUP
+  // spectator who (re)connected mid-round — mirrors reportGqGuesses/
+  // _lastGqGuesses in SoloSpectate (the solo/VS path, which already had
+  // this), never ported over when group mode was added. `guesses`/`solved`/
+  // `dailyCountry` are this module's own live round state (same ones
+  // read/reset by submitGuess/_gqGroupBeginRound), safe to read directly —
+  // this function only ever gets called while _gqGroupActive.
+  // Exposes this module's own `solved` (the GROUP SPECTATOR's local replay
+  // state, same var the real player uses) — lets spectate.js's 'allsolved'
+  // handler avoid double-triggering resolvePick's win effects (confetti/sfx
+  // twice) when the normal 'ganswer' broadcast already resolved the win
+  // before 'allsolved' arrived (see that handler's own comment).
+  window._gqGroupSpecSolvedNow = function () { return solved === true; };
+
+  window._gqGroupSnapshotForResend = function () {
+    if (!window._gqGroupActive) return null;
+    // Also includes whatever I have typed RIGHT NOW (not just past
+    // guesses) — otherwise a spectator who (re)connects mid-keystroke saw
+    // nothing in the "Escribe un país" bar until my NEXT character (the
+    // reported "leaving and re-entering spectate doesn't show what's typed
+    // right now"). Same guard as the live 'input' broadcast: nothing to
+    // show once I've already solved.
+    const typingEl = solved ? null : document.getElementById('gq-guess-input');
+    return {
+      guesses: guesses.slice(),
+      solved: (solved && dailyCountry) ? { countryName: dailyCountry.name, iso2: dailyCountry.iso2 } : null,
+      typing: typingEl ? typingEl.value : '',
+      // The shared post-first-solve 20s countdown ('gq' t:'countdown') is a
+      // ONE-TIME broadcast the host sends only at the moment of the first
+      // solve — a spectator who (re)connects/switches POV AFTER that moment
+      // never receives it, so their own mirrored countdown/round-result
+      // table never started (the reported "spectator doesn't react when
+      // everyone finishes, no coordinated times up"). Piggyback the current
+      // value (if any) on this resend so they can catch up.
+      round: _gqGroupRound,
+      totalRounds: _gqGroupRounds,
+      countdownEndsAt: _gqGroupCountdownEndsAt || null,
+      // Covers the OTHER way the round can already be over with nothing
+      // left to broadcast: everyone solved before the 20s countdown even
+      // started, which skips straight to a one-time 'allsolved' (see
+      // _gqGroupHandleGqEvent's 'solved' case) — a spectator connecting
+      // after THAT moment has no countdown to catch up on either, so
+      // without this flag they were just stuck on a frozen board with no
+      // times-up/round-result at all until the NEXT round's broadcasts.
+      roundClosed: _gqGroupRoundClosed,
+    };
+  };
+
+  // GROUP spectator only: force-syncs the "Ronda N/N" badge from a
+  // 'gqguesses' resend (see the listener in spectate.js), independent of
+  // whether a distinct 'round' broadcast also happens to arrive/dedupe
+  // correctly. The badge is driven by these SAME `_gqGroupRound`/
+  // `_gqGroupRounds` vars a real round-replay would set — this just updates
+  // them (and repaints) without touching guesses/solved/dailyCountry, so
+  // it's safe to call on every resend without disturbing the board. Without
+  // it, a spectator's round number could lag behind whatever the last
+  // ACCEPTED (non-duplicate) 'round' broadcast happened to be — worked most
+  // of the time, but left a stale/off-by-one badge in exactly the race the
+  // rest of this resend protocol exists to close (the reported "the
+  // spectator's round shows one behind the real one").
+  window.globequizSpectatorSyncRoundBadge = function (round, totalRounds) {
+    if (typeof round !== 'number') return;
+    _gqGroupRound = round;
+    if (typeof totalRounds === 'number') _gqGroupRounds = totalRounds;
+    _gqGroupUpdateRoundBadge();
+  };
+
+  // Starts (or advances to) round `round` with seed `seed` — called for
+  // round 1 from showGlobequizGroupMode (loads the 3D scene via
+  // initGlobeQuiz()), and every round after that from _gqGroupCloseRound,
+  // once the round-result table closes. Rounds 2+ do NOT call
+  // initGlobeQuiz() again — that reruns its loader/spinner/space-vignette
+  // reset on an ALREADY-loaded scene, which showed as a repeated black
+  // flicker every round (reported); instead this replays just the
+  // pregame-countdown+timer beat by hand, same code initGlobeQuiz() itself
+  // runs internally (see startGqCountdown there). The PRNG is seeded ONCE,
+  // at round 1 — see pickDailyCountry() for why rounds 2+ must keep
+  // drawing from that SAME stream instead of reseeding.
+  function _gqGroupBeginRound(round) {
+    // Defensive: everyone must be back to "player" for the new round — see
+    // the long comment on _gqGroupExitLoan. Normally already exited by the
+    // time the round-result table closes (_gqGroupCloseRound), this just
+    // guards against the round-1 case and any edge case that skipped it.
+    _gqGroupExitLoan();
+    _gqGroupRound            = round;
+    _gqGroupAttempts         = 0;
+    _gqGroupRank             = null;
+    _gqGroupIAlreadySolved   = false;
+    _gqGroupBestKm           = Infinity;
+    _gqGroupBestAtMs         = 0;
+    _gqGroupHostOrder        = [];
+    _gqGroupSolvedUids       = new Set();
+    _gqGroupWatchGuesses     = new Map();
+    _gqGroupWatchTyping      = new Map();
+    _gqGroupCountdownEndsAt  = null;
+    _gqGroupRoundScored      = false;
+    _gqGroupRoundClosed      = false;
+    _gqGroupStopCountdown();
+    document.querySelector('.gq-countdown-widget')?.style.setProperty('display', 'none');
+    guesses = []; solved = false; animatedGuessNames = new Set(); dailyCountry = null;
+    _gqGroupClearSolvedIcons();
+    _gqGroupUpdateRoundBadge();
+    if (round === 1) {
+      window.globequizSetSeed(_gqGroupBaseSeed);
+      window.initGlobeQuiz();
+      return;
+    }
+    // Cuts postgameloop.mp3 (still playing from the round-result table)
+    // right as the 3-2-1-GO starts — it kept playing straight through the
+    // next round otherwise (reported).
+    if (typeof playMusic === 'function') playMusic(null);
+    // Same base position/zoom/auto-rotate reset initGlobeQuiz() does for
+    // round 1 — dropped when round 2+ stopped calling initGlobeQuiz() (to
+    // fix the black flicker), which left the globe wherever the previous
+    // round's guesses left it instead of a fresh spinning view (reported).
+    if (sphere) { sphere.rotation.x = BASE_ROT_X; sphere.rotation.y = BASE_ROT_Y; }
+    zoomZ = BASE_Z;
+    if (camera) camera.position.z = zoomZ;
+    if (typeof updateSpaceVignette === 'function') updateSpaceVignette();
+    startAutoRotate();
+    pickDailyCountry();
+    drawTexture();
+    renderGuessList();
+    updateHint();
+    const msg = document.getElementById('gq-win-msg');
+    if (msg) msg.style.display = 'none';
+    const input = document.getElementById('gq-guess-input'), btn = document.getElementById('gq-guess-btn');
+    if (input) { input.disabled = false; input.value = ''; }
+    if (btn) btn.classList.remove('gq-disabled');
+    const guessRow = document.querySelector('.gq-guess-row');
+    const hintEl2  = document.getElementById('gq-hint');
+    const canvasEl = document.getElementById('gq-canvas');
+    if (guessRow) guessRow.style.display = 'none';
+    if (hintEl2) hintEl2.style.display = 'none';
+    if (canvasEl) canvasEl.style.pointerEvents = 'none';
+    // Tagged with the round counter (same reason as the 'round' broadcast
+    // below) so a spectator's badge is already correct DURING this round's
+    // 3-2-1-GO, instead of only once 'round' arrives at the END of it (the
+    // reported "starting round 2/5, the spectator still shows 1/5").
+    if (typeof window._specReportPregame === 'function') window._specReportPregame({ mode: 'globequiz', startedAt: Date.now(), round: _gqGroupRound, totalRounds: _gqGroupRounds });
+    runGqPregameCountdown(() => {
+      _gqGroupHideRoundBadge(() => {});
+      if (guessRow) guessRow.style.display = '';
+      if (hintEl2) hintEl2.style.display = '';
+      if (canvasEl) canvasEl.style.pointerEvents = '';
+      if (typeof playMusic === 'function' && typeof sfxGameMusic !== 'undefined') playMusic(sfxGameMusic);
+      startTimer();
+      if (typeof window._specReportRound === 'function') window._specReportRound({ mode: 'globequiz', startedAt: gqTimerStart, round: _gqGroupRound, totalRounds: _gqGroupRounds });
+    });
+  }
+
+  // ── Leaderboard grupal (reusa .gq-friends-bar + .lb-entry, mismo sistema
+  // que flagsSetLobbyScores/etc en flags.js — GQ_LB_WINDOW/GQ_LB_ROW_H_CQMIN
+  // ya existían para la lista de amigos del modo diario). ──────────────────
+  function _gqGroupBuildLeaderboard() {
+    const bar = document.getElementById('gq-friends-bar');
+    if (!bar) return;
+    bar.innerHTML = '';
+    // .lb-rank (el numerito 1°/2°/3°) es display:none por defecto — solo se
+    // muestra con esta clase (ver #gq-friends-bar.vs-active .lb-rank en
+    // style.css), igual que #flags-leaderboard/#leaderboard.
+    bar.classList.add('vs-active');
+    gqLbElements = {};
+    _gqGroupLastScores = {};
+    const myName = (window._sbProfile && window._sbProfile.name) || localStorage.getItem('playerName') || 'Tú';
+    const playerEl = document.createElement('div');
+    playerEl.className = 'lb-entry lb-player';
+    playerEl.id = 'gq-lb-player';
+    playerEl.innerHTML = `<span class="lb-rank rank-other"></span>`
+      + `<div class="lb-avatar"><img class="lb-avatar-img" src="${localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png'}"></div>`
+      + `<span class="lb-name">${myName}</span>`
+      + `<span class="lb-score" id="gq-lb-player-score">0</span>`;
+    playerEl.style.transition = 'none';
+    playerEl.style.top = '-9999px';
+    gqLbElements['player'] = playerEl;
+    bar.appendChild(playerEl);
+    if (window.CustomizeAssets) window.CustomizeAssets.applyCard(playerEl, (window._sbProfile && window._sbProfile.card_code) || '0001');
+    (window._lobbyMembers || []).forEach(m => {
+      const el = document.createElement('div');
+      el.className = 'lb-entry';
+      el.id = 'gq-lb-lob' + m.id;
+      el.innerHTML = `<span class="lb-rank rank-other"></span>`
+        + `<div class="lb-avatar"><img class="lb-avatar-img" src="${m.avatar}"></div>`
+        + `<span class="lb-name">${m.name}</span>`
+        + `<span class="lb-score">0</span>`;
+      el.style.transition = 'none';
+      el.style.top = '-9999px';
+      window.CustomizeAssets?.applyCard(el, m.cardCode || '0001');
+      gqLbElements['lob' + m.id] = el;
+      bar.appendChild(el);
+    });
+    requestAnimationFrame(() => {
+      _gqGroupPositionLb(0, false);
+      requestAnimationFrame(() => {
+        Object.values(gqLbElements).forEach(el => { el.style.transition = 'top 0.7s cubic-bezier(0.22,1,0.36,1)'; });
+      });
+    });
+  }
+  // Same pattern as flagsPositionLeaderboard (js/flags.js, the proven one
+  // the other 4 modes all share) — NOT excluding disconnected members from
+  // the sort/list at all. Their score is simply frozen (they can't answer
+  // anymore), so they drift down in rank naturally as everyone else keeps
+  // scoring, same as any player who just stops scoring. An earlier attempt
+  // specifically excluded/froze their `top` — that put them in a SEPARATE
+  // coordinate system from the active window, which re-anchors its
+  // bottomOffset against a member count that no longer included them, so
+  // the frozen row's stale position drifted out of sync and visually
+  // collided with the active window (the reported "everyone keeps dropping
+  // position and overlapping"). ALSO dropped the `-9999px` sentinel for
+  // out-of-window ranks flags.js never had either — every row always gets
+  // a real, continuous `top` from the SAME formula (the container's own
+  // clip-path hides whatever falls outside, see .gq-friends-bar); jumping
+  // a row between a real coordinate and -9999px was its own source of
+  // visible overlap during the 0.7s transition.
+  function _gqGroupPositionLb(myScore, animate) {
+    const liveById = new Map((window._lobbyMembers || []).map(m => ['lob' + m.id, m.score || 0]));
+    // Roster comes from gqLbElements (built ONCE at match start, see the
+    // build loop above), not from window._lobbyMembers directly: the moment
+    // someone leaves the room, the presence layer drops them from
+    // window._lobbyMembers entirely (window.LB.onMembers → _refreshLobbyOpponents
+    // in lobby.js), so building `all` from that list straight away made
+    // their row disappear from the ranking mid-animation while everyone
+    // else's card re-flowed into the freed slot — the departed member's own
+    // card, never touched again, sat frozen at its old top/z-index and got
+    // buried under whoever moved into it (the reported "the instant someone
+    // leaves, the rest shift down and that card ends up underneath").
+    // Falling back to their last known score keeps them counted at their
+    // frozen rank instead, same as an ordinary disconnect.
+    const all = Object.keys(gqLbElements).map(id => {
+      if (id === 'player') return { id, score: myScore };
+      const score = liveById.has(id) ? liveById.get(id) : (_gqGroupLastScores[id] || 0);
+      _gqGroupLastScores[id] = score;
+      return { id, score };
+    });
+    // Disconnected members always sort to the BOTTOM, regardless of score —
+    // otherwise someone who left after scoring well would keep sitting near
+    // the top of the ranking, greyed out, instead of reading as "out of the
+    // match" the way a last-place row does.
+    all.sort((a, b) => {
+      const da = a.id !== 'player' && _gqGroupDisconnectedUids.has(a.id.slice(3));
+      const db = b.id !== 'player' && _gqGroupDisconnectedUids.has(b.id.slice(3));
+      if (da !== db) return da ? 1 : -1;
+      return b.score - a.score;
+    });
+    if (!animate) Object.values(gqLbElements).forEach(el => { el.style.transition = 'none'; });
+    const playerRank = all.findIndex(p => p.id === 'player');
+    let windowStart = Math.max(0, playerRank - 1);
+    let windowEnd   = Math.min(all.length, windowStart + GQ_LB_WINDOW);
+    windowStart     = Math.max(0, windowEnd - GQ_LB_WINDOW);
+    const bottomOffset = Math.max(0, GQ_LB_WINDOW - (windowEnd - windowStart)) * GQ_LB_ROW_H_CQMIN;
+    all.forEach((p, rank) => {
+      const el = gqLbElements[p.id];
+      if (!el) return;
+      el.style.top = ((rank - windowStart) * GQ_LB_ROW_H_CQMIN + bottomOffset) + 'cqmin';
+      // z-index by CURRENT rank, not DOM order: the rows are created once
+      // (player first, then _lobbyMembers in their original join order) and
+      // never reordered in the DOM, so with no z-index at all the paint
+      // order stayed frozen at that original order forever. A member who
+      // disconnects mid-match keeps drifting down in rank (frozen score)
+      // while whoever overtakes them animates through their old slot — if
+      // that overtaker happened to be LATER in the original DOM order, its
+      // card painted on top and fully buried the disconnected member's card
+      // (the reported "4 players, one leaves, only 3 cards show — the
+      // disconnected one ends up under the one above it").
+      el.style.zIndex = String(all.length - rank);
+      const rk = el.querySelector('.lb-rank');
+      if (rk) rk.className = 'lb-rank ' + (rank === 0 ? 'rank-1' : rank === 1 ? 'rank-2' : rank === 2 ? 'rank-3' : 'rank-other');
+      if (rk) rk.textContent = rank + 1;
+    });
+    if (animate) requestAnimationFrame(() => {
+      Object.values(gqLbElements).forEach(el => { el.style.transition = 'top 0.7s cubic-bezier(0.22,1,0.36,1)'; });
+    });
+    const s = gqLbElements['player']?.querySelector('.lb-score');
+    if (s) s.textContent = Math.round(myScore).toLocaleString();
+  }
+  window.globequizSetLobbyScores = function(members) {
+    if (!window._gqGroupActive || !Array.isArray(members)) return;
+    members.forEach(m => {
+      const el = gqLbElements['lob' + m.id];
+      if (el) { const s = el.querySelector('.lb-score'); if (s) s.textContent = Math.round(m.score || 0).toLocaleString(); }
+    });
+    _gqGroupPositionLb(_gqGroupTotal, true);
+  };
+  // Exposed so spectate.js's OWN separate leaderboard renderer
+  // (_renderGroupLeaderboardInner, used by real players "on loan" watching
+  // each other while waiting AND by the true external spectator) can apply
+  // the exact same "exclude from live re-sort" rule _gqGroupPositionLb uses
+  // below — that renderer has no disconnected-tracking of its own.
+  window._gqGroupIsDisconnected = uid => _gqGroupDisconnectedUids.has(uid);
+  window.globequizSetLobbyDisconnected = function(uid, disconnected) {
+    if (disconnected) _gqGroupDisconnectedUids.add(uid); else _gqGroupDisconnectedUids.delete(uid);
+    const el = gqLbElements['lob' + uid];
+    if (!el) return;
+    el.classList.toggle('is-disconnected', !!disconnected);
+    if (disconnected) {
+      if (!el.querySelector('.lb-disconnected-icon')) {
+        const icon = document.createElement('div');
+        icon.className = 'lb-disconnected-icon';
+        icon.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.5 2.5 5.09 3.91l2.59 2.59-2.09 2.09A3.003 3.003 0 0 0 6 14.83V17H4v2h2v2h2v-2h2v-2h.17c.93 0 1.76-.37 2.37-.96l-.01-.01 2.06 2.06 1.41-1.41-9.5-9.5zm1.59 9.09A1.003 1.003 0 0 1 8 10.83V9.41l1.5 1.5-.41.68H8.09zm5.72 1.64-.01-.01c.13-.29.2-.61.2-.93V9.17c0-.93-.37-1.76-.96-2.37L11.66 5h2.59L19 9.75l-3.17 3.17.02.01zM19.07 4.93l-1.41 1.42L19 7.68l1.5-1.5-1.43-1.25z"/></svg>';
+        el.appendChild(icon);
+      }
+    } else {
+      el.querySelector('.lb-disconnected-icon')?.remove();
+    }
+    // Re-sort right away — otherwise a member who leaves after scoring well
+    // stays parked near the top (greyed out) until the next score broadcast
+    // happens to trigger a re-sort; _gqGroupPositionLb's own sort now sends
+    // disconnected rows straight to the bottom regardless of score. "Por
+    // turnos" uses its own separate positioning (sorts by rounds won, no
+    // fixed 4-row window — see _gqTurnsPositionLb).
+    if (window._gqGroupTurnsActive) _gqTurnsPositionLb();
+    else _gqGroupPositionLb(_gqGroupTotal, true);
+  };
+  // Sin efecto visual de "wrong" por intento en esta variante (v1) — acá
+  // casi todo intento salvo el último es técnicamente "wrong", un flash en
+  // cada uno sería ruido constante; se deja como no-op.
+  window.globequizSetLobbyWrongFor = function() {};
+  // Shake + ícono de cronómetro (⏱️, mismo _applyTimesUpEffect universal que
+  // usan flags/shapes/monuments) en la fila de quien se quedó SIN
+  // responder al cerrarse la ronda — llamado tanto para MI propia fila
+  // (uid === yo) como para la de otro jugador (ver 'gq' t:'ranout' en
+  // _gqGroupHandleGqEvent). Antes era un no-op puro: nadie — ni el propio
+  // jugador que se quedó sin tiempo — veía nunca este efecto (el reportado
+  // "ni el jugador ni el espectador ven la animación del cronómetro").
+  window.globequizSetLobbyTimesUpFor = function(uid) {
+    const el = (uid === window._sbUserId) ? gqLbElements['player'] : gqLbElements['lob' + uid];
+    if (typeof window._applyTimesUpEffect === 'function') window._applyTimesUpEffect(el);
+  };
+  // check.png pop-in (+ check.mp3) over whoever's card just solved — STAYS
+  // up (unlike the clock/shake, which fades) until the round ends, see
+  // _gqGroupBeginRound's cleanup below. Called for MY OWN card too (the
+  // 'gq' t:'solved' broadcast echoes back to its own sender — LB's channel
+  // has broadcast.self:true, see _subscribe in lobby.js) — this is what the
+  // player who just solved, every OTHER real player in the room, and the
+  // external spectator (see the matching 'gq' handler in spectate.js) all
+  // see, all from this SAME call.
+  window.globequizSetLobbySolvedFor = function(uid) {
+    const el = (uid === window._sbUserId) ? gqLbElements['player'] : gqLbElements['lob' + uid];
+    if (!el) return;
+    if (typeof sfxCheck !== 'undefined' && typeof sfxPlay === 'function') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+    let icon = el.querySelector('.lb-check-icon');
+    if (!icon) {
+      icon = document.createElement('img');
+      icon.className = 'lb-check-icon';
+      icon.src = 'images/check.png';
+      icon.draggable = false;
+      el.appendChild(icon);
+    }
+    icon.classList.remove('show'); void icon.offsetWidth;
+    icon.classList.add('show');
+  };
+  // Clears every check icon left over from the PREVIOUS round — called from
+  // _gqGroupBeginRound (real players' own leaderboard), and mirrored for
+  // the external spectator in spectate.js's 'round' handler (isNewRound).
+  function _gqGroupClearSolvedIcons() {
+    Object.values(gqLbElements).forEach(el => el?.querySelector('.lb-check-icon')?.remove());
+  }
+
+  // Preload gate for the lobby's pre-match sync panel (see _runLobbySyncGate
+  // in lobby.js) — GlobeQuiz group needs three.js (CDN) + the embedded
+  // countries geojson parsed before showGlobequizGroupMode can actually
+  // start; the other 4 modes' assets are already preloaded up front (see
+  // manifest.js) and resolve instantly.
+  window._gqGroupPreload = function() {
+    return Promise.all([loadThree(), loadCountries()]);
+  };
+
+  // Entry point — llamado desde _launchLobbyGame (lobby.js) cuando el modo
+  // de la sala es 'globequiz'. La PRNG se seedea UNA sola vez acá (ronda 1,
+  // dentro de _gqGroupBeginRound) — nunca se vuelve a reseedear a mitad de
+  // match, ver pickDailyCountry().
+  window.showGlobequizGroupMode = function(rounds, seed) {
+    window._gqGroupActive = true;
+    _gqGroupBaseSeed      = seed;
+    _gqGroupRounds        = Math.max(1, rounds || 1);
+    _gqGroupTotal         = 0;
+    _gqGroupUsedCountries = new Set();
+    _gqGroupDisconnectedUids = new Set();
+    const gqScreen = document.getElementById('globequiz-screen');
+    if (gqScreen) gqScreen.style.display = 'block';
+    if (typeof window.letterboxRefresh === 'function') window.letterboxRefresh();
+    window.LB.onGq(_gqGroupHandleGqEvent);
+    // Feeds _gqGroupWatchGuesses (see _gqGroupOnPeerAnswer) for the
+    // "watch whoever's still playing" feature — registered once for the
+    // whole match, same lifetime as onGq above.
+    window.LB.onAnswer(_gqGroupOnPeerAnswer);
+    _gqGroupBuildLeaderboard();
+    _gqGroupBeginRound(1);
+  };
+
+  // Called from globequizHardReset (mode teardown / quit / abandon) — stops
+  // the round-protocol listener and any pending timers so nothing from a
+  // finished/abandoned group match keeps firing into the next thing played.
+  function _gqGroupTeardown() {
+    if (!window._gqGroupActive) return;
+    // Hides the watch banner/list if I was mid-loan — my own LB channel was
+    // never touched by that (see the long comment on _gqGroupEnterLoan), so
+    // there's no channel/spectator system to reconnect here, just local UI.
+    _gqGroupExitLoan();
+    _gqGroupOnLoan = false;
+    _gqGroupWatchGuesses = new Map();
+    _gqGroupWatchTyping = new Map();
+    window._gqGroupActive = false;
+    _gqGroupStopCountdown();
+    if (_gqGroupResultTimer) { clearInterval(_gqGroupResultTimer); _gqGroupResultTimer = null; }
+    if (window.LB && typeof window.LB.onGq === 'function') window.LB.onGq(null);
+    if (window.LB && typeof window.LB.onAnswer === 'function') window.LB.onAnswer(null);
+    _gqGroupHostOrder = [];
+    _gqGroupCountdownEndsAt = null;
+    document.getElementById('gq-round-result-screen')?.style.setProperty('display', 'none');
+    document.getElementById('gq-friends-bar')?.classList.remove('vs-active');
+    document.getElementById('gq-group-round-badge')?.style.setProperty('display', 'none');
+    const alertEl = document.getElementById('gq-group-alert');
+    if (alertEl) { alertEl.style.display = 'none'; alertEl.classList.remove('is-visible'); }
+    clearTimeout(_gqGroupAlertTimer);
+    const tuo = document.getElementById('timeup-overlay');
+    if (tuo) { tuo.style.display = 'none'; tuo.classList.remove('timeup-in', 'timeup-out'); }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // GloboReto grupal "POR TURNOS" — un jugador a la vez adivina el MISMO
+  // país (el resto mira en vivo); al acertar o agotar su reloj, el turno
+  // pasa al siguiente jugador CONECTADO; si nadie acierta después de darle
+  // la vuelta a todos, se repite la vuelta sobre el mismo país (hot-potato)
+  // hasta que alguien acierte. Reutiliza TODO lo genérico de la variante
+  // "tiempo real" de arriba (_gqGroupRound/_gqGroupRounds/_gqGroupTotal/
+  // _gqGroupBaseSeed/_gqGroupDisconnectedUids/_gqGroupUsedCountries,
+  // gqLbElements/_gqGroupBuildLeaderboard/_gqGroupPositionLb/
+  // _gqGroupLastScores, _gqGroupRankScore/_gqGroupFailScore/
+  // _gqGroupApplyRoundScore, _gqGroupShowRoundResultTable/_gqGroupShowTimesUp,
+  // window._lobbyHandleGameEnd) — lo único nuevo es de QUIÉN es el turno y
+  // el protocolo de traspaso, arbitrado por el HOST (mismo principio que el
+  // 'solved'/'rank'/'countdown' de tiempo real: única fuente de verdad para
+  // evitar que dos clientes vean un orden de turno distinto por latencia).
+  // ══════════════════════════════════════════════════════════════════════
+  window._gqGroupTurnsActive = false;   // true durante todo el match "por turnos" grupal
+  window._gqGroupTurnsMyTurn = false;   // ¿me toca a MÍ ahora mismo?
+  let _gqTurnsTimeSec      = GQ_TURN_TIME_SECONDS; // leído de getGloboretoConfig().turnTime al arrancar
+  let _gqTurnsOrder        = [];        // uids conectados, orden determinístico (ordenado por id), recalculado cada ronda
+  let _gqTurnsPointer      = 0;         // índice en _gqTurnsOrder de quien tiene el turno
+  let _gqTurnsActiveUid    = null;
+  let _gqTurnsMyAttempts   = 0;         // mis intentos ESTA ronda (puede ser >1 si la vuelta se repite y me toca de nuevo)
+  let _gqTurnsMyBestKm     = Infinity;
+  let _gqTurnsMyBestAtMs   = 0;
+  let _gqTurnsTimerInterval = null;
+  let _gqTurnsSecondsLeft   = 0;
+  let _gqTurnsStartedAt     = 0;
+  // Every real client sees every 'ttyping' broadcast (see the 'ttyping' case
+  // in _gqTurnsHandleGqEvent below), so ANY of them — not just the active
+  // typer — can cache the latest text. Included in the HOST's 'tstate' reply
+  // so a GroupSpectate viewer who (re)connects mid-turn sees what's ALREADY
+  // typed right away, instead of blank until the NEXT keystroke (the
+  // reported "aun no sale con lo que tiene escrito en ese momento"). Reset
+  // on every turn hand-off — a new typer never inherits the previous one's
+  // leftover text.
+  let _gqTurnsLastTypingText = '';
+  // Reemplaza al puntaje por cercanía/intentos SOLO en esta variante: acá el
+  // leaderboard ordena y decide el ganador final por CANTIDAD DE RONDAS
+  // GANADAS (uid -> conteo), no por _gqGroupTotal. Reseteado por match en
+  // showGlobequizGroupTurnsMode.
+  let _gqTurnsWinsByUid = {};
+  // Desempate final: si al cerrar la ÚLTIMA ronda configurada hay empate en
+  // la cima de rondas ganadas, se juega UNA ronda extra solo entre quienes
+  // empataron — el resto queda afuera del sorteo de turno (espectadores de
+  // hecho, ver _gqTurnsComputeOrder) hasta que termine la partida. Quien
+  // gane esa ronda extra es el ganador final, sin volver a chequear empate.
+  let _gqTurnsIsTiebreak = false;
+  let _gqTurnsTiebreakUids = null; // Set<uid> o null
+
+  // Ruleta grupal — generaliza _showGqRoulette (js/vs.js, 1v1) a N jugadores.
+  // Igual que ahí, es puramente COSMÉTICA: el que arranca ya está decidido
+  // de forma determinística por semilla+ronda (ver _gqTurnsPickStarterIdx,
+  // sin broadcast, todos los clientes calculan el mismo valor), la ruleta
+  // solo gira y cae en uno de los casilleros que le tocaron a ese jugador.
+  // Tres assets reales (mismas cuñas parejas, un jugador por casillero
+  // cuando no divide exacto deja casillero(s) en blanco = "gira de nuevo",
+  // nunca elegibles como target así que la ruleta jamás cae ahí de verdad):
+  // ruleta1.png (10 cuñas: 2/5/9/10 jugadores), ruleta1-2.png (12 cuñas:
+  // 3/4/6) y ruleta1-3.png (8 cuñas: 7/8).
+  // seamAtTop: ruleta1.png tiene una cuña CENTRADA arriba (0°) — mismo
+  // criterio que ya usaba el 1v1 (seat 0 en rotate(0deg)). ruleta1-2.png y
+  // ruleta1-3.png en cambio tienen una COSTURA arriba (borde entre dos
+  // cuñas justo en 0°), no una cuña centrada — sin corregir esto, los
+  // avatares quedaban plantados sobre la línea divisoria en vez de en el
+  // medio de cada cuña (el reportado "descoordinada por la mitad" con 4
+  // jugadores, que usan ruleta1-2.png).
+  const GQ_GROUP_ROULETTE_LAYOUT = {
+    2:  { image: 'images/ruleta1.png',   total: 10, seamAtTop: false },
+    3:  { image: 'images/ruleta1-2.png', total: 12, seamAtTop: true },
+    4:  { image: 'images/ruleta1-2.png', total: 12, seamAtTop: true },
+    5:  { image: 'images/ruleta1.png',   total: 10, seamAtTop: false },
+    6:  { image: 'images/ruleta1-2.png', total: 12, seamAtTop: true },
+    7:  { image: 'images/ruleta1-3.png', total: 8,  seamAtTop: true }, // 1 casillero de sobra
+    8:  { image: 'images/ruleta1-3.png', total: 8,  seamAtTop: true },
+    9:  { image: 'images/ruleta1.png',   total: 10, seamAtTop: false }, // 1 casillero de sobra
+    10: { image: 'images/ruleta1.png',   total: 10, seamAtTop: false },
+  };
+  // Xorshift32 determinístico, SEPARADO del gqRand() que alimenta
+  // pickDailyCountry (nunca comparte su stream — no hay riesgo de
+  // desincronizar el país sorteado por consumir de más de esa PRNG). Usado
+  // por el sorteo cosmético de la ruleta grupal para que la cantidad de
+  // "rebotes" en gira-de-nuevo (y por lo tanto la DURACIÓN de la animación)
+  // salga IDÉNTICA en todos los clientes — antes usaba Math.random(), cada
+  // cliente tiraba una cantidad distinta de rebotes y por lo tanto el
+  // 3-2-1-GO arrancaba en un momento distinto en cada pantalla (el
+  // reportado "la ruleta y el 3-2-1-GO inician descoordinados, el ganador
+  // arranca antes que el resto").
+  function _gqMiniRand(seed) {
+    let s = seed >>> 0; if (!s) s = 1;
+    return () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return (s >>> 0) / 0x100000000; };
+  }
+  // `seed`: cuando se pasa, TODO el sorteo cosmético (rebotes, casillero
+  // final entre los del ganador, vueltas extra, jitter) sale de esa PRNG
+  // determinística en vez de Math.random() — mismo seed en todos los
+  // clientes (ver _gqTurnsPickOrderAndShowRoulette) da la MISMA secuencia,
+  // así que la animación entera (y su duración) queda idéntica para todos.
+  // Sin seed (el boceto de ?gqdebug=1, ver _gqTurnsDebugRoulette) sigue
+  // siendo puro Math.random() — cada click da un resultado distinto, que es
+  // justamente lo que ese botón de prueba necesita.
+  function _showGqGroupRoulette(order, starterUid, onDone, seed) {
+    const overlay  = document.getElementById('gq-roulette-overlay');
+    const content  = document.getElementById('gq-roulette-content');
+    const wheel    = document.getElementById('gq-roulette-wheel');
+    const wheelBg  = document.getElementById('gq-roulette-wheel-bg');
+    const seatsEl  = document.getElementById('gq-roulette-seats');
+    const resultEl = document.getElementById('gq-roulette-result');
+    if (!overlay || !content || !wheel || !seatsEl || !order.length) { onDone(); return; }
+    const layout = GQ_GROUP_ROULETTE_LAYOUT[order.length] || { image: 'images/ruleta1.png', total: order.length, seamAtTop: false };
+    if (wheelBg) wheelBg.src = layout.image;
+    const seatDeg = 360 / layout.total;
+    const angleOffset = layout.seamAtTop ? seatDeg / 2 : 0;
+    const identityFor = uid => uid === window._sbUserId
+      ? { avatar: localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png',
+          name: (window._sbProfile && window._sbProfile.name) || localStorage.getItem('playerName') || t('vs.syncYou') }
+      : { avatar: ((window._lobbyMembers || []).find(m => m.id === uid) || {}).avatar || 'images/profilepic/ppdefault.png',
+          name: _gqGroupResolveName(uid) };
+    seatsEl.innerHTML = '';
+    // Si layout.total es múltiplo exacto de la cantidad de jugadores, cada
+    // uno se reparte total/N casilleros por igual (round-robin, i%N) — igual
+    // que antes. Si NO divide exacto (7 con 8 cuñas, 9 con 10), cada jugador
+    // recibe UN casillero fijo (order[i]) y los que sobran quedan en blanco
+    // ("gira de nuevo") — la ruleta SÍ puede detenerse ahí de verdad antes
+    // de la parada final (ver `landings` más abajo).
+    const evenSplit = layout.total % order.length === 0;
+    const matching = [];
+    const blankIndices = [];
+    for (let i = 0; i < layout.total; i++) {
+      const ownerUid = evenSplit ? order[i % order.length] : (i < order.length ? order[i] : null);
+      const seat = document.createElement('div');
+      seat.className = 'gq-roulette-seat' + (ownerUid ? '' : ' gq-roulette-seat-blank');
+      seat.style.transform = `rotate(${i * seatDeg + angleOffset}deg) translateY(-22cqmin)`;
+      if (ownerUid) {
+        const identity = identityFor(ownerUid);
+        seat.innerHTML = `<img src="${identity.avatar}" alt="" draggable="false" oncontextmenu="return false">`
+          + `<span class="gq-roulette-seat-name">${identity.name}</span>`;
+        if (ownerUid === starterUid) matching.push(i);
+      } else {
+        seat.innerHTML = `<span class="gq-roulette-seat-again">↻</span>`;
+        blankIndices.push(i);
+      }
+      seatsEl.appendChild(seat);
+    }
+    // "Gira de nuevo" ahora puede caer de verdad — a diferencia de antes
+    // (donde el sorteo real solo elegía entre casilleros con jugador y la
+    // ruleta solo PASABA de largo por los en blanco), el resultado final
+    // (starterUid, ya decidido de forma determinística) puede pasar por 0,
+    // 1 o 2 paradas intermedias en un casillero en blanco antes de la
+    // parada real — la probabilidad de cada rebote extra se reduce a la
+    // mitad, así que nunca se hace pesado. Sin casilleros en blanco (layout
+    // parejo), landings queda con un solo elemento, igual que antes.
+    const roll = (typeof seed === 'number') ? _gqMiniRand(seed) : Math.random;
+    const landings = [];
+    let bounceChance = 0.45;
+    while (blankIndices.length && landings.length < 2 && roll() < bounceChance) {
+      landings.push(blankIndices[Math.floor(roll() * blankIndices.length)]);
+      bounceChance *= 0.4;
+    }
+    landings.push(matching[Math.floor(roll() * matching.length)]);
+    if (resultEl) resultEl.textContent = '';
+    wheel.style.transition = 'none';
+    wheel.style.transform = 'rotate(0deg)';
+    content.classList.remove('gq-roulette-in', 'gq-roulette-out');
+    overlay.style.display = 'flex';
+    void overlay.offsetWidth;
+    overlay.classList.add('gq-roulette-visible');
+    content.classList.add('gq-roulette-in');
+    const POPIN_MS = 450, SPIN_MS = 3700, AGAIN_SPIN_MS = 2200, HOLD_MS = 900, AGAIN_HOLD_MS = 700, POPOUT_MS = 350;
+    // Rotación absoluta ACUMULADA a través de todas las paradas — cada
+    // parada intermedia sigue girando desde donde quedó la anterior (nunca
+    // "salta" hacia atrás), y solo la ÚLTIMA usa el mismo largo/vueltas que
+    // el giro único de antes.
+    let rotation = 0;
+    const spinToStep = (stepIdx) => {
+      const index = landings[stepIdx];
+      const isFinal = stepIdx === landings.length - 1;
+      const spins = (isFinal ? 6 : 3) + Math.floor(roll() * 2);
+      const jitterDeg = (roll() * 2 - 1) * (seatDeg * 0.35);
+      const desiredMod = (((-index * seatDeg - angleOffset) % 360) + 360) % 360;
+      const curMod = ((rotation % 360) + 360) % 360;
+      const forwardDelta = ((desiredMod - curMod) % 360 + 360) % 360;
+      rotation += forwardDelta + spins * 360 + jitterDeg;
+      const spinMs = isFinal ? SPIN_MS : AGAIN_SPIN_MS;
+      wheel.style.transition = `transform ${spinMs}ms cubic-bezier(0.45, 0, 0.15, 1)`;
+      wheel.style.transform = `rotate(${rotation}deg)`;
+      setTimeout(() => {
+        if (!isFinal) {
+          if (resultEl) {
+            resultEl.textContent = t('gq.rouletteAgain');
+            resultEl.classList.remove('gq-roulette-result-in');
+            void resultEl.offsetWidth;
+            resultEl.classList.add('gq-roulette-result-in');
+          }
+          setTimeout(() => {
+            if (resultEl) resultEl.classList.remove('gq-roulette-result-in');
+            spinToStep(stepIdx + 1);
+          }, AGAIN_HOLD_MS);
+          return;
+        }
+        if (resultEl) {
+          resultEl.textContent = (starterUid === window._sbUserId)
+            ? t('gq.rouletteYouStart')
+            : t('gq.rouletteOppStarts', { name: _gqGroupResolveName(starterUid) });
+          resultEl.classList.remove('gq-roulette-result-in');
+          void resultEl.offsetWidth;
+          resultEl.classList.add('gq-roulette-result-in');
+        }
+        setTimeout(() => {
+          content.classList.add('gq-roulette-out');
+          overlay.classList.remove('gq-roulette-visible');
+          setTimeout(() => {
+            overlay.style.display = 'none';
+            content.classList.remove('gq-roulette-out');
+            onDone();
+          }, POPOUT_MS);
+        }, HOLD_MS);
+      }, spinMs);
+    };
+    setTimeout(() => {
+      content.classList.remove('gq-roulette-in');
+      void wheel.offsetWidth;
+      spinToStep(0);
+    }, POPIN_MS);
+  }
+  // Exposed so an EXTERNAL GroupSpectate viewer (spectate.js, no local
+  // match state of its own) can mirror the exact same roulette a passive
+  // "watch the whole room" spectator otherwise never saw at all — the real
+  // players only broadcast 'pregame'/'round' AFTER their roulette already
+  // finished (see _gqTurnsBeginRound), so this needed its own dedicated
+  // 'troulette' broadcast (see _gqTurnsPickOrderAndShowRoulette) to fire
+  // BEFORE it starts. No seed passed here (4th arg) — a spectator's copy of
+  // the bounce cosmetics doesn't need to match the real players' pixel for
+  // pixel, only the final starter does.
+  window._gqShowGroupRouletteFor = _showGqGroupRoulette;
+
+  // Orden de turno determinístico — todos los clientes ordenan la MISMA
+  // lista (yo + window._lobbyMembers, excluyendo a quien ya esté marcado
+  // desconectado) por id, sin necesidad de broadcast, igual que
+  // pickDailyCountry() confía en que todos comparten la misma PRNG.
+  function _gqTurnsComputeOrder() {
+    // window.LB.getMembers() (a diferencia de window._lobbyMembers, que me
+    // excluye a MÍ) trae a TODOS — incluido yo — ya ordenados por
+    // joined_at (ver _fetchMembers en lobby.js, la misma consulta a la DB
+    // que ve todo el mundo), así que el orden de turno sale IDÉNTICO en
+    // todos los clientes sin necesidad de sortear nada acá.
+    let ids = (window.LB.getMembers() || [])
+      .map(m => m.id)
+      .filter(id => !_gqGroupDisconnectedUids.has(id));
+    // Desempate final: solo quienes empataron en la cima juegan la ronda
+    // extra — el resto queda afuera del sorteo (espectadores de hecho, ver
+    // _gqTurnsCheckTie/_gqTurnsCloseRound).
+    if (_gqTurnsTiebreakUids) ids = ids.filter(id => _gqTurnsTiebreakUids.has(id));
+    return ids;
+  }
+  // Al cerrar la última ronda configurada: ¿hay empate en la cima de rondas
+  // ganadas entre dos o más jugadores TODAVÍA conectados? Determinístico —
+  // _gqTurnsWinsByUid se incrementa igual en TODOS los clientes al recibir
+  // el mismo 'tround' (ver _gqTurnsCloseRound), así que no hace falta
+  // arbitraje del host ni broadcast para decidirlo. Devuelve un Set<uid> con
+  // los empatados, o null si no hay empate (o solo queda 1 conectado).
+  function _gqTurnsCheckTie() {
+    const activeUids = (window.LB.getMembers() || [])
+      .map(m => m.id)
+      .filter(id => !_gqGroupDisconnectedUids.has(id));
+    if (activeUids.length < 2) return null;
+    const maxWins = Math.max(...activeUids.map(id => _gqTurnsWinsByUid[id] || 0));
+    const tied = activeUids.filter(id => (_gqTurnsWinsByUid[id] || 0) === maxWins);
+    return tied.length > 1 ? new Set(tied) : null;
+  }
+  // Generaliza seed%2===0 (1v1) a N jugadores — se suma la ronda para que no
+  // arranque siempre el mismo jugador en cada país de la partida.
+  function _gqTurnsPickStarterIdx(order) {
+    return ((_gqGroupBaseSeed + _gqGroupRound) % order.length + order.length) % order.length;
+  }
+
+  function _gqPaintGroupTurnBanner() {
+    const hintEl = document.getElementById('gq-hint');
+    if (!hintEl || window._gqGroupTurnsMyTurn) return;
+    hintEl.textContent = t('gq.waitingTurnFor', { name: _gqGroupResolveName(_gqTurnsActiveUid) });
+  }
+
+  // Aviso central gris "es tu turno" — MISMA entrada/salida que
+  // _gqGroupAlert (tiempo real, "alguien ya adivinó"): pop con rebote +
+  // fade, se muestra un rato y se retira sola. A diferencia de un simple
+  // toggle, esto es un AVISO puntual (dispara solo en el hand-off, no se
+  // queda pegado mientras dure mi turno — el reportado "se queda eterno").
+  let _gqMyTurnAlertTimer = null;
+  function _gqShowMyTurnAlert() {
+    const el = document.getElementById('gq-myturn-notice');
+    if (!el) return;
+    el.style.display = 'block';
+    void el.offsetWidth; // fuerza el reflow, igual que _gqGroupAlert
+    requestAnimationFrame(() => el.classList.add('is-visible'));
+    clearTimeout(_gqMyTurnAlertTimer);
+    _gqMyTurnAlertTimer = setTimeout(() => {
+      el.classList.remove('is-visible');
+      setTimeout(() => { el.style.display = 'none'; }, 300);
+    }, 2200);
+  }
+  function _gqHideMyTurnAlert() {
+    clearTimeout(_gqMyTurnAlertTimer);
+    const el = document.getElementById('gq-myturn-notice');
+    if (!el) return;
+    // Forced early (the player answered before the 2.2s auto-hide above even
+    // fired) used to set display:none in this SAME tick as removing
+    // 'is-visible' — the fade-out transition never got a frame to play, so
+    // the notice just vanished instantly instead of playing its exit
+    // animation like it does on its own (the reported "si responde antes de
+    // que termine la animación, simplemente desaparece"). Same 300ms the
+    // auto-hide path already waits before hiding it for real.
+    el.classList.remove('is-visible');
+    setTimeout(() => { el.style.display = 'none'; }, 300);
+  }
+
+  function _gqTurnsSetActiveTurn(uid) {
+    _gqTurnsActiveUid = uid;
+    const mine = uid === window._sbUserId;
+    const wasMine = window._gqGroupTurnsMyTurn;
+    window._gqGroupTurnsMyTurn = mine;
+    const input = document.getElementById('gq-guess-input');
+    const btn = document.getElementById('gq-guess-btn');
+    const row = document.querySelector('.gq-guess-row');
+    if (input) input.disabled = !mine;
+    if (btn) btn.classList.toggle('gq-disabled', !mine);
+    if (row) row.classList.toggle('gq-locked', !mine);
+    document.querySelector('.gq-countdown-widget')?.style.removeProperty('display');
+    _gqTurnsStartTimer();
+    if (mine) {
+      if (input) { input.focus(); input.placeholder = t('globequiz.inputPh'); }
+      updateHint();
+      if (!wasMine && typeof sfxCheck !== 'undefined' && typeof sfxPlay === 'function') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+      if (!wasMine) _gqShowMyTurnAlert(); // solo en el hand-off, no en cada repintado
+    } else {
+      if (input) input.placeholder = t('globequiz.inputPh');
+      _gqPaintGroupTurnBanner();
+      _gqHideMyTurnAlert();
+    }
+  }
+  // Leído por spectate.js (_renderGroupLeaderboardInner) para resaltar la
+  // fila de quien tiene el turno — mismo patrón cross-módulo que
+  // window._gqGroupIsDisconnected.
+  window._gqGroupTurnsActiveUid = () => _gqTurnsActiveUid;
+
+  // NO reutiliza _gqPaintTurnTimer (1v1) — ese lee _gqTurnSecondsLeft
+  // (singular, variable DISTINTA del 1v1), que nunca se mueve durante un
+  // match grupal — pintaba siempre su valor inicial congelado en 20 (el
+  // reportado "el contador se queda atascado en 20 y no baja").
+  function _gqPaintGroupTurnsTimer() {
+    const el = document.getElementById('gq-timer-number');
+    if (el) el.textContent = String(Math.max(0, _gqTurnsSecondsLeft));
+  }
+  function _gqTurnsTick() {
+    const elapsedSec = Math.floor((Date.now() - _gqTurnsStartedAt) / 1000);
+    const secondsLeft = Math.max(0, _gqTurnsTimeSec - elapsedSec);
+    if (secondsLeft === _gqTurnsSecondsLeft) return;
+    _gqTurnsSecondsLeft = secondsLeft;
+    _gqPaintGroupTurnsTimer();
+    pulseCountdown();
+    if (secondsLeft > 0 && secondsLeft <= 5) {
+      _gqSetCountdownIconRed(true);
+      if (typeof sfxTickdown !== 'undefined' && typeof sfxPlay === 'function') { sfxTickdown.currentTime = 0; sfxPlay(sfxTickdown); }
+    }
+    if (secondsLeft <= 0) {
+      _gqTurnsStopTimer();
+      if (typeof sfxTimesUp !== 'undefined' && typeof sfxPlay === 'function') { sfxTimesUp.currentTime = 0; sfxPlay(sfxTimesUp); }
+      // Solo quien tiene el turno declara su propio timeout — el reloj del
+      // resto es puramente visual (mismo criterio que el 1v1).
+      if (window._gqGroupTurnsMyTurn) _gqTurnsHandleMyTimeout();
+    }
+  }
+  function _gqTurnsStartTimer() {
+    _gqTurnsStopTimer();
+    _gqTurnsStartedAt = Date.now();
+    _gqTurnsSecondsLeft = _gqTurnsTimeSec + 1;
+    _gqSetCountdownIconRed(false);
+    _gqTurnsTick();
+    _gqTurnsTimerInterval = setInterval(_gqTurnsTick, 250);
+  }
+  function _gqTurnsStopTimer() {
+    if (_gqTurnsTimerInterval) clearInterval(_gqTurnsTimerInterval);
+    _gqTurnsTimerInterval = null;
+  }
+  function _gqTurnsHandleMyTimeout() {
+    if (!window._gqGroupTurnsActive || !window._gqGroupTurnsMyTurn) return;
+    window.LB.sendGq({ t: 'tguess', uid: window._sbUserId, round: _gqGroupRound, timeout: true });
+  }
+
+  // HOST-only: elige el próximo uid CONECTADO en _gqTurnsOrder (hot-potato —
+  // si le da toda la vuelta sin encontrar uno disponible, window.LB's
+  // triggerAlone ya se encarga de "me quedé solo").
+  function _gqTurnsAdvance() {
+    if (!_gqTurnsOrder.length) return;
+    for (let step = 1; step <= _gqTurnsOrder.length; step++) {
+      const idx = (_gqTurnsPointer + step) % _gqTurnsOrder.length;
+      const uid = _gqTurnsOrder[idx];
+      if (_gqGroupDisconnectedUids.has(uid)) continue;
+      _gqTurnsPointer = idx;
+      // startedAt: GroupSpectate (external, generic viewer) has no local
+      // per-turn countdown of its own to start from otherwise — see
+      // globequizSpectatorStartTurnTimer in spectate.js's 'tturn' handling.
+      window.LB.sendGq({ t: 'tturn', uid, round: _gqGroupRound, startedAt: Date.now(), turnTime: _gqTurnsTimeSec });
+      return;
+    }
+  }
+  // Announces the ROUND-OPENING turn (the roulette's own winner, before any
+  // hand-off has happened) to GroupSpectate — unlike every later hand-off,
+  // this one was never covered by a 'tturn' broadcast (only _gqTurnsAdvance
+  // sent those); a spectator who missed the earlier 'troulette' (its own
+  // starterUid is only used as a stand-in, consumed by the next 'round') had
+  // nothing to fall back on and stayed on a blank hint until the FIRST real
+  // guess/timeout finally sent a 'tturn' (the reported "el primer mensaje...
+  // no aparece hasta que responde"). Host-only, same convention as every
+  // other 'tturn'/'tround' broadcast.
+  function _gqTurnsBroadcastFirstTurn(uid) {
+    if (!window.LB || typeof window.LB.sendGq !== 'function' || !window.LB.isHost()) return;
+    window.LB.sendGq({ t: 'tturn', uid, round: _gqGroupRound, startedAt: Date.now(), turnTime: _gqTurnsTimeSec });
+  }
+  // Llamada desde lobby.js (onMembers, detección en tiempo real de member-
+  // drop) — si quien se desconectó tenía el turno activo, lo pasa AL
+  // INSTANTE en vez de esperar a que se le agote el reloj.
+  window._gqGroupTurnsHandlePlayerGone = function (uid) {
+    if (!window._gqGroupTurnsActive) return;
+    // Ronda extra de desempate: por diseño son SOLO 2 jugadores (ver
+    // _gqTurnsCheckTie/_gqTurnsIsTiebreak) — si uno de los dos abandona a
+    // mitad de esa ronda, _gqTurnsAdvance (más abajo) recorre TODO
+    // _gqTurnsOrder salteando desconectados y termina volviendo al ÚNICO
+    // conectado una y otra vez, dándole turno tras turno sin que la partida
+    // termine nunca (el reportado "sigue eternamente esperando una
+    // respuesta" — literalmente nadie declara ganador, solo se le sigue
+    // pasando el turno al mismo jugador). Con un único participante
+    // conectado del duelo, esa ronda ya no puede jugarse — cada cliente
+    // (host o no, a diferencia de _gqTurnsAdvance que es host-only) decide
+    // por sí mismo si ES ese sobreviviente y termina la partida ahí mismo,
+    // igual que lo haría al acertar la ronda normalmente.
+    if (_gqTurnsIsTiebreak && Array.isArray(_gqTurnsOrder) && _gqTurnsOrder.length) {
+      const stillIn = _gqTurnsOrder.filter(id => !_gqGroupDisconnectedUids.has(id) && id !== uid);
+      if (stillIn.length === 1 && stillIn[0] === window._sbUserId) {
+        _gqTurnsStopTimer();
+        // NOT a direct window._lobbyHandleGameEnd() call — that only marks
+        // MY OWN client as finished. Every other client in the room
+        // (already-decided players just watching the tiebreak, plus any
+        // external GroupSpectate viewer) only learns a round closed via the
+        // 'tround' broadcast (see the 'tguess' correct-answer case right
+        // above, normally host-only) — calling _lobbyHandleGameEnd() alone
+        // left them with nothing to react to, so _checkAllFinished()
+        // (lobby.js) kept waiting on players who were never going to report
+        // themselves finished, and "GANASTE" only ever appeared once the
+        // unrelated ~12s safety-timeout fallback fired — which, timed
+        // against a still-running turn clock, looked exactly like "esperando
+        // a que termine el tiempo" (reported). Broadcasting this exactly
+        // like a real correct guess makes EVERY client (this one included,
+        // via the SAME 'tround' handler) run the normal
+        // _gqTurnsCloseRound → _lobbyHandleGameEnd path together,
+        // immediately.
+        if (window.LB && typeof window.LB.sendGq === 'function') {
+          window.LB.sendGq({
+            t: 'tround', round: _gqGroupRound, winnerUid: window._sbUserId,
+            startAt: Date.now() + GQ_TROUND_BUFFER_MS,
+            countryName: dailyCountry?.name, iso2: dailyCountry?.iso2,
+            // Flags this 'tround' as ending by abandonment, not a real
+            // guess — see soloWin in _gqTurnsCloseRound: nobody's clock
+            // "ran out", so the TIMES UP flash is skipped entirely, for
+            // every client (winner included), straight to the final result.
+            soloWin: true,
+          });
+        }
+        return;
+      }
+    }
+    if (!window.LB.isHost() || uid !== _gqTurnsActiveUid) return;
+    _gqTurnsAdvance();
+  };
+
+  function _gqTurnsShowTyping(text) {
+    if (window._gqGroupTurnsMyTurn) return;
+    const input = document.getElementById('gq-guess-input');
+    if (!input) return;
+    input.placeholder = (text || '').trim() || t('globequiz.inputPh');
+  }
+
+  // Margen del 'tround' (ver su startAt más abajo) — suficiente para que el
+  // broadcast le llegue a CUALQUIER cliente de la sala, ganador/host
+  // incluido, antes del instante compartido en el que todos arrancan el
+  // flash/tabla/ruleta/3-2-1-GO.
+  const GQ_TROUND_BUFFER_MS = 400;
+
+  // Protocolo por turnos sobre el mismo canal window.LB.sendGq/onGq —
+  // namespacing propio ('tturn'/'tguess'/'tround'/'ttyping') para no pisar
+  // el de tiempo real ('solved'/'rank'/'countdown'/'allsolved'/'ranout'/
+  // 'typing'), aunque nunca conviven (cada variante registra su propio
+  // handler en onGq al arrancar el match).
+  function _gqTurnsHandleGqEvent(payload) {
+    if (!window._gqGroupTurnsActive || !payload) return;
+    // GroupSpectate (generic external viewer) resync — checked BEFORE the
+    // round-match guard below, since the whole point is a spectator who
+    // doesn't necessarily know the CURRENT round asking for it. Same idea
+    // real-time GloboReto already has (window._gqGroupSnapshotForResend/
+    // 'staterequest' in lobby.js) — turns mode has no per-uid POV to target
+    // though, so this is a broadcast anyone can answer, HOST-only (single
+    // source of truth, same convention as 'tround'/'tguess' arbitration)
+    // to avoid N duplicate replies.
+    if (payload.t === 'treq') {
+      if (window.LB.isHost()) {
+        window.LB.sendGq({
+          t: 'tstate', round: _gqGroupRound, totalRounds: _gqGroupRounds,
+          activeUid: _gqTurnsActiveUid, startedAt: _gqTurnsStartedAt,
+          isTiebreak: _gqTurnsIsTiebreak,
+          guesses: guesses.slice(),
+          typingText: _gqTurnsLastTypingText,
+          turnTime: _gqTurnsTimeSec,
+        });
+      }
+      return;
+    }
+    if (payload.round !== _gqGroupRound) return;
+    if (payload.t === 'tturn') {
+      const idx = _gqTurnsOrder.indexOf(payload.uid);
+      if (idx !== -1) _gqTurnsPointer = idx;
+      _gqTurnsLastTypingText = '';
+      _gqTurnsSetActiveTurn(payload.uid);
+      return;
+    }
+    if (payload.t === 'ttyping') { _gqTurnsLastTypingText = payload.text || ''; _gqTurnsShowTyping(payload.text); return; }
+    if (payload.t === 'tguess') {
+      // Same as globequizReceiveOpponentTurnGuess in the 1v1 variant: whoever's
+      // turn it was just answered (or timed out) — auto-rotate stops for
+      // EVERY client in the room, not just the one who typed (that one already
+      // stopped it locally in _gqTurnsSubmitGuess). Missing this left every
+      // other member's own globe spinning forever through the whole match
+      // (the reported "su globo sigue rotando" once the turn moves on).
+      stopAutoRotate();
+      // Refleja un intento ajeno (correcto o no) en mi propia lista/globo —
+      // igual que globequizReceiveOpponentTurnGuess hace en el 1v1 (mi propio
+      // intento ya se pintó localmente en _gqTurnsSubmitGuess). Un timeout
+      // (sin guess real) no cuenta como "confirmación" — nada que reflejar
+      // ni sonar.
+      if (payload.uid !== window._sbUserId && !payload.timeout) {
+        // Mismo sfxCheck que ya suena en MI PROPIO cliente al confirmar (ver
+        // playCheckSfx en el wiring del botón/Enter) — sin esto, el resto de
+        // la sala no tenía ninguna señal de audio cuando el jugador activo
+        // confirmaba su respuesta (el reportado "tiene que sonar el check
+        // cuando alguien haga su confirmación").
+        if (typeof sfxCheck !== 'undefined' && typeof sfxPlay === 'function') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); }
+        if (payload.correct === false && payload.name) {
+          guesses.push({ name: payload.name, km: payload.km, dir: payload.dir, color: payload.color });
+          drawTexture();
+          renderGuessList();
+          updateHint();
+          const country = countryByName.get(normalize(payload.name));
+          if (country) focusOnCountry(country);
+        }
+      }
+      if (window.LB.isHost()) {
+        if (payload.correct === true) {
+          // startAt (no "cerrar ya"): el host recibe su propio broadcast por
+          // el mismo canal realtime que todos, pero cuando el host ES el
+          // ganador esa vuelta es más corta que la ida-y-vuelta real que
+          // tarda en llegarle a cualquier otro cliente — sin esto, ESE
+          // cliente arrancaba el flash/tabla/ruleta/3-2-1-GO apenas le
+          // llegaba a ÉL, un poco antes que al resto (el reportado "el
+          // ganador de la ronda inicia antes que el resto"). Con un target
+          // de reloj absoluto compartido, cada cliente (ganador incluido)
+          // arranca contra SU PROPIO Date.now() en vez de "en cuanto me
+          // llegó el mensaje" — mismo patrón que _gqGroupCountdownEndsAt.
+          // countryName/iso2: un espectador externo genérico (GroupSpectate)
+          // nunca jugó esta ronda, así que no tiene forma propia de conocer
+          // el país correcto para su propia tabla de resultados — a
+          // diferencia de un jugador real, cuyo dailyCountry ya lo tiene
+          // desde que arrancó la ronda (mismo seed compartido).
+          window.LB.sendGq({ t: 'tround', round: _gqGroupRound, winnerUid: payload.uid, startAt: Date.now() + GQ_TROUND_BUFFER_MS, countryName: dailyCountry?.name, iso2: dailyCountry?.iso2 });
+        } else {
+          _gqTurnsAdvance();
+        }
+      }
+      return;
+    }
+    if (payload.t === 'tround') {
+      const delay = Math.max(0, (payload.startAt || Date.now()) - Date.now());
+      setTimeout(() => {
+        if (window._gqGroupTurnsActive && _gqGroupRound === payload.round) _gqTurnsCloseRound(payload.winnerUid, !!payload.soloWin);
+      }, delay);
+      return;
+    }
+  }
+
+  // Ronda resuelta (alguien acertó) — el leaderboard "por turnos" ordena y
+  // decide el ganador final por CANTIDAD DE RONDAS GANADAS, no por el
+  // puntaje de cercanía/intentos de tiempo real (_gqGroupRankScore/
+  // _gqGroupFailScore quedan sin usar acá a propósito).
+  function _gqTurnsCloseRound(winnerUid, soloWin) {
+    _gqTurnsStopTimer();
+    _gqSetCountdownIconRed(false);
+    document.querySelector('.gq-countdown-widget')?.style.setProperty('display', 'none');
+    stopTimer();
+    if (typeof playMusic === 'function') playMusic(null);
+    const input = document.getElementById('gq-guess-input'), btn = document.getElementById('gq-guess-btn');
+    if (input) input.disabled = true;
+    if (btn) btn.classList.add('gq-disabled');
+    const amWinner = winnerUid === window._sbUserId;
+    if (winnerUid) _gqTurnsWinsByUid[winnerUid] = (_gqTurnsWinsByUid[winnerUid] || 0) + 1;
+    const myWins = _gqTurnsWinsByUid[window._sbUserId] || 0;
+    // _gqGroupShowRoundResultTable (reutilizada tal cual del modo tiempo
+    // real, ver más abajo) arma SU PROPIA fila leyendo _gqGroupTotal
+    // directo, no window._lobbyMembers — sin esto, mi puntaje ahí quedaba
+    // siempre en 0 aunque el resto (que sí sale de window._lobbyMembers,
+    // alimentado por reportScore/sendScore de abajo) se actualizara bien
+    // (el reportado "al resto le salió 1-0-0-0 pero a mí 0-0-0-0").
+    _gqGroupTotal = myWins;
+    // Mismo canal que _gqGroupApplyRoundScore usa para el puntaje de tiempo
+    // real — acá simplemente viaja la cantidad de rondas ganadas, así que
+    // _gqGroupShowRoundResultTable muestra ese número sin necesitar ningún
+    // cambio propio.
+    window.LB.reportScore(myWins);
+    window.LB.sendScore(myWins);
+    _gqTurnsPositionLb();
+    const isLastRound = _gqGroupRound >= _gqGroupRounds;
+    // Desempate final: si al cerrar la última ronda configurada dos o más
+    // siguen empatados en la cima, se juega UNA ronda extra solo entre
+    // ellos (_gqTurnsIsTiebreak ya está seteado por esa rama abajo, así que
+    // esta ronda extra NUNCA vuelve a chequear empate — su único ganador es
+    // el ganador final de la partida, ver el comentario en la declaración
+    // de _gqTurnsIsTiebreak más arriba).
+    const tiedUids = (isLastRound && !_gqTurnsIsTiebreak) ? _gqTurnsCheckTie() : null;
+    const afterFlash = () => {
+      if (!window._gqGroupTurnsActive) return;
+      if (tiedUids) {
+        _gqTurnsIsTiebreak = true;
+        _gqTurnsTiebreakUids = tiedUids;
+        // Everyone who did NOT tie for first — they take no further part in
+        // the match from here on (the extra round is only between
+        // _gqTurnsTiebreakUids), grayed out on their live card for every
+        // viewer (other players, themselves, and any spectator — see
+        // _gqTurnsPositionLb below and _renderGroupLeaderboardInner in
+        // spectate.js) per request. Clarified from an earlier
+        // misunderstanding — this is about whoever was ALREADY eliminated
+        // BEFORE the tiebreak, not whoever loses the tiebreak itself.
+        window._gqTurnsTiebreakLosers = new Set(
+          (window.LB.getMembers() || []).map(m => m.id).filter(id => !tiedUids.has(id))
+        );
+        _gqTurnsPositionLb(false);
+        _gqGroupShowRoundResultTable(() => {
+          if (!window._gqGroupTurnsActive) return;
+          _gqTurnsBeginRound(_gqGroupRound + 1);
+        });
+        return;
+      }
+      if (isLastRound) { window._lobbyHandleGameEnd(myWins); return; }
+      _gqGroupShowRoundResultTable(() => {
+        if (!window._gqGroupTurnsActive) return;
+        _gqTurnsBeginRound(_gqGroupRound + 1);
+      });
+    };
+    // A diferencia de tiempo real (donde el flash "se acabó el tiempo"
+    // aplica a TODOS por igual, ganaron o no, porque ahí "ganar" es solo
+    // llegar primero dentro de la misma ventana compartida), acá "ganar" es
+    // literalmente acertar — mostrarle el flash de "se acabó tu tiempo" a
+    // quien justo acertó es una señal contradictoria (el reportado "al que
+    // gana no debe salirle el Times Up").
+    // Aun así, no aparece de inmediato — mismo GQ_VS_ANIM_MS que el 1v1
+    // espera después de showWin() (llamado en _gqTurnsSubmitGuess al
+    // acertar) para que el confeti/celda verde alcancen a verse antes de
+    // taparlos con la tabla de resultados (el reportado "no tiene que
+    // colocarse inmediatamente").
+    // soloWin: the tiebreak ended because everyone else abandoned it (see
+    // window._gqGroupTurnsHandlePlayerGone) — nobody "ran out of time"
+    // here, there was simply nobody left to keep playing against. Per
+    // request, this plays the GAME OVER overlay (same one every 1v1 loser
+    // already gets, see globequizSpectatorShowLoss) for EVERYONE — winner
+    // included, since it's a shared broadcast event, not "TIMES UP" (which
+    // implied a clock running out that never actually happened).
+    if (soloWin) {
+      if (dailyCountry) focusOnCountry(dailyCountry);
+      _gqGroupShowGameOver(afterFlash);
+      return;
+    }
+    if (amWinner) { setTimeout(() => { if (window._gqGroupTurnsActive) afterFlash(); }, GQ_VS_ANIM_MS); return; }
+    // Para quien NO ganó: centra el globo en el país correcto antes del
+    // flash — el ganador ya lo ve centrado porque focusOnCountry corre
+    // dentro de su propio _gqTurnsSubmitGuess al acertar, pero el resto se
+    // quedaba mirando donde sea que hubiera dejado su último intento
+    // fallido (el reportado "eso solo lo ve el ganador, no el resto").
+    if (dailyCountry) focusOnCountry(dailyCountry);
+    if (typeof sfxTimesUp !== 'undefined' && typeof sfxPlay === 'function') { sfxTimesUp.currentTime = 0; sfxPlay(sfxTimesUp); }
+    _gqGroupShowTimesUp(afterFlash);
+  }
+
+  // Calcula el orden de esta ronda (solo jugadores CONECTADOS ahora mismo —
+  // recalculado siempre, así que si alguien se desconectó entre rondas ya
+  // no forma parte del sorteo) y muestra la ruleta. `cb()` se llama recién
+  // cuando el giro terminó — el ganador queda en _gqTurnsOrder[_gqTurnsPointer].
+  // Reutilizada tanto para la ronda 1 (ver startGqCountdown más abajo) como
+  // para rondas 2+ (_gqTurnsBeginRound) — en ambos casos la ruleta gira
+  // ANTES del 3-2-1-GO, igual que el 1v1 (_gqMaybeStart en vs.js: ruleta →
+  // recién ahí el 3-2-1), no después.
+  function _gqTurnsPickOrderAndShowRoulette(cb) {
+    const order = _gqTurnsComputeOrder();
+    if (!order.length) return; // window.LB.triggerAlone() ya cubre "me quedé solo"
+    _gqTurnsOrder = order;
+    _gqTurnsPointer = _gqTurnsPickStarterIdx(order);
+    const starterUid = order[_gqTurnsPointer];
+    // Seed propio (distinto del que usa _gqTurnsPickStarterIdx) para que el
+    // sorteo cosmético de la ruleta (rebotes/vueltas/jitter, ver
+    // _showGqGroupRoulette) salga IDÉNTICO en todos los clientes — antes
+    // tiraba de Math.random() en cada uno por separado, así que la duración
+    // de la animación (sobre todo la cantidad de "gira de nuevo") variaba
+    // por cliente y el 3-2-1-GO terminaba arrancando en momentos distintos.
+    const rouletteSeed = ((_gqGroupBaseSeed + _gqGroupRound * 104729 + 17) >>> 0);
+    // Único aviso de "la ruleta está girando AHORA" que le llega a un
+    // espectador externo genérico (GroupSpectate) — 'pregame'/'round' recién
+    // se mandan DESPUÉS de que la ruleta ya terminó en la pantalla real (ver
+    // más abajo), así que sin esto un espectador nunca veía ninguna ruleta.
+    // TODOS los clientes reales mandan este mismo broadcast al arrancar la
+    // ronda (nadie es "el único emisor") — spectate.js lo deduplica por
+    // número de ronda.
+    if (window.LB && typeof window.LB.sendGq === 'function') {
+      window.LB.sendGq({
+        t: 'troulette',
+        round: _gqGroupRound,
+        starterUid,
+        tiebreakUids: _gqTurnsTiebreakUids ? Array.from(_gqTurnsTiebreakUids) : null,
+      });
+    }
+    _showGqGroupRoulette(order, starterUid, () => {
+      if (!window._gqGroupTurnsActive) return; // se abandonó/cerró a mitad del giro
+      // Pre-pinta el segundero ANTES del 3-2-1-GO — el widget queda visible
+      // durante ese countdown y, sin esto, mostraba el placeholder "0:00"
+      // del HTML hasta recién arrancar el turno de verdad (el reportado
+      // "en el 3-2-1-GO sale 0:00, ahí deben salir los segundos que
+      // corresponden").
+      const timerEl = document.getElementById('gq-timer-number');
+      if (timerEl) timerEl.textContent = String(_gqTurnsTimeSec);
+      cb();
+    }, rouletteSeed);
+  }
+
+  // Arranca (o avanza a) la ronda `round` — misma estructura que
+  // _gqGroupBeginRound (tiempo real): ronda 1 pasa por initGlobeQuiz()
+  // (bootstrap completo del globo 3D), rondas 2+ repiten a mano el mismo
+  // beat de pregame/timer sin volver a llamar initGlobeQuiz() (evita el
+  // flicker negro, ver el comentario largo en _gqGroupBeginRound). La
+  // ruleta (con quien siga conectado en este momento) es lo PRIMERO que se
+  // ve al cerrar la tabla de resultados de la ronda anterior — recién
+  // después arranca el beat de cámara/pregame/3-2-1-GO.
+  function _gqTurnsBeginRound(round) {
+    _gqGroupRound          = round;
+    _gqGroupRoundScored    = false;
+    _gqTurnsMyAttempts     = 0;
+    _gqTurnsMyBestKm       = Infinity;
+    _gqTurnsMyBestAtMs     = 0;
+    _gqTurnsActiveUid      = null;
+    _gqTurnsOrder          = [];
+    _gqTurnsLastTypingText = '';
+    guesses = []; solved = false; animatedGuessNames = new Set(); dailyCountry = null;
+    _gqGroupClearSolvedIcons();
+    _gqGroupUpdateRoundBadge();
+    if (round === 1) {
+      window.globequizSetSeed(_gqGroupBaseSeed);
+      window.initGlobeQuiz();
+      return;
+    }
+    const input = document.getElementById('gq-guess-input'), btn = document.getElementById('gq-guess-btn');
+    if (input) { input.disabled = true; input.value = ''; }
+    if (btn) btn.classList.add('gq-disabled');
+    // Corta postgameloop.mp3 (todavía sonando desde la tabla de resultados)
+    // ANTES de mostrar la ruleta, no después — si no, seguía de fondo
+    // durante todo el giro (el reportado "no corta la música").
+    if (typeof playMusic === 'function') playMusic(null);
+    _gqTurnsPickOrderAndShowRoulette(() => {
+      if (sphere) { sphere.rotation.x = BASE_ROT_X; sphere.rotation.y = BASE_ROT_Y; }
+      zoomZ = BASE_Z;
+      if (camera) camera.position.z = zoomZ;
+      if (typeof updateSpaceVignette === 'function') updateSpaceVignette();
+      startAutoRotate();
+      pickDailyCountry();
+      drawTexture();
+      renderGuessList();
+      updateHint();
+      const msg = document.getElementById('gq-win-msg');
+      if (msg) msg.style.display = 'none';
+      const guessRow = document.querySelector('.gq-guess-row');
+      const hintEl2  = document.getElementById('gq-hint');
+      const canvasEl = document.getElementById('gq-canvas');
+      if (guessRow) guessRow.style.display = 'none';
+      if (hintEl2) hintEl2.style.display = 'none';
+      if (canvasEl) canvasEl.style.pointerEvents = 'none';
+      if (typeof window._specReportPregame === 'function') window._specReportPregame({ mode: 'globequiz_turns', startedAt: Date.now(), round: _gqGroupRound, totalRounds: _gqGroupRounds, isTiebreak: _gqTurnsIsTiebreak });
+      runGqPregameCountdown(() => {
+        _gqGroupHideRoundBadge(() => {});
+        if (guessRow) guessRow.style.display = '';
+        if (hintEl2) hintEl2.style.display = '';
+        if (canvasEl) canvasEl.style.pointerEvents = '';
+        if (typeof playMusic === 'function' && typeof sfxGameMusic !== 'undefined') playMusic(sfxGameMusic);
+        startTimer();
+        if (typeof window._specReportRound === 'function') window._specReportRound({ mode: 'globequiz_turns', startedAt: gqTimerStart, round: _gqGroupRound, totalRounds: _gqGroupRounds, isTiebreak: _gqTurnsIsTiebreak });
+        _gqTurnsSetActiveTurn(_gqTurnsOrder[_gqTurnsPointer]);
+        _gqTurnsBroadcastFirstTurn(_gqTurnsOrder[_gqTurnsPointer]);
+      });
+    });
+  }
+
+  function _gqGroupTurnsTeardown() {
+    if (!window._gqGroupTurnsActive) return;
+    window._gqGroupTurnsActive = false;
+    window._gqGroupTurnsMyTurn = false;
+    _gqTurnsStopTimer();
+    if (window.LB && typeof window.LB.onGq === 'function') window.LB.onGq(null);
+    _gqTurnsOrder = [];
+    _gqTurnsActiveUid = null;
+    _gqTurnsIsTiebreak = false;
+    _gqTurnsTiebreakUids = null;
+    window._gqTurnsTiebreakLosers = null;
+    _gqHideMyTurnAlert();
+    document.getElementById('gq-round-result-screen')?.style.setProperty('display', 'none');
+    const _gqTurnsBar = document.getElementById('gq-friends-bar');
+    if (_gqTurnsBar) {
+      _gqTurnsBar.classList.remove('vs-active', 'gq-turns-mode');
+      // Removing the classes alone left every room member's OWN row
+      // (id="gq-lb-lob<uid>") sitting in the DOM — whatever got built/shown
+      // next in this SAME bar (solo, a new group room, or a 1v1 duel) kept
+      // rendering them alongside its own cards (the reported "cards que no
+      // deberían salir" right after a group match).
+      _gqTurnsBar.querySelectorAll('.lb-entry[id^="gq-lb-lob"]').forEach(el => el.remove());
+    }
+    document.getElementById('gq-group-round-badge')?.style.setProperty('display', 'none');
+    document.getElementById('gq-roulette-overlay')?.style.setProperty('display', 'none');
+    // Restaura el fondo por defecto — _showGqGroupRoulette lo pisa según la
+    // cantidad de jugadores, pero el 1v1 (_showGqRoulette en vs.js) nunca
+    // toca este src, asume que siempre es ruleta1.png.
+    const wheelBgReset = document.getElementById('gq-roulette-wheel-bg');
+    if (wheelBgReset) wheelBgReset.src = 'images/ruleta1.png';
+    const tuoT = document.getElementById('timeup-overlay');
+    if (tuoT) { tuoT.style.display = 'none'; tuoT.classList.remove('timeup-in', 'timeup-out'); }
+  }
+
+  // Guess submission for the group "por turnos" match — mismo patrón que
+  // _gqGroupSubmitGuess (tiempo real): separado de submitGuess() (solo/1v1),
+  // reutiliza solo los helpers puros de parseo/distancia/dibujo. A
+  // diferencia de tiempo real, acá SÍ importa de quién es el turno: un
+  // intento (correcto o no) SIEMPRE termina el turno de quien lo hizo.
+  function _gqTurnsSubmitGuess() {
+    const input = document.getElementById('gq-guess-input');
+    const hintEl = document.getElementById('gq-hint');
+    if (!input || solved || !window._gqGroupTurnsMyTurn) return;
+    const raw = input.value;
+    if (!raw.trim()) return;
+    const norm = normalize(raw);
+    const country = countryByName.get(norm);
+    if (!country) {
+      if (_gqSuggestion && _gqSuggestion.forNorm === norm && _gqSuggestion.country) {
+        input.value = displayName(_gqSuggestion.country);
+        _gqSuggestion = null;
+        _gqTurnsSubmitGuess();
+        return;
+      }
+      const suggestion = findSuggestion(norm);
+      if (suggestion) showSuggestion(suggestion, norm);
+      else if (hintEl) hintEl.textContent = t('globequiz.notFound');
+      return;
+    }
+    _gqSuggestion = null;
+    if (guesses.find(g => g.name === country.name)) {
+      if (hintEl) hintEl.textContent = t('globequiz.alreadyGuessedShared');
+      return;
+    }
+    input.value = '';
+    stopAutoRotate();
+    _gqTurnsMyAttempts++;
+    _gqTurnsStopTimer();
+    if (country.name === dailyCountry.name) {
+      solved = true;
+      if (typeof sfxBonus !== 'undefined' && typeof sfxPlay === 'function') { sfxBonus.currentTime = 0; sfxPlay(sfxBonus); }
+      drawTexture();
+      renderGuessList();
+      updateHint();
+      focusOnCountry(country);
+      showWin();
+      if (typeof window._specReportAnswer === 'function') {
+        window._specReportAnswer(true, _gqTurnsMyAttempts, { win: true, countryName: dailyCountry.name, iso2: dailyCountry.iso2 });
+      }
+      window.LB.sendGq({ t: 'tguess', uid: window._sbUserId, round: _gqGroupRound, correct: true });
+      return;
+    }
+    const km = minBorderDistance(country, dailyCountry);
+    const dir = bearingArrow(bearing(country.centroid, dailyCountry.centroid));
+    const color = distColor(km);
+    guesses.push({ name: country.name, km, dir, color });
+    if (km < _gqTurnsMyBestKm) { _gqTurnsMyBestKm = km; _gqTurnsMyBestAtMs = Date.now() - gqTimerStart; }
+    drawTexture();
+    renderGuessList();
+    updateHint();
+    focusOnCountry(country);
+    if (typeof window._specReportAnswer === 'function') {
+      window._specReportAnswer(false, guesses.length, { name: country.name, km, dir, color });
+    }
+    window.LB.sendGq({ t: 'tguess', uid: window._sbUserId, round: _gqGroupRound, correct: false, name: country.name, km, dir, color });
+  }
+
+  // ── Leaderboard EXCLUSIVO de "por turnos": misma tarjeta personalizable de
+  // siempre (--cust-card) pero ROTADA 90° a panorámico — no la celda, y no
+  // estirada/forzada: el arte se pinta a su relación de aspecto real
+  // (intercambiando ancho/alto antes de rotar, ver el ::before en
+  // style.css) y gira entero, igual que el mockup (nombre arriba, foto +
+  // cantidad de RONDAS GANADAS abajo). Apiladas SIN ventana fija — la altura
+  // de cada fila se recalcula según cuántos jugadores hay (ver
+  // _gqTurnsPositionLb) para que los 10 posibles entren SIEMPRE en el mismo
+  // espacio lateral que en tiempo real solo alcanzaba para 4. Deliberadamente
+  // separado de _gqGroupBuildLeaderboard/_gqGroupPositionLb (tiempo real):
+  // ese sigue con su tarjeta vertical sin rotar + ventana de 4 de siempre.
+  function _gqTurnsBuildLeaderboard() {
+    const bar = document.getElementById('gq-friends-bar');
+    if (!bar) return;
+    bar.innerHTML = '';
+    bar.classList.add('vs-active', 'gq-turns-mode');
+    gqLbElements = {};
+    _gqTurnsWinsByUid = {};
+    const buildRow = (name, avatar, cardCode) => {
+      const el = document.createElement('div');
+      el.className = 'lb-entry';
+      // .gq-turn-bg es un div APARTE (no ::before de .lb-entry) a propósito:
+      // container-type:size tiene que vivir en algo que NO sea ancestro de
+      // .lb-name/.lb-score, que usan cqmin asumiendo que miden contra el
+      // stage grande del juego (como en todo el resto del código) — puesto
+      // en .lb-entry directamente, esas cqmin pasaban a medir contra esta
+      // fila diminuta y el texto quedaba invisible (el reportado "no sale
+      // el nombre ni el puntaje").
+      // .lb-score vive SUELTO acá, no adentro de .lb-turn-row — está
+      // anclado al borde IZQUIERDO de toda la carta (ver CSS), lejos de la
+      // foto/nombre que quedan del lado derecho.
+      el.innerHTML = `<div class="gq-turn-bg"></div>`
+        + `<span class="lb-name">${name}</span>`
+        + `<span class="lb-score">0</span>`
+        + `<div class="lb-turn-row">`
+        + `<div class="gq-turn-avatar-wrap"><img class="lb-avatar-img" src="${avatar}"></div>`
+        + `</div>`;
+      window.CustomizeAssets?.applyCard(el, cardCode || '0001');
+      return el;
+    };
+    // window.LB.getMembers() incluye a TODOS, yo incluido, ya en orden de
+    // entrada (ver _gqTurnsComputeOrder).
+    (window.LB.getMembers() || []).forEach(m => {
+      const isMe = m.id === window._sbUserId;
+      const el = buildRow(
+        isMe ? ((window._sbProfile && window._sbProfile.name) || localStorage.getItem('playerName') || m.name || 'Tú') : m.name,
+        isMe ? (localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png') : m.avatar,
+        isMe ? ((window._sbProfile && window._sbProfile.card_code) || '0001') : m.cardCode
+      );
+      if (isMe) { el.classList.add('lb-player'); el.id = 'gq-lb-player'; gqLbElements['player'] = el; }
+      else { el.id = 'gq-lb-lob' + m.id; gqLbElements['lob' + m.id] = el; }
+      bar.appendChild(el);
+    });
+    _gqTurnsPositionLb(false); // fresh build, nothing to slide from yet
+  }
+  // Ordenamiento vía FLEXBOX (ver #gq-friends-bar.gq-turns-mode en
+  // style.css: flex-direction:column + justify-content:flex-end, cada fila
+  // flex:0 0 10%) — nada de top/height calculados a mano acá, eso ya dio
+  // varias vueltas de bugs de unidades. Esta función solo decide el ORDEN
+  // (CSS `order`, ver más abajo) y el texto de cada fila; el motor de layout
+  // hace el resto: ancla abajo, deja el hueco arriba si hay menos de 10, y
+  // nunca puede desalinearse porque no hay ninguna cuenta propia que
+  // desincronizar.
+  // `animate`: false for the very first paint right after building the rows
+  // from scratch (_gqTurnsBuildLeaderboard/_gqTurnsDebugPreview) — there is
+  // no "previous" arrangement to slide from yet, every row is still at its
+  // default insertion-order slot, and animating that initial snap-to-rank
+  // would look like an unwanted slide-in the instant the board appears.
+  function _gqTurnsPositionLb(animate) {
+    if (animate === undefined) animate = true;
+    const ids = Object.keys(gqLbElements);
+    // FLIP (First-Last-Invert-Play): CSS `order` itself can't be
+    // transitioned — changing it just snaps every row straight to its new
+    // slot (the reported "solo se tpea, falta la animación de subida y
+    // bajada"). Measure where each row IS right now BEFORE touching `order`
+    // at all — offsetTop (not getBoundingClientRect, see its own comment in
+    // getLbRowHeight/mapgame-leaderboard.js: that one is scaled by the
+    // #app-stage transform, and a translateY built from it would end up
+    // double-scaled). offsetTop is local-CSS-px against the offsetParent —
+    // exactly the space a `transform` value on that same element lives in,
+    // whatever the stage scale is. Still no manual top/height math of our
+    // own, just reading the layout the flex engine already computed.
+    const prevTop = {};
+    if (animate) {
+      ids.forEach(id => {
+        const el = gqLbElements[id];
+        if (el) prevTop[id] = el.offsetTop;
+      });
+    }
+    const all = ids.map(id => ({
+      id,
+      wins: _gqTurnsWinsByUid[id === 'player' ? window._sbUserId : id.slice(3)] || 0,
+    }));
+    all.sort((a, b) => {
+      const da = a.id !== 'player' && _gqGroupDisconnectedUids.has(a.id.slice(3));
+      const db = b.id !== 'player' && _gqGroupDisconnectedUids.has(b.id.slice(3));
+      if (da !== db) return da ? 1 : -1;
+      return b.wins - a.wins;
+    });
+    all.forEach((p, rank) => {
+      const el = gqLbElements[p.id];
+      if (!el) return;
+      // order CSS: rank 0 (más rondas ganadas) queda PRIMERO en el flex —
+      // con flex-direction:column normal eso lo pondría arriba del todo,
+      // pero justify-content:flex-end empuja TODO el grupo hacia abajo, así
+      // que el efecto real es "1° arriba del grupo, último pegado al borde
+      // inferior", igual que antes.
+      el.style.order = String(rank);
+      const scoreEl = el.querySelector('.lb-score');
+      if (scoreEl) scoreEl.textContent = String(p.wins);
+      // Grayscale for whoever was already eliminated BEFORE the current
+      // tiebreak (see window._gqTurnsTiebreakLosers, set in
+      // _gqTurnsCloseRound) — visible on THEIR own card too, not just the
+      // two still dueling.
+      const pUid = p.id === 'player' ? window._sbUserId : p.id.slice(3);
+      el.classList.toggle('is-tiebreak-out', !!window._gqTurnsTiebreakLosers && window._gqTurnsTiebreakLosers.has(pUid));
+    });
+    if (!animate) return;
+    // Invert + play: en el frame SIGUIENTE (ya con el `order` nuevo
+    // aplicado y el layout recalculado), a cada fila que se movió se le
+    // pone un translateY que la deja EXACTAMENTE donde estaba antes (sin
+    // transición, invisible), y recién ahí se anima ese translateY de
+    // vuelta a 0 — el ojo ve la fila deslizarse de la posición vieja a la
+    // nueva en vez de saltar. .lb-entry no usa `transform` para nada más
+    // (la rotación 90° de la carta vive en .gq-turn-bg::before, un hijo
+    // aparte — ver ese comentario), así que es seguro pisarlo acá.
+    requestAnimationFrame(() => {
+      ids.forEach(id => {
+        const el = gqLbElements[id];
+        if (!el || !(id in prevTop)) return;
+        const delta = prevTop[id] - el.offsetTop;
+        if (Math.abs(delta) < 0.5) return;
+        el.style.transition = 'none';
+        el.style.transform = `translateY(${delta}px)`;
+        void el.offsetWidth;
+        requestAnimationFrame(() => {
+          el.style.transition = 'transform 0.5s cubic-bezier(0.22,1,0.36,1)';
+          el.style.transform = '';
+        });
+      });
+    });
+  }
+
+  // ══ TEMPORAL — boceto en vivo para iterar el diseño sin jugar una partida
+  // real (ver el botón detrás de ?gqdebug=1 en play/index.html). Arma
+  // jugadores FALSOS directamente en gqLbElements/_gqTurnsWinsByUid y
+  // reutiliza el mismo _gqTurnsPositionLb/CSS real — es EXACTAMENTE lo que
+  // ve un jugador real, ninguna maqueta aparte. Borrar junto con el bloque
+  // de play/index.html cuando el diseño quede aprobado. ══
+  window._gqTurnsDebugPreview = function (count) {
+    count = Math.max(1, Math.min(10, count || 10));
+    const gqScreen = document.getElementById('globequiz-screen');
+    if (gqScreen) gqScreen.style.display = 'block';
+    const bar = document.getElementById('gq-friends-bar');
+    if (!bar) return;
+    bar.innerHTML = '';
+    bar.classList.add('vs-active', 'gq-turns-mode');
+    gqLbElements = {};
+    _gqTurnsWinsByUid = {};
+    const names = ['Nombre', 'mytest', 'sharkite', 'Nacho', 'Pipe', 'Lola', 'Vale', 'Tincho', 'Fede', 'Rulo'];
+    for (let i = 0; i < count; i++) {
+      const isMe = i === 0;
+      const el = document.createElement('div');
+      el.className = 'lb-entry' + (isMe ? ' lb-player' : '');
+      el.innerHTML = `<div class="gq-turn-bg"></div>`
+        + `<span class="lb-name">${names[i] || ('Jugador ' + (i + 1))}</span>`
+        + `<span class="lb-score">0</span>`
+        + `<div class="lb-turn-row">`
+        + `<div class="gq-turn-avatar-wrap"><img class="lb-avatar-img" src="images/profilepic/ppdefault.png"></div>`
+        + `</div>`;
+      window.CustomizeAssets?.applyCard(el, (i % 2 === 0) ? '0001' : '0002');
+      const id = isMe ? 'player' : ('lob' + 'debug' + i);
+      gqLbElements[id] = el;
+      _gqTurnsWinsByUid[isMe ? window._sbUserId : ('debug' + i)] = Math.floor(Math.random() * 4);
+      bar.appendChild(el);
+    }
+    _gqTurnsPositionLb(false); // fresh build, nothing to slide from yet
+  };
+  window._gqTurnsDebugPreviewClose = function () {
+    const gqScreen = document.getElementById('globequiz-screen');
+    if (gqScreen) gqScreen.style.display = 'none';
+    document.getElementById('gq-friends-bar')?.classList.remove('vs-active', 'gq-turns-mode');
+  };
+
+  // Mismo espíritu TEMPORAL que _gqTurnsDebugPreview, pero para la RULETA
+  // sola (ver el botón detrás de ?gqdebug=1 en play/index.html) — arma
+  // `count` jugadores FALSOS (yo + fakes con nombre/avatar en
+  // window._lobbyMembers, leídos por _showGqGroupRoulette's identityFor tal
+  // cual lo haría una partida real) y hace girar la ruleta EXACTA que se ve
+  // antes del 3-2-1-GO, con un arrancador al azar cada vez, para poder
+  // revisar el layout con 2 a 10 personas sin jugar una partida real ni
+  // armar un desempate a mano. Borrar junto con el bloque de
+  // play/index.html cuando el diseño quede aprobado.
+  window._gqTurnsDebugRoulette = function (count) {
+    count = Math.max(2, Math.min(10, count || 10));
+    const gqScreen = document.getElementById('globequiz-screen');
+    if (gqScreen) gqScreen.style.display = 'block';
+    const names = ['mytest', 'sharkite', 'Nacho', 'Pipe', 'Lola', 'Vale', 'Tincho', 'Fede', 'Rulo', 'Bruno'];
+    const myId = window._sbUserId || 'debugme';
+    const fakeMembers = [];
+    const order = [myId];
+    for (let i = 0; i < count - 1; i++) {
+      const id = 'debugroulette' + i;
+      fakeMembers.push({ id, name: names[i % names.length], avatar: 'images/profilepic/ppdefault.png' });
+      order.push(id);
+    }
+    // Baraja el orden (Fisher-Yates) para que "yo" no quede siempre en el
+    // mismo casillero — así se ve tanto "arrancás vos" como "arranca fulano".
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = order[i]; order[i] = order[j]; order[j] = tmp;
+    }
+    window._lobbyMembers = fakeMembers;
+    const starterUid = order[Math.floor(Math.random() * order.length)];
+    _showGqGroupRoulette(order, starterUid, () => {});
+  };
+
+  // Entry point — llamado desde _launchLobbyGameNow (lobby.js) cuando el
+  // modo de la sala es 'globequiz_turns'. turnTime viene de
+  // window.LB.getGloboretoConfig() (ajustes del host).
+  window.showGlobequizGroupTurnsMode = function (rounds, turnTime, seed) {
+    window._gqGroupTurnsActive = true;
+    _gqGroupBaseSeed         = seed;
+    _gqGroupRounds           = Math.max(1, rounds || 1);
+    _gqGroupTotal            = 0;
+    _gqGroupUsedCountries    = new Set();
+    _gqGroupDisconnectedUids = new Set();
+    _gqTurnsWinsByUid        = {};
+    _gqTurnsIsTiebreak       = false;
+    _gqTurnsTiebreakUids     = null;
+    _gqTurnsTimeSec = Math.max(5, turnTime || GQ_TURN_TIME_SECONDS);
+    // Igual que globequizSetTurnsMode hace para el 1v1: lo oculta ya mismo,
+    // recién reaparece cuando el turno arranca de verdad (_gqTurnsSetActiveTurn).
+    // Sin esto, la ronda 1 nunca lo ocultaba (a diferencia de las rondas 2+,
+    // que sí lo hacen en _gqTurnsBeginRound) y mostraba el "0:00" de
+    // placeholder del HTML durante toda la carga/ruleta/3-2-1-GO.
+    document.querySelector('.gq-countdown-widget')?.style.setProperty('display', 'none');
+    const gqScreen = document.getElementById('globequiz-screen');
+    if (gqScreen) gqScreen.style.display = 'block';
+    if (typeof window.letterboxRefresh === 'function') window.letterboxRefresh();
+    window.LB.onGq(_gqTurnsHandleGqEvent);
+    _gqTurnsBuildLeaderboard();
+    _gqTurnsBeginRound(1);
+  };
+
+  // Guess submission for the group match — deliberately separate from
+  // submitGuess() (solo/1v1), which is full of analytics/streak/VS-specific
+  // branches that must never fire for a group match. Reuses only the pure
+  // helpers (normalize/countryByName/findSuggestion/showSuggestion for
+  // parsing, minBorderDistance/bearing/bearingArrow/distColor/drawTexture/
+  // renderGuessList/focusOnCountry for the guess itself) and the SAME
+  // shared guesses/solved/dailyCountry state submitGuess uses, so the globe
+  // rendering behaves identically.
+  function _gqGroupSubmitGuess() {
+    const input = document.getElementById('gq-guess-input');
+    const hintEl = document.getElementById('gq-hint');
+    if (!input || solved) return;
+    const raw = input.value;
+    if (!raw.trim()) return;
+    const norm = normalize(raw);
+    const country = countryByName.get(norm);
+    if (!country) {
+      if (_gqSuggestion && _gqSuggestion.forNorm === norm && _gqSuggestion.country) {
+        input.value = displayName(_gqSuggestion.country);
+        _gqSuggestion = null;
+        _gqGroupSubmitGuess();
+        return;
+      }
+      const suggestion = findSuggestion(norm);
+      if (suggestion) showSuggestion(suggestion, norm);
+      else if (hintEl) hintEl.textContent = t('globequiz.notFound');
+      return;
+    }
+    _gqSuggestion = null;
+    if (guesses.find(g => g.name === country.name)) {
+      if (hintEl) hintEl.textContent = t('globequiz.alreadyGuessed');
+      return;
+    }
+    input.value = '';
+    stopAutoRotate();
+    _gqGroupAttempts++;
+    if (country.name === dailyCountry.name) {
+      solved = true;
+      _gqGroupIAlreadySolved = true;
+      if (typeof sfxBonus !== 'undefined' && typeof sfxPlay === 'function') { sfxBonus.currentTime = 0; sfxPlay(sfxBonus); }
+      drawTexture();
+      renderGuessList();
+      // Same "El país correcto es {name}." hint solo/VS show on a win —
+      // reused as-is, it already reads `solved`/`dailyCountry` generically.
+      updateHint();
+      focusOnCountry(country);
+      // Confetti + green "correct country" cell, same as solo/VS — showWin()
+      // also disables the input/button, no need to do that by hand here.
+      showWin();
+      // Generic spectator relay (same call every other mode makes) — lets
+      // ANY spectator (external, or another finished player watching me on
+      // loan) see my winning guess and the reveal of the target country.
+      if (typeof window._specReportAnswer === 'function') {
+        window._specReportAnswer(true, _gqGroupAttempts, { win: true, countryName: dailyCountry.name, iso2: dailyCountry.iso2 });
+      }
+      // Marks me "finished" room-wide (window.LB.sendTimesUp, same generic
+      // hook the other 4 modes rely on for GroupSpectate's _finishedUids) —
+      // this is what makes a spectator's POV auto-advance PAST me once I
+      // solve, instead of leaving them stuck watching my now-idle globe.
+      if (typeof window._specReportTimesUp === 'function') window._specReportTimesUp();
+      window.LB.sendGq({ t: 'solved', uid: window._sbUserId, round: _gqGroupRound });
+      // Once the confetti/celebration has had time to be seen, spectate
+      // whoever's still playing instead of sitting idle — see
+      // _gqGroupEnterLoan (a no-op if everyone else already solved too).
+      setTimeout(() => { if (window._gqGroupActive) _gqGroupEnterLoan(); }, GQ_VS_ANIM_MS);
+      return;
+    }
+    const km = minBorderDistance(country, dailyCountry);
+    const dir = bearingArrow(bearing(country.centroid, dailyCountry.centroid));
+    guesses.push({ name: country.name, km, dir, color: distColor(km) });
+    if (km < _gqGroupBestKm) { _gqGroupBestKm = km; _gqGroupBestAtMs = Date.now() - gqTimerStart; }
+    drawTexture();
+    renderGuessList();
+    updateHint();
+    focusOnCountry(country);
+    // Generic spectator relay — lets a spectator's guess list mirror this
+    // wrong guess live, same as any other mode's board.
+    if (typeof window._specReportAnswer === 'function') {
+      window._specReportAnswer(false, guesses.length, { name: country.name, km, dir, color: distColor(km) });
+    }
+  }
 
   // Fully release the two WebGL contexts (globe + starfield) and their GPU
   // resources. GlobeQuiz keeps `initialized` true for the whole session so the
@@ -2957,16 +5378,32 @@
       const btn2 = document.getElementById('gq-guess-btn');
       const input2 = document.getElementById('gq-guess-input');
       const playCheckSfx = () => { if (typeof sfxCheck !== 'undefined' && typeof sfxPlay === 'function') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); } };
-      if (btn2) btn2.addEventListener('click', () => { playCheckSfx(); submitGuess(); });
-      if (input2) input2.addEventListener('keydown', (e) => { if (e.key === 'Enter') { playCheckSfx(); submitGuess(); } });
+      // Grupo (hasta 10, "tiempo real"): usa su propio submit — la mecánica de
+      // ronda compartida/ranking/puntaje no tiene nada que ver con el solo/1v1
+      // de submitGuess() (ver _gqGroupSubmitGuess más abajo).
+      const _gqDispatchSubmit = () => { if (window._gqGroupActive) _gqGroupSubmitGuess(); else if (window._gqGroupTurnsActive) _gqTurnsSubmitGuess(); else submitGuess(); };
+      if (btn2) btn2.addEventListener('click', () => { playCheckSfx(); _gqDispatchSubmit(); });
+      if (input2) input2.addEventListener('keydown', (e) => { if (e.key === 'Enter') { playCheckSfx(); _gqDispatchSubmit(); } });
       // "Por turnos": broadcast a live preview of what I'm typing while it's
       // my turn. Sent on every keystroke, no debounce — a broadcast message
       // is cheap and a delay here just reads as lag on the opponent's screen
-      // for fast typers.
+      // for fast typers. Group "tiempo real" does the same for whoever might
+      // be watching me on loan (see _gqGroupHandleGqEvent's 'typing' case);
+      // group "por turnos" mirrors it too (see _gqTurnsHandleGqEvent's
+      // 'ttyping' case), but only while it's genuinely MY turn.
       if (input2) {
         input2.addEventListener('input', () => {
-          if (!(window._vsActive && _gqTurnsVariant && window._gqMyTurn)) return;
-          window.VS?.reportGqTyping?.(input2.value);
+          if (window._vsActive && _gqTurnsVariant && window._gqMyTurn) {
+            window.VS?.reportGqTyping?.(input2.value);
+            return;
+          }
+          if (window._gqGroupActive && !solved) {
+            window.LB.sendGq({ t: 'typing', uid: window._sbUserId, text: input2.value, round: _gqGroupRound });
+            return;
+          }
+          if (window._gqGroupTurnsActive && window._gqGroupTurnsMyTurn) {
+            window.LB.sendGq({ t: 'ttyping', uid: window._sbUserId, text: input2.value, round: _gqGroupRound });
+          }
         });
       }
       // End-of-game panel confirm: same exit path as power (tear
@@ -3031,14 +5468,27 @@
       drawTexture();
       restoreUIState();
       fitCanvas();
-      const startGqCountdown = () => {
+      // Group "por turnos" round 1: the roulette runs BEFORE the 3-2-1-GO
+      // (same order as the 1v1's own _gqMaybeStart in vs.js — roulette,
+      // then the countdown), so this wraps the rest of startGqCountdown's
+      // body and only calls it once the spin resolves. Every other case
+      // (solo, "por rapidez", real-time group, 1v1 por turnos which does
+      // its OWN roulette earlier in vs.js) proceeds immediately, unchanged.
+      const _startGqCountdownBody = () => {
         if (spinner) spinner.style.display = 'none';
         // Reports the 3-2-1 start so the spectator watches it live (see
         // globequizSpectatorShowPregame) — it used to live INSIDE
         // runGqPregameCountdown, which the spectator now also calls to SHOW
         // the countdown, not to re-broadcast it.
         if (typeof window._specReportPregame === 'function') {
-          window._specReportPregame({ mode: _gqTurnsVariant ? 'globequiz_turns' : 'globequiz', startedAt: Date.now() });
+          const pregamePayload = { mode: (_gqTurnsVariant || window._gqGroupTurnsActive) ? 'globequiz_turns' : 'globequiz', startedAt: Date.now() };
+          // Group round 1: tag with the round counter (same reason as the
+          // 'round' broadcast further down, see its own comment) so a
+          // spectator's badge is already correct DURING the 3-2-1-GO,
+          // instead of only once 'round' arrives at the END of it (the
+          // reported "spectator doesn't see Ronda 1/5 during the 3-2-1-GO").
+          if (window._gqGroupActive || window._gqGroupTurnsActive) { pregamePayload.round = _gqGroupRound; pregamePayload.totalRounds = _gqGroupRounds; }
+          window._specReportPregame(pregamePayload);
         }
         // Music only starts when the 3-2-1-GO ends, same as the rest of the
         // modes (see runPregameCountdown in js/modes/mapgame-play.js).
@@ -3060,16 +5510,36 @@
           // country is never sent, only when the timer started, so the
           // spectator doesn't see the answer before the player.
           if (typeof window._specReportRound === 'function') {
-            const roundPayload = { mode: _gqTurnsVariant ? 'globequiz_turns' : 'globequiz', startedAt: gqTimerStart };
+            const roundPayload = { mode: (_gqTurnsVariant || window._gqGroupTurnsActive) ? 'globequiz_turns' : 'globequiz', startedAt: gqTimerStart };
             // Lets a spectator work out who starts without a broadcast of its
             // own: whichever role sent this 'round' says whether ITS OWN
             // client is the starter (both host and guest compute this
             // independently from the same seed, see window._gqAmIStarter in
             // vs.js) — the other role is the starter otherwise.
             if (window._vsActive && _gqTurnsVariant) roundPayload.amIStarter = !!window._gqAmIStarter;
+            // Group round 1 goes through this shared 1v1/solo path — tag it
+            // with the round counter so an external spectator can show the
+            // same "Ronda N/N" badge the real players see (see
+            // globequizSpectatorShowRound).
+            if (window._gqGroupActive || window._gqGroupTurnsActive) { roundPayload.round = _gqGroupRound; roundPayload.totalRounds = _gqGroupRounds; }
             window._specReportRound(roundPayload);
           }
+          if (window._gqGroupTurnsActive) {
+            _gqTurnsSetActiveTurn(_gqTurnsOrder[_gqTurnsPointer]);
+            _gqTurnsBroadcastFirstTurn(_gqTurnsOrder[_gqTurnsPointer]);
+          }
         });
+      };
+      const startGqCountdown = () => {
+        if (window._gqGroupTurnsActive) {
+          // Hide the loading spinner right away — _startGqCountdownBody
+          // would otherwise only do it AFTER the roulette resolves, leaving
+          // it covering the roulette overlay for the whole spin.
+          if (spinner) spinner.style.display = 'none';
+          _gqTurnsPickOrderAndShowRoulette(_startGqCountdownBody);
+          return;
+        }
+        _startGqCountdownBody();
       };
       // VS 1v1: don't start the 3-2-1 until the OPPONENT also finishes
       // loading their 3D globe (three.js + GeoJSON are heavy and take
@@ -3263,12 +5733,24 @@
     // switching to spectate) are cleared — here only the spectated friend's
     // single card belongs.
     const friendsBar2 = document.getElementById('gq-friends-bar');
-    if (friendsBar2) friendsBar2.querySelectorAll('.lb-entry[data-gq-friend]').forEach(el => el.remove());
+    if (friendsBar2) {
+      friendsBar2.querySelectorAll('.lb-entry[data-gq-friend]').forEach(el => el.remove());
+      // Same leftover as buildGqFriendRows/globequizVsPrepareOpponentRow: a
+      // GROUP "por turnos" match played earlier in this tab left its own
+      // rows (gq-lb-lob<uid>) + rotated gq-turns-mode layout on this same
+      // bar, never cleared outside window.gameStoppers.
+      friendsBar2.querySelectorAll('.lb-entry[id^="gq-lb-lob"]').forEach(el => el.remove());
+      friendsBar2.classList.remove('gq-turns-mode');
+    }
     const guessRow2 = document.querySelector('.gq-guess-row');
     if (guessRow2) guessRow2.style.display = 'none';
     const hintEl4 = document.querySelector('.gq-hint');
     if (hintEl4) hintEl4.style.display = 'none';
     if (typeof window.refreshIngamePower === 'function') window.refreshIngamePower();
+    // GROUP external spectator only (1v1/solo keep #gq-spec-typing — see
+    // globequizSpectatorShowTyping) — same locked typing bar above
+    // "ESPECTANDO" the in-game loan feature uses.
+    if (window._isGroupSpectating && window._isGroupSpectating()) window.globequizSpectatorShowGroupTyping();
     _gqSpecResetPanel();
     // The spectator used to deliberately never call
     // loadThree()/initThreeScene() ("v1 without globe"). Now it reuses
@@ -3396,17 +5878,38 @@
     abortGqPregameCountdown();
     const screenEl = document.getElementById('globequiz-screen');
     if (screenEl) screenEl.style.display = 'none';
+    // "Por turnos" GroupSpectate mirror (see _specGqTurnsShowRoundResult in
+    // spectate.js) — closing the session mid-table left it stuck visible
+    // otherwise, since nothing else hides it on this path.
+    document.getElementById('gq-round-result-screen')?.style.setProperty('display', 'none');
     // Restore what was hidden in Enter — if this same tab later starts a
     // REAL GlobeQuiz match, initGlobeQuiz() expects these elements in their
     // normal state.
     const powerBtn = document.getElementById('gq-power-btn');
     if (powerBtn) powerBtn.style.display = '';
     const friendsBar = document.querySelector('.gq-friends-bar');
-    if (friendsBar) friendsBar.style.display = '';
+    if (friendsBar) {
+      friendsBar.style.display = '';
+      // GROUP spectator (_renderGroupLeaderboardInner in spectate.js) leaves
+      // 'vs-active'/'gq-turns-mode' on this SAME shared container, plus its
+      // own 'group-spec-lb-{uid}' rows — none of that was ever undone here,
+      // so the NEXT thing to use #gq-friends-bar in this tab (a real match
+      // this player then starts themselves, or the next spectate session)
+      // inherited stale turns-mode CSS/leftover rows and rendered
+      // misplaced/duplicated (the reported "la posicion del leaderboard...
+      // parece descolocado"). #gq-lb-player is real players' own static row
+      // (see play/index.html) — the group spectator hides it outright while
+      // it builds its own rows in its place, restored here too.
+      friendsBar.classList.remove('vs-active', 'gq-turns-mode');
+      friendsBar.querySelectorAll('[id^="group-spec-lb-"]').forEach(el => el.remove());
+      const meEl = document.getElementById('gq-lb-player');
+      if (meEl) meEl.style.display = '';
+    }
     const guessRow = document.querySelector('.gq-guess-row');
     if (guessRow) guessRow.style.display = '';
     const hintEl = document.querySelector('.gq-hint');
     if (hintEl) hintEl.style.display = '';
+    window.globequizSpectatorHideGroupTyping();
     if (typeof window.refreshIngamePower === 'function') window.refreshIngamePower();
     if (!switchingMode) {
       const ls = document.getElementById('loading-screen');
@@ -3414,19 +5917,85 @@
     }
   };
 
-  // "Por turnos" ONLY: reuses the REAL per-turn countdown machinery
-  // (_gqStartTurnTimer/_gqTickTurnTimer, same closure) for a spectator too —
-  // it already no-ops the "declare my own timeout" branch since
-  // window._gqMyTurn is never true for a spectator, so nothing else needs
-  // changing. Also unhides the countdown widget, which globequizSetTurnsMode
-  // hid on mount (real players only unhide it themselves once THEIR 3-2-1
-  // ends, a spectator never runs that code path).
-  window.globequizSpectatorStartTurnTimer = function (startedAt) {
+  // "Por turnos" ONLY: reuses the REAL per-turn countdown's PAINT machinery
+  // (_gqTickTurnTimer/_gqPaintTurnTimer, same closure/DOM element) for a
+  // spectator too, but NOT _gqStartTurnTimer itself — that one deliberately
+  // IGNORES its `startedAt` argument and always sets _gqTurnStartedAt =
+  // Date.now() (see its own comment: correct for a REAL player, whose turn
+  // genuinely starts "now" on their own device). A spectator's `startedAt`
+  // instead comes from a REMOTE broadcast ('tturn'/'tstate') — some of that
+  // 20s may have already elapsed before it even arrived (more so on a fresh
+  // join/reconnect mid-turn) — routing it through _gqStartTurnTimer silently
+  // discarded it and always restarted the visible clock at the full 20s
+  // (the reported "el contador... esta en 8 segs, el espectador lo ve en
+  // 20"). _specClockOffsetMs corrects for the two devices' clocks
+  // disagreeing, same pattern as globequizSpectatorShowPregame. Also
+  // unhides the countdown widget, which globequizSetTurnsMode hid on mount
+  // (real players only unhide it themselves once THEIR 3-2-1 ends, a
+  // spectator never runs that code path).
+  // `durationSec`: GROUP "por turnos" rooms have a CONFIGURABLE turn time
+  // (see the turnTime stepper in lobby.js, defaults to 20 but not always
+  // 20) — the spectator never runs showGlobequizGroupTurnsMode itself (only
+  // a real player does), so it never learns the room's actual value unless
+  // a caller passes it along (see 'tturn'/'tstate' in spectate.js, both now
+  // carry the sender's own _gqTurnsTimeSec). Falls back to the 1v1 constant
+  // when omitted (1v1 duels have no such setting).
+  window.globequizSpectatorStartTurnTimer = function (startedAt, durationSec) {
     document.querySelector('.gq-countdown-widget')?.style.removeProperty('display');
-    _gqStartTurnTimer(startedAt);
+    _gqStopTurnTimer();
+    const offset = typeof window._specClockOffsetMs === 'function' ? window._specClockOffsetMs() : 0;
+    _gqTurnStartedAt = (typeof startedAt === 'number' ? startedAt : Date.now()) - offset;
+    _gqSpecTurnDurationSec = (typeof durationSec === 'number' && durationSec > 0) ? durationSec : GQ_TURN_TIME_SECONDS;
+    _gqTurnSecondsLeft = _gqSpecTurnDurationSec + 1; // force the first poll to paint
+    _gqSetCountdownIconRed(false);
+    _gqSpecTickTurnTimer();
+    _gqTurnTimerInterval = setInterval(_gqSpecTickTurnTimer, 250);
   };
+  // Spectator-only twin of _gqTickTurnTimer: same paint/pulse/red-icon/tick
+  // sfx behavior, but against _gqSpecTurnDurationSec (settable per room)
+  // instead of the 1v1's hardcoded GQ_TURN_TIME_SECONDS, and it never
+  // declares a timeout (a spectator has no turn of its own to forfeit — the
+  // real timeout is always announced by whoever's turn it actually was, via
+  // 'tguess'/'tround').
+  let _gqSpecTurnDurationSec = GQ_TURN_TIME_SECONDS;
+  function _gqSpecTickTurnTimer() {
+    const elapsedSec = Math.floor((Date.now() - _gqTurnStartedAt) / 1000);
+    const secondsLeft = Math.max(0, _gqSpecTurnDurationSec - elapsedSec);
+    if (secondsLeft === _gqTurnSecondsLeft) return;
+    _gqTurnSecondsLeft = secondsLeft;
+    _gqPaintTurnTimer();
+    pulseCountdown();
+    if (secondsLeft > 0 && secondsLeft <= 5) {
+      _gqSetCountdownIconRed(true);
+      if (typeof sfxTickdown !== 'undefined' && typeof sfxPlay === 'function') { sfxTickdown.currentTime = 0; sfxPlay(sfxTickdown); }
+    }
+    if (secondsLeft <= 0) _gqStopTurnTimer();
+  }
   window.globequizSpectatorStopTurnTimer = function () {
     _gqStopTurnTimer();
+  };
+
+  // GROUP spectator only: the same locked "what are they typing" bar the
+  // in-game loan feature shows above #spectator-mini-hud (see
+  // _gqGroupShowWatchBanner/_gqGroupUpdateTypingPreview) — the external
+  // spectator was instead using #gq-spec-typing (the older 1v1 element, a
+  // plain floating text, not positioned above "ESPECTANDO" and not styled
+  // as the locked input bar) — reused here so both watch-modes look
+  // identical, per the user's request.
+  window.globequizSpectatorShowGroupTyping = function () {
+    document.getElementById('gq-group-watch-typing-row')?.style.setProperty('display', '');
+    // The raw markup's placeholder="" is empty until the first live/resent
+    // typing text arrives — without this, a freshly-entered spectator saw a
+    // blank box instead of the "Escribe un país..." placeholder (the
+    // reported "right when entering, it's empty").
+    _gqGroupUpdateTypingPreview('');
+  };
+  window.globequizSpectatorHideGroupTyping = function () {
+    document.getElementById('gq-group-watch-typing-row')?.style.setProperty('display', 'none');
+    _gqGroupUpdateTypingPreview('');
+  };
+  window.globequizSpectatorSetGroupTypingText = function (text) {
+    _gqGroupUpdateTypingPreview(text || '');
   };
 
   // "Por turnos" ONLY: mirrors the real players' roulette (see
@@ -3465,6 +6034,126 @@
     if (el) { el.classList.remove('gq-spec-typing-show'); el.textContent = ''; }
   };
 
+  // GROUP "por turnos" GroupSpectate (the generic external "watch the whole
+  // room" viewer) ONLY — unlike every other spectator context (1v1/solo/
+  // group "por rapidez", each a genuinely DIFFERENT board per member), this
+  // mode has ONE shared board: there's nothing "per member" to show a photo
+  // for. Per request, this replaces the generic "Espectando a {name}" +
+  // photo mini-hud (spectate.js) with the EXACT #gq-hint/input real
+  // non-active players already see, instead of a separate custom banner.
+  // enable=false undoes it (leaving #gq-hint/.gq-guess-row hidden again, the
+  // default globequizSpectatorEnter leaves them in for every other case).
+  window.globequizSpectatorSetupGroupTurnsSharedView = function (enable) {
+    const hintEl = document.querySelector('.gq-hint');
+    const guessRow = document.querySelector('.gq-guess-row');
+    const input = document.getElementById('gq-guess-input');
+    const btn = document.getElementById('gq-guess-btn');
+    // Real waiting players never see their OWN #gq-hint/.gq-guess-row until
+    // their 3-2-1-GO actually ends (initGlobeQuiz hides them synchronously,
+    // runGqPregameCountdown's onDone reveals them — see its own comment).
+    // Showing them here unconditionally on enable=true left the spectator's
+    // mirror visible THROUGH the roulette/3-2-1-GO (the reported "la tabla
+    // de escribir esta disponible desde la cuenta regresiva... en el
+    // 3-2-1-GO no deberia de estar") — kept hidden here regardless of
+    // `enable`; globequizSpectatorSetGroupTurnsWaitingFor (below) is what
+    // actually reveals them, at the exact moment a real turn is known,
+    // together with the "Esperando respuesta de..." text.
+    if (hintEl) hintEl.style.display = 'none';
+    if (guessRow) {
+      guessRow.style.display = 'none';
+      guessRow.classList.toggle('gq-locked', !!enable);
+    }
+    if (input) {
+      input.disabled = !!enable;
+      input.value = '';
+      // NOT t('globequiz.inputPh') ("Escribe un país...") — that's an
+      // INVITATION to type, meaningless for a spectator who can't. Left
+      // blank until the first real 'ttyping'/'tturn' fills it in (the
+      // reported "el escribe un país que sale desde el inicio").
+      input.placeholder = '';
+    }
+    if (btn) btn.classList.toggle('gq-disabled', !!enable);
+    // #gq-hint starts blank too — until the first 'troulette'/'tturn'
+    // resolves who actually has the turn, showing "Esperando respuesta de
+    // Alguien..." was a worse default than nothing (the reported "obtiene
+    // el mensaje default... y no 'Esperando respuesta de tal' de frente").
+    if (enable && hintEl) hintEl.textContent = '';
+    // #gq-spec-turn/#gq-spec-typing are the 1v1/solo spectator's OWN turn
+    // banner + typing bubble (centered ABOVE the guess row, see their
+    // comment in play/index.html) — this shared-board view already covers
+    // the exact same information via #gq-hint/the disabled input itself, so
+    // showing both at once left the spectator with TWO "who's typing what"
+    // boxes stacked on screen. Reset/hidden here regardless of enable — this
+    // view never uses them.
+    if (typeof window.globequizSpectatorSetupTurnsUI === 'function') window.globequizSpectatorSetupTurnsUI();
+    // #gq-group-watch-typing-row is the REAL-TIME "por rapidez" per-member
+    // watch banner (see _gqGroupShowWatchBanner/globequizSpectatorShowGroupTyping)
+    // — it sits ABOVE #gq-hint (bottom:15cqmin vs 13cqmin, see style.css) and
+    // is styled identically to #gq-guess-input, so it read as a SECOND
+    // "Escribe un país..." box floating above the real one. It leaks in here
+    // because the generic per-member POV-switch/'gqguesses' code in
+    // spectate.js calls globequizSpectatorSetGroupTypingText (note: no
+    // "Turns" in the name — a DIFFERENT function from
+    // globequizSpectatorSetGroupTurnsTypingText above) without checking the
+    // mode (the reported "sale DOS lugares de escribir... el de arriba en el
+    // centro" — confirmed from a screenshot to be THIS element, not
+    // #gq-spec-turn/#gq-spec-typing). Force-hidden here as a hard guarantee.
+    if (enable && typeof window.globequizSpectatorHideGroupTyping === 'function') window.globequizSpectatorHideGroupTyping();
+  };
+  // Same "Esperando respuesta de {name}..." text real waiting players get
+  // from _gqPaintGroupTurnBanner — this spectator resolves the name itself
+  // (GroupSpectate's own roster, see spectate.js) since it never ran that
+  // function's _gqGroupResolveName lookup.
+  window.globequizSpectatorSetGroupTurnsWaitingFor = function (name) {
+    const hintEl = document.getElementById('gq-hint');
+    if (hintEl) {
+      hintEl.textContent = t('gq.waitingTurnFor', { name: name || 'Alguien' });
+      // This is the exact moment a real turn is actually known — reveal the
+      // hint AND the locked input TOGETHER here (see
+      // globequizSpectatorSetupGroupTurnsSharedView's own comment: both stay
+      // hidden through the roulette/3-2-1-GO otherwise, same as real waiting
+      // players' own screen).
+      hintEl.style.display = '';
+    }
+    const guessRow = document.querySelector('.gq-guess-row');
+    if (guessRow) guessRow.style.display = '';
+  };
+  // GROUP "por turnos" GroupSpectate ONLY: focuses the shared globe on the
+  // round's winning country — the same reveal a real winner's own client
+  // shows via showWin(), which this spectator never runs (it never
+  // guesses). Deliberately separate from globequizSpectatorResolvePick:
+  // that one is the 1v1/solo POV mirror, and its _gqTurnsVariant-gated
+  // branches would paint the wrong (elapsed-race) value onto #gq-timer-number,
+  // which THIS shared board uses for the per-turn countdown instead (the
+  // reported "no se tpea al país correcto cuando lo adivinan").
+  window.globequizSpectatorRevealGroupTurnsCountry = function (countryName, iso2) {
+    if (!countryName) return;
+    const country = countryByName.get(normalize(countryName));
+    if (!country) return;
+    solved = true;
+    dailyCountry = country;
+    drawTexture();
+    stopAutoRotate();
+    focusOnCountry(country);
+  };
+  // Same spot a real waiting player's own placeholder swaps to (see
+  // globequizShowOpponentTyping/_gqTurnsShowTyping) — "lo que escribe en
+  // vivo" below the "Esperando respuesta de..." line, on the disabled input
+  // itself rather than a separate speech-bubble element.
+  window.globequizSpectatorSetGroupTurnsTypingText = function (text) {
+    const input = document.getElementById('gq-guess-input');
+    if (!input) return;
+    // NOT t('globequiz.inputPh') ("Escribe un país...") when there's no live
+    // typing to show — same reasoning as globequizSpectatorSetupGroupTurnsSharedView's
+    // own blank default: that's an INVITATION to type, meaningless for a
+    // spectator. This runs on every turn hand-off ('tturn' clears the
+    // previous typer's text) — falling back to the placeholder here
+    // silently reintroduced it right after the setup function's own blank
+    // default (the reported "el 'escribe un país' sigue saliendo en el
+    // espectador").
+    input.placeholder = (text || '').trim();
+  };
+
   // "Por turnos" ONLY: live preview of whichever side is currently typing —
   // same live-typing broadcast the real (waiting) opponent sees inside their
   // own disabled input (placeholder swapped for their live keystrokes, see
@@ -3485,6 +6174,38 @@
     if (_gqSpecTimerInterval) { clearInterval(_gqSpecTimerInterval); _gqSpecTimerInterval = null; }
     _gqStopTurnTimer();
     _gqSpecResetPanel();
+    // GROUP tiempo real tags its pregame payload with round/totalRounds
+    // (see _gqGroupBeginRound/initGlobeQuiz's window._specReportPregame) —
+    // sync the "Ronda N/N" badge from it right away, DURING the 3-2-1-GO,
+    // instead of waiting for the 'round' broadcast that only arrives once
+    // it ends (the reported "spectator doesn't see Ronda 1/5 during the
+    // 3-2-1-GO" / "starting round 2/5, spectator still shows 1/5"). Also
+    // clears the typed-text cache/UI for the new round, same reason as
+    // isNewRound's gqTyping reset in spectate.js — a pregame IS always a
+    // new round starting.
+    if (payload && typeof payload.round === 'number') {
+      _gqGroupRound = payload.round;
+      _gqGroupRounds = payload.totalRounds;
+      // "Por turnos" desempate: propagado desde el jugador real (ver
+      // _gqTurnsIsTiebreak/_specReportPregame) — un espectador nunca corre
+      // _gqTurnsCloseRound por sí mismo, así que sin esto seguía mostrando
+      // "Ronda N/N" durante la ronda extra en vez de "Ronda Final".
+      _gqTurnsIsTiebreak = !!payload.isTiebreak;
+      _gqGroupUpdateRoundBadge();
+      if (typeof window.globequizSpectatorSetGroupTypingText === 'function') window.globequizSpectatorSetGroupTypingText('');
+    }
+    // Clears the PREVIOUS round's guesses/dailyCountry (and redraws the
+    // globe) NOW, hidden behind this same 3-2-1-GO overlay — real players'
+    // own globe is reset (rotation/zoom back to base) BEFORE their 3-2-1-GO
+    // even starts (see _gqTurnsBeginRound's roulette callback in this same
+    // file), so they never see it happen. globequizSpectatorShowRound below
+    // used to be the ONLY place this ran, right when the countdown ends and
+    // the globe is fully visible again — the spectator watched the board
+    // visibly snap/reset at that exact moment (the reported "reinicia la
+    // animacion de globo al culmino del 3-2-1-GO"). Left in ShowRound too,
+    // as a harmless no-op safety net for a spectator who reconnects mid-
+    // round and never saw this pregame.
+    window.globequizSpectatorResetForNewPov();
     // The real player cuts the menu music as soon as they enter and stays
     // silent through the whole 3-2-1 (see initGlobeQuiz, playMusic(null)
     // before runGqPregameCountdown) — no audio was touched at any point of
@@ -3512,13 +6233,256 @@
   // A single "round" per session — starts the local timer from
   // payload.startedAt (the same instant the real player saw their 3-2-1-GO
   // end), without needing per-second ticks from the broadcaster.
+  // GROUP spectator only: switching POV with the arrows replays THIS SAME
+  // 'round' phase for the newly watched member (see _resendState in
+  // spectate.js) — solved/guesses/dailyCountry are the SAME module vars the
+  // real player and the 1v1 spectator use, and they carried over from
+  // whichever member was watched BEFORE (e.g. solved=true from someone who
+  // already won), silently blocking globequizSpectatorSyncGuesses's `if
+  // (solved) return` guard and leaving the globe on the wrong
+  // country/rotation for the new target (the reported "switching POV, the
+  // countries don't load or position correctly"). Exported so spectate.js
+  // can call it before replaying the new member's cached guess history.
+  window.globequizSpectatorResetForNewPov = function () {
+    solved = false;
+    guesses = [];
+    dailyCountry = null;
+    drawTexture();
+    renderGuessList();
+  };
+
+  // GROUP spectator only: replays the newly watched member's ALREADY-made
+  // guesses/win for the current round, INCLUDING camera positioning — unlike
+  // globequizSpectatorSyncGuesses's bulk catch-up path (built for a brand
+  // new spectator joining mid-match, see its own comment), which never
+  // focuses the globe or stops the base auto-rotate for "por rapidez" (that
+  // mode normally gets its live per-guess focus from resolvePick instead,
+  // one guess at a time) — used bare, a POV switch left the globe spinning
+  // at the generic base view/rotation regardless of what the newly watched
+  // member had already done (the reported "rotating to another POV forces
+  // the base spin animation and initial globe position"). gq is
+  // {guesses, solved} from GroupSpectate.getGqState(uid).
+  window.globequizSpectatorReplayGroupState = function (gq) {
+    solved = false; guesses = []; dailyCountry = null;
+    if (gq && gq.solved) {
+      if (typeof window.globequizSpectatorResolvePick === 'function') {
+        window.globequizSpectatorResolvePick({ win: true, countryName: gq.solved.countryName, iso2: gq.solved.iso2 });
+      }
+      return;
+    }
+    const list = (gq && gq.guesses) || [];
+    guesses = list.slice();
+    drawTexture();
+    renderGuessList();
+    if (list.length > 0) {
+      stopAutoRotate();
+      const last = list[list.length - 1];
+      const country = countryByName.get(normalize(last.name || ''));
+      if (country) focusOnCountry(country);
+    } else {
+      startAutoRotate();
+    }
+  };
+
+  // GROUP spectator only: mirrors the shared post-solve 20s countdown real
+  // still-playing members see (.gq-countdown-widget/#gq-timer-number, see
+  // _gqGroupStartCountdown) — driven purely by the broadcast `endsAt` wall
+  // clock, with its OWN interval/state so it never touches the real
+  // player-only _gqGroupCountdownEndsAt or calls _gqGroupCloseRound() (round
+  // closing for a spectator is just "the next round/pregame arrives",
+  // already handled elsewhere). Deliberately NOT tied to _gqGroupActive.
+  let _gqSpecCountdownTimer = null;
+  let _gqSpecCountdownLastSec = null;
+  window.globequizSpectatorShowCountdown = function (endsAt) {
+    if (typeof endsAt !== 'number') return;
+    if (_gqSpecCountdownTimer) clearInterval(_gqSpecCountdownTimer);
+    _gqSpecCountdownLastSec = null;
+    _gqSetCountdownIconRed(false);
+    document.querySelector('.gq-countdown-widget')?.style.removeProperty('display');
+    const tick = () => {
+      if (typeof window._specGqKeepAlive === 'function') window._specGqKeepAlive();
+      const secondsLeft = Math.ceil((endsAt - Date.now()) / 1000);
+      if (secondsLeft === _gqSpecCountdownLastSec) return;
+      _gqSpecCountdownLastSec = secondsLeft;
+      _gqGroupPaintCountdown(secondsLeft);
+      if (typeof pulseCountdown === 'function') pulseCountdown();
+      if (secondsLeft > 0 && secondsLeft <= 5) _gqSetCountdownIconRed(true);
+      // Freezes at 0 (like the real still-playing player, see
+      // _gqGroupTickCountdown's comment), then chains straight into the
+      // times-up flash + round-result table — same beat every real member
+      // goes through in _gqGroupCloseRound/_gqGroupShowTimesUp, just without
+      // any of the real scoring/round-advance side effects (a spectator
+      // learns "the round moved on" from the next round/pregame broadcast
+      // instead). Without this the round-result table was skipped entirely
+      // for external spectators (the reported "don't leave the results
+      // table out").
+      if (secondsLeft <= 0) {
+        clearInterval(_gqSpecCountdownTimer); _gqSpecCountdownTimer = null;
+        // The widget itself was left displayed (frozen at "0") through the
+        // whole times-up flash + round-result table, only hidden once the
+        // NEXT round began (globequizSpectatorShowRound) — for a real
+        // player the full-screen times-up overlay covers it either way, but
+        // for the external spectator it stayed visibly stuck on screen
+        // (the reported "the countdown takes a while to be removed, it
+        // stays in place"). Hide it right here instead of waiting.
+        document.querySelector('.gq-countdown-widget')?.style.setProperty('display', 'none');
+        window.globequizSpectatorShowRoundResult();
+      }
+    };
+    tick();
+    _gqSpecCountdownTimer = setInterval(tick, 250);
+  };
+  window.globequizSpectatorHideCountdown = function () {
+    if (_gqSpecCountdownTimer) { clearInterval(_gqSpecCountdownTimer); _gqSpecCountdownTimer = null; }
+    _gqSpecCountdownLastSec = null;
+    document.querySelector('.gq-countdown-widget')?.style.setProperty('display', 'none');
+  };
+
+  // GROUP spectator only: mirrors _gqGroupShowTimesUp + _gqGroupShowRoundResultTable
+  // for an external spectator — same 1.8s+0.4s times-up flash, then the
+  // country reveal + ranked list for 10s. Built from GroupSpectate's OWN
+  // already-live-tracked members/scores (cumulative totals, identical to
+  // what _gqGroupShowRoundResultTable shows real players — see its own
+  // comment) instead of the real-player-only window._lobbyMembers/
+  // _gqGroupTotal, which this client never populates. The revealed country
+  // comes from `dailyCountry`, which globequizSpectatorReplayGroupState/
+  // resolvePick already set to the round's winner's country as soon as
+  // ANYONE solved (spoiler-safe: never set before a win).
+  let _gqSpecResultTimer = null;
+  window.globequizSpectatorShowRoundResult = function () {
+    const buildTable = () => {
+      const screen = document.getElementById('gq-round-result-screen');
+      const list   = document.getElementById('gq-round-result-list');
+      const tag    = document.getElementById('gq-round-result-tag');
+      if (!screen || !list || !window.GroupSpectate) return;
+      const members = window.GroupSpectate.getMembers().slice().sort((a, b) => (b.score || 0) - (a.score || 0));
+      if (tag) tag.textContent = t('globequiz.groupRoundBadge', { round: _gqGroupRound, total: _gqGroupRounds });
+      // `dailyCountry` is only ever set on THIS client when the CURRENTLY
+      // WATCHED member's own win was replayed (resolvePick/
+      // globequizSpectatorReplayGroupState) — if the round closed while
+      // watching someone who never won it, it's still null even though the
+      // room's real winner (anyone) already revealed it. Fall back to
+      // whichever member's cached win (see the 'ganswer' handler in
+      // spectate.js, kept for EVERY solver regardless of POV) has it.
+      let revealCountry = dailyCountry;
+      if (!revealCountry && window.GroupSpectate.getGqState) {
+        for (const m of members) {
+          const gq = window.GroupSpectate.getGqState(m.id);
+          if (gq && gq.solved && gq.solved.countryName) {
+            revealCountry = countryByName.get(normalize(gq.solved.countryName));
+            if (revealCountry) break;
+          }
+        }
+      }
+      const countryLabel = document.getElementById('gq-round-result-country-label');
+      const countryFlag  = document.getElementById('gq-round-result-flag');
+      if (countryLabel) countryLabel.textContent = revealCountry ? t('globequiz.hintCorrect', { name: displayName(revealCountry) }) : '';
+      if (countryFlag) {
+        const flagUrl = revealCountry && revealCountry.iso2 && window.flagUrlForCountryCode ? window.flagUrlForCountryCode(revealCountry.iso2) : '';
+        countryFlag.src = flagUrl || '';
+        countryFlag.style.display = flagUrl ? '' : 'none';
+      }
+      const medals = ['🥇', '🥈', '🥉'];
+      list.innerHTML = '';
+      members.forEach((m, i) => {
+        const row = document.createElement('div');
+        row.className = 'gq-round-result-row';
+        row.innerHTML =
+          `<span class="gq-round-result-pos">${medals[i] || (i + 1)}</span>` +
+          `<div class="gq-round-result-avatar-wrap"><img class="gq-round-result-avatar" src="${m.avatar || 'images/profilepic/ppdefault.png'}" draggable="false" oncontextmenu="return false"></div>` +
+          `<span class="gq-round-result-name">${m.name || '?'}</span>` +
+          `<span class="gq-round-result-score">${Math.round(m.score || 0).toLocaleString()}</span>`;
+        window.CustomizeAssets?.applyFrame(row.querySelector('.gq-round-result-avatar-wrap'), m.frameCode || '0001');
+        list.appendChild(row);
+      });
+      screen.style.display = 'flex';
+      if (typeof playMusic === 'function' && typeof sfxPostgame !== 'undefined') playMusic(sfxPostgame);
+      const bar  = document.getElementById('gq-round-result-bar');
+      const cdEl = document.getElementById('gq-round-result-cd');
+      const DURATION_MS = 10000;
+      const start = Date.now();
+      if (bar) { bar.style.transition = 'none'; bar.style.width = '100%'; void bar.offsetWidth; }
+      if (cdEl) cdEl.textContent = '10';
+      // Double rAF (not a single one): `screen.style.display` just flipped
+      // from 'none' to 'flex' a few lines up, in this SAME synchronous
+      // block — a single requestAnimationFrame can still land before the
+      // browser has actually laid out/painted the newly-visible screen at
+      // all, so the "100%, no transition" state and the "0%, linear
+      // transition" state below get coalesced into one paint with no
+      // visible animation in between (the reported "the round-result timer
+      // bar doesn't load properly for the spectator" — it just snaps to
+      // empty). The forced reflow above closes most of that gap already;
+      // this second rAF is the belt-and-suspenders fix for whatever's left.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (bar) { bar.style.transition = `width ${DURATION_MS}ms linear`; bar.style.width = '0%'; }
+      }));
+      clearInterval(_gqSpecResultTimer);
+      _gqSpecResultTimer = setInterval(() => {
+        if (typeof window._specGqKeepAlive === 'function') window._specGqKeepAlive();
+        const remain = Math.ceil((DURATION_MS - (Date.now() - start)) / 1000);
+        if (cdEl) cdEl.textContent = Math.max(0, remain);
+        if (remain <= 0) { clearInterval(_gqSpecResultTimer); _gqSpecResultTimer = null; screen.style.display = 'none'; }
+      }, 200);
+    };
+    // Same rule as the real players' own _gqGroupCloseRound: this "TIMES UP"
+    // flash ALWAYS plays, regardless of whether the currently watched
+    // member solved or not — skipping it for a solve desynced the
+    // spectator's round transition from the rest of the room (they reached
+    // the round-result table/next round ~2.2s early, the reported "watching
+    // whoever's still missing solve skips the times-up animation entirely
+    // and shows the results panel/next round early"). The clock/shake CARD
+    // effect is the only genuinely conditional piece, and it's handled
+    // separately over its own dedicated 'gq' t:'ranout' signal (see the
+    // onGq handler in spectate.js) — never gated by this same flash.
+    // On the LAST round, real players still see this SAME "TIMES UP" flash
+    // (it's unconditional, see _gqGroupCloseRound) but then skip straight to
+    // the FINAL ranking panel instead of the per-round table (isLastRound
+    // there) — the spectator's own local mirror didn't know this was the
+    // last round and built the per-round table anyway, so it flashed
+    // briefly (country reveal + per-round ranking, camera mid-zoom from
+    // focusOnCountry) right before the incoming 'final' postgame swapped it
+    // out for the real "GANA X" panel a beat later (the reported "tries to
+    // show the 'country was X' panel first, then GANA X, all zoomed and
+    // broken"). Mirror the same branch: flash still plays, but wait for
+    // that real postgame instead of building the table.
+    const isLastRound = _gqGroupRound >= _gqGroupRounds;
+    _gqGroupShowTimesUp(isLastRound ? () => {} : buildTable);
+  };
+  // Closes the round-result mirror early if a genuinely new round for the
+  // watched member arrives before its own 10s finishes (e.g. a POV switch
+  // right as the room moves on) — see globequizSpectatorShowRound's
+  // isGroupRound branch.
+  window.globequizSpectatorHideRoundResult = function () {
+    clearInterval(_gqSpecResultTimer); _gqSpecResultTimer = null;
+    const screen = document.getElementById('gq-round-result-screen');
+    if (screen) screen.style.display = 'none';
+  };
+
   window.globequizSpectatorShowRound = function (payload) {
     // The round is the signal that the 3-2-1-GO already ended on the real
     // side — in case it arrives while the local mirror
     // (globequizSpectatorShowPregame) is still animating (network latency),
     // it's cut here so it isn't left stuck on screen covering the globe.
     abortGqPregameCountdown();
+    window.globequizSpectatorResetForNewPov();
     _gqSpecResetPanel();
+    // GROUP tiempo real tags its round payload with round/totalRounds (see
+    // _gqGroupBeginRound/initGlobeQuiz's window._specReportRound) — real
+    // group players NEVER show an ascending elapsed clock (the round is
+    // untimed until someone solves, see .gq-countdown-widget display:none in
+    // _gqGroupBeginRound), only the shared 20s countdown AFTER a solve. The
+    // external spectator was running the 1v1-style ascending tick here
+    // unconditionally (the reported "the timer still shows"). Show the same
+    // "Ronda N/N" badge the real players see instead.
+    const isGroupRound = payload && typeof payload.round === 'number';
+    if (isGroupRound) {
+      _gqGroupRound = payload.round;
+      _gqGroupRounds = payload.totalRounds;
+      _gqTurnsIsTiebreak = !!payload.isTiebreak; // see globequizSpectatorShowPregame's comment
+      window.globequizSpectatorHideCountdown();
+      window.globequizSpectatorHideRoundResult();
+      _gqGroupUpdateRoundBadge();
+    }
     _gqSpecStartedAt = (payload && typeof payload.startedAt === 'number') ? payload.startedAt : Date.now();
     if (_gqSpecTimerInterval) clearInterval(_gqSpecTimerInterval);
     if (_gqSpecCardInterval) clearInterval(_gqSpecCardInterval);
@@ -3529,7 +6493,8 @@
     // (globequizSpectatorSetTurn) covers what a "Por turnos" spectator needs
     // to know instead; a live per-turn countdown mirror is deliberately
     // skipped here (same cosmetic/low-value call as the roulette animation).
-    if (!_gqTurnsVariant) {
+    // GROUP tiempo real: same reasoning, see isGroupRound above.
+    if (!_gqTurnsVariant && !isGroupRound) {
       // #gq-timer-number is the BIG timer — the real player paints it with
       // updateTimerDisplay() as whole seconds (String(wholeSec)), never "S:CC"
       // (that's only the small leaderboard card's format, formatGqCardTime).
@@ -3629,6 +6594,15 @@
       // updateHint() — the spectator doesn't show the "hotter/colder" hint.
       solved = true;
       dailyCountry = countryByName.get(normalize(payload.countryName || ''));
+      // Fallback by iso2 — countryByName's keys are normalized ENGLISH/
+      // Spanish names, but a name that doesn't match ANY of those aliases
+      // exactly (accents/edge cases) silently left dailyCountry null, which
+      // skipped focusOnCountry/showWin ENTIRELY below (guarded by `if
+      // (dailyCountry)`) — the reported "the POV doesn't get TP'd to the
+      // correct country and no confetti shows" on a real win.
+      if (!dailyCountry && payload.iso2 && countries) {
+        dailyCountry = countries.find(c => c.iso2 === payload.iso2) || null;
+      }
       if (dailyCountry) {
         drawTexture();
         focusOnCountry(dailyCountry);

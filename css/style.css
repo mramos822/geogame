@@ -1209,6 +1209,67 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 #gq-pregame-countdown-img.gq-pop {
   animation: pregame-pop 0.55s cubic-bezier(0.22,1,0.36,1) forwards;
 }
+/* GloboReto grupal: "Ronda N/N" arriba de todo, durante el 3-2-1-GO — misma
+   tipografía/trazo que .gq-hint ("¿frío o caliente?", debajo del globo),
+   solo que más grande, para que se lea como texto del juego, no como UI. */
+#gq-group-round-badge {
+  position: absolute;
+  top: 4cqmin;
+  left: 50%;
+  transform: translateX(-50%) scale(0.7);
+  font-family: 'Dimbo', sans-serif;
+  font-size: 8cqmin;
+  color: #ffffff;
+  -webkit-text-stroke: 0.75cqmin #000000;
+  paint-order: stroke fill;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+}
+#gq-group-round-badge.is-visible {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+/* GloboReto grupal: alerta "alguien ya adivinó" — el toast genérico vive en
+   el panel de versus, tapado detrás de la pantalla del globo durante la
+   partida, así que esta tiene su propio banner. Notificación simple (mismo
+   estilo que .gq-turn-notice, "no respondiste a tiempo"), no un globo de
+   diálogo — centrada, texto grande, fondo bien translúcido (no una placa
+   sólida), con una entrada tipo pop (no solo un fade). */
+.gq-group-alert {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.7);
+  background: rgba(5,15,30,0.45);
+  color: #fffbe6;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 4.4cqmin;
+  padding: 2cqmin 4cqmin;
+  border-radius: 2cqmin;
+  white-space: nowrap;
+  text-align: center;
+  z-index: 260;
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+  pointer-events: none;
+}
+.gq-group-alert.is-visible { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+/* GloboReto grupal: la MISMA barra de escribir bloqueada que .gq-guess-row
+   usa en "por turnos" (1v1) — reusa .gq-guess-input tal cual (mismo cajón
+   crema/dorado, misma opacidad al estar disabled) — pero arriba del HUD de
+   "ESPECTANDO" (#spectator-mini-hud, anclado abajo) en vez de en su posición
+   normal, mostrando lo que escribe la persona que espectás. z-index bien
+   alto porque #gq-countdown-widget (arriba de la pantalla) usa 1000, aunque
+   acá abajo no debería ni cruzarse con él. */
+.gq-group-watch-typing-row {
+  position: absolute;
+  bottom: 15cqmin;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1010;
+}
 
 .gq-confetti {
   position: absolute;
@@ -1415,6 +1476,24 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   pointer-events: none;
   -webkit-user-drag: none;
 }
+/* Casillero "de sobra" en una ruleta grupal cuya cantidad de cuñas no
+   divide exacto entre los jugadores (ver GQ_GROUP_ROULETTE_LAYOUT en
+   globequiz.js) — nunca es el target real, solo pasa de largo girando. */
+.gq-roulette-seat-blank {
+  width: 7cqmin;
+  height: 7cqmin;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.35);
+  border: 0.35cqmin dashed rgba(255,255,255,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.gq-roulette-seat-again {
+  font-size: 3.4cqmin;
+  color: rgba(255,255,255,0.75);
+  line-height: 1;
+}
 .gq-roulette-seat-name {
   position: absolute;
   top: 100%;
@@ -1551,6 +1630,81 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 }
 .gq-endgame-row-name { flex: 1; text-align: left; }
 .gq-endgame-row-dist { opacity: 0.85; }
+
+/* GloboReto grupal: tabla de 10s entre rondas — mismos tonos que
+   .gq-endgame-box (crema/dorado) en vez del popup azul genérico. */
+.gq-round-result-box { width: 62cqmin; }
+.gq-round-result-list {
+  width: 100%;
+  max-height: 32cqmin;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8cqmin;
+  scrollbar-width: none;
+}
+.gq-round-result-list::-webkit-scrollbar { display: none; }
+.gq-round-result-row {
+  display: flex;
+  align-items: center;
+  gap: 1.2cqmin;
+  padding: 0.8cqmin 1.4cqmin;
+  border-radius: 1.2cqmin;
+  background: rgba(139,106,0,0.1);
+  border: 0.15cqmin solid rgba(139,106,0,0.3);
+}
+.gq-round-result-row.is-me { background: rgba(47,174,74,0.18); border-color: #2fae4a; }
+/* Se desconectó a mitad de partida — sorteado al último puesto (ver el sort
+   en _gqGroupShowRoundResultTable), mismo criterio grayscale que su carta
+   en vivo (.lb-entry.is-disconnected). */
+.gq-round-result-row.is-disconnected { filter: grayscale(1); opacity: 0.6; }
+.gq-round-result-dq {
+  font-family: 'VAGRoundBold','Arial Black',sans-serif;
+  font-size: 1.7cqmin;
+  color: #c62828;
+  letter-spacing: 0.05em;
+}
+.gq-round-result-pos {
+  font-family: 'VAGRoundBold','Arial Black',sans-serif;
+  font-size: 2.4cqmin;
+  color: #8b6a00;
+  min-width: 4cqmin;
+  text-align: center;
+}
+.gq-round-result-avatar-wrap { flex: none; width: 5cqmin; height: 5cqmin; position: relative; }
+.gq-round-result-avatar { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; border: 0.15cqmin solid #8b6a00; }
+.gq-round-result-name {
+  flex: 1;
+  font-family: 'VAGRoundBold','Arial Black',sans-serif;
+  font-size: 2cqmin;
+  color: #5a4400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gq-round-result-score {
+  font-family: 'Arial Black', Impact, sans-serif;
+  font-size: 2.3cqmin;
+  color: #ffffff;
+  -webkit-text-stroke: 0.4cqmin #000000;
+  paint-order: stroke fill;
+}
+.gq-round-result-timer-row { display: flex; align-items: center; gap: 1.5cqmin; width: 100%; }
+.gq-round-result-bar-wrap {
+  flex: 1;
+  height: 1.4cqmin;
+  background: rgba(139,106,0,0.15);
+  border-radius: 1cqmin;
+  overflow: hidden;
+}
+.gq-round-result-bar { height: 100%; background: #2fae4a; border-radius: 1cqmin; width: 100%; }
+.gq-round-result-cd-txt {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2.2cqmin;
+  color: #5a4400;
+  min-width: 4cqmin;
+  text-align: right;
+}
 .gq-endgame-msgs {
   display: flex;
   flex-direction: column;
@@ -3590,6 +3744,26 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   margin-top: 0.4cqmin;
   text-align: right;
   opacity: 0.75;
+}
+/* Day divider between message groups ("Hoy"/"Ayer"/"Hace N días"/full date
+   past a week, see _dayLabel in chat.js) — a thin rule with the label
+   centered on top, same idea as a typical chat app's date separators. */
+.chat-day-sep {
+  display: flex;
+  align-items: center;
+  gap: 1.2cqmin;
+  margin: 0.6cqmin 0;
+  color: #8b6a00;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 1.7cqmin;
+  opacity: 0.85;
+}
+.chat-day-sep::before, .chat-day-sep::after {
+  content: '';
+  flex: 1;
+  height: 0.18cqmin;
+  background: #8b6a00;
+  opacity: 0.35;
 }
 .loading-chat-empty {
   margin: auto;
@@ -6692,6 +6866,32 @@ body.is-mobile #screen-warning-icon {
   transform: translate(-50%, -50%) scale(1);
 }
 
+/* check.png over a GloboReto group card the instant that player solves —
+   unlike .lb-timesup-icon, this one STAYS (no fade-out) until the round
+   ends (see _gqGroupClearSolvedIcons in globequiz.js). Same pop-in beat as
+   .gqvr-check (rematch confirm), just sized for the small leaderboard row. */
+.lb-check-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 9cqmin;
+  height: 9cqmin;
+  object-fit: contain;
+  pointer-events: none;
+  z-index: 200;
+  transform: translate(-50%, -50%) scale(0);
+  opacity: 0;
+  filter: drop-shadow(0 0.35cqmin 0.45cqmin rgba(0,0,0,0.55));
+}
+.lb-check-icon.show {
+  animation: lbCheckPop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes lbCheckPop {
+  0%   { transform: translate(-50%, -50%) scale(0);    opacity: 0; }
+  60%  { transform: translate(-50%, -50%) scale(1.25); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1);    opacity: 1; }
+}
+
 
 @keyframes emote-pop {
   0%   { opacity: 0; transform: scale(0.3) translateY(10px); }
@@ -6808,6 +7008,216 @@ body.is-mobile #screen-warning-icon {
   z-index: 10;
 }
 
+/* GloboReto grupal "por turnos" (ver _gqTurnsBuildLeaderboard/
+   _gqTurnsPositionLb en globequiz.js) — la MISMA tarjeta personalizable de
+   siempre (--cust-card) pero ROTADA 90° a panorámico, calcado del mockup:
+   nombre arriba, foto + cantidad de rondas ganadas abajo. El arte NO se
+   estira/deforma: el ::before de abajo se dibuja con el ancho/alto
+   INTERCAMBIADOS (100cqh de ancho x 100cqw de alto — container-type:size
+   habilita que esas unidades midan contra el tamaño de ESTA MISMA fila) y
+   recién ahí rota 90°, así que después de girar queda con la proporción
+   real del PNG, nunca deformado, sea cual sea el alto que le tocó a la fila
+   (lo pone JS según cuántos jugadores hay, ver _gqTurnsPositionLb — así los
+   10 posibles entran SIEMPRE en el mismo espacio lateral que en tiempo real
+   solo alcanza para 4). Exclusivo de esta variante — el modo tiempo real no
+   toca esta clase, sigue con su tarjeta vertical sin rotar de siempre. */
+#gq-friends-bar.gq-turns-mode {
+  /* Más ancho que el default de tiempo real (12.6cqmin) — hay margen libre
+     entre el borde de la barra celeste (#right-edge-bar, right:15%) y donde
+     arranca .gq-friends-bar (right:16.5%) sin invadir el globo, que termina
+     bastante más a la izquierda. */
+  width: 17cqmin;
+  /* Más a la derecha (right más chico, MISMA unidad % que el 16.5% de
+     tiempo real — mezclar con cqmin antes lo mandó fuera del área visible,
+     "no sale nada") y más alto hacia arriba (bottom se mantiene, height
+     crece un poco, no tanto como para desbordar el stage). */
+  right: 15.4%;
+  bottom: 1.5cqmin;
+  height: 95cqmin;
+  /* FLEXBOX en vez de position:absolute + top/height calculados a mano —
+     varias vueltas de bugs de unidades (cqmin hardcodeado desincronizado,
+     container-type contaminando cqmin de los hijos, huecos entre filas)
+     vinieron todas de esa cuenta manual. Con flex-direction:column +
+     justify-content:flex-end, "ancladas abajo del todo" sale gratis del
+     motor de layout, sin ningún cálculo propio que pueda desalinearse. */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  /* Separación entre cartas — el alto de fila baja de 10% a 9% para
+     dejarle lugar a este gap sin perder el "10 entran siempre" (10×9% +
+     9×1% = 99%, adentro de los 100% incluso con el peor caso). */
+  gap: 1%;
+}
+#gq-friends-bar.gq-turns-mode .lb-entry {
+  aspect-ratio: unset;
+  /* relative, NO absolute — sigue siendo un ítem normal del flex column de
+     arriba (absolute lo sacaría del flujo), pero mantiene a .gq-turn-bg
+     (position:absolute; inset:0) ANCLADO A ESTA fila y no a algún ancestro
+     más arriba sin position. */
+  position: relative;
+  /* Alto FIJO (9% del contenedor + el gap de arriba) para que el PEOR caso
+     (10 jugadores) entre siempre — con menos, flex-end deja el hueco libre
+     arriba en vez de estirar cada fila. */
+  flex: 0 0 9%;
+  width: 100%;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  gap: 0.2cqmin;
+  padding: 0.3cqmin 0.5cqmin;
+  box-sizing: border-box;
+  overflow: hidden;
+  background-image: none;
+  /* NO container-type acá — ver el comentario en .gq-turn-bg abajo. */
+  /* Sin borde/sombra propios (el reportado "sacale el bordecito") — pero SÍ
+     con esquinas curvas, igual que la tarjeta vertical original
+     (.lb-entry base usa 1.1cqmin): sin esto, overflow:hidden recortaba las
+     puntas redondeadas del arte de la carta en ángulos rectos. */
+  border: none;
+  box-shadow: none;
+  border-radius: 1.1cqmin;
+}
+/* .lb-player (mi propia fila) trae un borde blanco genérico de la tarjeta
+   vertical de siempre — se anula acá también, mismo criterio. */
+#gq-friends-bar.gq-turns-mode .lb-entry.lb-player {
+  border: none;
+  /* Glow dorado alrededor de MI PROPIA celda, para distinguirla del resto
+     sin volver a poner un borde plano encima del PNG. */
+  box-shadow: 0 0 0.7cqmin 0.15cqmin rgba(240,192,64,0.9);
+}
+/* Div APARTE (no ::before de .lb-entry) para el truco de rotación —
+   container-type:size tiene que vivir en algo que NO sea ancestro de
+   .lb-name/.lb-score: esas usan cqmin asumiendo que miden contra el stage
+   grande del juego (como en TODO el resto del código), y puesto en
+   .lb-entry directamente esas cqmin pasaban a medir contra esta fila
+   diminuta — texto invisible (el reportado "no sale el nombre ni el
+   puntaje"). Aislado acá, container-type solo afecta a su propio
+   ::before, nunca a los hermanos de texto. */
+#gq-friends-bar.gq-turns-mode .gq-turn-bg {
+  position: absolute;
+  inset: 0;
+  container-type: size;
+  z-index: 0;
+  pointer-events: none;
+}
+#gq-friends-bar.gq-turns-mode .gq-turn-bg::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100cqh;
+  height: 100cqw;
+  background-image: var(--cust-card, var(--cust-card-default, none));
+  background-size: 140% 140%;
+  background-position: center;
+  background-repeat: no-repeat;
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+#gq-friends-bar.gq-turns-mode .lb-name,
+#gq-friends-bar.gq-turns-mode .lb-turn-row {
+  position: relative;
+  z-index: 1;
+}
+#gq-friends-bar.gq-turns-mode .lb-name {
+  /* INVERTIDO: ahora ancla por `left` (no `right`) — el punto de partida
+     del texto es fijo en la esquina IZQUIERDA y crece hacia la derecha a
+     medida que el nombre es más largo, junto con la foto del mismo lado. */
+  position: absolute;
+  top: 2%;
+  left: 6%;
+  max-width: 90%;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2.1cqmin;
+  color: #ffffff;
+  -webkit-text-stroke: 0.34cqmin #000000;
+  paint-order: stroke fill;
+}
+#gq-friends-bar.gq-turns-mode .lb-turn-row {
+  /* INVERTIDO: ahora del lado IZQUIERDO, debajo del nombre (mismo anclaje
+     left:6%). */
+  display: flex;
+  position: absolute;
+  left: 6%;
+  bottom: 4%;
+  z-index: 1;
+  align-items: center;
+  justify-content: flex-start;
+  height: 60%;
+}
+#gq-friends-bar.gq-turns-mode .gq-turn-avatar-wrap {
+  /* Acotada por ALTO (no ancho) — con height:auto, el aspect-ratio calculaba
+     el alto a partir del 40% del ANCHO de la carta, que podía superar el
+     alto real disponible en .lb-turn-row (esta fila ya perdió espacio
+     vertical contra el nombre de arriba) y quedaba recortada por abajo por
+     el overflow:hidden de .lb-entry — se veía "corrida hacia abajo" en vez
+     de centrada. */
+  width: auto;
+  height: 100%;
+  aspect-ratio: 1 / 1;
+  flex-shrink: 0;
+}
+#gq-friends-bar.gq-turns-mode .gq-turn-avatar-wrap .lb-avatar-img {
+  width: 100%;
+  height: 100%;
+  /* Cuadrado con esquinas curvas, no círculo — mismo criterio que el marco
+     de la tarjeta original (.lb-entry, border-radius:1.1cqmin), no un
+     avatar redondo tipo perfil. */
+  border-radius: 18%;
+  object-fit: cover;
+  display: block;
+  border: 0.3cqmin solid #fffbe6;
+}
+#gq-friends-bar.gq-turns-mode .lb-score {
+  /* INVERTIDO: ahora del lado DERECHO (foto+nombre pasaron a la izquierda),
+     anclado cerca del borde INFERIOR — no centrado en Y — para dejar el
+     espacio de arriba libre por si el nombre es largo y se extiende hacia
+     ese lado. */
+  position: absolute;
+  right: 6%;
+  bottom: 6%;
+  z-index: 1;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 5.4cqmin;
+  color: #ffffff;
+  -webkit-text-stroke: 0.5cqmin #000000;
+  paint-order: stroke fill;
+}
+
+/* Aviso central "es tu turno" (GloboReto GRUPAL "por turnos" únicamente) —
+   reemplaza a la cola de orden de turno lateral (probada y descartada por
+   pedido: muy angosta/recortada, más lío que utilidad). MISMA entrada/salida
+   que .gq-group-alert (tiempo real, "alguien ya adivinó"): pop con
+   cubic-bezier con rebote + fade, se muestra un rato y se retira sola (ver
+   _gqShowMyTurnAlert en globequiz.js) — no se queda pegada mientras dure mi
+   turno, solo avisa. Gris (a diferencia del azulado de esa otra), y
+   pointer-events:none para no bloquear el globo/clicks debajo. */
+.gq-myturn-notice {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.7);
+  background: rgba(70,70,70,0.55);
+  color: #fffbe6;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 4.4cqmin;
+  padding: 2cqmin 4cqmin;
+  border-radius: 2cqmin;
+  white-space: nowrap;
+  text-align: center;
+  z-index: 260;
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+  pointer-events: none;
+}
+.gq-myturn-notice.is-visible {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
 /* Espectador de versus (citiesSpectatorSetPlayerCard etc.): la fila del
    rival no tenía z-index propio, así que quedaba SIEMPRE por debajo de
    .lb-player en la pila de apilamiento — un hijo con z-index alto (el
@@ -6831,6 +7241,18 @@ body.is-mobile #screen-warning-icon {
   z-index: 10;
 }
 .lb-entry.lb-group-pov .lb-name { color: #ffe066; }
+
+/* GloboReto grupal "por turnos": resalta la fila de quien tiene el turno
+   activo ahora mismo (ver window._gqGroupTurnsActiveUid en globequiz.js,
+   leído por _renderGroupLeaderboardInner en spectate.js). Halo verde para
+   distinguirlo del amarillo de lb-group-pov (esa es la fila que las
+   flechas de POV están mirando, un concepto distinto). */
+.lb-entry.lb-group-turn {
+  border: 1.5px solid #4ee06a;
+  box-shadow: 0 0 0.9cqmin rgba(78,224,106,0.65);
+  z-index: 10;
+}
+.lb-entry.lb-group-turn .lb-name { color: #4ee06a; }
 
 .lb-entry.lb-best {
   border: 1.5px solid #f0c040;
@@ -6956,7 +7378,8 @@ body.is-mobile #screen-warning-icon {
   display: none;
 }
 #flags-leaderboard.vs-active .lb-rank,
-#leaderboard.vs-active .lb-rank {
+#leaderboard.vs-active .lb-rank,
+#gq-friends-bar.vs-active .lb-rank {
   display: block;
 }
 .lb-rank.rank-1     { -webkit-text-stroke: 0.38cqmin #d4af37; }
@@ -7827,6 +8250,15 @@ body.is-mobile #screen-warning-icon {
 
 /* Desconectado durante partida grupal */
 .lb-entry.is-disconnected {
+  filter: grayscale(1);
+  opacity: 0.55;
+  transition: filter 0.4s, opacity 0.4s;
+}
+/* GloboReto "por turnos": quedó afuera ANTES del desempate (no forma parte
+   de la ronda extra, ver window._gqTurnsTiebreakLosers) — mismo grayscale
+   que un desconectado, pero SIN el ícono (sigue conectado, solo no juega
+   esta ronda). */
+.lb-entry.is-tiebreak-out {
   filter: grayscale(1);
   opacity: 0.55;
   transition: filter 0.4s, opacity 0.4s;
@@ -9076,7 +9508,13 @@ body.is-mobile #splash-screen.mode-monuments .game-bg-clouds-monuments {
   inset: 0;
   width: 100%;
   height: 100%;
-  z-index: 220;
+  /* 225: strictly above #loading-friend-group (220) and #loading-rankings-group
+     (210) — was tied at 220 with #loading-friend-group, so whichever came
+     later in the DOM won the tiebreak (source order), leaving the friend
+     profile/rankings panel on top of "Gira Competitiva" when joining a
+     group with one of those already open (reported). This panel represents
+     an active group you just joined — it should always win. */
+  z-index: 225;
   pointer-events: none;
   transform: translateY(-120%);
   transition: transform 0.4s ease-out;
@@ -9383,13 +9821,69 @@ body.is-mobile #splash-screen.mode-monuments .game-bg-clouds-monuments {
   gap: 1.4cqmin;
   align-self: center;
 }
+.lobby-mode-icons-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .8cqmin;
+  align-self: center;
+  margin-top: 0.6cqmin;
+}
 .lobby-mode-icons {
   display: flex;
   align-items: center;
-  gap: .4cqmin;
+  gap: .6cqmin;
   flex-shrink: 0;
 }
+.lobby-gq-info {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 3.4cqmin;
+  color: #4a3b00;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+/* Punto grande: separa Rondas/Tiempo dentro de #lobby-gq-info, y los badges
+   de modo del resumen de GloboReto. */
+.lobby-gq-dot-inline, .lobby-gq-dot {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 4.6cqmin;
+  line-height: 0;
+  color: #4a3b00;
+  vertical-align: middle;
+}
+.lobby-gq-dot { flex-shrink: 0; }
 
+/* Tooltip del nombre del modo al pasar el cursor sobre el badge/ícono — un
+   <img> no puede llevar ::after de forma confiable (contenido generado en
+   elementos reemplazados), por eso el tooltip cuelga del <span> que lo
+   envuelve (ver _modeIconsHtml en lobby.js), no de la imagen misma. */
+.lobby-mode-icon-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.lobby-mode-icon-wrap::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: 130%;
+  left: 50%;
+  transform: translateX(-50%) translateY(3px);
+  background: rgba(8,20,38,0.95);
+  color: #fff;
+  padding: 0.5cqmin 1.4cqmin;
+  border-radius: 1cqmin;
+  font-size: 1.6cqmin;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 60;
+  box-shadow: 0 0.3cqmin 0.8cqmin rgba(0,0,0,0.4);
+  opacity: 0;
+  transition: opacity 0.12s, transform 0.12s;
+}
+.lobby-mode-icon-wrap:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
 .lobby-mode-icons img {
   width: 4.8cqmin;
   height: 4.8cqmin;
@@ -9448,7 +9942,28 @@ body.is-mobile #splash-screen.mode-monuments .game-bg-clouds-monuments {
 .lobby-mode-edit-btn:hover { background: #fff3c0; }
 
 /* ── Lobby mode picker popup ── */
-.lobby-mode-picker-box { gap: 2.2cqmin; min-width: 60cqmin; max-width: 72cqmin; }
+.lobby-mode-picker-box { position: relative; gap: 2.2cqmin; min-width: 60cqmin; max-width: 72cqmin; }
+/* Back arrow arriba-izquierda del panel — mismo patrón visual que
+   .practice-back-wrap/.loading-social-back-wrap (2 imágenes apiladas,
+   la segunda aparece en hover), pero a escala de un popup chico. */
+.lobby-picker-topback {
+  position: absolute;
+  top: 1.4cqmin; left: 1.4cqmin;
+  width: 7.5cqmin;
+  cursor: pointer;
+  z-index: 5;
+}
+.lobby-picker-topback img { display: block; width: 100%; }
+.lobby-picker-topback .loading-play-confirm2 {
+  position: absolute;
+  top: 49%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 118%;
+  opacity: 0;
+  transition: opacity 0.08s;
+}
+.lobby-picker-topback:hover .loading-play-confirm2,
+.lobby-picker-topback:active .loading-play-confirm2 { opacity: 1; }
 .lobby-mode-picker-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -9478,6 +9993,14 @@ body.is-mobile #splash-screen.mode-monuments .game-bg-clouds-monuments {
   background: rgba(76,255,114,0.18);
   border-color: #4cff72;
   box-shadow: 0 0 1.2cqmin rgba(76,255,114,0.45);
+}
+/* GloboReto: excluyente con los otros 4 — fila propia, y cuando está
+   seleccionado los otros 4 quedan visualmente bloqueados (siguen siendo
+   clickeables: clickear uno de ellos vuelve a habilitar el modo combinable). */
+.lobby-mode-pick-btn-globoreto { grid-column: 1 / -1; }
+.lobby-mode-pick-btn.is-locked {
+  opacity: 0.4;
+  filter: grayscale(0.6);
 }
 .lobby-mode-pick-num {
   position: absolute;
@@ -9561,6 +10084,96 @@ body.is-mobile #splash-screen.mode-monuments .game-bg-clouds-monuments {
   font-size: 2.6cqmin; padding: 1.2cqmin 5cqmin;
 }
 .lobby-mode-picker-save:hover { background: #36b545; }
+
+/* ── Vista de ajustes de GloboReto (dentro del MISMO panel azul del picker) ── */
+#lobby-globoreto-config-view { display: flex; flex-direction: column; gap: 1.8cqmin; width: 100%; }
+.lobby-gq-variant-row { display: flex; gap: 1.8cqmin; }
+.lobby-gq-variant-btn {
+  flex: 1;
+  min-width: 0;
+  min-height: 15cqmin;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7cqmin;
+  padding: 1.8cqmin 1.4cqmin;
+  background: rgba(255,255,255,0.12);
+  border: 2px solid rgba(255,255,255,0.25);
+  border-radius: 2cqmin;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s, border-color 0.15s, box-shadow 0.15s;
+  color: #fff;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  text-align: center;
+}
+.lobby-gq-variant-icon { width: 6cqmin; height: 6cqmin; object-fit: contain; }
+.lobby-gq-variant-title { font-size: 2.3cqmin; }
+.lobby-gq-variant-desc { font-size: 1.6cqmin; color: #a0c8ff; line-height: 1.3; }
+.lobby-gq-variant-btn:hover { background: rgba(255,255,255,0.22); transform: scale(1.03); }
+.lobby-gq-variant-btn:active { transform: scale(0.97); }
+.lobby-gq-variant-btn.is-selected {
+  background: rgba(76,255,114,0.18);
+  border-color: #4cff72;
+  box-shadow: 0 0 1.2cqmin rgba(76,255,114,0.45);
+}
+.lobby-gq-variant-btn.is-selected .lobby-gq-variant-desc { color: #d8ffe0; }
+.lobby-gq-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2cqmin;
+  animation: welcomePopIn 0.2s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+.lobby-gq-setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.2cqmin;
+  background: rgba(255,255,255,0.08);
+  border: 1.5px solid rgba(255,255,255,0.18);
+  border-radius: 1.6cqmin;
+  padding: 1.2cqmin 1.8cqmin;
+  color: #fff;
+  font-size: 2.1cqmin;
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+}
+.lobby-gq-stepper { display: flex; align-items: center; gap: 1.2cqmin; }
+.lobby-gq-stepper-btn {
+  width: 3.6cqmin; height: 3.6cqmin;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.18);
+  border: 1.5px solid rgba(255,255,255,0.3);
+  color: #fff;
+  font-size: 2.2cqmin;
+  line-height: 1;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.lobby-gq-stepper-btn:hover { background: rgba(255,255,255,0.3); }
+.lobby-gq-stepper-btn:active { transform: scale(0.9); }
+.lobby-gq-stepper-val { min-width: 5cqmin; text-align: center; font-size: 2.3cqmin; color: #fff700; }
+.lobby-mode-picker-save:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* GloboReto config (host picks variant + rounds/turnTime) on mobile — same
+   body.is-mobile pattern used elsewhere in this file. Side-by-side variant
+   cards + cqmin-sized stepper buttons work fine on a desktop pointer, but
+   on a phone the whole #app-stage is scaled down to fit a narrow screen, so
+   those same cqmin values land as tiny, cramped touch targets — stacking
+   the variant cards and enlarging the stepper buttons/text makes this
+   screen usable when the host is on a phone. */
+body.is-mobile .lobby-mode-picker-box { min-width: 78cqmin; max-width: 88cqmin; }
+body.is-mobile .lobby-gq-variant-row { flex-direction: column; gap: 2.2cqmin; }
+body.is-mobile .lobby-gq-variant-btn { min-height: 11cqmin; flex-direction: row; justify-content: flex-start; text-align: left; padding: 2cqmin 2.6cqmin; gap: 1.8cqmin; }
+body.is-mobile .lobby-gq-variant-icon { width: 7cqmin; height: 7cqmin; flex: none; }
+body.is-mobile .lobby-gq-variant-title { font-size: 2.9cqmin; }
+body.is-mobile .lobby-gq-variant-desc { font-size: 2.1cqmin; }
+body.is-mobile .lobby-gq-setting-row { padding: 1.8cqmin 2.4cqmin; font-size: 2.6cqmin; }
+body.is-mobile .lobby-gq-stepper-btn { width: 5.2cqmin; height: 5.2cqmin; font-size: 3cqmin; }
+body.is-mobile .lobby-gq-stepper-val { min-width: 6.5cqmin; font-size: 2.9cqmin; }
 
 /* ── Pantalla intermedia entre modos ── */
 .lobby-intermediate-box {
@@ -10120,6 +10733,12 @@ body.is-mobile #splash-screen.mode-monuments .game-bg-clouds-monuments {
   border-radius: 1.2cqmin;
 }
 .lobby-result-row.is-me { background: rgba(255,231,74,0.18); border: 0.3cqmin solid #ffe14a; }
+/* GloboReto "por turnos": el que empató para el desempate pero perdió esa
+   ronda extra — mismo criterio grayscale que una fila desconectada
+   (.gq-round-result-row.is-disconnected/.lb-entry.is-disconnected), visible
+   igual para todos (jugadores, el propio perdedor, y espectadores — ver
+   window._gqTurnsTiebreakLosers en globequiz.js). */
+.lobby-result-row.is-tiebreak-loser { filter: grayscale(1); opacity: 0.6; }
 .lobby-result-pos { font-family: 'VAGRoundBold','Arial Black',sans-serif; font-size: 3cqmin; color: #fffbe6; min-width: 5cqmin; text-align: center; }
 /* Wrap: mismo criterio que .lobby-member-avatar-wrap — el marco real
    (.cust-frame-wrap::after) necesita su propio contenedor posicionado. */
@@ -10334,6 +10953,97 @@ body.is-mobile #splash-screen.mode-monuments .game-bg-clouds-monuments {
   object-fit: cover;
   display: block;
 }
+/* Pre-match sync panel (see _runLobbySyncGate in lobby.js) — one row per
+   lobby member, avatar grayscale + spinner until that client reports
+   ready, check mark once it does. */
+.lobby-sync-box { max-width: 70cqmin; }
+.lobby-sync-title {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 3.2cqmin;
+  color: #fffbe6;
+  text-align: center;
+}
+.lobby-sync-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2.4cqmin;
+  max-width: 60cqmin;
+}
+.lobby-sync-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8cqmin;
+  width: 12cqmin;
+}
+/* .lobby-sync-slot is the positioned box; .lobby-sync-avatar-wrap (which
+   gets CustomizeAssets.applyFrame — a ::after PSEUDO-ELEMENT, z-index:4) is
+   just ONE child of it. The spinner/check are SIBLINGS of the avatar-wrap,
+   not descendants — keeping them out of that pseudo-element's own stacking
+   entirely is what actually guarantees they sit on top of the frame,
+   instead of z-index alone trying (and failing) to out-rank it (the
+   reported "the loaded check is behind the frame"). */
+.lobby-sync-slot {
+  position: relative;
+  width: 10cqmin;
+  height: 10cqmin;
+}
+.lobby-sync-avatar-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.lobby-sync-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  transition: filter 0.3s ease;
+}
+.lobby-sync-slot.not-ready .lobby-sync-avatar { filter: grayscale(1) brightness(0.7); }
+.lobby-sync-spinner {
+  display: none;
+  position: absolute;
+  inset: -0.5cqmin;
+  border: 0.5cqmin solid rgba(255,255,255,0.25);
+  border-top-color: #fffbe6;
+  border-radius: 50%;
+  z-index: 20;
+  animation: lobbySyncSpin 0.8s linear infinite;
+}
+.lobby-sync-slot.not-ready .lobby-sync-spinner { display: block; }
+@keyframes lobbySyncSpin { to { transform: rotate(360deg); } }
+.lobby-sync-check {
+  position: absolute;
+  bottom: -0.4cqmin;
+  right: -0.4cqmin;
+  width: 4cqmin;
+  height: 4cqmin;
+  border-radius: 50%;
+  background: #2fae4a;
+  color: #fff;
+  font-size: 2.4cqmin;
+  line-height: 4cqmin;
+  text-align: center;
+  border: 0.25cqmin solid #fffbe6;
+  z-index: 20;
+  opacity: 0;
+  transform: scale(0);
+  transition: opacity 0.25s ease, transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+}
+.lobby-sync-slot:not(.not-ready) .lobby-sync-check { opacity: 1; transform: scale(1); }
+.lobby-sync-name {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 1.9cqmin;
+  color: #fffbe6;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .vs-popup-name {
   font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
   font-size: 4.5cqmin;

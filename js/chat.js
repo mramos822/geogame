@@ -63,6 +63,38 @@ window.Chat = (() => {
     try { return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }); }
     catch (e) { return ''; }
   }
+  // Groups messages into day separators ("Hoy"/"Ayer"/"Hace N días"/full
+  // date past a week) — calendar-day key (LOCAL time, not UTC) so a message
+  // sent at 23:50 and one at 00:05 the next day land in different buckets
+  // even though they're minutes apart.
+  function _dayKey(iso) {
+    const d = new Date(iso);
+    return d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate();
+  }
+  // English has no built-in ordinal formatter — "March 18th" needs this by
+  // hand; Spanish's "18 de marzo" doesn't need one at all (Intl handles it).
+  function _ordinal(n) {
+    const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+  }
+  function _dayLabel(iso) {
+    const d = new Date(iso);
+    const now = new Date();
+    const startOf = x => new Date(x.getFullYear(), x.getMonth(), x.getDate());
+    const diffDays = Math.round((startOf(now) - startOf(d)) / 86400000);
+    if (diffDays === 0) return _T('chat.dayToday', 'Hoy');
+    if (diffDays === 1) return _T('chat.dayYesterday', 'Ayer');
+    if (diffDays >= 2 && diffDays <= 6) return _T('chat.dayAgo', 'Hace {n} días', { n: diffDays });
+    // 7+ days: the actual date, formatted per the CURRENT UI language, not
+    // the browser's own locale — a Spanish-speaking user with an
+    // English-configured OS should still see "18 de marzo de 2026".
+    const lang = (typeof window.getLang === 'function') ? window.getLang() : 'es';
+    if (lang === 'en') {
+      const month = new Intl.DateTimeFormat('en', { month: 'long' }).format(d);
+      return month + ' ' + _ordinal(d.getDate()) + ', ' + d.getFullYear();
+    }
+    return new Intl.DateTimeFormat('es', { day: 'numeric', month: 'long', year: 'numeric' }).format(d);
+  }
   function _escapeHtml(s) {
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -238,10 +270,17 @@ window.Chat = (() => {
       return;
     }
     const uid = _myId();
+    let lastDayKey = null;
     box.innerHTML = _messages.map(m => {
       const mine = m.sender_id === uid;
       const cls = 'chat-bubble' + (m._pending ? ' is-pending' : '') + (m._failed ? ' is-failed' : '');
-      return `<div class="chat-bubble-row ${mine ? 'mine' : 'theirs'}">` +
+      const dayKey = _dayKey(m.created_at);
+      let sep = '';
+      if (dayKey !== lastDayKey) {
+        lastDayKey = dayKey;
+        sep = `<div class="chat-day-sep"><span>${_escapeHtml(_dayLabel(m.created_at))}</span></div>`;
+      }
+      return sep + `<div class="chat-bubble-row ${mine ? 'mine' : 'theirs'}">` +
         `<div class="${cls}">${_escapeHtml(censorProfanity(m.content))}<span class="chat-bubble-time">${_fmtTime(m.created_at)}</span></div>` +
       `</div>`;
     }).join('');
