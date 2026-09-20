@@ -91,6 +91,18 @@
   .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;}
   .box{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 16px 12px;
     min-width:0;}
+
+  /* ── Changelog ── */
+  .changelog-list{display:flex;flex-direction:column;gap:14px;max-width:820px;margin:0 auto;}
+  .changelog-entry{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 20px;}
+  .changelog-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
+  .changelog-version{font-size:15px;font-weight:700;color:var(--accent);letter-spacing:.02em;}
+  .changelog-num{font-size:11px;color:var(--dim);background:var(--panel2);border:1px solid var(--border);
+    border-radius:20px;padding:2px 10px;}
+  .changelog-date{font-size:12px;color:var(--muted);margin-left:auto;}
+  .changelog-entry ul{margin:0;padding-left:20px;}
+  .changelog-entry li{font-size:13px;color:var(--text);line-height:1.6;}
+  .changelog-entry li::marker{color:var(--dim);}
   .box h2{font-size:12.5px;color:var(--text);margin:0 0 14px;font-weight:700;letter-spacing:.02em;
     display:flex;align-items:center;justify-content:space-between;gap:8px;}
   .box.wide{grid-column:1 / -1;}
@@ -780,6 +792,11 @@
         </div>
       </div>
     </section>
+
+    <!-- ── NOVEDADES (changelog) ── -->
+    <section class="tab-page" data-page="changelog">
+      <div class="changelog-list" id="changelog-list"></div>
+    </section>
   </main>
 </div>
 
@@ -858,6 +875,7 @@ const PAGES = [
   ['resumen','📊 Resumen'], ['retencion','🔁 Retención'], ['leaderboards','🏆 Leaderboards'],
   ['versus','⚔️ Versus'], ['social','🤝 Social'], ['economia','💰 Economía'], ['integridad','🚩 Integridad'],
   ['invitados','👻 Invitados'], ['mensajes','✉️ Mensajes'], ['cuentas','👤 Cuentas'], ['fundador','👑 Fundador'],
+  ['changelog','📝 Novedades'],
 ];
 const MODE_TABS = [
   ['total','Total'], ['flags','Banderas'], ['shapes','Figuras'], ['cities','Ciudades'], ['monuments','Monumentos'],
@@ -878,6 +896,167 @@ function accountStatus(a){
   if(d < 7) return { cls:'active', label:'Activo' };
   if(d < 30) return { cls:'stale', label:`Inactivo (${d}d)` };
   return { cls:'churned', label:`Perdido (${d}d)` };
+}
+
+// ── Changelog (Novedades) ──────────────────────────────────────────────────────
+// Static list, oldest→newest as written here; rendered newest-first. Each
+// entry: [version, "YYYY-MM-DD", updateNumber, [bullets...]]. Update this
+// array by hand on future releases — it's a handwritten summary, not pulled
+// live from git.
+const CHANGELOG = [
+  ['1.21.0','2026-06-09',1,['Ajustes internos y mantenimiento de versión.']],
+  ['1.26.0','2026-06-10',2,[
+    'Corregidos varios cuelgues en iPhone al pasar entre modos de juego durante la Gira Mundial.',
+    'Las barras de amigos en la partida ahora titilan con un color verde en vez de solo cambiar de opacidad.',
+  ]],
+  ['1.40.0','2026-06-10',3,[
+    'Numerosas correcciones de estabilidad en iPhone para evitar que el juego se cerrara solo al cambiar de modo en la Gira Mundial.',
+    'Optimizado el peso de las imágenes del juego para que cargue más rápido.',
+    'El botón de confirmar en las pantallas de instrucciones y de fin de partida ahora espera a que todo esté realmente cargado antes de aparecer.',
+  ]],
+  ['1.41.0','2026-06-10',4,['Corrección adicional de un cierre inesperado en iPhone al pasar de Ciudades a Monumentos.']],
+  ['2.1.3','2026-06-11',5,[
+    'Gran trabajo de estabilidad en iPhone: identificada y resuelta la causa real de los cierres inesperados durante la Gira Mundial (acumulación de memoria gráfica al pasar de un modo a otro).',
+    'Reducido el peso de fondos, personajes y otras imágenes para aliviar la memoria del dispositivo.',
+    'Corregidas las nubes con nombres de amigos en la pantalla final, que aparecían mal ubicadas en iPhone.',
+  ]],
+  ['2.5.2','2026-06-11',6,[
+    'Corregidos varios detalles visuales de las nubes y avatares en la pantalla final (posición, tamaño, texto).',
+    'Arreglado que el juego quedara sin sonido en iPhone en ciertos casos.',
+    'Reemplazada la advertencia de resolución de pantalla por una detección de orientación horizontal/vertical en celulares.',
+    'Agregado el sistema de cuentas con Supabase: registro, perfiles y amigos, con ventana de cuenta traducida (ES/EN).',
+  ]],
+  ['2.6.3','2026-06-12',7,[
+    'Agregada la vista de cuenta ya logueada, con opción de cambiar contraseña, cambiar correo o cerrar sesión.',
+    'El estado de amigos (en línea / jugando / desconectado) ahora se actualiza automáticamente sin recargar la página.',
+    'Ciudades ahora elige las preguntas con una selección más equilibrada para un público de Latinoamérica y Estados Unidos.',
+  ]],
+  ['2.6.45','2026-06-12',8,[
+    'El estado de "en línea" de los amigos ahora se actualiza en tiempo real (antes dependía de refrescos periódicos).',
+    'Agregada recuperación de contraseña por correo electrónico.',
+    'La foto de perfil ahora se puede cambiar directamente desde el modal de cuenta.',
+    'Eliminados los amigos de prueba: la lista de amigos ahora se carga siempre desde cuentas reales.',
+    'Actualizaciones optimistas al aceptar/rechazar/bloquear amigos (el botón cambia al instante, sin esperar al servidor).',
+  ]],
+  ['3.5.38','2026-07-29',9,[
+    'Agregado el modo Versus: duelos 1 contra 1 y salas grupales de hasta 10 jugadores, con anfitrión, expulsar/transferir sala, invitaciones y notificaciones.',
+    'Lanzada la landing page pública (mygeochallenge.com) con política de privacidad, y soporte para anuncios.',
+    'Agregado el panel de Rankings: Top 100, Top Global y Top de Amigos.',
+    'Agregado el modo GlobeQuiz (GloboReto): adivinar el país señalado en un globo 3D, con racha diaria.',
+    'Agregado el modo Espectador y el sistema de cosméticos Founder (marcos/cartas/celdas exclusivos).',
+  ]],
+  ['3.5.40','2026-08-19',10,[
+    'El espectador de GlobeQuiz ahora ve el globo 3D real de la partida (antes era una versión simplificada), con el país elegido al azar en cada partida.',
+    'El panel de estadísticas ahora muestra si cada cuenta conectada está usando celular o PC.',
+  ]],
+  ['3.5.41','2026-08-19',11,['El panel de estadísticas ahora muestra también el dispositivo y el nombre de invitado en el detalle de cada partida.']],
+  ['3.5.42','2026-08-19',12,['Corrección técnica de carga de caché que impedía ver correctamente a los invitados conectados en el panel de estadísticas.']],
+  ['3.5.43','2026-08-19',13,['Arreglado el registro de actividad de invitados (no se estaba guardando por un problema de permisos).']],
+  ['3.5.44','2026-08-19',14,['El registro de actividad de un invitado ahora se dispara al confirmar su nombre, no solo al hacer clic en jugar.']],
+  ['3.5.45','2026-09-06',15,[
+    'GloboReto ahora se puede jugar como duelo 1 contra 1 (Versus), además del modo diario en solitario.',
+    'Correcciones de estabilidad en la sincronización en tiempo real.',
+  ]],
+  ['3.5.46','2026-09-06',16,['Agregado el chat directo entre amigos (Mensajes).']],
+  ['3.5.47','2026-09-06',17,['Agregada una pestaña de Rankings visible para cuentas de invitado (solo para administración).']],
+  ['3.5.48','2026-09-06',18,['El creador del juego ahora puede enviar mensajes/avisos a los jugadores invitados.']],
+  ['3.5.49','2026-09-06',19,['Los mensajes del creador ahora también llegan a las cuentas registradas, no solo a invitados.']],
+  ['3.5.50','2026-09-06',20,['El pop-up de mensajes del creador ahora tiene el mismo estilo visual (viñeta) que el resto del juego.']],
+  ['3.5.51','2026-09-06',21,['Mejorada la animación y el botón de confirmar del pop-up de mensajes.']],
+  ['3.5.52','2026-09-06',22,['Los mensajes del creador ahora muestran si ya fueron leídos.']],
+  ['3.5.53','2026-09-07',23,['Los mensajes "a todos" ahora solo se entregan a los jugadores conectados en ese momento.']],
+  ['3.5.54','2026-09-07',24,['Corregido que el estado de "leído" de un mensaje nunca se guardaba.']],
+  ['3.5.55','2026-09-07',25,['Corrección de caché para que todos reciban la última versión del sistema de mensajes.']],
+  ['3.5.56','2026-09-07',26,['Los mensajes "a todos" ahora muestran quién los leyó y se actualizan en vivo.']],
+  ['3.5.57','2026-09-07',27,['En estadísticas, la columna "Partidas" ahora muestra el total histórico correcto.']],
+  ['3.5.58','2026-09-07',28,['El historial de cuenta en estadísticas ahora cuenta solo partidas reales (no intentos descartados).']],
+  ['3.5.59','2026-09-07',29,['El historial de cuenta ahora distingue entre partidas de Gira Mundial y partidas sueltas.']],
+  ['3.5.60','2026-09-07',30,[
+    'GloboReto 1v1: agregada una barra de sincronización para que ambos jugadores arranquen la partida al mismo tiempo.',
+    'Corregido un congelamiento ocasional al cargar el globo 3D por una falla del servidor externo que provee esa librería.',
+  ]],
+  ['3.5.61','2026-09-07',31,['Ajuste visual: fondo opaco en el popup de sincronización de GloboReto 1v1 para no ver el globo por detrás mientras se coordina el inicio.']],
+  ['3.5.62','2026-09-07',32,['Revertido el fondo opaco anterior; el popup de sincronización vuelve a ser translúcido.']],
+  ['3.5.63','2026-09-09',33,['Reorganización interna del código del modo Monumentos (sin cambios visibles para el jugador).']],
+  ['3.5.64','2026-09-09',34,['Limpieza y ajustes finales tras la reorganización interna del código.']],
+  ['3.5.65','2026-09-09',35,['Mantenimiento interno del código (sin cambios visibles para el jugador).']],
+  ['3.5.66','2026-09-09',36,['Corregido que GloboReto 1v1 se quedara cargando indefinidamente para jugadores en regiones lejanas entre sí.']],
+  ['3.5.67','2026-09-09',37,['En GloboReto Versus, la casilla para escribir y la pista ahora permanecen ocultas hasta que termina la cuenta regresiva 3-2-1-YA.']],
+  ['3.5.68','2026-09-09',38,[
+    'El inicio de los duelos Versus ya no depende de que los relojes de ambos dispositivos coincidan.',
+    'Agregadas fuentes alternativas para cargar la librería del globo 3D si la principal falla.',
+  ]],
+  ['3.5.69','2026-09-09',39,['GloboReto Versus: la librería del globo 3D ahora se empieza a cargar desde que se envía la invitación, y se amplió el margen de espera para que ambos jugadores estén listos.']],
+  ['3.5.70','2026-09-09',40,['Los errores de conexión en Versus ahora muestran un motivo y un código de error concreto en el aviso.']],
+  ['3.5.71','2026-09-09',41,['Simplificado y hecho más simétrico el arranque de los duelos GloboReto 1v1.']],
+  ['3.6.0','2026-09-10',42,['Rediseñado el panel de fin de duelo de GloboReto 1v1, con nuevo flujo de revancha.']],
+  ['3.6.1','2026-09-10',43,[
+    'Mejorada la coordinación del modo espectador en GloboReto.',
+    'Ajustes en el otorgamiento de monedas y experiencia (XP) en partidas Versus.',
+  ]],
+  ['3.6.2','2026-09-10',44,[
+    'Mejoras de rendimiento en celulares.',
+    'Corregida la sincronización de notificaciones y la presencia en el panel de Rankings.',
+  ]],
+  ['3.6.3','2026-09-10',45,['Liberación correcta de los recursos gráficos de GlobeQuiz al salir del modo, para evitar consumo de memoria innecesario.']],
+  ['3.6.4','2026-09-10',46,['Agregada la opción de compartir el resultado de GlobeQuiz en Twitter/X, ahora disponible para todos, con enlace directo.']],
+  ['3.6.5','2026-09-10',47,['Mejorado el texto al compartir en GlobeQuiz y agregada una llama animada a la racha en el popup de invitados.']],
+  ['3.6.6','2026-09-10',48,['Los mensajes para compartir en redes ahora siempre mencionan a GeoChallenge y el modo jugado.']],
+  ['3.6.7','2026-09-10',49,['El filtro de práctica de América ahora incluye también el Caribe.']],
+  ['3.6.8','2026-09-11',50,['El puntaje más alto ahora se calcula como la mejor partida individual, no como la suma de los 4 modos.']],
+  ['3.6.9','2026-09-11',51,['El puntaje más alto ahora es el mejor resultado de una Gira Mundial completa, no la suma de resultados sueltos por modo.']],
+  ['3.6.10','2026-09-11',52,['Agregada la variante "Por turnos" a GloboReto (en vez de por rapidez), con soporte completo para espectadores.']],
+  ['3.6.11','2026-09-14',53,[
+    'Agregado un marco exclusivo para el jugador Top 1 del ranking.',
+    'Herramientas internas de desarrollo para practicar/probar el modo espectador.',
+  ]],
+  ['3.6.12','2026-09-14',54,[
+    'Agregados alias en inglés faltantes para varios países en GloboReto.',
+    'Aruba y Curazao ahora son jugables.',
+  ]],
+  ['3.6.13','2026-09-14',55,['Agregado un límite anti-spam al chat de mensajes.']],
+  ['3.6.14','2026-09-14',56,[
+    'Agregada la insignia de cuentas verificadas.',
+    'Corregido un problema de idioma con el límite anti-spam del chat.',
+    'Nuevo desglose de economía (XP/monedas) en el panel de estadísticas.',
+  ]],
+  ['3.6.15','2026-09-15',57,[
+    'Corregido el desajuste del reloj de turno en GloboReto por turnos.',
+    'Agregado el popup de Founder también para GloboReto.',
+    'Gibraltar ahora es jugable.',
+  ]],
+  ['3.6.16','2026-09-15',58,[
+    'Corregida la desincronización de relojes entre dispositivos durante la cuenta regresiva 3-2-1-YA vista por el espectador.',
+    'Mejorado el reintento de confirmación para el Top 1 cuando pierde su puesto.',
+    'Corregido el reinicio de la animación de nubes.',
+  ]],
+  ['3.6.17','2026-09-15',59,[
+    'En Ciudades, la pista del país ahora aparece a los 3 segundos.',
+    'Ajustado el tiempo de aparición de la silueta en Figuras.',
+  ]],
+  ['3.6.18','2026-09-15',60,['GloboReto por turnos: el tiempo para responder cada turno se limitó a 20 segundos.']],
+  ['3.6.19','2026-09-15',61,['Agregada Groenlandia al modo Banderas.']],
+  ['3.7.0','2026-09-19',62,[
+    'Agregado GloboReto grupal por turnos, con ruleta para decidir el orden, cuenta regresiva por turno y ronda de desempate.',
+    'Soporte completo de espectador en vivo para GloboReto grupal por turnos.',
+    'Corregida la descoordinación de la cuenta regresiva "Empezando en..." de las salas grupales entre jugadores de distintos países.',
+    'Los paneles del menú (rankings, amigos, perfil, etc.) ahora se cierran automáticamente al arrancar una partida.',
+    'Mejorada la pantalla de configuración de GloboReto para anfitriones que juegan desde el celular.',
+  ]],
+];
+function renderChangelog(){
+  const el = $('changelog-list');
+  if(!el) return;
+  el.innerHTML = [...CHANGELOG].reverse().map(([ver,date,num,bullets])=>`
+    <div class="changelog-entry">
+      <div class="changelog-head">
+        <span class="changelog-version">Ver. ${ver}</span>
+        <span class="changelog-num">Actualización #${num}</span>
+        <span class="changelog-date">${date}</span>
+      </div>
+      <ul>${bullets.map(b=>`<li>${b}</li>`).join('')}</ul>
+    </div>
+  `).join('');
 }
 
 // ── Navegación por pestañas ────────────────────────────────────────────────────
@@ -957,6 +1136,7 @@ function enterDashboard(data){
   buildRangeBar();
   document.querySelectorAll('.tab-page').forEach(p=>p.classList.toggle('active', p.dataset.page===currentPage));
   render(data);
+  renderChangelog();
   if(currentPage==='mensajes') loadMessages();
   startPolling();
 }
