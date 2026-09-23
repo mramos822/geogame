@@ -8598,9 +8598,11 @@ body.is-mobile #screen-warning-icon {
 body.is-mobile .vol-btn-wrap,
 body.is-mobile #fs-btn {
   width: 9cqmin;
+  top: 4.5%;
 }
-body.is-mobile #sfx-btn { left: calc(17% + 10.5cqmin); }
-body.is-mobile #fs-btn  { left: calc(17% + 21cqmin); }
+body.is-mobile #vol-btn { left: 15%; }
+body.is-mobile #sfx-btn { left: calc(15% + 10.5cqmin); }
+body.is-mobile #fs-btn  { left: calc(15% + 21cqmin); }
 #fs-btn img {
   width: 100%;
   height: auto;
