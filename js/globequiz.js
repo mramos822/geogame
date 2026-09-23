@@ -3177,25 +3177,24 @@
     const el = document.getElementById('gq-timer-number');
     if (el) el.textContent = String(Math.max(0, secondsLeft));
   }
-  // Shared wall-clock target (endsAt comes from the host) — same
-  // self-correcting pattern as the lobby's own start countdown
-  // (window.LB.sendCountdown): every client independently re-derives
-  // "seconds left" from Date.now(), so a slow tab or late timer never drifts
-  // the displayed number, it just catches up.
-  //
-  // Two devices' clocks can disagree by several whole seconds (worse across
-  // long distances/different countries, not really about network latency
-  // itself — same root cause already documented on window.LB's own
-  // getHostClockOffsetMs) — without correcting for it here, `endsAt` (always
-  // stamped with the HOST's Date.now()) showed a DIFFERENT starting number
-  // to each player depending on their own clock's drift (the reported "a mí
-  // me sale empezando en 10 pero al usuario chileno en 14").
-  function _gqHostClockOffsetMs() {
-    return (window.Lobby && typeof window.Lobby.getHostClockOffsetMs === 'function') ? window.Lobby.getHostClockOffsetMs() : 0;
-  }
+  // Local wall-clock target: every client counts its OWN 20s from the
+  // instant it actually received the 'countdown' signal (_gqGroupStartCountdown
+  // recomputes `endsAt` fresh right below), instead of comparing the HOST's
+  // stamped endsAt against Date.now() + a ping/pong CLOCK-OFFSET ESTIMATE —
+  // that estimate can itself still be off by several seconds (reported, for
+  // the same pattern on the lobby's own start countdown: "le sale Empieza en
+  // 16, casi 6 segs de diferencia" — even WITH that correction in place).
+  // Same fix applied there (window.Lobby's _startCountdown): treat the
+  // broadcast as a plain SIGNAL, react the moment it's received, instead of
+  // scheduling everyone against a shared clock two devices need to agree on
+  // down to the second. Bonus: every player now gets the FULL 20s to answer
+  // from the moment THEY learned the window opened, instead of a high-latency
+  // player's countdown silently running for less real time than a low-latency
+  // one's (both used to share the same absolute endsAt, stamped when the
+  // signal left the host).
   function _gqGroupTickCountdown() {
     if (!_gqGroupCountdownEndsAt) return;
-    const secondsLeft = Math.ceil((_gqGroupCountdownEndsAt - (Date.now() + _gqHostClockOffsetMs())) / 1000);
+    const secondsLeft = Math.ceil((_gqGroupCountdownEndsAt - Date.now()) / 1000);
     // Only repaint/pulse/tick-sound when the displayed SECOND actually
     // changes — same guard _gqTickTurnTimer uses. Without it (this ran on
     // every 250ms poll unconditionally) the countdown icon's glow animation
@@ -3223,7 +3222,11 @@
   }
   function _gqGroupStartCountdown(endsAt) {
     _gqGroupStopCountdown();
-    _gqGroupCountdownEndsAt = endsAt;
+    // endsAt (still passed in — kept for API compat, deliberately unused):
+    // see the long comment in _gqGroupTickCountdown. Recomputed fresh from
+    // THIS client's own Date.now() at the instant the signal is actually
+    // received.
+    _gqGroupCountdownEndsAt = Date.now() + GQ_GROUP_COUNTDOWN_MS;
     _gqGroupLastSecondsLeft = null;
     _gqSetCountdownIconRed(false);
     document.querySelector('.gq-countdown-widget')?.style.removeProperty('display');

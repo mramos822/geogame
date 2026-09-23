@@ -233,7 +233,7 @@ function startResultsLoop() {
   if (loopStarted) return;
   loopStarted = true;
   sfxLoop.currentTime = 0;
-  sfxLoop.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; sfxLoop.muted = (typeof isMuted !== 'undefined' && isMuted);
+  sfxLoop.volume = (typeof window.getMusicVolumeLevel === 'function') ? window.getMusicVolumeLevel() : ((typeof isMuted !== 'undefined' && isMuted) ? 0 : 1); sfxLoop.muted = (typeof isMusicMuted !== 'undefined' ? isMusicMuted : (typeof isMuted !== 'undefined' && isMuted));
   sfxPlay(sfxLoop).catch(e => console.error('loop play failed:', e));
 }
 
@@ -383,7 +383,7 @@ function showResultsScreen() {
   sfxLoop.muted = (typeof isMuted !== 'undefined' && isMuted);
   sfxPlay(sfxLoop).then(() => { if (!loopStarted) { sfxLoop.pause(); sfxLoop.currentTime = 0; } }).catch(() => {});
   sfxCheer.currentTime = 0;
-  sfxCheer.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; sfxCheer.muted = (typeof isMuted !== 'undefined' && isMuted);
+  sfxCheer.volume = (typeof window.getMusicVolumeLevel === 'function') ? window.getMusicVolumeLevel() : ((typeof isMuted !== 'undefined' && isMuted) ? 0 : 1); sfxCheer.muted = (typeof isMusicMuted !== 'undefined' ? isMusicMuted : (typeof isMuted !== 'undefined' && isMuted));
   sfxPlay(sfxCheer).catch(e => console.error('cheer play failed:', e));
   clearTimeout(confirmTimeout);
   confirmTimeout = setTimeout(() => resultsConfirm.classList.add('visible'), 300);

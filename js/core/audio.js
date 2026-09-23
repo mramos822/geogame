@@ -24,7 +24,7 @@ window.startMenuMusic = function () {
   if (!m) return;
   m.loop = true;
   m.currentTime = 0;
-  m.muted = localStorage.getItem('muted') === 'true';
+  m.muted = (typeof isMusicMuted !== 'undefined') ? isMusicMuted : (localStorage.getItem('muted') === 'true');
   const p = m.play();
   if (p && typeof p.then === 'function') {
     p.catch(() => {
@@ -67,30 +67,123 @@ if (IS_MOBILE) document.body.classList.add('is-mobile');
 // the confirm handler (~confirmStep 0→1) below.
 const IS_CHROME_IOS = IS_IOS && /CriOS/i.test(navigator.userAgent);
 
-// ── VOLUME TOGGLE ─────────────────────────────────────────────────────────────
-let isMuted = localStorage.getItem('muted') === 'true';
+// ── VOLUME ────────────────────────────────────────────────────────────────────
+// Two INDEPENDENT continuous levels (0..1) — music and sfx, split at request
+// ("divide entre SFX y musica"). MUSIC = the 6 looping tracks
+// (endgamecheeryay/endgameloop/gamemusic/menuloop/postgameloop/pregameloop,
+// see getMusicTracks below); everything else is SFX (getSfxTracks).
+// `isMuted`/`isMusicMuted` are kept as DERIVED flags (level <= 0): dozens of
+// call sites across the codebase (results.js, final.js, shapes.js...) still
+// read `isMuted` directly as a simple boolean for their own one-off
+// sfx.volume assignments, outside this file's reach — those stay binary
+// (full/silent), only the ones routed through sfxPlay()/getMusicTracks()/
+// getSfxTracks() (the bulk of them) and the iOS music gain actually get the
+// in-between levels.
+function _loadVol(key) {
+  const saved = localStorage.getItem(key);
+  if (saved !== null) {
+    const n = parseFloat(saved);
+    if (!isNaN(n)) return Math.max(0, Math.min(1, n));
+  }
+  // Migrates whichever OLDER flag existed before this split (the single
+  // 'volumeLevel' slider from right before this, then further back the
+  // plain binary 'muted') — someone who had turned it down/off before
+  // shouldn't come back to full volume.
+  const savedOld = localStorage.getItem('volumeLevel');
+  if (savedOld !== null) {
+    const n = parseFloat(savedOld);
+    if (!isNaN(n)) return Math.max(0, Math.min(1, n));
+  }
+  return localStorage.getItem('muted') === 'true' ? 0 : 1;
+}
+let musicVolumeLevel = _loadVol('musicVolumeLevel');
+let sfxVolumeLevel   = _loadVol('sfxVolumeLevel');
+let isMuted      = sfxVolumeLevel   <= 0; // legacy flag most old call sites read — now specifically SFX
+let isMusicMuted = musicVolumeLevel <= 0;
+
+function volIconForLevel(level) {
+  const pct = Math.round(level * 100);
+  if (pct <= 0)  return 'images/vol2.png';
+  if (pct <= 33) return 'images/vol1-3.png';
+  if (pct <= 66) return 'images/vol1-2.png';
+  return 'images/vol1.png';
+}
+// SFX icon has only 2 states (per request), not the 4-tier vol one: 0% →
+// sfx2, anything else (1-100%) → sfx1.
+function sfxIconForLevel(level) {
+  return level <= 0 ? 'images/sfx2.png' : 'images/sfx1.png';
+}
+
+function getMusicTracks() {
+  return [sfxPostgame, sfxPregame, sfxGameMusic, sfxMenuMusic, window.sfxCheer || null, window.sfxLoop || null].filter(Boolean);
+}
+function getSfxTracks() {
+  return [sfxCheck, sfxSelect, sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus, sfxTickdown, sfxTimesUp,
+    typeof sfxLevel2 !== 'undefined' ? sfxLevel2 : null,
+  ].filter(Boolean);
+}
+// Kept for any external/legacy caller — the union of both categories.
+function getAllSfx() { return getMusicTracks().concat(getSfxTracks()); }
+
+// Paints ONE popup's fill/handle/percentage label from a level — shared by
+// both sliders, `prefix` picks which ('vol' for music, 'sfx' for sfx,
+// matching their #<prefix>-slider-fill/-handle/-pct ids in play/index.html).
+function _paintSlider(prefix, level) {
+  const fill   = document.getElementById(prefix + '-slider-fill');
+  const handle = document.getElementById(prefix + '-slider-handle');
+  const pctEl  = document.getElementById(prefix + '-slider-pct');
+  // Invertido a pedido: ARRIBA = menos volumen, ABAJO = más — ver el
+  // comentario de #vol-slider-fill/-handle en style.css.
+  const pct = Math.round(level * 100) + '%';
+  if (fill)   fill.style.height = pct;
+  if (handle) handle.style.top = pct;
+  if (pctEl)  pctEl.textContent = pct;
+}
+
+function applyMusicVolume() {
+  isMusicMuted = musicVolumeLevel <= 0;
+  localStorage.setItem('musicVolumeLevel', String(musicVolumeLevel));
+  getMusicTracks().forEach(sfx => { sfx.volume = musicVolumeLevel; sfx.muted = isMusicMuted; });
+  applyMusicMute(); // iOS: music runs through Web Audio (gain); no-op on PC
+  const img = document.getElementById('vol-img');
+  if (img) img.src = volIconForLevel(musicVolumeLevel);
+  _paintSlider('vol', musicVolumeLevel);
+}
+function applySfxVolume() {
+  isMuted = sfxVolumeLevel <= 0;
+  localStorage.setItem('sfxVolumeLevel', String(sfxVolumeLevel));
+  getSfxTracks().forEach(sfx => { sfx.volume = sfxVolumeLevel; sfx.muted = isMuted; });
+  const img = document.getElementById('sfx-img');
+  if (img) img.src = sfxIconForLevel(sfxVolumeLevel);
+  _paintSlider('sfx', sfxVolumeLevel);
+}
+// Exposed so any OTHER file that wants to respect the real level (instead of
+// the old binary isMuted) can.
+window.getMusicVolumeLevel = () => musicVolumeLevel;
+window.getSfxVolumeLevel   = () => sfxVolumeLevel;
+// Legacy name from before the split — kept pointing at SFX specifically,
+// since that's what almost every old `isMuted`-reading call site plays.
+window.getVolumeLevel = () => sfxVolumeLevel;
+function setMusicVolumeLevel(level) { musicVolumeLevel = Math.max(0, Math.min(1, level)); applyMusicVolume(); }
+function setSfxVolumeLevel(level)   { sfxVolumeLevel   = Math.max(0, Math.min(1, level)); applySfxVolume(); }
+window.setMusicVolumeLevel = setMusicVolumeLevel;
+window.setSfxVolumeLevel   = setSfxVolumeLevel;
+// Legacy name — kept pointing at SFX (see getVolumeLevel's own comment).
+window.setVolumeLevel = setSfxVolumeLevel;
 
 // On iOS, currentTime=0 can reset the muted state. Always apply muted right
-// before play() so it persists.
+// before play() so it persists. Auto-picks the right category — sfxPlay()
+// is called with BOTH plain sfx AND (from results.js) the two music loops.
 function sfxPlay(sfx) {
-  sfx.muted = isMuted;
-  try { sfx.volume = isMuted ? 0 : 1; } catch(e) {}
+  const music = getMusicTracks().indexOf(sfx) !== -1;
+  sfx.muted = music ? isMusicMuted : isMuted;
+  try { sfx.volume = music ? musicVolumeLevel : sfxVolumeLevel; } catch(e) {}
   return sfx.play();
 }
 
-function getAllSfx() {
-  return [sfxCheck, sfxPostgame, sfxPregame, sfxGameMusic, sfxMenuMusic, sfxSelect, sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus, sfxTickdown, sfxTimesUp,
-    typeof sfxLevel2  !== 'undefined' ? sfxLevel2        : null,
-    window.sfxCheer  || null,
-    window.sfxLoop   || null,
-  ].filter(Boolean);
-}
-
 document.addEventListener('DOMContentLoaded', () => {
-  if (isMuted) {
-    const img = document.getElementById('vol-img');
-    if (img) img.src = 'images/vol2.png';
-  }
+  applyMusicVolume(); // paints the music icon + slider at the saved level
+  applySfxVolume();   // paints the sfx icon + slider at the saved level
 });
 
 // ── HOVER SOUNDS ──────────────────────────────────────────────────────────────
@@ -101,6 +194,7 @@ function playSelect() { sfxSelect.currentTime = 0; sfxPlay(sfxSelect); }
   document.querySelector('.splash-confirm-wrap'),
   document.querySelector('.gameover-confirm-wrap'),
   document.getElementById('vol-btn'),
+  document.getElementById('sfx-btn'),
 ].forEach(el => el?.addEventListener('mouseenter', playSelect));
 
 [
@@ -108,15 +202,63 @@ function playSelect() { sfxSelect.currentTime = 0; sfxPlay(sfxSelect); }
   document.querySelector('.gameover-confirm-wrap'),
 ].forEach(el => el?.addEventListener('mouseleave', playSelect));
 
-document.getElementById('vol-btn')?.addEventListener('click', () => {
-  isMuted = !isMuted;
-  localStorage.setItem('muted', isMuted);
-  const vol = isMuted ? 0 : 1;
-  getAllSfx().forEach(sfx => { sfx.volume = vol; sfx.muted = isMuted; });
-  applyMusicMute(); // iOS: music runs through Web Audio (gain); no-op on PC
-  document.getElementById('vol-img').src = isMuted ? 'images/vol2.png' : 'images/vol1.png';
-  const _a = new Audio('sfx/check.mp3'); _a.play();
-});
+// ── VOLUME SLIDER POPUPS ──────────────────────────────────────────────────────
+// Clicking the icon opens/closes the vertical bar instead of toggling mute
+// directly — dragging (or just clicking) inside the bar is what actually
+// sets the level (via `setLevel`). Shared by both #vol-btn (music) and
+// #sfx-btn (sfx) — `prefix` picks the #<prefix>-img/-slider-popup/-track ids.
+const VOL_WHEEL_STEP = 0.05; // 5% por "muesca" de rueda
+function _initVolSliderPopup(prefix, getLevel, setLevel) {
+  const btn   = document.getElementById(prefix + '-btn');
+  const img   = document.getElementById(prefix + '-img');
+  const popup = document.getElementById(prefix + '-slider-popup');
+  const track = document.getElementById(prefix + '-slider-track');
+  if (!btn || !img || !popup || !track) return;
+
+  // Scroll arriba/abajo con el cursor sobre el botón O la barra sube/baja el
+  // volumen — `btn` (el <div> padre) contiene a ambos, así que un solo
+  // listener ahí cubre los dos casos por bubbling. preventDefault evita que
+  // la página (o el stage) se mueva mientras se ajusta.
+  btn.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const dir = e.deltaY < 0 ? 1 : -1; // arriba = sube, abajo = baja
+    setLevel(getLevel() + dir * VOL_WHEEL_STEP);
+  }, { passive: false });
+
+  img.addEventListener('click', (e) => {
+    e.stopPropagation();
+    sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+    popup.classList.toggle('open');
+  });
+
+  // Invertido a pedido: 0 (menos) ARRIBA, 1 (más) ABAJO — misma convención
+  // que la CSS del fill (height%)/handle (top%) ya usa.
+  function levelFromPointer(clientY) {
+    const rect = track.getBoundingClientRect();
+    if (!rect.height) return getLevel();
+    return Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+  }
+  let dragging = false;
+  track.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    try { track.setPointerCapture(e.pointerId); } catch (err) {}
+    setLevel(levelFromPointer(e.clientY));
+  });
+  track.addEventListener('pointermove', (e) => {
+    if (dragging) setLevel(levelFromPointer(e.clientY));
+  });
+  ['pointerup', 'pointercancel'].forEach(ev => track.addEventListener(ev, () => { dragging = false; }));
+
+  // Any click OUTSIDE the popup (and outside the icon, which has its own
+  // toggle above) closes it — same pattern as any other in-game popup.
+  document.addEventListener('pointerdown', (e) => {
+    if (!popup.classList.contains('open')) return;
+    if (popup.contains(e.target) || e.target === img) return;
+    popup.classList.remove('open');
+  });
+}
+_initVolSliderPopup('vol', () => musicVolumeLevel, setMusicVolumeLevel);
+_initVolSliderPopup('sfx', () => sfxVolumeLevel,   setSfxVolumeLevel);
 
 // ── Game SFX (lazy: instantiated on the first game) ──────────────────────────
 let sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus, sfxTickdown, sfxTimesUp;
@@ -132,7 +274,11 @@ function loadGameSFX() {
   sfxBonus     = new Audio('sfx/bonus.mp3');
   sfxTickdown  = new Audio('sfx/countdown.mp3');
   sfxTimesUp   = new Audio('sfx/timesup.mp3');
-  if (isMuted) getAllSfx().forEach(sfx => { sfx.volume = 0; sfx.muted = true; });
+  // Newly-created <audio> elements default to volume:1 — apply the CURRENT
+  // sfx level right away (all of these are SFX, not music), so a
+  // lazily-loaded one doesn't start at full volume until the next unrelated
+  // volume change.
+  getSfxTracks().forEach(sfx => { sfx.volume = sfxVolumeLevel; sfx.muted = isMuted; });
   // Force preload on iOS: without .load() the first play() triggers download + decode
   [sfxPin, sfxCountdown, sfxError, sfxAcertar, sfxVeryNice, sfxTag, sfxBonus, sfxTickdown, sfxTimesUp]
     .forEach(sfx => { sfx.load(); });
@@ -183,12 +329,8 @@ function iosCtx() {
   return _iosCtx;
 }
 
-function iosMusicMuted() {
-  return (typeof isMuted !== 'undefined') ? isMuted : (localStorage.getItem('muted') === 'true');
-}
-
 function applyMusicMute() {
-  if (_iosGain) _iosGain.gain.value = iosMusicMuted() ? 0 : 1;
+  if (_iosGain) _iosGain.gain.value = (typeof musicVolumeLevel !== 'undefined') ? musicVolumeLevel : (isMusicMuted ? 0 : 1);
 }
 
 function iosLoadBuf(url) {
@@ -283,7 +425,7 @@ function fadeOutMusic(track, ms) {
     return;
   }
   if (!track || track.paused) return;
-  const startVol = isMuted ? 0 : (track.volume || 1);
+  const startVol = isMusicMuted ? 0 : (track.volume || musicVolumeLevel);
   const t0 = performance.now();
   const step = () => {
     const k = Math.min(1, (performance.now() - t0) / ms);
@@ -299,7 +441,7 @@ window.fadeOutMusic = fadeOutMusic;
 // rematch +1 score bump. sfxPin is lazy (loadGameSFX); no-op if not loaded yet.
 function playPinClip() {
   if (typeof sfxPin === 'undefined' || !sfxPin) return;
-  const vol = isMuted ? 0 : 1;
+  const vol = sfxVolumeLevel;
   try {
     sfxPin.pause();
     sfxPin.currentTime = 0;

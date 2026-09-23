@@ -50,7 +50,8 @@ function ensureShapeTagStyle() {
 
 let _shapeGroupCount = 0;
 const sfxLevel2 = new Audio('sfx/level2.mp3');
-if (typeof isMuted !== 'undefined' && isMuted) sfxLevel2.volume = 0;
+if (typeof volumeLevel !== 'undefined') sfxLevel2.volume = volumeLevel;
+else if (typeof isMuted !== 'undefined' && isMuted) sfxLevel2.volume = 0;
 let shapesStreak = 0;
 let shapesRoundStartTime = null;
 let shapesTimeLeft = window.GAME_DURATION;

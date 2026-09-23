@@ -1283,21 +1283,8 @@ window.Lobby = (() => {
   let _savedLobbyModes  = []; // modes confirmed by broadcast; more reliable than the DB at start
   let _lastEnteredLobbyId = null; // see enterLobby's own reset guard below
 
-  // ── Clock-offset probe (host ↔ me) ──────────────────────────────────────────
-  // `until` in a 'cd' broadcast (sendCountdown) is stamped with the HOST's own
-  // Date.now() + 10000 — every guest computing `until - Date.now()` against
-  // THEIR OWN clock is really computing (true remaining time) MINUS (however
-  // far their clock disagrees with the host's). Two devices' clocks can
-  // easily disagree by several whole seconds (worse across long distances/
-  // different countries, not really about network latency itself) — this
-  // showed up as the countdown starting from something other than 10
-  // depending on the guest's own clock, and freezing at 0 for a while (their
-  // clock ran BEHIND the host's) or skipping past 0 straight into the match
-  // (their clock ran AHEAD) instead of respecting the full 10s for everyone
-  // (reported: "depende de la ubicacion... Peru Singapur USA, algunos se
-  // quedan en 0 un rato y otros ni llega a 0"). Same NTP-style ping/pong
-  // pattern already used for the exact same reason in spectate.js
-  // (_clockOffsetMs there — "reported: watching someone in Singapore").
+  // ── Clock-offset probe (host ↔ me) — kept for other callers, unused by the
+  // start countdown below any more (see _startCountdown's own comment).
   let _hostClockOffsetMs = 0;
   let _hostClockOffsetBestRtt = Infinity;
   function _onHostClockPong(payload) {
@@ -1371,17 +1358,32 @@ window.Lobby = (() => {
     setTimeout(() => { try { el.remove(); } catch (e) {} }, 300);
   }
 
+  // 10s room start countdown — same length sendCountdown(Date.now() + 10000)
+  // uses to build the (no longer trusted here) `until`, see below.
+  const LOBBY_COUNTDOWN_MS = 10000;
   function _startCountdown(until) {
     _counting = true;
+    // Local wall-clock target: MY OWN 10s from the instant I actually
+    // received this 'cd' broadcast, instead of the host-stamped `until`
+    // (still passed in — kept for API compat, deliberately unused below).
+    // `until` was compared against Date.now() + _hostClockOffsetMs (a
+    // ping/pong ESTIMATE of how far my clock disagrees with the host's) —
+    // still wrong by several seconds in practice, because that estimate can
+    // itself be off (reported: "le sale Empieza en 16, casi 6 segs de
+    // diferencia" — STILL happening with that correction in place). Same
+    // fix already applied to GloboReto's 'tround' (por turnos): treat the
+    // broadcast as a plain SIGNAL, react the moment it's received, instead
+    // of scheduling everyone against a shared clock that needs two devices
+    // to agree on the time down to the second. What's left over is real
+    // network latency alone (normally well under a second), not a
+    // multi-second clock-skew estimate that can itself be wrong.
+    until = Date.now() + LOBBY_COUNTDOWN_MS;
     _cdUntil = until;
     window._lobbyCountingDown = true;
     _applyCountdownButtons(true);
     clearInterval(_cdInterval);
     _cdTick = () => {
-      // Corrects for the guest's own clock disagreeing with the host's (see
-      // _hostClockOffsetMs's own comment) — a no-op (offset stays 0) for the
-      // host, who IS the reference `until` was stamped against.
-      const remain = Math.ceil((until - (Date.now() + _hostClockOffsetMs)) / 1000);
+      const remain = Math.ceil((until - Date.now()) / 1000);
       const text = T('lobby.starting', 'Empezando en') + ' ' + Math.max(0, remain) + '…';
       const cd = document.getElementById('lobby-countdown');
       if (cd) cd.textContent = text;

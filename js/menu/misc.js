@@ -65,12 +65,6 @@
     if (fn) { try { const p = fn.call(document); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
   }
 
-  function updateIcon() {
-    btn.textContent = fsElement() ? '✕' : '⛶';
-  }
-  document.addEventListener('fullscreenchange', updateIcon);
-  document.addEventListener('webkitfullscreenchange', updateIcon);
-
   btn.addEventListener('click', () => {
     if (isIOS) {
       if (!isStandalone) showIOSToast();
@@ -156,7 +150,7 @@
   wrap.addEventListener('click', () => {
     if (confirmCooldown) return;
     confirmCooldownLock();
-    const a = new Audio('sfx/check.mp3'); a.volume = isMuted ? 0 : 1; a.muted = isMuted; a.play();
+    const a = new Audio('sfx/check.mp3'); a.volume = (typeof window.getVolumeLevel === 'function') ? window.getVolumeLevel() : (isMuted ? 0 : 1); a.muted = isMuted; a.play();
     wrap.classList.add('confirm-pressed');
     setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);
     document.getElementById('loading-screen').style.display = 'none';

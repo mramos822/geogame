@@ -8449,11 +8449,12 @@ body.is-mobile #screen-warning-icon {
   animation: machine3-scroll 10s linear infinite;
 }
 
-/* ── VOLUME BUTTON ───────────────────────────────── */
-#vol-btn {
+/* ── VOLUME / SFX BUTTONS ────────────────────────── */
+/* #vol-btn (música) y #sfx-btn comparten esta forma — solo cambia el `left`
+   (ver cada id abajo) y qué nivel controla cada uno (js/core/audio.js). */
+.vol-btn-wrap {
   position: absolute;
   top: 3.5%;
-  left: 17%;
   transform: translate(-50%, -50%);
   /* Por encima de #spectator-loading (1500): silenciar/pantalla completa
      tienen que seguir accesibles incluso durante la transición de carga. */
@@ -8461,8 +8462,10 @@ body.is-mobile #screen-warning-icon {
   cursor: pointer;
   width: 6cqmin;
 }
+#vol-btn { left: 17%; }
+#sfx-btn { left: calc(17% + 7cqmin); }
 
-#vol-btn img {
+.vol-btn-wrap img {
   display: block;
   width: 100%;
   pointer-events: none;
@@ -8470,29 +8473,132 @@ body.is-mobile #screen-warning-icon {
   -webkit-user-drag: none;
   height: auto;
 }
+/* El ÍCONO sí necesita recibir el click (abre/cierra la barra, ver
+   js/core/audio.js) — sin este override quedaba con pointer-events:none de
+   la regla genérica de arriba (pensada para cuando el click lo manejaba el
+   <div> padre) y el click nunca le llegaba (el reportado "clickeo y no pasa
+   nada"). #vol-btn/#sfx-btn + #vol-img/#sfx-img (2 ids) pesa más que
+   .vol-btn-wrap img (1 clase + 1 elemento), así que gana pase lo que pase
+   el orden en el archivo. */
+#vol-btn #vol-img, #sfx-btn #sfx-img {
+  pointer-events: auto;
+}
 
+/* Barra vertical que aparece al clickear el ícono (ver js/core/audio.js) —
+   mismo estilo "caja oscura semi-transparente" que #fs-btn tenía, colgando
+   debajo del ícono. Oculta/mostrada con opacity+scale (display:none
+   rompería la transición), .open la habilita para recibir clicks/drag.
+   Clase compartida por #vol-slider-popup (música) y #sfx-slider-popup. */
+.vol-slider-popup {
+  position: absolute;
+  top: calc(100% + 0.4cqmin);
+  left: 50%;
+  transform: translateX(-50%) scale(0.85);
+  transform-origin: top center;
+  width: 4.8cqmin;
+  padding: 1.4cqmin 0;
+  background: rgba(0,0,0,0.55);
+  border: 0.15cqmin dashed rgba(255,255,255,0.7);
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 1.8cqmin;
+  opacity: 0;
+  pointer-events: none;
+  /* En celular (dedo, no cursor) evita que un toque que arranca en el
+     padding/porcentaje (no justo en la barra angosta) mueva la página en
+     vez de nada — el drag en sí lo maneja .vol-slider-track (ver su propio
+     ::before, que le agranda el área táctil real). */
+  touch-action: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.vol-slider-popup.open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) scale(1);
+}
+.vol-slider-track {
+  position: relative;
+  width: 1.6cqmin;
+  height: 16cqmin;
+  border-radius: 0;
+  background: rgba(255,255,255,0.25);
+  cursor: pointer;
+  touch-action: none;
+}
+/* Área táctil real más ancha que el dibujo visible — en celular, con el
+   dedo (no un cursor fino), 1.6cqmin es casi imposible de acertar. Al ser
+   un ::before del propio track (no un elemento aparte), un pointerdown acá
+   reporta el track mismo como e.target, así que el JS (js/core/audio.js)
+   no necesita saber nada de esto. */
+.vol-slider-track::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -1.6cqmin;
+  right: -1.6cqmin;
+}
+/* Nivel actual en %, debajo de la barra — ver applyMusicVolume/applySfxVolume
+   en js/core/audio.js. */
+.vol-slider-pct {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 1.7cqmin;
+  color: #ffffff;
+  text-shadow: 0 0.1cqmin 0.25cqmin rgba(0,0,0,0.6);
+  white-space: nowrap;
+}
+/* Invertida a pedido: ARRIBA = menos volumen, ABAJO = más — se llena desde
+   ARRIBA hacia abajo a medida que sube el volumen. Su % de alto lo pone JS. */
+.vol-slider-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  background: #ffffff;
+}
+.vol-slider-handle {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: 2.2cqmin;
+  height: 2.2cqmin;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0.15cqmin 0.4cqmin rgba(0,0,0,0.5);
+  transform: translate(-50%, -50%);
+  cursor: grab;
+}
+.vol-slider-handle:active { cursor: grabbing; }
+
+/* Sin caja/marco — solo el ícono, a pedido. */
 #fs-btn {
   position: absolute;
   top: 3.5%;
-  left: calc(17% + 7cqmin);
+  left: calc(17% + 14cqmin);
   transform: translate(-50%, -50%);
   z-index: 1600;
   cursor: pointer;
   width: 6cqmin;
-  height: 6cqmin;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 3.2cqmin;
-  color: #fff;
-  border: 0.35cqmin dashed rgba(255,255,255,0.7);
-  border-radius: 1.2cqmin;
-  background: rgba(0,0,0,0.25);
   opacity: 0.85;
-  transition: opacity 0.15s, background 0.15s;
+  transition: opacity 0.15s;
   user-select: none;
 }
-#fs-btn:hover { opacity: 1; background: rgba(0,0,0,0.45); }
+#fs-btn:hover { opacity: 1; }
+#fs-btn img {
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
 
 /* ── FLAGS MODE OVERRIDES ─────────────────────────────── */
 #splash-screen.mode-flags .splash-text2-label        { padding-top: 20%; }
@@ -9601,7 +9707,7 @@ body.is-mobile #splash-screen.mode-monuments .game-bg-clouds-monuments {
 .recording-mode #flags-check-overlay,
 .recording-mode #flags-wrong-overlay,
 .recording-mode #ingame-power,
-.recording-mode #vol-btn { display: none !important; }
+.recording-mode #vol-btn, .recording-mode #sfx-btn { display: none !important; }
 
 
 /* ═══════════════════════════════════════════════════════════════

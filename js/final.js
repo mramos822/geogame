@@ -286,7 +286,7 @@ function hideFinalScreen() {
 document.getElementById('final-confirm-back-wrap')?.addEventListener('click', () => {
   if (typeof confirmCooldown !== 'undefined' && confirmCooldown) return;
   if (typeof confirmCooldownLock === 'function') confirmCooldownLock();
-  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; sfxCheck.play(); }
+  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.volume = (typeof window.getVolumeLevel === 'function') ? window.getVolumeLevel() : ((typeof isMuted !== 'undefined' && isMuted) ? 0 : 1); sfxCheck.play(); }
   const w = document.getElementById('final-confirm-back-wrap');
   w.classList.add('confirm-pressed');
   setTimeout(() => w.classList.remove('confirm-pressed'), 50);
@@ -372,7 +372,7 @@ function showConnErrorPopup() {
 }
 window.showConnErrorPopup = showConnErrorPopup;
 document.getElementById('conn-error-popup-close')?.addEventListener('click', () => {
-  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; sfxCheck.play(); }
+  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.volume = (typeof window.getVolumeLevel === 'function') ? window.getVolumeLevel() : ((typeof isMuted !== 'undefined' && isMuted) ? 0 : 1); sfxCheck.play(); }
   document.getElementById('conn-error-popup')?.classList.remove('open');
 });
 
@@ -453,16 +453,16 @@ function hideGuestRankPopup() {
 window.showGuestRankPopup = showGuestRankPopup;
 
 document.getElementById('guest-rank-popup-close')?.addEventListener('click', () => {
-  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; sfxCheck.play(); }
+  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.volume = (typeof window.getVolumeLevel === 'function') ? window.getVolumeLevel() : ((typeof isMuted !== 'undefined' && isMuted) ? 0 : 1); sfxCheck.play(); }
   hideGuestRankPopup();
 });
 document.getElementById('guest-rank-popup-register')?.addEventListener('click', () => {
-  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; sfxCheck.play(); }
+  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.volume = (typeof window.getVolumeLevel === 'function') ? window.getVolumeLevel() : ((typeof isMuted !== 'undefined' && isMuted) ? 0 : 1); sfxCheck.play(); }
   document.getElementById('guest-rank-popup')?.classList.remove('open');
   if (typeof window.openAccountModal === 'function') window.openAccountModal('register');
 });
 document.getElementById('guest-rank-popup-login')?.addEventListener('click', () => {
-  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; sfxCheck.play(); }
+  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.volume = (typeof window.getVolumeLevel === 'function') ? window.getVolumeLevel() : ((typeof isMuted !== 'undefined' && isMuted) ? 0 : 1); sfxCheck.play(); }
   document.getElementById('guest-rank-popup')?.classList.remove('open');
   if (typeof window.openAccountModal === 'function') window.openAccountModal('login');
 });
@@ -470,7 +470,7 @@ document.getElementById('guest-rank-popup-login')?.addEventListener('click', () 
 document.getElementById('final-confirm-wrap')?.addEventListener('click', () => {
   if (typeof confirmCooldown !== 'undefined' && confirmCooldown) return;
   if (typeof confirmCooldownLock === 'function') confirmCooldownLock();
-  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.volume = (typeof isMuted !== 'undefined' && isMuted) ? 0 : 1; sfxCheck.play(); }
+  if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxCheck.volume = (typeof window.getVolumeLevel === 'function') ? window.getVolumeLevel() : ((typeof isMuted !== 'undefined' && isMuted) ? 0 : 1); sfxCheck.play(); }
   const wrap = document.getElementById('final-confirm-wrap');
   wrap.classList.add('confirm-pressed');
   setTimeout(() => wrap.classList.remove('confirm-pressed'), 50);

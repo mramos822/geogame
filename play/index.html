@@ -35,7 +35,7 @@
   <meta name="twitter:description"  content="Identify cities on maps, recognize country flags, match country shapes and name world landmarks. Compete with friends online.">
   <meta name="twitter:image"        content="https://mygeochallenge.com/images/og-preview.png">
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6238929099865050" crossorigin="anonymous"></script>
-  <link rel="stylesheet" href="css/style.css?v=3.7.3">
+  <link rel="stylesheet" href="css/style.css?v=3.7.4">
   <link rel="preload" href="images/characters/men3.png" as="image">
   <link rel="preload" href="images/characters/men4.png" as="image">
   <link rel="preload" href="images/characters/girl3.png" as="image">
@@ -1473,7 +1473,7 @@
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
     </div>
-    <div id="loading-version">Ver. 3.7.3</div>
+    <div id="loading-version">Ver. 3.7.4</div>
   </div>
 
   <!-- Pantalla de resultado versus (W/L) — fuera del loading-screen para verse tras la partida -->
@@ -2194,10 +2194,32 @@
     <img src="images/countdown/gameover.png" alt="Game Over">
   </div>
 
-  <div id="vol-btn">
+  <!-- .vol-slider-* clases compartidas por música (vol-) y sfx (sfx-) — ver
+       CSS. Los ids con prefijo son los que lee js/core/audio.js. -->
+  <div id="vol-btn" class="vol-btn-wrap">
     <img id="vol-img" src="images/vol1.png" alt="">
+    <!-- Barra de MÚSICA — se abre al clickear el ícono (ver js/core/audio.js).
+         #vol-slider-fill/-handle se posicionan por JS según el % actual. -->
+    <div id="vol-slider-popup" class="vol-slider-popup">
+      <div id="vol-slider-track" class="vol-slider-track">
+        <div id="vol-slider-fill" class="vol-slider-fill"></div>
+        <div id="vol-slider-handle" class="vol-slider-handle"></div>
+      </div>
+      <span id="vol-slider-pct" class="vol-slider-pct">100%</span>
+    </div>
   </div>
-  <div id="fs-btn">⛶</div>
+  <div id="sfx-btn" class="vol-btn-wrap">
+    <img id="sfx-img" src="images/sfx1.png" alt="">
+    <!-- Barra de SFX — mismo patrón que #vol-slider-popup, ver js/core/audio.js. -->
+    <div id="sfx-slider-popup" class="vol-slider-popup">
+      <div id="sfx-slider-track" class="vol-slider-track">
+        <div id="sfx-slider-fill" class="vol-slider-fill"></div>
+        <div id="sfx-slider-handle" class="vol-slider-handle"></div>
+      </div>
+      <span id="sfx-slider-pct" class="vol-slider-pct">100%</span>
+    </div>
+  </div>
+  <div id="fs-btn"><img id="fs-img" src="images/fullscreen.png" alt=""></div>
 
   <div id="ingame-power" style="display:none">
     <img id="ingame-power-icon" src="images/power.png" alt="" draggable="false" oncontextmenu="return false">
@@ -2476,7 +2498,7 @@
   <script src="js/i18n-data.js?v=3.5.65"></script>
 
   <!-- ── Core (audio, helpers UI, campaña) ───────────────────────────────── -->
-  <script src="js/core/audio.js?v=3.6.0"></script>
+  <script src="js/core/audio.js?v=3.7.4"></script>
   <script src="js/core/ui-helpers.js?v=3.7.0"></script>
   <script src="js/core/campaign.js?v=3.6.11"></script>
 
@@ -2510,29 +2532,29 @@
   <script src="js/modes/mapgame-vs.js?v=3.5.65"></script>
   <script src="js/modes/mapgame-leaderboard.js?v=3.6.9"></script>
   <script src="js/modes/mapgame-play.js?v=3.6.17"></script>
-  <script src="js/modes/mapgame-misc.js?v=3.6.2"></script>
+  <script src="js/modes/mapgame-misc.js?v=3.7.4"></script>
   <script src="js/modes/cities-spectate.js?v=3.6.16"></script>
   <script src="js/modes/monuments-spectate.js?v=3.6.16"></script>
-  <script src="js/modes/practice-panel.js?v=3.5.65"></script>
+  <script src="js/modes/practice-panel.js?v=3.7.4"></script>
 
   <!-- ── Multijugador (versus / espectador / lobby / chat) ───────────────── -->
   <script src="js/vs.js?v=3.7.2"></script>
   <script src="js/spectate.js?v=3.7.0"></script>
-  <script src="js/lobby.js?v=3.7.2"></script>
+  <script src="js/lobby.js?v=3.7.4"></script>
   <script src="js/chat.js?v=3.7.0"></script>
 
   <!-- ── Otros modos ─────────────────────────────────────────────────────── -->
   <script src="js/flags.js?v=3.6.16"></script>
-  <script src="js/shapes.js?v=3.6.17"></script>
-  <script src="js/globequiz.js?v=3.7.2"></script>
+  <script src="js/shapes.js?v=3.7.4"></script>
+  <script src="js/globequiz.js?v=3.7.4"></script>
 
   <!-- ── Launchers del menú + IIFEs de UI global ─────────────────────────── -->
   <script src="js/menu/menu-launchers.js?v=3.7.0"></script>
-  <script src="js/menu/misc.js?v=3.5.65"></script>
+  <script src="js/menu/misc.js?v=3.7.4"></script>
 
   <!-- ── Pantallas de resultados ────────────────────────────────────────── -->
-  <script src="js/results.js?v=3.5.65"></script>
-  <script src="js/final.js?v=3.6.16"></script>
+  <script src="js/results.js?v=3.7.4"></script>
+  <script src="js/final.js?v=3.7.4"></script>
 
   <button id="recording-toggle" style="display:none" onclick="document.body.classList.toggle('recording-mode');this.classList.toggle('active')">⏺</button>
   <script>

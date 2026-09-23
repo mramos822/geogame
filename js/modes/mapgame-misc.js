@@ -121,7 +121,7 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
           window.releaseGameMemory({ keepBitmaps: true });
         }
         document.getElementById(_nextBtn).click();
-        setTimeout(() => { sfxCheck.volume = isMuted ? 0 : 1; }, 150);
+        setTimeout(() => { sfxCheck.volume = (typeof window.getVolumeLevel === 'function') ? window.getVolumeLevel() : (isMuted ? 0 : 1); }, 150);
       };
       if (window.__loadingReady) {
         _fireNext();

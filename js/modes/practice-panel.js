@@ -245,7 +245,8 @@ if (practiceRange) {
     const idx = parseInt(practiceRange.value, 10);
     if (idx !== _lastRangeIdx) {
       const s = new Audio('sfx/select.mp3');
-      if (localStorage.getItem('muted') !== 'true') s.play().catch(() => {});
+      s.volume = (typeof window.getVolumeLevel === 'function') ? window.getVolumeLevel() : (localStorage.getItem('muted') === 'true' ? 0 : 1);
+      if (s.volume > 0) s.play().catch(() => {});
       _lastRangeIdx = idx;
     }
     window.practiceConfig.timer = TIMER_IDX_TO_SEC[idx];
