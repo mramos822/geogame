@@ -8,6 +8,12 @@
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
     gtag('config', 'AW-18355179202');
+    // GA4 (myGeoChallenge property) — para verificación de tráfico de
+    // Playwire. Agregado directo (no via "etiquetas conectadas" de GA4,
+    // que mostraba 0 conectadas) porque el gtag.js de arriba ya está
+    // instalado en el sitio; solo faltaba este config() apuntando a la
+    // propiedad.
+    gtag('config', 'G-6326X51SV9');
   </script>
   <base href="../">
   <meta charset="UTF-8">
