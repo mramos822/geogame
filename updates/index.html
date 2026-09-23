@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=AW-18355179202"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'AW-18355179202');
+    gtag('config', 'G-6326X51SV9');
+  </script>
+  <base href="../">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Updates — myGeoChallenge</title>
+  <meta name="description" content="What's new in myGeoChallenge: new game modes, features, and fixes, shipped continuously by a small independent team.">
+  <link rel="canonical" href="https://mygeochallenge.com/updates/">
+  <link rel="icon" type="image/png" href="images/planet3.png">
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://mygeochallenge.com/"},{"@type":"ListItem","position":2,"name":"Updates","item":"https://mygeochallenge.com/updates/"}]}
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--gold:#f5c842;--gold-dark:#c8920a;--dark:#0f1e2d;--sky:#3a8acb}
+    html{scroll-behavior:smooth}
+    body{font-family:'Nunito',sans-serif;background:var(--dark);color:#cdd8e8;overflow-x:hidden}
+    nav{display:flex;align-items:center;justify-content:space-between;padding:14px 48px;background:rgba(10,30,55,.6);border-bottom:1px solid rgba(255,255,255,.1);position:sticky;top:0;z-index:200;backdrop-filter:blur(10px)}
+    .nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+    .nav-logo img{height:54px;filter:drop-shadow(0 2px 8px rgba(0,0,0,.4));transition:transform .2s}
+    .nav-logo:hover img{transform:scale(1.1)}
+    .nav-right{display:flex;align-items:center;gap:14px}
+    .nav-link{color:rgba(255,255,255,.8);text-decoration:none;font-size:.88rem;font-weight:700;transition:color .2s}
+    .nav-link:hover,.nav-link.active{color:var(--gold)}
+    .lang-btn{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);color:#fff;font-family:inherit;font-size:.82rem;font-weight:800;padding:6px 13px;border-radius:50px;cursor:pointer;transition:background .2s;letter-spacing:.5px}
+    .lang-btn:hover{background:rgba(255,255,255,.22)}
+    .nav-kofi{background:#ff5e5b;color:#fff;font-weight:800;font-size:.85rem;padding:8px 16px;border-radius:50px;text-decoration:none;transition:background .15s,transform .15s;white-space:nowrap}
+    .nav-kofi:hover{background:#e04a47;transform:scale(1.05)}
+    .nav-play{background:var(--gold);color:var(--dark);font-weight:900;font-size:.92rem;padding:9px 22px;border-radius:50px;text-decoration:none;transition:transform .15s,background .2s}
+    .nav-play:hover{background:var(--gold-dark);color:#fff;transform:scale(1.05)}
+    .art-hero{position:relative;padding:80px 24px 56px;text-align:center;background:linear-gradient(135deg,#0d1d30 0%,#183358 100%);border-bottom:1px solid rgba(255,255,255,.06)}
+    .eyebrow{display:inline-block;font-size:.73rem;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:var(--gold);background:rgba(245,200,66,.1);border:1px solid rgba(245,200,66,.25);padding:5px 16px;border-radius:50px;margin-bottom:16px}
+    .art-title{font-size:clamp(1.8rem,4.4vw,3rem);font-weight:900;color:#fff;line-height:1.15;max-width:840px;margin:0 auto 16px}
+    .art-title span{color:var(--gold)}
+    .art-desc{font-size:1rem;font-weight:600;color:rgba(255,255,255,.62);max-width:640px;margin:0 auto;line-height:1.75}
+    .art-body{max-width:760px;margin:0 auto;padding:52px 24px 70px}
+    .log-month{font-size:.78rem;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:var(--gold);margin:38px 0 16px;padding-bottom:8px;border-bottom:1px solid rgba(245,200,66,.2)}
+    .log-month:first-child{margin-top:0}
+    .log-entry{display:flex;gap:18px;padding:14px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+    .log-date{flex-shrink:0;width:82px;font-size:.8rem;font-weight:800;color:rgba(255,255,255,.4);padding-top:2px}
+    .log-text{font-size:.95rem;font-weight:600;color:rgba(255,255,255,.75);line-height:1.65}
+    .log-text strong{color:#fff}
+    .log-tag{display:inline-block;font-size:.68rem;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:var(--dark);background:var(--gold);padding:1px 8px;border-radius:20px;margin-right:8px;vertical-align:middle}
+    footer{background:var(--dark);color:rgba(255,255,255,.42);padding:28px 24px;text-align:center;font-size:.84rem;font-weight:600;border-top:1px solid rgba(255,255,255,.06)}
+    .footer-links{margin-bottom:10px;display:flex;justify-content:center;flex-wrap:wrap;gap:5px 18px}
+    footer a{color:var(--gold);text-decoration:none}
+    @media(max-width:660px){nav{padding:12px 16px}.nav-link{display:none}.nav-kofi{display:none}}
+    @media(max-width:480px){nav{padding:10px 14px;gap:6px}.nav-logo img{height:42px}.nav-right{gap:8px}.lang-btn{padding:5px 10px;font-size:.75rem}.nav-play{padding:7px 15px;font-size:.82rem}.log-date{width:64px;font-size:.74rem}}
+    @media(max-width:360px){.nav-logo img{height:34px}.nav-play{padding:6px 11px;font-size:.78rem}}
+  </style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-logo" href="/"><img src="images/horizontallogo.png" alt="myGeoChallenge"></a>
+  <div class="nav-right">
+    <a class="nav-link" href="how-to-play/" data-i18n="nav.howto">How to Play</a>
+    <a class="nav-link" href="learn/" data-i18n="nav.learn">Learn</a>
+    <a class="nav-link" href="about/" data-i18n="nav.about">About</a>
+    <a class="nav-link active" href="updates/" data-i18n="nav.updates">Updates</a>
+    <button class="lang-btn" id="lang-btn" type="button">🌐 <span id="lang-label">ES</span></button>
+    <a class="nav-kofi" href="https://ko-fi.com/mygeochallenge" target="_blank" rel="noopener">☕ Support</a>
+    <a class="nav-play" href="play/" data-i18n="nav.play">Play Free</a>
+  </div>
+</nav>
+
+<header class="art-hero">
+  <div><div class="eyebrow" data-i18n="eyebrow">Updates</div></div>
+  <h1 class="art-title" data-i18n="title">What's <span>new</span>.</h1>
+  <p class="art-desc" data-i18n="desc">myGeoChallenge ships new modes, features, and fixes continuously. Here's a running log of what's changed recently.</p>
+</header>
+
+<main class="art-body">
+
+  <div class="log-month" data-i18n="m.sep">September 2026</div>
+  <div class="log-entry"><div class="log-date">Sep 22</div><div class="log-text" data-i18n="e1"><span class="log-tag" data-i18n="tag.new">New</span> Independent volume controls for music and sound effects, with a new mobile-friendly layout for the in-game buttons.</div></div>
+  <div class="log-entry"><div class="log-date">Sep 19</div><div class="log-text" data-i18n="e2"><span class="log-tag" data-i18n="tag.new">New</span> <strong>GloboReto Grupal "Por Turnos"</strong> — a new turn-based way to play GloboReto with friends, with full live spectating.</div></div>
+  <div class="log-entry"><div class="log-date">Sep 20</div><div class="log-text" data-i18n="e3"><span class="log-tag" data-i18n="tag.fix">Fix</span> Streak recovery pop-up for GloboReto, so a missed day doesn't silently reset your progress.</div></div>
+  <div class="log-entry"><div class="log-date">Sep 15</div><div class="log-text" data-i18n="e4"><span class="log-tag" data-i18n="tag.new">New</span> Greenland added to the Flags mode.</div></div>
+  <div class="log-entry"><div class="log-date">Sep 14</div><div class="log-text" data-i18n="e5"><span class="log-tag" data-i18n="tag.new">New</span> Verified accounts, an exclusive frame for the #1 ranked player, and Aruba/Curaçao added as playable flags.</div></div>
+
+  <div class="log-month" data-i18n="m.aug">September 2026 (early) &amp; August 2026</div>
+  <div class="log-entry"><div class="log-date">Sep 6-9</div><div class="log-text" data-i18n="e6"><span class="log-tag" data-i18n="tag.new">New</span> Direct friend-to-friend chat, and GloboReto playable as a live 1-vs-1 Versus duel.</div></div>
+  <div class="log-entry"><div class="log-date">Aug 19</div><div class="log-text" data-i18n="e7"><span class="log-tag" data-i18n="tag.fix">Fix</span> Stability fixes for guest sessions and Chrome on iOS.</div></div>
+
+  <div class="log-month" data-i18n="m.jul">July 2026</div>
+  <div class="log-entry"><div class="log-date">Jul 31</div><div class="log-text" data-i18n="e8"><span class="log-tag" data-i18n="tag.new">New</span> <strong>GloboReto (GlobeQuiz)</strong> launched: a low-poly 3D globe, guess the country of the day, with a real-time spectator mode.</div></div>
+  <div class="log-entry"><div class="log-date">Jul 14</div><div class="log-text" data-i18n="e9"><span class="log-tag" data-i18n="tag.new">New</span> This website — Learn articles, About, and How to Play — published alongside the game.</div></div>
+
+  <p class="art-desc" style="margin-top:44px;text-align:left" data-i18n="note">This log covers player-facing highlights only — most weeks also ship smaller fixes and polish that don't make the list.</p>
+
+</main>
+
+<footer>
+  <div class="footer-links">
+    <a href="/" data-i18n="f.home">Home</a>
+    <a href="about/" data-i18n="f.about">About</a>
+    <a href="how-to-play/" data-i18n="f.howto">How to Play</a>
+    <a href="learn/" data-i18n="f.learn">Learn</a>
+    <a href="updates/" data-i18n="f.updates">Updates</a>
+    <a href="contact/" data-i18n="f.contact">Contact</a>
+    <a href="privacy/" data-i18n="f.priv">Privacy Policy</a>
+    <a href="play/" data-i18n="f.play">Play</a>
+  </div>
+  <p>&copy; 2026 myGeoChallenge · mygeochallenge.com · <span data-i18n="f.rights">All rights reserved</span></p>
+</footer>
+
+<script>
+const T={
+  en:{},
+  es:{
+    'nav.howto':'Cómo Jugar','nav.learn':'Aprender','nav.about':'El Juego','nav.updates':'Novedades','nav.play':'Jugar Gratis',
+    'eyebrow':'Novedades',
+    'title':'Qué hay de <span>nuevo</span>.',
+    'desc':'myGeoChallenge suma modos, funciones y arreglos de forma continua. Este es un registro de los cambios más recientes.',
+    'm.sep':'Septiembre 2026',
+    'e1':'<span class="log-tag">Nuevo</span> Control de volumen independiente para música y efectos de sonido, con un nuevo diseño de los botones in-game pensado para celular.',
+    'e2':'<span class="log-tag">Nuevo</span> <strong>GloboReto Grupal "Por Turnos"</strong> — una nueva forma de jugar GloboReto con amigos por turnos, con espectador en vivo completo.',
+    'e3':'<span class="log-tag">Arreglo</span> Pop-up de recuperación de racha para GloboReto, para que un día salteado no reinicie el progreso en silencio.',
+    'e4':'<span class="log-tag">Nuevo</span> Se agregó Groenlandia al modo Banderas.',
+    'e5':'<span class="log-tag">Nuevo</span> Cuentas verificadas, un marco exclusivo para el jugador #1 del ranking, y Aruba/Curazao jugables como banderas.',
+    'm.aug':'Comienzos de septiembre y agosto 2026',
+    'e6':'<span class="log-tag">Nuevo</span> Chat directo entre amigos, y GloboReto jugable como duelo 1 contra 1 en vivo (Versus).',
+    'e7':'<span class="log-tag">Arreglo</span> Arreglos de estabilidad para sesiones de invitado y Chrome en iOS.',
+    'm.jul':'Julio 2026',
+    'e8':'<span class="log-tag">Nuevo</span> Lanzamiento de <strong>GloboReto (GlobeQuiz)</strong>: un globo 3D low-poly, adiviná el país del día, con espectador en vivo.',
+    'e9':'<span class="log-tag">Nuevo</span> Este sitio web — artículos de Aprender, El Juego y Cómo Jugar — publicado junto con el juego.',
+    'note':'Este registro cubre solo lo más visible para el jugador — la mayoría de las semanas también salen arreglos y pulido más chicos que no entran en la lista.',
+    'tag.new':'Nuevo','tag.fix':'Arreglo',
+    'f.home':'Inicio','f.about':'El Juego','f.howto':'Cómo Jugar','f.learn':'Aprender','f.updates':'Novedades','f.contact':'Contacto','f.priv':'Política de Privacidad','f.play':'Jugar','f.rights':'Todos los derechos reservados'
+  }
+};
+document.querySelectorAll('[data-i18n]').forEach(el=>{const k=el.dataset.i18n;if(T.en[k]===undefined)T.en[k]=el.innerHTML;});
+const lb=document.getElementById('lang-btn');
+const ll=document.getElementById('lang-label');
+let lang=localStorage.getItem('mgc-landing-lang')||'en';
+function applyLang(l){
+  lang=l;localStorage.setItem('mgc-landing-lang',l);document.documentElement.lang=l;
+  document.querySelectorAll('[data-i18n]').forEach(el=>{const k=el.dataset.i18n;if(T[l]&&T[l][k]!==undefined)el.innerHTML=T[l][k];});
+  ll.textContent=l==='en'?'ES':'EN';
+}
+lb.addEventListener('click',()=>applyLang(lang==='en'?'es':'en'));
+applyLang(lang);
+</script>
+</body>
+</html>

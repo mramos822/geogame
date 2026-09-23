@@ -124,6 +124,7 @@
     <a href="about/" data-i18n="f.about">About</a>
     <a href="how-to-play/" data-i18n="f.howto">How to Play</a>
     <a href="learn/" data-i18n="f.learn">Learn</a>
+    <a href="updates/" data-i18n="f.updates">Updates</a>
     <a href="contact/" data-i18n="f.contact">Contact</a>
     <a href="privacy/" data-i18n="f.priv">Privacy Policy</a>
     <a href="play/" data-i18n="f.play">Play</a>
@@ -148,7 +149,7 @@ const T={
     'li3':'<strong>Una captura de pantalla</strong> si el problema es visual. Vale mil palabras, literalmente.',
     's2':'Cuenta y <span>privacidad</span>',
     'p2':'¿Quieres borrar tu cuenta o tus datos? Escríbenos desde el email vinculado a tu cuenta y nos encargamos. Los detalles de exactamente qué guardamos (muy poco) están en la <a href="privacy/">Política de Privacidad</a>.',
-    'f.home':'Inicio','f.about':'El Juego','f.howto':'Cómo Jugar','f.learn':'Aprender','f.contact':'Contacto','f.priv':'Política de Privacidad','f.play':'Jugar','f.rights':'Todos los derechos reservados'
+    'f.home':'Inicio','f.about':'El Juego','f.howto':'Cómo Jugar','f.learn':'Aprender','f.updates':'Novedades','f.contact':'Contacto','f.priv':'Política de Privacidad','f.play':'Jugar','f.rights':'Todos los derechos reservados'
   }
 };
 document.querySelectorAll('[data-i18n]').forEach(el=>{const k=el.dataset.i18n;if(T.en[k]===undefined)T.en[k]=el.innerHTML;});
