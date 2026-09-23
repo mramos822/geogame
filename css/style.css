@@ -1106,7 +1106,7 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
    la primera vuelta de este fix (apuntando a #right-edge-bar) no se vio
    (el reportado "no se pintó, sigue celeste"). */
 .gq-edge-bar.gq-my-turn {
-  background-color: #8bff38;
+  background-color: #39cf2b;
 }
 
 .gq-power-wrap {
