@@ -8600,9 +8600,9 @@ body.is-mobile #fs-btn {
   width: 9cqmin;
   top: 4.5%;
 }
-body.is-mobile #vol-btn { left: 19%; }
-body.is-mobile #sfx-btn { left: calc(19% + 10.5cqmin); }
-body.is-mobile #fs-btn  { left: calc(19% + 21cqmin); }
+body.is-mobile #vol-btn { left: 18%; }
+body.is-mobile #sfx-btn { left: calc(18% + 10.5cqmin); }
+body.is-mobile #fs-btn  { left: calc(18% + 21cqmin); }
 #fs-btn img {
   width: 100%;
   height: auto;
