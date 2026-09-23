@@ -3774,5 +3774,16 @@ window.Lobby = (() => {
     // Don't clear _roomNameCache: it survives between panel opens so the name persists
   }
 
-  return { enterLobby, loadPublicList, startPublicRealtime, stopPublicRealtime, tryPendingJoin, tryRestore, showIncomingInvite, showInviteNotif, cancelCountdown: _stopCountdown };
+  return {
+    enterLobby, loadPublicList, startPublicRealtime, stopPublicRealtime, tryPendingJoin, tryRestore, showIncomingInvite, showInviteNotif, cancelCountdown: _stopCountdown,
+    // How far ahead (positive) or behind (negative) THIS device's clock is
+    // from the host's, in ms — same NTP-style ping/pong already used for the
+    // pre-match "Empezando en X…" countdown (_hostClockOffsetMs itself, see
+    // its own comment above). Exposed here (window.Lobby, where this
+    // variable actually lives — NOT window.LB, a separate closure with no
+    // access to it) so any OTHER shared countdown stamped with the host's
+    // Date.now() (e.g. GloboReto's post-first-solve 20s window,
+    // _gqGroupCountdownEndsAt in globequiz.js) can correct for it too.
+    getHostClockOffsetMs: () => _hostClockOffsetMs,
+  };
 })();

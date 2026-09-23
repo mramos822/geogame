@@ -1092,6 +1092,21 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   background-color: rgba(135, 198, 255, 0.90);
   z-index: 205;
   pointer-events: none;
+  transition: background-color 0.4s ease;
+}
+/* GloboReto grupal "por turnos" únicamente: TODA esta barra celeste (no
+   una celda/rectángulo aparte, ver _gqTurnsSetActiveTurn en globequiz.js)
+   pasa a este verde fuerte tipo semáforo (mismo tono que el check de
+   images/confirm1.png) mientras es MI propio turno, y vuelve sola al
+   celeste de siempre en cuanto deja de serlo — la transition de arriba
+   anima ambos sentidos con solo togglear la clase. #right-edge-bar (el
+   genérico de los otros modos) queda SIEMPRE tapado por #globequiz-screen
+   (z-index 200 vs 49) mientras se juega GlobeQuiz — ESTA es la barra que
+   realmente se ve ahí (z-index 205, por encima de esa pantalla), por eso
+   la primera vuelta de este fix (apuntando a #right-edge-bar) no se vio
+   (el reportado "no se pintó, sigue celeste"). */
+.gq-edge-bar.gq-my-turn {
+  background-color: #8bff38;
 }
 
 .gq-power-wrap {
@@ -1184,6 +1199,88 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   z-index: 210;
 }
 #gq-lb-player { top: 0; }
+
+/* GloboReto GRUPAL "por turnos" únicamente — cola de turnos a la IZQUIERDA
+   del leaderboard (.gq-friends-bar está en right:16.5%, width:12.6cqmin).
+   Columna simple: el turno ACTUAL queda pegado abajo (foto más grande +
+   nombre), y quienes siguen se apilan arriba, achicándose con la distancia —
+   ver _gqTurnsBuildTurnOrder en globequiz.js, que arma/actualiza los hijos
+   en ESTE orden (de más lejano arriba a "actual" al final/abajo). Oculto por
+   default — solo _gqTurnsBuildTurnOrder lo muestra (por turnos), nunca en
+   solo/1v1/tiempo real. */
+.gq-turn-order {
+  display: none;
+  position: absolute;
+  right: calc(16.5% + 12.6cqmin + 7cqmin);
+  bottom: 3cqmin;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.9cqmin;
+  z-index: 210;
+}
+.gq-turn-order.active { display: flex; }
+.gq-turn-order-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5cqmin;
+  /* --sz: side length in cqmin; --op: opacity — both set inline per item by
+     JS, biggest/most opaque = current turn, shrinking AND fading going
+     up/away from it. */
+  width: var(--sz);
+  opacity: var(--op, 1);
+  flex: 0 0 auto;
+  /* Grows/shrinks and fades smoothly as an item moves closer to/farther
+     from the current turn — the up/down slide itself is a separate FLIP
+     transform, set and animated from JS (see _gqTurnsBuildTurnOrder). */
+  transition: width 0.5s cubic-bezier(0.22,1,0.36,1), opacity 0.5s cubic-bezier(0.22,1,0.36,1);
+}
+.gq-turn-order-label {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2.4cqmin;
+  color: #fff;
+  text-shadow: 0 0.15cqmin 0.3cqmin rgba(0,0,0,0.6);
+  white-space: nowrap;
+}
+/* Only the CURRENT item gets this label (built above its photo, see
+   _gqTurnsBuildTurnOrder) — the queue above it never has one. */
+.gq-turn-order-item:not(.is-current) .gq-turn-order-label { display: none; }
+.gq-turn-order-avatar-wrap {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 0.6cqmin;
+  overflow: hidden;
+  box-shadow: 0 0 0 0.25cqmin rgba(255,255,255,0.85);
+  transition: width 0.35s cubic-bezier(0.22,1,0.36,1), height 0.35s cubic-bezier(0.22,1,0.36,1);
+}
+.gq-turn-order-item.is-current .gq-turn-order-avatar-wrap {
+  box-shadow: 0 0 0 0.3cqmin #ffd23f;
+}
+.gq-turn-order-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  -webkit-user-drag: none;
+}
+.gq-turn-order-name {
+  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
+  font-size: 2.3cqmin;
+  color: #fff;
+  text-shadow: 0 0.15cqmin 0.3cqmin rgba(0,0,0,0.6);
+  white-space: nowrap;
+  max-width: 13cqmin;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Only the CURRENT turn (last item, see the JS-built order) shows its name
+   below the photo — the rest are photo-only, name would clutter a shrinking
+   queue. */
+.gq-turn-order-item:not(.is-current) .gq-turn-order-name { display: none; }
+/* Grayscale for whoever was already eliminated before the final tiebreak —
+   same criterion/state as their .lb-entry row (is-tiebreak-out). */
+.gq-turn-order-item.is-tiebreak-out .gq-turn-order-avatar-wrap { filter: grayscale(1); opacity: 0.5; }
+.gq-turn-order-item.is-disconnected .gq-turn-order-avatar-wrap { filter: grayscale(1); opacity: 0.45; }
 
 /* Mismo centro/tamaño que .gq-globe-wrap pero SIN recorte circular — las
    partículas del confeti (ver globequiz.js, showWin) tienen que poder salir
@@ -1877,6 +1974,10 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 }
 .gq-guess-btn:hover .gq-guess-btn2 { opacity: 1; }
 .gq-guess-btn.gq-disabled { pointer-events: none; opacity: 0.5; }
+/* GloboReto "por turnos": blocks the exit/quit button once the match's
+   final round (tiebreak included) has definitively ended — see
+   _gqDisableExitOnMatchEnd in globequiz.js. */
+#gq-power-btn.gq-disabled { pointer-events: none; opacity: 0.5; }
 
 .gq-suggestion-link {
   text-decoration: underline;
@@ -3491,6 +3592,12 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   will-change: transform;
   pointer-events: auto; /* captura todos los clicks: nada detrás es seleccionable */
 }
+/* Opened by clicking a member row INSIDE the group panel (#loading-versus-group,
+   225) — see _raiseFriendPanelIfOverGroup in social-panel.js: must render on
+   top of it in that case, unlike the default 220 (below 225), which exists
+   for the OPPOSITE scenario (joining a group while this panel is already
+   open behind it — see #loading-versus-group's own z-index comment). */
+#loading-friend-group.above-versus-group { z-index: 226; }
 #loading-friend-group.table-gone {
   transition: transform 0.4s ease-in;
   transform: translateY(-120%);

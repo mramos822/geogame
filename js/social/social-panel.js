@@ -481,6 +481,21 @@ function _startFriendStatusPoll(friendId) {
 }
 
 // Open a friend's profile with real Supabase data.
+// #loading-friend-group (220) normally sits BELOW #loading-versus-group
+// (225) on purpose — see that panel's own z-index comment: it must win when
+// you JOIN a group while a friend profile happens to already be open behind
+// it. But clicking a member row INSIDE the group panel (see _buildMemberRow
+// in lobby.js) also opens this same friend panel — with the default order
+// it opened UNDERNEATH the still-visible group panel, invisible (the
+// reported "el panel de perfil de mi amigo... se pone atrás"). Bumped above
+// it ONLY for that case (group panel actually open right now), so the
+// earlier "join while already open" fix is untouched.
+function _raiseFriendPanelIfOverGroup(friendGroup) {
+  if (!friendGroup) return;
+  const versusGroup = document.getElementById('loading-versus-group');
+  const groupOpen = !!versusGroup && versusGroup.classList.contains('panel-visible') && !versusGroup.classList.contains('table-gone');
+  friendGroup.classList.toggle('above-versus-group', groupOpen);
+}
 function openFriendProfile(friend) {
   if (socialData.blockedMe.some(b => b.id === friend.id)) {
     sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
@@ -488,6 +503,7 @@ function openFriendProfile(friend) {
     _clearFriendPanel();
     const friendGroup = document.getElementById('loading-friend-group');
     if (friendGroup) friendGroup.classList.remove('table-gone');
+    _raiseFriendPanelIfOverGroup(friendGroup);
     _showFriendPanelError(true);
     return;
   }
@@ -615,6 +631,7 @@ function openFriendProfile(friend) {
   const friendGroup = document.getElementById('loading-friend-group');
   if (friendGroup) {
     friendGroup.classList.remove('table-gone');
+    _raiseFriendPanelIfOverGroup(friendGroup);
     _applyFriendPanelStatus(friend);
   }
   if (friend.id) _startFriendStatusPoll(friend.id);

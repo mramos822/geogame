@@ -1035,6 +1035,14 @@ window.refreshVsSpectatorBadge = function (n) {
     panel.classList.remove('table-gone');
     panel.classList.add('panel-visible');
     document.getElementById('loading-screen')?.classList.add('table-shown');
+    // The group panel must always win over an ALREADY-open friend profile
+    // (opened earlier from Rankings/Friends, not from inside this same
+    // group) — see #loading-friend-group's own z-index comment. A leftover
+    // 'above-versus-group' boost from a PREVIOUS group (opened by clicking a
+    // member row there, see _raiseFriendPanelIfOverGroup in social-panel.js)
+    // would otherwise still be sitting on the friend panel here, wrongly
+    // keeping it on top of this new group.
+    document.getElementById('loading-friend-group')?.classList.remove('above-versus-group');
     versusGoTo('root', true);
   }
 

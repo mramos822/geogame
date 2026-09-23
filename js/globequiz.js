@@ -53,6 +53,12 @@
   let focusAnimId = null;
 
   let countries = null;           // [{name, geometry, centroid}]
+  // Linked territories (see LINKED_TERRITORIES) — name -> geometry. Drawn on
+  // the globe and colored together with the country they belong to, but
+  // deliberately NEVER added to `countries`/`countryByName`: they can't be
+  // picked as the daily country nor typed/guessed on their own (e.g.
+  // Falkland Is./Malvinas — disputed territory, "no son algo para escoger").
+  let linkedTerritoryGeoms = {};
   let countryByName = new Map();  // normalized -> country
   let dailyCountry = null;
   let guesses = [];               // [{name, km, dir, color}]
@@ -128,7 +134,12 @@
     'St-Barthélemy', 'St-Martin', 'Sint Maarten',
     'Cayman Is.', 'Turks and Caicos Is.', 'British Virgin Is.', 'U.S. Virgin Is.',
     'Saint Helena', // British territory, not a sovereign country
-    'Falkland Is.', // Islas Malvinas — disputed territory, not a sovereign country
+    // Islas Malvinas — excluded from the pickable/guessable pool (not a
+    // sovereign country, and "no son algo para escoger"), but still DRAWN on
+    // the globe and colored together with Argentina — see LINKED_TERRITORIES/
+    // linkedTerritoryGeoms below, which pull its geometry straight from the
+    // raw dataset regardless of this exclusion.
+    'Falkland Is.',
   ]);
 
   function loadCountries() {
@@ -164,6 +175,17 @@
       Object.keys(abbrevs).forEach(abbr => {
         const c = countryByName.get(normalize(abbrevs[abbr]));
         if (c) countryByName.set(normalize(abbr), c);
+      });
+      // Linked territories (Falkland Is./Malvinas, see LINKED_TERRITORIES) —
+      // pulled from the RAW feature list (before the EXCLUDED_COUNTRIES
+      // filter above, which is what keeps them out of `countries` on
+      // purpose) purely for their geometry, so drawTexture()/updateOutlines()
+      // can paint them on the globe alongside whichever country they belong
+      // to without making them independently pickable/guessable.
+      const linkedNames = new Set(Object.values(LINKED_TERRITORIES).flat());
+      linkedTerritoryGeoms = {};
+      geo.features.forEach(f => {
+        if (linkedNames.has(f.properties.name)) linkedTerritoryGeoms[f.properties.name] = f.geometry;
       });
       return countries;
     });
@@ -587,13 +609,22 @@
   function updateOutlines() {
     if (!outlineGroup) return;
     clearOutlines();
-    if (solved) addOutline(dailyCountry.geometry);
+    if (solved) {
+      addOutline(dailyCountry.geometry);
+      (LINKED_TERRITORIES[dailyCountry.name] || []).forEach(linkedName => {
+        const geom = linkedTerritoryGeoms[linkedName];
+        if (geom) addOutline(geom);
+      });
+    }
     guesses.forEach(g => {
       const c = countryByName.get(normalize(g.name));
       if (c) addOutline(c.geometry);
+      // Linked territories (Falkland Is./Malvinas) are NEVER in
+      // countryByName on purpose (see linkedTerritoryGeoms) — their geometry
+      // lives there instead.
       (LINKED_TERRITORIES[g.name] || []).forEach(linkedName => {
-        const lc = countryByName.get(normalize(linkedName));
-        if (lc) addOutline(lc.geometry);
+        const geom = linkedTerritoryGeoms[linkedName];
+        if (geom) addOutline(geom);
       });
     });
   }
@@ -722,7 +753,10 @@
     // "fatten" each one with its own stroke to hide it, which is what looked
     // odd/bloated). Marked countries are painted separately, on top.
     const marked = new Map();
-    if (solved) marked.set(dailyCountry.name, CORRECT_COLOR);
+    if (solved) {
+      marked.set(dailyCountry.name, CORRECT_COLOR);
+      (LINKED_TERRITORIES[dailyCountry.name] || []).forEach(linked => marked.set(linked, CORRECT_COLOR));
+    }
     guesses.forEach(g => {
       marked.set(g.name, g.color);
       (LINKED_TERRITORIES[g.name] || []).forEach(linked => marked.set(linked, g.color));
@@ -730,6 +764,10 @@
 
     texCtx.beginPath();
     countries.forEach(c => { if (!marked.has(c.name)) addGeometryToPath(c.geometry); });
+    // Linked territories (Falkland Is./Malvinas) — drawn as ordinary land
+    // right alongside everything else, just never part of `countries` (so
+    // they're never pickable/guessable on their own).
+    Object.keys(linkedTerritoryGeoms).forEach(name => { if (!marked.has(name)) addGeometryToPath(linkedTerritoryGeoms[name]); });
     texCtx.fillStyle = LAND_DEFAULT;
     texCtx.fill('evenodd');
 
@@ -740,6 +778,10 @@
       // (that's now the 3D vector line, see updateOutlines, which doesn't
       // pixelate on zoom).
       if (color) paintGeometry(c.geometry, color, color);
+    });
+    Object.keys(linkedTerritoryGeoms).forEach(name => {
+      const color = marked.get(name);
+      if (color) paintGeometry(linkedTerritoryGeoms[name], color, color);
     });
     if (canvasTex) { canvasTex.needsUpdate = true; }
     updateOutlines();
@@ -3002,6 +3044,40 @@
     return prox + speedBonus + attBonus;
   }
 
+  // Trailing-edge throttle for the "por rapidez" group typing preview (see
+  // its call site's own comment) — at most one 'typing' broadcast every
+  // GQ_GROUP_TYPING_THROTTLE_MS per player, but the LAST keystroke always
+  // still goes out (via the trailing timer) so nothing typed is silently
+  // lost, just coalesced.
+  const GQ_GROUP_TYPING_THROTTLE_MS = 200;
+  let _gqGroupTypingLastSent = 0;
+  let _gqGroupTypingPending  = null;
+  let _gqGroupTypingTimer    = null;
+  function _gqGroupSendTypingThrottled(text) {
+    const now = Date.now();
+    _gqGroupTypingPending = text;
+    const elapsed = now - _gqGroupTypingLastSent;
+    if (elapsed >= GQ_GROUP_TYPING_THROTTLE_MS) {
+      _gqGroupTypingLastSent = now;
+      _gqGroupTypingPending = null;
+      window.LB.sendGq({ t: 'typing', uid: window._sbUserId, text, round: _gqGroupRound });
+      return;
+    }
+    if (_gqGroupTypingTimer) return;
+    _gqGroupTypingTimer = setTimeout(() => {
+      _gqGroupTypingTimer = null;
+      if (_gqGroupTypingPending === null || !window._gqGroupActive || solved) return;
+      _gqGroupTypingLastSent = Date.now();
+      window.LB.sendGq({ t: 'typing', uid: window._sbUserId, text: _gqGroupTypingPending, round: _gqGroupRound });
+      _gqGroupTypingPending = null;
+    }, GQ_GROUP_TYPING_THROTTLE_MS - elapsed);
+  }
+  function _gqGroupStopTypingThrottle() {
+    if (_gqGroupTypingTimer) { clearTimeout(_gqGroupTypingTimer); _gqGroupTypingTimer = null; }
+    _gqGroupTypingPending = null;
+    _gqGroupTypingLastSent = 0;
+  }
+
   window._gqGroupActive = false;
   let _gqGroupBaseSeed      = 0;
   let _gqGroupRound         = 1;
@@ -3106,9 +3182,20 @@
   // (window.LB.sendCountdown): every client independently re-derives
   // "seconds left" from Date.now(), so a slow tab or late timer never drifts
   // the displayed number, it just catches up.
+  //
+  // Two devices' clocks can disagree by several whole seconds (worse across
+  // long distances/different countries, not really about network latency
+  // itself — same root cause already documented on window.LB's own
+  // getHostClockOffsetMs) — without correcting for it here, `endsAt` (always
+  // stamped with the HOST's Date.now()) showed a DIFFERENT starting number
+  // to each player depending on their own clock's drift (the reported "a mí
+  // me sale empezando en 10 pero al usuario chileno en 14").
+  function _gqHostClockOffsetMs() {
+    return (window.Lobby && typeof window.Lobby.getHostClockOffsetMs === 'function') ? window.Lobby.getHostClockOffsetMs() : 0;
+  }
   function _gqGroupTickCountdown() {
     if (!_gqGroupCountdownEndsAt) return;
-    const secondsLeft = Math.ceil((_gqGroupCountdownEndsAt - Date.now()) / 1000);
+    const secondsLeft = Math.ceil((_gqGroupCountdownEndsAt - (Date.now() + _gqHostClockOffsetMs())) / 1000);
     // Only repaint/pulse/tick-sound when the displayed SECOND actually
     // changes — same guard _gqTickTurnTimer uses. Without it (this ran on
     // every 250ms poll unconditionally) the countdown icon's glow animation
@@ -3231,6 +3318,17 @@
     const tag    = document.getElementById('gq-round-result-tag');
     if (!screen || !list) { onDone(); return; }
     const myId = window._sbUserId;
+    // window._lobbyMembers' scores come from the 'lbscore' realtime
+    // BROADCAST (instant, but fire-and-forget — a dropped message under any
+    // network hiccup leaves that member stuck showing an OLDER round's win
+    // count here). window.LB.getMembers() is backed by the DB (reportScore
+    // + postgres_changes on lobby_members) — slower to land but reliable,
+    // eventually catching up. Since "wins" only ever go UP within a match,
+    // taking whichever of the two is HIGHER for each member is always safe
+    // and self-heals a dropped broadcast instead of leaving the table stuck
+    // (the reported "a veces la tabla no se actualiza con el puntaje
+    // nuevo").
+    const dbScoreById = new Map((window.LB && typeof window.LB.getMembers === 'function' ? window.LB.getMembers() : []).map(m => [m.id, m.score || 0]));
     const all = [{
       id: myId,
       name: (window._sbProfile && window._sbProfile.name) || localStorage.getItem('playerName') || 'Tú',
@@ -3238,7 +3336,8 @@
       frameCode: (window._sbProfile && window._sbProfile.frame_code) || '0001',
       score: _gqGroupTotal,
     }].concat((window._lobbyMembers || []).map(m => ({
-      id: m.id, name: m.name, avatar: m.avatar, frameCode: m.frameCode || '0001', score: m.score || 0,
+      id: m.id, name: m.name, avatar: m.avatar, frameCode: m.frameCode || '0001',
+      score: Math.max(m.score || 0, dbScoreById.get(m.id) || 0),
       disconnected: _gqGroupDisconnectedUids.has(m.id),
     })));
     // Disconnected members sort to the BOTTOM as disqualified, regardless
@@ -4051,6 +4150,7 @@
     _gqGroupWatchTyping = new Map();
     window._gqGroupActive = false;
     _gqGroupStopCountdown();
+    _gqGroupStopTypingThrottle();
     if (_gqGroupResultTimer) { clearInterval(_gqGroupResultTimer); _gqGroupResultTimer = null; }
     if (window.LB && typeof window.LB.onGq === 'function') window.LB.onGq(null);
     if (window.LB && typeof window.LB.onAnswer === 'function') window.LB.onAnswer(null);
@@ -4403,11 +4503,134 @@
       _gqPaintGroupTurnBanner();
       _gqHideMyTurnAlert();
     }
+    // Also refreshes the turn-order queue on every hand-off, not just when
+    // wins/tiebreak state change.
+    _gqTurnsBuildTurnOrder();
+    // TODA la barra celeste de GlobeQuiz (.gq-edge-bar — NO #right-edge-bar,
+    // que queda tapado por #globequiz-screen, ver el comentario en
+    // style.css) pasa a verde fuerte SOLO mientras es MI propio turno, se
+    // apaga en cuanto deja de serlo.
+    document.querySelector('.gq-edge-bar')?.classList.toggle('gq-my-turn', mine);
   }
   // Leído por spectate.js (_renderGroupLeaderboardInner) para resaltar la
   // fila de quien tiene el turno — mismo patrón cross-módulo que
   // window._gqGroupIsDisconnected.
   window._gqGroupTurnsActiveUid = () => _gqTurnsActiveUid;
+
+  // Cola de turnos a la izquierda del leaderboard (#gq-turn-order, ver
+  // play/index.html) — quien tiene el turno ahora al final/abajo (foto más
+  // grande + nombre), y quienes le siguen en _gqTurnsOrder apilados arriba,
+  // achicándose con la distancia. Actualizada en CADA hand-off de turno
+  // (_gqTurnsSetActiveTurn).
+  const GQ_TURN_ORDER_MAX_SZ = 9;   // cqmin — turno actual
+  const GQ_TURN_ORDER_MIN_SZ = 3;   // cqmin — piso para que el más lejano no desaparezca
+  const GQ_TURN_ORDER_SHRINK = 0.8; // factor de tamaño por cada paso de distancia
+  const GQ_TURN_ORDER_OPACITY_STEP = 0.22; // cuánto se apaga cada paso más lejos del turno actual
+  const GQ_TURN_ORDER_MIN_OPACITY  = 0.28; // piso — nunca del todo invisible
+  // uid -> <div class="gq-turn-order-item"> ya creado — persistidos entre
+  // llamadas (a diferencia de un innerHTML='' + reconstruir del todo en cada
+  // hand-off) para poder animar el FLIP de abajo: un elemento que sigue en
+  // la cola debe DESLIZARSE a su nuevo lugar, no destruirse y reaparecer
+  // instantáneo en el nuevo.
+  let _gqTurnOrderElements = {};
+  function _gqTurnsClearTurnOrder() {
+    const wrap = document.getElementById('gq-turn-order');
+    if (wrap) { wrap.classList.remove('active'); wrap.innerHTML = ''; }
+    _gqTurnOrderElements = {};
+  }
+  function _gqTurnsBuildTurnOrder() {
+    const wrap = document.getElementById('gq-turn-order');
+    if (!wrap) return;
+    if (!window._gqGroupTurnsActive || !_gqTurnsOrder.length || !_gqTurnsActiveUid) {
+      _gqTurnsClearTurnOrder();
+      return;
+    }
+    const myId = window._sbUserId;
+    const infoByUid = new Map((window.LB.getMembers() || []).map(m => [m.id, m]));
+    const startIdx = _gqTurnsOrder.indexOf(_gqTurnsActiveUid);
+    if (startIdx === -1) { _gqTurnsClearTurnOrder(); return; }
+    // Orden de "quién sigue" desde el turno actual, dando toda una vuelta a
+    // _gqTurnsOrder (mismo hot-potato circular que _gqTurnsAdvance) —
+    // salteando desconectados, igual que el turno real nunca se les pasa a
+    // ellos tampoco.
+    const queue = [];
+    for (let step = 0; step < _gqTurnsOrder.length; step++) {
+      const uid = _gqTurnsOrder[(startIdx + step) % _gqTurnsOrder.length];
+      if (_gqGroupDisconnectedUids.has(uid)) continue;
+      queue.push(uid);
+    }
+    if (!queue.length) { _gqTurnsClearTurnOrder(); return; }
+    wrap.classList.add('active');
+    // FLIP (First-Last-Invert-Play), mismo patrón que _gqTurnsPositionLb:
+    // medir dónde está CADA elemento persistido ANTES de tocar nada.
+    const prevTop = {};
+    Object.keys(_gqTurnOrderElements).forEach(uid => { prevTop[uid] = _gqTurnOrderElements[uid].offsetTop; });
+    // Hijos en orden VISUAL de arriba hacia abajo (columna normal, sin
+    // column-reverse) — el más lejano primero, el turno actual (queue[0])
+    // último, así queda pegado abajo por el propio flujo del DOM.
+    const nextElements = {};
+    for (let i = queue.length - 1; i >= 0; i--) {
+      const uid = queue[i];
+      const isCurrent = i === 0;
+      const isMe = uid === myId;
+      const m = infoByUid.get(uid);
+      const name = isMe ? ((window._sbProfile && window._sbProfile.name) || localStorage.getItem('playerName') || (m && m.name) || 'Tú')
+                         : ((m && m.name) || '?');
+      const avatar = isMe ? (localStorage.getItem('profilePhoto') || 'images/profilepic/ppdefault.png')
+                           : ((m && m.avatar) || 'images/profilepic/ppdefault.png');
+      const sz = Math.max(GQ_TURN_ORDER_MIN_SZ, GQ_TURN_ORDER_MAX_SZ * Math.pow(GQ_TURN_ORDER_SHRINK, i));
+      const op = Math.max(GQ_TURN_ORDER_MIN_OPACITY, 1 - i * GQ_TURN_ORDER_OPACITY_STEP);
+      // Reusa el <div> del uid si ya existía (lo que hace posible el FLIP de
+      // abajo) — uno nuevo solo para un uid recién entrado a la cola visible.
+      let item = _gqTurnOrderElements[uid];
+      if (!item) {
+        item = document.createElement('div');
+        item.className = 'gq-turn-order-item';
+      }
+      item.classList.toggle('is-current', isCurrent);
+      item.classList.toggle('is-tiebreak-out', !!(window._gqTurnsTiebreakLosers && window._gqTurnsTiebreakLosers.has(uid)));
+      item.style.setProperty('--sz', sz + 'cqmin');
+      item.style.setProperty('--op', String(op));
+      // "Turno de:" label — only above the CURRENT (bottom-most) photo, see
+      // .gq-turn-order-item:not(.is-current) .gq-turn-order-label in
+      // style.css.
+      item.innerHTML = (isCurrent ? `<span class="gq-turn-order-label">${t('gq.turnOf')}</span>` : '')
+        + `<div class="gq-turn-order-avatar-wrap"><img class="gq-turn-order-avatar" src="${avatar}"></div>`
+        + `<span class="gq-turn-order-name">${name}</span>`;
+      // appendChild on an EXISTING node moves it (doesn't clone/duplicate) —
+      // this is what re-orders the whole column on every hand-off.
+      wrap.appendChild(item);
+      nextElements[uid] = item;
+    }
+    // Whoever dropped out of the visible queue (disconnected, or the room
+    // shrank) never got re-appended above — remove their leftover node.
+    Object.keys(_gqTurnOrderElements).forEach(uid => {
+      if (!nextElements[uid]) _gqTurnOrderElements[uid].remove();
+    });
+    _gqTurnOrderElements = nextElements;
+    // Invert + play: en el frame siguiente (con el nuevo orden/tamaño/
+    // opacidad ya aplicados y el layout recalculado), a cada elemento que
+    // YA EXISTÍA se le pone un translateY que lo deja exactamente donde
+    // estaba antes (sin transición, invisible), y recién ahí se anima ese
+    // translateY de vuelta a 0 — se ve deslizar de la posición vieja a la
+    // nueva en vez de saltar. Un uid nuevo (no estaba en prevTop) no tiene
+    // "posición vieja" de la cual venir, aparece directamente en su lugar.
+    requestAnimationFrame(() => {
+      Object.keys(nextElements).forEach(uid => {
+        if (!(uid in prevTop)) return;
+        const el = nextElements[uid];
+        const delta = prevTop[uid] - el.offsetTop;
+        if (Math.abs(delta) < 0.5) return;
+        el.style.transition = 'none';
+        el.style.transform = `translateY(${delta}px)`;
+        void el.offsetWidth;
+        requestAnimationFrame(() => {
+          el.style.transition = 'transform 0.5s cubic-bezier(0.22,1,0.36,1)';
+          el.style.transform = '';
+        });
+      });
+    });
+  }
 
   // NO reutiliza _gqPaintTurnTimer (1v1) — ese lee _gqTurnSecondsLeft
   // (singular, variable DISTINTA del 1v1), que nunca se mueve durante un
@@ -4523,7 +4746,6 @@
         if (window.LB && typeof window.LB.sendGq === 'function') {
           window.LB.sendGq({
             t: 'tround', round: _gqGroupRound, winnerUid: window._sbUserId,
-            startAt: Date.now() + GQ_TROUND_BUFFER_MS,
             countryName: dailyCountry?.name, iso2: dailyCountry?.iso2,
             // Flags this 'tround' as ending by abandonment, not a real
             // guess — see soloWin in _gqTurnsCloseRound: nobody's clock
@@ -4545,12 +4767,6 @@
     if (!input) return;
     input.placeholder = (text || '').trim() || t('globequiz.inputPh');
   }
-
-  // Margen del 'tround' (ver su startAt más abajo) — suficiente para que el
-  // broadcast le llegue a CUALQUIER cliente de la sala, ganador/host
-  // incluido, antes del instante compartido en el que todos arrancan el
-  // flash/tabla/ruleta/3-2-1-GO.
-  const GQ_TROUND_BUFFER_MS = 400;
 
   // Protocolo por turnos sobre el mismo canal window.LB.sendGq/onGq —
   // namespacing propio ('tturn'/'tguess'/'tround'/'ttyping') para no pisar
@@ -4620,22 +4836,12 @@
       }
       if (window.LB.isHost()) {
         if (payload.correct === true) {
-          // startAt (no "cerrar ya"): el host recibe su propio broadcast por
-          // el mismo canal realtime que todos, pero cuando el host ES el
-          // ganador esa vuelta es más corta que la ida-y-vuelta real que
-          // tarda en llegarle a cualquier otro cliente — sin esto, ESE
-          // cliente arrancaba el flash/tabla/ruleta/3-2-1-GO apenas le
-          // llegaba a ÉL, un poco antes que al resto (el reportado "el
-          // ganador de la ronda inicia antes que el resto"). Con un target
-          // de reloj absoluto compartido, cada cliente (ganador incluido)
-          // arranca contra SU PROPIO Date.now() en vez de "en cuanto me
-          // llegó el mensaje" — mismo patrón que _gqGroupCountdownEndsAt.
           // countryName/iso2: un espectador externo genérico (GroupSpectate)
           // nunca jugó esta ronda, así que no tiene forma propia de conocer
           // el país correcto para su propia tabla de resultados — a
           // diferencia de un jugador real, cuyo dailyCountry ya lo tiene
           // desde que arrancó la ronda (mismo seed compartido).
-          window.LB.sendGq({ t: 'tround', round: _gqGroupRound, winnerUid: payload.uid, startAt: Date.now() + GQ_TROUND_BUFFER_MS, countryName: dailyCountry?.name, iso2: dailyCountry?.iso2 });
+          window.LB.sendGq({ t: 'tround', round: _gqGroupRound, winnerUid: payload.uid, countryName: dailyCountry?.name, iso2: dailyCountry?.iso2 });
         } else {
           _gqTurnsAdvance();
         }
@@ -4643,10 +4849,27 @@
       return;
     }
     if (payload.t === 'tround') {
-      const delay = Math.max(0, (payload.startAt || Date.now()) - Date.now());
-      setTimeout(() => {
-        if (window._gqGroupTurnsActive && _gqGroupRound === payload.round) _gqTurnsCloseRound(payload.winnerUid, !!payload.soloWin);
-      }, delay);
+      // Reacted to the instant it's RECEIVED — no shared "startAt" to wait
+      // for. This used to schedule everyone (winner included) against a
+      // future instant stamped with the HOST's own Date.now(), specifically
+      // so the winner's own shorter round-trip back to itself didn't start
+      // the flash/table/roulette/3-2-1-GO before it reached everyone else
+      // (reported: "el ganador de la ronda inicia antes que el resto"). But
+      // comparing that timestamp against each OTHER client's own raw
+      // Date.now() ignored any clock skew between devices — which can be
+      // several whole seconds, unrelated to network latency — so a player
+      // whose system clock ran behind the host's still waited several extra
+      // REAL seconds after 'tround' arrived before actually closing the
+      // round, and everything chained after it (round-result table,
+      // roulette, next round) inherited that same delay (reported: "recibe
+      // el times up con la tabla 4 segundos tarde... la ruleta la tiene
+      // super tarde"). Simpler and more robust than correcting for clock
+      // skew (which still depends on a ping/pong estimate converging in
+      // time): treat 'tround' as a plain signal, exactly like the live
+      // typing preview already does — whatever asymmetry is left is real
+      // network latency alone (same order of magnitude the typing preview
+      // already tolerates fine), not multi-second clock drift.
+      if (window._gqGroupTurnsActive && _gqGroupRound === payload.round) _gqTurnsCloseRound(payload.winnerUid, !!payload.soloWin);
       return;
     }
   }
@@ -4655,6 +4878,21 @@
   // decide el ganador final por CANTIDAD DE RONDAS GANADAS, no por el
   // puntaje de cercanía/intentos de tiempo real (_gqGroupRankScore/
   // _gqGroupFailScore quedan sin usar acá a propósito).
+  // See its call site's own comment — fired once, right as the match's
+  // final game-over/correct-country reveal begins. Re-enabled by
+  // _gqTurnsResetExitButton on the next match (rematch/new room), never here.
+  function _gqDisableExitOnMatchEnd() {
+    // #gq-power-btn is a <div> (see play/index.html), not a real <button> —
+    // there's no native `.disabled` to set. The class alone (see its
+    // matching CSS rule) sets pointer-events:none, which fully blocks the
+    // click listener in menu-launchers.js from ever firing.
+    document.getElementById('gq-power-btn')?.classList.add('gq-disabled');
+    const popup = document.getElementById('gq-quit-popup');
+    if (popup) popup.style.display = 'none';
+  }
+  function _gqTurnsResetExitButton() {
+    document.getElementById('gq-power-btn')?.classList.remove('gq-disabled');
+  }
   function _gqTurnsCloseRound(winnerUid, soloWin) {
     _gqTurnsStopTimer();
     _gqSetCountdownIconRed(false);
@@ -4689,6 +4927,18 @@
     // el ganador final de la partida, ver el comentario en la declaración
     // de _gqTurnsIsTiebreak más arriba).
     const tiedUids = (isLastRound && !_gqTurnsIsTiebreak) ? _gqTurnsCheckTie() : null;
+    // The match is DEFINITELY ending right here, with no further tiebreak
+    // (isLastRound covers the tiebreak round too, since _gqGroupRound keeps
+    // climbing past the originally configured _gqGroupRounds — see
+    // _gqTurnsBeginRound) — right as the game-over/correct-country reveal
+    // begins (soloWin's game-over overlay, the winner's own already-shown
+    // showWin(), or the loser's times-up flash below), disable the power/
+    // quit button so it can't be used to abandon a match that's effectively
+    // already decided, and auto-close the "are you sure?" popup if it
+    // happened to be open at that exact moment (confirming it now would
+    // needlessly abandon-report a match that's over, and leaving it open
+    // over an inert button does nothing useful either).
+    if (isLastRound && !tiedUids) _gqDisableExitOnMatchEnd();
     const afterFlash = () => {
       if (!window._gqGroupTurnsActive) return;
       if (tiedUids) {
@@ -4737,17 +4987,24 @@
     // included, since it's a shared broadcast event, not "TIMES UP" (which
     // implied a clock running out that never actually happened).
     if (soloWin) {
-      if (dailyCountry) focusOnCountry(dailyCountry);
+      // solved/drawTexture: see the matching comment below — without these,
+      // only the winner's own client (which already set them locally at
+      // guess time, see _gqTurnsSubmitGuess) ever painted the country green;
+      // everyone else's globe just got re-centered on it (focusOnCountry)
+      // but stayed whatever heat color it had from their own last guess.
+      if (dailyCountry) { solved = true; drawTexture(); focusOnCountry(dailyCountry); }
       _gqGroupShowGameOver(afterFlash);
       return;
     }
     if (amWinner) { setTimeout(() => { if (window._gqGroupTurnsActive) afterFlash(); }, GQ_VS_ANIM_MS); return; }
-    // Para quien NO ganó: centra el globo en el país correcto antes del
-    // flash — el ganador ya lo ve centrado porque focusOnCountry corre
-    // dentro de su propio _gqTurnsSubmitGuess al acertar, pero el resto se
-    // quedaba mirando donde sea que hubiera dejado su último intento
-    // fallido (el reportado "eso solo lo ve el ganador, no el resto").
-    if (dailyCountry) focusOnCountry(dailyCountry);
+    // Para quien NO ganó: pinta el país correcto de verde y centra el globo
+    // ahí antes del flash — el ganador ya hizo ambas cosas (drawTexture()/
+    // focusOnCountry corren dentro de su propio _gqTurnsSubmitGuess al
+    // acertar), pero el resto nunca corría drawTexture() con `solved` en
+    // true, así que su globo seguía mostrando el país sin pintar (el
+    // reportado "el país correcto solo se pinta de verde al que acertó pero
+    // no al resto").
+    if (dailyCountry) { solved = true; drawTexture(); focusOnCountry(dailyCountry); }
     if (typeof sfxTimesUp !== 'undefined' && typeof sfxPlay === 'function') { sfxTimesUp.currentTime = 0; sfxPlay(sfxTimesUp); }
     _gqGroupShowTimesUp(afterFlash);
   }
@@ -4898,6 +5155,11 @@
     if (wheelBgReset) wheelBgReset.src = 'images/ruleta1.png';
     const tuoT = document.getElementById('timeup-overlay');
     if (tuoT) { tuoT.style.display = 'none'; tuoT.classList.remove('timeup-in', 'timeup-out'); }
+    _gqTurnsClearTurnOrder();
+    // Sin esto, dejar la sala JUSTO en tu propio turno dejaba la barra en
+    // verde para lo próximo que se juegue en esta misma pantalla (solo/1v1
+    // GlobeQuiz, tiempo real).
+    document.querySelector('.gq-edge-bar')?.classList.remove('gq-my-turn');
   }
 
   // Guess submission for the group "por turnos" match — mismo patrón que
@@ -5080,6 +5342,11 @@
       const pUid = p.id === 'player' ? window._sbUserId : p.id.slice(3);
       el.classList.toggle('is-tiebreak-out', !!window._gqTurnsTiebreakLosers && window._gqTurnsTiebreakLosers.has(pUid));
     });
+    // Piggybacks on every trigger this function already runs on (score
+    // change, tiebreak marked, a fresh build) so the turn-order queue's
+    // grayscale/eliminated state stays in sync too, not just on the next
+    // turn hand-off.
+    _gqTurnsBuildTurnOrder();
     if (!animate) return;
     // Invert + play: en el frame SIGUIENTE (ya con el `order` nuevo
     // aplicado y el layout recalculado), a cada fila que se movió se le
@@ -5194,6 +5461,10 @@
     _gqTurnsIsTiebreak       = false;
     _gqTurnsTiebreakUids     = null;
     _gqTurnsTimeSec = Math.max(5, turnTime || GQ_TURN_TIME_SECONDS);
+    // Undoes _gqDisableExitOnMatchEnd from a PREVIOUS match in the same room
+    // (rematch) — otherwise the power/quit button stayed disabled forever
+    // after the first match ever ended.
+    _gqTurnsResetExitButton();
     // Igual que globequizSetTurnsMode hace para el 1v1: lo oculta ya mismo,
     // recién reaparece cuando el turno arranca de verdad (_gqTurnsSetActiveTurn).
     // Sin esto, la ronda 1 nunca lo ocultaba (a diferencia de las rondas 2+,
@@ -5387,10 +5658,19 @@
       // "Por turnos": broadcast a live preview of what I'm typing while it's
       // my turn. Sent on every keystroke, no debounce — a broadcast message
       // is cheap and a delay here just reads as lag on the opponent's screen
-      // for fast typers. Group "tiempo real" does the same for whoever might
-      // be watching me on loan (see _gqGroupHandleGqEvent's 'typing' case);
-      // group "por turnos" mirrors it too (see _gqTurnsHandleGqEvent's
-      // 'ttyping' case), but only while it's genuinely MY turn.
+      // for fast typers, and "por turnos" only ever has ONE active typer at
+      // a time. Group "tiempo real" does the same for whoever might be
+      // watching me on loan (see _gqGroupHandleGqEvent's 'typing' case) —
+      // but THERE, with up to several players typing concurrently on the
+      // SAME realtime channel (the reported "jugamos seis... recibían las
+      // respuestas súper tarde"), one broadcast per keystroke per player can
+      // burst well past Supabase Realtime's per-channel message rate,
+      // getting messages silently delayed/dropped — including the important
+      // solved/rank/round ones queued behind that noise. Throttled via
+      // _gqGroupSendTypingThrottled instead (see its own comment). "Por
+      // turnos" mirrors this too (see _gqTurnsHandleGqEvent's 'ttyping'
+      // case), but only while it's genuinely MY turn — never more than one
+      // sender at once there, so no throttle needed.
       if (input2) {
         input2.addEventListener('input', () => {
           if (window._vsActive && _gqTurnsVariant && window._gqMyTurn) {
@@ -5398,7 +5678,7 @@
             return;
           }
           if (window._gqGroupActive && !solved) {
-            window.LB.sendGq({ t: 'typing', uid: window._sbUserId, text: input2.value, round: _gqGroupRound });
+            _gqGroupSendTypingThrottled(input2.value);
             return;
           }
           if (window._gqGroupTurnsActive && window._gqGroupTurnsMyTurn) {
@@ -6127,8 +6407,17 @@
   // which THIS shared board uses for the per-turn countdown instead (the
   // reported "no se tpea al país correcto cuando lo adivinan").
   window.globequizSpectatorRevealGroupTurnsCountry = function (countryName, iso2) {
-    if (!countryName) return;
-    const country = countryByName.get(normalize(countryName));
+    if (!countryName && !iso2) return;
+    let country = countryByName.get(normalize(countryName || ''));
+    // Fallback by iso2 — same fix as the 1v1 win handler above
+    // (globequizSpectatorShowGroupResult): countryByName's keys are
+    // normalized EN/ES aliases, so a name that doesn't match any of them
+    // exactly (accents/edge cases) left `country` null and silently skipped
+    // the reveal entirely (the reported "a veces no se pone en verde el
+    // país ganador cuando alguien ve al otro rival").
+    if (!country && iso2 && countries) {
+      country = countries.find(c => c.iso2 === iso2) || null;
+    }
     if (!country) return;
     solved = true;
     dailyCountry = country;
