@@ -8592,6 +8592,15 @@ body.is-mobile #screen-warning-icon {
   user-select: none;
 }
 #fs-btn:hover { opacity: 1; }
+/* Celular: botones x1.5 (dedo, no cursor fino) — reespacia también los
+   `left` en la misma proporción, si no el ancho extra los hace solaparse
+   (a 6cqmin con 7cqmin de separación ya iban justos). */
+body.is-mobile .vol-btn-wrap,
+body.is-mobile #fs-btn {
+  width: 9cqmin;
+}
+body.is-mobile #sfx-btn { left: calc(17% + 10.5cqmin); }
+body.is-mobile #fs-btn  { left: calc(17% + 21cqmin); }
 #fs-btn img {
   width: 100%;
   height: auto;
