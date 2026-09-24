@@ -1340,8 +1340,17 @@ function showCountryShape(country, ext1, ext2, startDelay) {
   let anyClicked = false;
   const tagEls = [];
 
-  shapesTagsTimeout = setTimeout(() => {
+  // Decode both images now; the reveal below waits for the silhouette (capped
+  // at 800ms) so it never pops in ~0.2s after the flash when it wasn't decoded
+  // yet (always the case for later rounds, which reveal after 0ms).
+  if (img2.decode) img2.decode().catch(() => {});
+  const silhouetteReady = img.decode
+    ? Promise.race([img.decode().catch(() => {}), new Promise(r => setTimeout(r, 800))])
+    : Promise.resolve();
+
+  shapesTagsTimeout = setTimeout(() => silhouetteReady.then(() => {
   if (shapesAborted) return; // abandoned during the 3-2-1
+  if (!img.isConnected) return; // round torn down while waiting for the decode
 
   const whiteBg = document.createElement('div');
   whiteBg.className = 'shapes-clip-overlay';
@@ -1639,7 +1648,7 @@ function showCountryShape(country, ext1, ext2, startDelay) {
 
     tagEls.push(tag);
   });
-  }, startDelay);
+  }), startDelay);
 }
 
 const SHAPE_COUNTRIES = [

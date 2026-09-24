@@ -404,7 +404,25 @@ function nextCity() {
   }
 }
 
+// The tag slides in only once the photo is decoded (capped at 800ms), so the
+// empty photo frame never shows for ~0.5s before the picture pops in.
 function slideMonumentIn(monument) {
+  const src = `images/places/${monument.img}`;
+  const probe = new Image();
+  probe.src = src;
+  if (probe.complete && probe.naturalWidth) { _slideMonumentInNow(monument); return; }
+  const seq = slideMonumentIn._seq = (slideMonumentIn._seq || 0) + 1;
+  const ready = probe.decode ? probe.decode().catch(() => {}) : Promise.resolve();
+  Promise.race([ready, new Promise(r => setTimeout(r, 800))]).then(() => {
+    // Superseded by a newer round, or left the mode / game over while waiting.
+    if (seq !== slideMonumentIn._seq || mapGameOver || window.pendingGameMode !== 'monuments') return;
+    // The speed bonus counts from when the photo actually appears.
+    if (typeof state !== 'undefined' && state && state.currentCity === monument) state.cityShownAt = Date.now();
+    _slideMonumentInNow(monument);
+  });
+}
+
+function _slideMonumentInNow(monument) {
   const wasVisible = cityTagEl.style.visibility === 'visible';
   if (wasVisible) {
     const ghost = cityTagEl.cloneNode(true);
