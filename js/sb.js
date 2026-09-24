@@ -2,8 +2,54 @@
 const _SB_URL  = 'https://xituwurshmaqsnnnrdhx.supabase.co';
 const _SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhpdHV3dXJzaG1hcXNubm5yZGh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyMjU0OTUsImV4cCI6MjA5NjgwMTQ5NX0.jlT6O8dkuYXc8F3fOK_QXgH4Sqw6dAbhi2EIkvcS7Mk';
 
-const sb = supabase.createClient(_SB_URL, _SB_ANON);
+// CrazyGames profile pictures (imgs.crazygames.com, stored in avatar_url by
+// crazygames-auth) are generic stock avatars that make those players look
+// like bots here, so they're only shown inside the CrazyGames build. On any
+// other build every crazygames.com URL is dropped from the data (REST
+// responses + realtime payloads) before the UI sees it, and the usual default
+// picture is shown instead. The SDK script loads before this file in the
+// CrazyGames build, so window.CrazyGames tells the builds apart.
+const _SB_HIDE_CG_AVATARS = !window.CrazyGames;
+const _SB_CG_URL = /^https?:\/\/[^/]*crazygames\.com\//i;
+function _sbStripCgAvatars(v) {
+  if (typeof v === 'string') return _SB_CG_URL.test(v) ? null : v;
+  if (Array.isArray(v)) return v.map(_sbStripCgAvatars);
+  if (v && typeof v === 'object') {
+    for (const k of Object.keys(v)) v[k] = _sbStripCgAvatars(v[k]);
+  }
+  return v;
+}
+async function _sbFilteredFetch(input, init) {
+  const res = await fetch(input, init);
+  const url = typeof input === 'string' ? input : (input.url || input.href || String(input));
+  if (!url.includes('/rest/v1/') || !(res.headers.get('content-type') || '').includes('json')) return res;
+  const text = await res.text();
+  let body = text;
+  if (text.includes('crazygames.com')) {
+    try { body = JSON.stringify(_sbStripCgAvatars(JSON.parse(text))); } catch (e) {}
+  }
+  const headers = new Headers(res.headers);
+  headers.delete('content-length'); headers.delete('content-encoding');
+  return new Response(body, { status: res.status, statusText: res.statusText, headers });
+}
+
+const sb = supabase.createClient(_SB_URL, _SB_ANON, _SB_HIDE_CG_AVATARS ? { global: { fetch: _sbFilteredFetch } } : {});
 window.sb = sb;
+
+if (_SB_HIDE_CG_AVATARS) {
+  // Realtime (postgres_changes, broadcast, presence) doesn't go through fetch.
+  const _sbChannel = sb.channel.bind(sb);
+  sb.channel = function (...args) {
+    const ch = _sbChannel(...args);
+    const on = ch.on.bind(ch);
+    ch.on = (type, filter, cb) => on(type, filter, typeof cb === 'function' ? (p, ...rest) => cb(_sbStripCgAvatars(p), ...rest) : cb);
+    const presenceState = ch.presenceState.bind(ch);
+    ch.presenceState = () => _sbStripCgAvatars(presenceState());
+    return ch;
+  };
+  // A CrazyGames avatar cached as this device's own photo by an older version.
+  try { if (_SB_CG_URL.test(localStorage.getItem('profilePhoto') || '')) localStorage.removeItem('profilePhoto'); } catch (e) {}
+}
 
 // Shared dev/admin account id (BlueLite) — same account as
 // ADMIN_GUEST_RANKINGS_UID in js/menu/rankings-panel.js. Used to gate
