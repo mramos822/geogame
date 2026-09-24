@@ -38,7 +38,7 @@ document.querySelector('.splash-confirm-wrap')?.addEventListener('click', () => 
     // static poster set by swapHowtoVideo.
     if (!IS_CHROME_IOS) {
       const howtoVideo = document.querySelector('.splash-howtoplay-video');
-      if (howtoVideo) howtoVideo.play();
+      if (howtoVideo) howtoVideo.play()?.catch(() => {});
     }
     confirmStep = 1;
     window.waitForHowtoVideo();

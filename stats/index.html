@@ -1124,6 +1124,11 @@ const CHANGELOG = [
     'Figuras y Monumentos: la silueta y la etiqueta del monumento ahora aparecen solo cuando la imagen terminó de cargar, para evitar animaciones cortadas o que se demoraban en aparecer.',
     'Reducidos los mensajes innecesarios en la consola del navegador.',
   ]],
+  ['3.8.6','2026-09-24',78,[
+    'Corregido el botón de confirmar (el check) de las instrucciones, que a veces no aparecía porque el video del tutorial tardaba o fallaba al cargar: ahora el video se recupera solo y el botón siempre se muestra.',
+    'El video del tutorial de la pantalla de práctica también se recupera si falla al cargar.',
+    'Corregido un error de la consola al iniciar el video de instrucciones.',
+  ]],
 ];
 function renderChangelog(){
   const el = $('changelog-list');

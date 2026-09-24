@@ -44,6 +44,22 @@ window.hideSplashConfirm = function () {
   if (w) w.classList.remove('confirm-ready');
 };
 
+// Tutorial videos fetched as blobs, used when the direct <video> load stalls
+// or errors (flaky connection, the portal iframe, a range request that never
+// answers): the confirm must never stay hidden waiting on a video that won't
+// load. One fetch per src, shared with practice-panel.js.
+const _howtoVideoBlobCache = {}, _howtoVideoBlobReady = {};
+function _getHowtoVideoBlobUrl(src) {
+  if (!_howtoVideoBlobCache[src]) {
+    _howtoVideoBlobCache[src] = fetch(src)
+      .then(r => r.ok ? r.blob() : Promise.reject())
+      .then(b => URL.createObjectURL(b))
+      .then(url => (_howtoVideoBlobReady[src] = url, url))
+      .catch(() => null);
+  }
+  return _howtoVideoBlobCache[src];
+}
+
 // Hide the splash confirm, reveal it once the howtoplay video can play.
 window.waitForHowtoVideo = function () {
   window.hideSplashConfirm();
@@ -51,11 +67,34 @@ window.waitForHowtoVideo = function () {
   // Chrome-iOS never plays the video (static poster), so don't wait for load
   // events that will never fire.
   if (!v || v.readyState >= 3 || IS_CHROME_IOS) { window.showSplashConfirm(); return; }
-  let done = false;
-  const reveal = () => { if (!done) { done = true; window.showSplashConfirm(); } };
+  const src = v.currentSrc || v.src;
+  // Blob already fetched for this video: use it straight away.
+  if (src && _howtoVideoBlobReady[src] && v.src !== _howtoVideoBlobReady[src]) {
+    try { v.src = _howtoVideoBlobReady[src]; v.load(); if (!IS_CHROME_IOS) v.play()?.catch(() => {}); } catch (e) {}
+  }
+  let done = false, recovering = false;
+  const reveal = () => { if (done) return; done = true; clearTimeout(recoverTimer); window.showSplashConfirm(); };
+  // The direct load errored or is taking too long: retry from a blob, then
+  // reveal the confirm shortly after either way.
+  const tryRecover = () => {
+    if (done || recovering) return;
+    if (!src) { reveal(); return; }
+    recovering = true;
+    clearTimeout(recoverTimer);
+    _getHowtoVideoBlobUrl(src).then(blobUrl => {
+      if (done) return;
+      if (blobUrl) {
+        try { v.src = blobUrl; v.load(); if (!IS_CHROME_IOS) v.play()?.catch(() => {}); } catch (e) {}
+        setTimeout(reveal, 1500);
+      } else reveal();
+    });
+  };
   v.addEventListener('canplaythrough', reveal, { once: true });
   v.addEventListener('loadeddata',     reveal, { once: true });
-  v.addEventListener('error',          reveal, { once: true });
+  v.addEventListener('error',          tryRecover, { once: true });
+  // preload="none": nothing downloads until load()/play() is asked for.
+  try { v.load(); if (!IS_CHROME_IOS) v.play()?.catch(() => {}); } catch (e) {}
+  const recoverTimer = setTimeout(tryRecover, 1200);
   setTimeout(reveal, 5000); // safety fallback
 };
 

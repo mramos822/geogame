@@ -199,7 +199,21 @@ document.querySelectorAll('.practice-mode-item').forEach(btn => {
       // Chrome-iOS: same decode crash as the real splash (see IS_CHROME_IOS) —
       // static poster, no load()/play().
       if (IS_CHROME_IOS) { vid.poster = PRACTICE_MODE_VIDEOS[mode].replace(/howtoplay(\d)\.mp4$/, 'howtoplay$1-poster.jpg'); }
-      else { vid.src = PRACTICE_MODE_VIDEOS[mode]; vid.load(); vid.play().catch(() => {}); }
+      else {
+        const src = PRACTICE_MODE_VIDEOS[mode];
+        vid.src = src; vid.load(); vid.play().catch(() => {});
+        // Same blob fallback as the splash video (see waitForHowtoVideo).
+        const recover = () => {
+          if (typeof _getHowtoVideoBlobUrl !== 'function') return;
+          _getHowtoVideoBlobUrl(src).then(blobUrl => {
+            if (blobUrl && vid.src !== blobUrl && window.practiceConfig.mode === mode) {
+              try { vid.src = blobUrl; vid.load(); vid.play().catch(() => {}); } catch (e) {}
+            }
+          });
+        };
+        vid.addEventListener('error', recover, { once: true });
+        setTimeout(() => { if (vid.readyState < 2) recover(); }, 1200);
+      }
     }
     // Show continents or difficulty depending on the mode
     const showCont = mode !== 'monuments';
