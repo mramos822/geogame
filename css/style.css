@@ -8670,17 +8670,21 @@ body.is-mobile #fs-btn  { left: calc(18% + 21cqmin); }
   z-index: 15;
   pointer-events: none;
 }
-/* Same back button as the menu panels (.loading-panel2-back): back1 + the
-   back2 arrow that shows on hover, hidden again while pressed. */
+/* Small back button in the top-right corner, sized like the in-game power
+   button (#ingame-power): back1 + the back2 arrow that shows on hover,
+   hidden again while pressed. */
 #ad-panel-close {
   position: absolute;
-  top: 13cqmin;
-  left: 17cqmin;
-  width: 15.3cqmin;
+  top: 12px;
+  right: 14px;
+  width: 6.5cqmin;
+  height: 6.5cqmin;
   z-index: 20;
   cursor: pointer;
+  transition: transform 0.12s ease;
 }
-#ad-panel-close .loading-play-confirm2 { opacity: 0; transition: opacity 0.08s; }
+#ad-panel-close:hover { transform: scale(1.15); }
+#ad-panel-close .loading-play-confirm2 { width: 100%; opacity: 0; transition: opacity 0.08s; }
 #ad-panel-close:hover .loading-play-confirm2,
 #ad-panel-close:active .loading-play-confirm2 { opacity: 1; }
 #ad-panel-close.confirm-pressed .loading-play-confirm2 { opacity: 0; }
