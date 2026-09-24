@@ -680,14 +680,22 @@ window.sbDeleteFriendship = async function(friendshipId, userA, userB) {
 function _sbDeviceType() {
   return (navigator.maxTouchPoints > 1) ? 'mobile' : 'pc';
 }
+// Which build this is (same logic as detectPlatform in analytics.js); written
+// with every presence heartbeat so /stats can tell where an account is now.
+function _sbPlatform() {
+  if (typeof window.GC_PLATFORM === 'string' && window.GC_PLATFORM) return window.GC_PLATFORM;
+  if (window.CrazyGames) return 'crazygames';
+  if (window.GD_OPTIONS) return 'gd';
+  return 'web';
+}
 
 window.sbUpdateLastActive = async function(userId) {
-  await sb.from('profiles').update({ last_active: new Date().toISOString(), device: _sbDeviceType() }).eq('id', userId);
+  await sb.from('profiles').update({ last_active: new Date().toISOString(), device: _sbDeviceType(), last_platform: _sbPlatform() }).eq('id', userId);
 };
 
 window.sbSetPlaying = async function(userId, playing, practicing) {
   await sb.from('profiles')
-    .update({ is_playing: playing, is_practicing: !!practicing, last_active: new Date().toISOString(), device: _sbDeviceType() })
+    .update({ is_playing: playing, is_practicing: !!practicing, last_active: new Date().toISOString(), device: _sbDeviceType(), last_platform: _sbPlatform() })
     .eq('id', userId);
 };
 

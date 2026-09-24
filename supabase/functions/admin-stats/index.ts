@@ -352,7 +352,7 @@ Deno.serve(async (req) => {
       // que el panel pueda mostrar nombres, no solo un número — antes no
       // había forma de saber QUIÉN está online desde /stats.
       sb.from('profiles')
-        .select('username, is_playing, playing_mode, last_active, device')
+        .select('username, is_playing, playing_mode, last_active, device, last_platform')
         .gte('last_active', onlineISO)
         .order('is_playing', { ascending: false })
         .order('last_active', { ascending: false })
@@ -1289,6 +1289,7 @@ Deno.serve(async (req) => {
       ...(onlineUsersRes.data || []).map((p: any) => ({
         username: p.username, guest_name: null, is_playing: !!p.is_playing,
         playing_mode: p.playing_mode || null, last_active: p.last_active, device: p.device || null,
+        platform: p.last_platform || 'web',
       })),
       ...onlineGuestRows.map((g: any) => ({
         username: null, guest_name: g.guest_name || null, is_playing: !!g.is_playing,

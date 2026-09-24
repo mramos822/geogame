@@ -380,7 +380,11 @@
     window.CustomizeAssets?.applyCellForStatus(row, u.cell_code, status);
     let statusText = u.is_playing ? tx(u.is_practicing ? 'practicing' : 'playing') + (u.playing_mode ? ' · ' + u.playing_mode : '') : tx('idle');
     const tags = [];
-    if (u.crazygames) tags.push('🎮 CG');
+    // Where they're connected from right now (profiles.last_platform); an account
+    // created on CrazyGames but playing elsewhere keeps a smaller origin tag.
+    if (u.platform === 'crazygames') tags.push('🎮 CG');
+    else if (u.platform === 'gd') tags.push('🕹️ GD');
+    else if (u.crazygames) tags.push('🎮 CG acc');
     if (u.in_match) tags.push(tx('inMatch'));
     if (u.in_lobby) tags.push(tx('inLobby'));
     const canWatch = u.is_playing && !u.in_match && !u.in_lobby;
