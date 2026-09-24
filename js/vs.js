@@ -159,7 +159,7 @@ window.VS = (() => {
       .on('broadcast', { event: 'emote' }, ({ payload }) => {
         if (!payload || payload.role === _role || !window.Emotes) return;
         const o = window._vsOpponent || {};
-        window.Emotes.show({ idx: Number(payload.e), name: o.name || 'Rival', avatar: o.avatar });
+        window.Emotes.show({ idx: Number(payload.e), name: o.name || 'Rival', avatar: o.avatar, key: 'r:' + payload.role });
       })
       // Opponent finished THEIR timer (see reportGameEnd/_vsHandleGameEnd) —
       // the "+5s" dot bonus runs independently on each player, so the two

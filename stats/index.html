@@ -1334,6 +1334,11 @@ const CHANGELOG = [
     'Los emotes 7, 8 y 9 son exclusivos de este selector; los emotes automáticos de las tarjetas siguen usando solo del 1 al 6.',
   ]],
   ['3.9.1','2026-09-24',87,['Nuevo emote número 10: aparece tanto en los emotes automáticos de las tarjetas como en el selector para enviar manualmente.']],
+  ['3.9.2','2026-09-24',88,[
+    'Emotes: el botón ahora es una carita, los emotes se ven girados para que la cola apunte a la foto de quien los envía, esperan 1,5 segundos entre uno y otro y se quedan 3 segundos en pantalla.',
+    'Emotes: las teclas del 1 al 9 mandan los emotes 1 al 9 y el 0 manda el 10 (no funcionan mientras escribes en un campo de texto).',
+    'Emotes: si mandas otro mientras el anterior sigue en pantalla, se mantiene la misma foto y solo cambia el emote.',
+  ]],
 ];
 function renderChangelog(){
   const el = $('changelog-list');

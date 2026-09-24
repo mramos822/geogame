@@ -270,7 +270,7 @@ window.LB = (() => {
       .on('broadcast', { event: 'emote' }, ({ payload }) => {
         if (!payload || !payload.uid || payload.uid === _myId() || !window.Emotes) return;
         const m = _members.find(x => x.id === payload.uid);
-        window.Emotes.show({ idx: Number(payload.e), name: m ? m.name : (payload.n || ''), avatar: m ? m.avatar : (payload.a || null) });
+        window.Emotes.show({ idx: Number(payload.e), name: m ? m.name : (payload.n || ''), avatar: m ? m.avatar : (payload.a || null), key: 'u:' + payload.uid });
       })
       // Synced countdown (ephemeral, doesn't touch the DB)
       .on('broadcast', { event: 'cd' },       ({ payload }) => { if (_onCountdown) _onCountdown(payload || {}); })
