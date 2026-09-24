@@ -233,7 +233,10 @@
   function errText(code) { return tx('err_' + code) || tx('err_generic'); }
 
   async function maybeAskEmail() {
-    const email = window._sbProfile?.email || '';
+    // Emails aren't in profiles anymore (they were public): read our own from
+    // the session.
+    let email = '';
+    try { email = (await window.sb.auth.getUser()).data?.user?.email || ''; } catch (e) {}
     if (emailPrompted || !window._sbProfile?.crazygames_user_id || !email.endsWith(INTERNAL_DOMAIN)) return;
     emailPrompted = true;
     // Let the founder popup (800ms after login) and friends go first.
@@ -335,7 +338,6 @@
       try {
         const r = await callEmail({ action: 'confirm', code });
         if (!r.ok) return setErr('code', errText(r.data.error));
-        if (window._sbProfile) window._sbProfile.email = r.data.email || pendingEmail;
         show('ok');
       } catch (e) {
         setErr('code', errText('generic'));
@@ -375,7 +377,6 @@
       const data = await res.json().catch(() => ({}));
       ok = res.ok && data.ok; email = data.email || ''; err = data.error || '';
     } catch (e) {}
-    if (ok && window._sbProfile) window._sbProfile.email = email;
     const modal = makeModal('email-change-result-modal',
       '<button class="account-modal-close" type="button" data-act="close">✕</button>' +
       '<div class="account-view">' +

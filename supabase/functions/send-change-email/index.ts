@@ -4,8 +4,8 @@
 //       -> emails a confirmation link to the NEW address:
 //          https://mygeochallenge.com/play/?email_token=<token>
 //   { action: 'confirm', token }  (no session needed: the token is the proof)
-//       -> sets the auth email (confirmed); the on_auth_email_sync trigger
-//          mirrors it into profiles.email, which the username login reads.
+//       -> sets the auth email (confirmed); the
+//          username login (account-auth) resolves it from auth.users.
 //
 // Before: it took a `userId` from the body (never checked against the
 // caller) and asked Auth for an email_change_new link keyed by the NEW
@@ -73,8 +73,8 @@ Deno.serve(async (req) => {
       if (!row || Date.now() - new Date(row.created_at).getTime() > TOKEN_TTL_MS) {
         return reply({ error: 'expired_or_used' }, 410);
       }
-      const { data: taken } = await admin.from('profiles').select('id').ilike('email', row.email).neq('id', row.user_id).limit(1);
-      if (taken && taken.length) return reply({ error: 'email_taken' }, 409);
+      const { data: inUse } = await admin.rpc('auth_email_in_use', { p_email: row.email, p_exclude: row.user_id });
+      if (inUse) return reply({ error: 'email_taken' }, 409);
       const { error: updErr } = await admin.auth.admin.updateUserById(row.user_id, { email: row.email, email_confirm: true });
       if (updErr) return reply({ error: updErr.message }, 500);
       await admin.from('email_verifications').delete().eq('user_id', row.user_id);
@@ -92,8 +92,8 @@ Deno.serve(async (req) => {
       return reply({ error: 'invalid_email' }, 400);
     }
     if ((user.email || '').toLowerCase() === newEmail) return reply({ error: '__same_email__' }, 400);
-    const { data: taken } = await admin.from('profiles').select('id').ilike('email', newEmail).neq('id', user.id).limit(1);
-    if (taken && taken.length) return reply({ error: 'email_taken' }, 409);
+    const { data: inUse } = await admin.rpc('auth_email_in_use', { p_email: newEmail, p_exclude: user.id });
+    if (inUse) return reply({ error: 'email_taken' }, 409);
 
     const { data: prev } = await admin.from('email_verifications').select('created_at').eq('user_id', user.id).maybeSingle();
     if (prev && Date.now() - new Date(prev.created_at).getTime() < RESEND_COOLDOWN_MS) return reply({ error: 'too_soon' }, 429);

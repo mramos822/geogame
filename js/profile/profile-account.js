@@ -149,7 +149,15 @@
     showView(viewLogin);
   });
 
-  let _forgotEmail = null;
+  // Username being recovered — the email itself never reaches the browser
+  // (account-auth resolves it server-side, see sbResetPassword in js/sb.js).
+  let _forgotUser = null;
+  function _authErrText(code) {
+    const en = typeof window.getLang === 'function' && window.getLang() === 'en';
+    if (code === '__too_many__') return en ? 'Too many attempts. Try again in 15 minutes.' : 'Demasiados intentos. Intenta de nuevo en 15 minutos.';
+    if (code === '__no_email__') return en ? "This account has no email to send the code to." : 'Esta cuenta no tiene un correo al que enviar el código.';
+    return null;
+  }
   let _forgotResendCooldown = false;
 
   document.getElementById('forgot-submit')?.addEventListener('click', async () => {
@@ -160,14 +168,8 @@
     sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
     showView(viewLoading);
     try {
-      const { data: profile, error } = await window.sb.from('profiles').select('email').eq('username', username).single();
-      if (error || !profile?.email) {
-        showView(viewForgot);
-        if (errEl) errEl.textContent = t('account.errUserNotFound') || 'Este usuario no existe.';
-        return;
-      }
-      await window.sbResetPassword(profile.email);
-      _forgotEmail = profile.email;
+      await window.sbResetPassword(username);
+      _forgotUser = username;
       const codeEl = document.getElementById('forgot-code');
       const codeErrEl = document.getElementById('forgot-err-code');
       if (codeEl) codeEl.value = '';
@@ -175,7 +177,9 @@
       showView(viewForgotCode);
     } catch(e) {
       showView(viewForgot);
-      if (errEl) errEl.textContent = (e.message && e.message !== '{}') ? e.message : 'Error al enviar el correo.';
+      if (errEl) errEl.textContent = e.message === '__user_not_found__'
+        ? (t('account.errUserNotFound') || 'Este usuario no existe.')
+        : (_authErrText(e.message) || 'Error al enviar el correo.');
     }
   });
 
@@ -192,7 +196,7 @@
     const codeEl = document.getElementById('forgot-code');
     const errEl  = document.getElementById('forgot-err-code');
     const code = codeEl?.value.trim() || '';
-    if (!_forgotEmail) { showView(viewForgot); return; }
+    if (!_forgotUser) { showView(viewForgot); return; }
     if (!/^\d{6}$/.test(code)) {
       if (errEl) errEl.textContent = t('account.errCodeInvalid') || 'Ingresa el código de 6 dígitos.';
       return;
@@ -201,24 +205,25 @@
     if (errEl) errEl.textContent = '';
     showView(viewLoading);
     try {
-      const { error } = await window.sb.auth.verifyOtp({ email: _forgotEmail, token: code, type: 'recovery' });
-      if (error) throw error;
+      await window.sbVerifyResetCode(_forgotUser, code);
       localStorage.setItem('_pendingPasswordReset', '1');
-      _forgotEmail = null;
-      // The PASSWORD_RECOVERY listener in sb.js opens the new-password view.
+      _forgotUser = null;
+      // The session comes from setSession (no PASSWORD_RECOVERY event), so
+      // the new-password view is opened here directly.
+      window._openRecoveryChangePassView();
     } catch(e) {
       showView(viewForgotCode);
-      if (errEl) errEl.textContent = t('account.errCodeInvalid') || 'Código inválido o expirado.';
+      if (errEl) errEl.textContent = _authErrText(e.message) || t('account.errCodeInvalid') || 'Código inválido o expirado.';
     }
   });
 
   document.getElementById('forgot-code-resend')?.addEventListener('click', async () => {
     const resendBtn = document.getElementById('forgot-code-resend');
-    if (_forgotResendCooldown || !_forgotEmail) return;
+    if (_forgotResendCooldown || !_forgotUser) return;
     sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
     _forgotResendCooldown = true;
     try {
-      await window.sbResetPassword(_forgotEmail);
+      await window.sbResetPassword(_forgotUser);
       const errEl = document.getElementById('forgot-err-code');
       if (errEl) { errEl.classList.add('account-error-ok'); errEl.textContent = t('account.codeResent') || 'Código reenviado.'; }
     } catch(e) { /* silent: doesn't block the flow */ }
@@ -336,6 +341,8 @@
           if (err.message === '__user_not_found__') {
             if (errU) errU.textContent = t('account.errUserNotFound');
             if (userEl) userEl.classList.add('input-error');
+          } else if (err.message === '__too_many__') {
+            if (errP) errP.textContent = _authErrText('__too_many__');
           } else {
             if (errP) errP.textContent = t('account.errWrongPass');
             if (passEl) passEl.classList.add('input-error');

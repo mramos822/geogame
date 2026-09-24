@@ -270,25 +270,49 @@ window.sbRegister = async function(username, email, password) {
   return data;
 };
 
+// Username login without exposing emails: the account-auth Edge Function
+// checks the password server-side (emails live only in auth.users — reading
+// them from profiles used to make every player's email public) and returns a
+// one-time token that becomes a normal session here.
+// Errors: __user_not_found__ | __wrong_password__ | __too_many__
+async function _sbAccountAuth(payload) {
+  const res = await fetch(`${_SB_URL}/functions/v1/account-auth`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': _SB_ANON },
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json().catch(() => ({}));
+  return { ok: res.ok, json };
+}
+function _sbAuthError(code) {
+  return new Error(code === 'user_not_found' ? '__user_not_found__'
+    : code === 'too_many_attempts' ? '__too_many__'
+    : code === 'no_email' ? '__no_email__'
+    : code === 'wrong_code' ? '__wrong_code__'
+    : '__wrong_password__');
+}
 window.sbLogin = async function(username, password) {
-  const { data: profile, error: pe } = await sb
-    .from('profiles').select('email').eq('username', username).single();
-  if (pe || !profile || !profile.email) throw new Error('__user_not_found__');
-  const { data, error } = await sb.auth.signInWithPassword({ email: profile.email, password });
+  const { ok, json } = await _sbAccountAuth({ action: 'login', username, password });
+  if (!ok || !json.tokenHash) throw _sbAuthError(json.error);
+  const { data, error } = await sb.auth.verifyOtp({ token_hash: json.tokenHash, type: 'magiclink' });
   if (error) throw new Error('__wrong_password__');
   return data;
 };
 
 const _AUTH_REDIRECT = 'https://mygeochallenge.com/play/';
 
-window.sbResetPassword = async function(email) {
-  const res = await fetch(`${_SB_URL}/functions/v1/send-reset-email`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'apikey': _SB_ANON },
-    body: JSON.stringify({ email }),
-  });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error || 'Error al enviar el correo.');
+// Password recovery by USERNAME (the email is resolved server-side and never
+// reaches the browser): a 6-digit code is mailed, then sbVerifyResetCode
+// turns it into a session so the "new password" view can save it.
+window.sbResetPassword = async function(username) {
+  const { ok, json } = await _sbAccountAuth({ action: 'reset_request', username });
+  if (!ok) throw _sbAuthError(json.error);
+};
+window.sbVerifyResetCode = async function(username, code) {
+  const { ok, json } = await _sbAccountAuth({ action: 'reset_verify', username, code });
+  if (!ok || !json.access_token) throw _sbAuthError(json.error || 'wrong_code');
+  const { error } = await sb.auth.setSession({ access_token: json.access_token, refresh_token: json.refresh_token });
+  if (error) throw new Error('__wrong_code__');
 };
 
 window.sbChangePassword = async function(newPassword) {

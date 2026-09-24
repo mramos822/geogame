@@ -87,19 +87,25 @@ Deno.serve(async (req: Request) => {
   // 1) Existing link? By crazygames_user_id, or by the internal email in case
   // an earlier attempt created the user but died before tagging the profile
   // (or a concurrent request is creating it right now).
-  const findExisting = async () => {
-    const { data } = await admin
-      .from('profiles')
-      .select('id, email')
-      .or(`crazygames_user_id.eq.${crazygamesUserId},email.eq.${internalEmail}`)
-      .limit(1)
-      .maybeSingle();
-    return data as { id: string; email: string | null } | null;
+  // Emails live only in auth.users (profiles.email was dropped: it was
+  // publicly readable), so the account's current email comes from the Auth
+  // admin API.
+  const findExisting = async (): Promise<{ id: string; email: string | null } | null> => {
+    const { data: prof } = await admin
+      .from('profiles').select('id').eq('crazygames_user_id', crazygamesUserId).limit(1).maybeSingle();
+    let id = prof?.id as string | undefined;
+    if (!id) {
+      const { data: byEmail } = await admin.rpc('auth_user_id_for_email', { p_email: internalEmail });
+      id = (byEmail as string) || undefined;
+    }
+    if (!id) return null;
+    const { data: u } = await admin.auth.admin.getUserById(id);
+    return { id, email: u?.user?.email || null };
   };
 
   // The magic link must target the account's REAL auth email: accounts
   // created before the hashed format keep their old cg_<lowercased id>@...
-  // address, so it's taken from the profile instead of recomputed.
+  // address, so it's taken from auth.users (findExisting) instead of recomputed.
   let loginEmail = internalEmail;
   const found = await findExisting();
   let userId = found?.id;

@@ -5,8 +5,8 @@
 // with the player's session: Authorization: Bearer <access token>.
 //   { action: 'send',    email } -> emails a code (1/min, valid 30 min)
 //   { action: 'confirm', code  } -> sets the auth email (confirmed); the
-//                                   on_auth_email_sync trigger mirrors it
-//                                   into profiles.email
+//                                   username login finds it in auth.users
+//                                   (account-auth)
 // Only accounts still on the internal address can use it (normal accounts
 // already verified a real email at signup).
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -76,8 +76,8 @@ Deno.serve(async (req: Request) => {
     if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/.test(email) || email.endsWith(INTERNAL_DOMAIN)) {
       return cors({ error: 'invalid_email' }, 400);
     }
-    const { data: taken } = await admin.from('profiles').select('id').ilike('email', email).neq('id', user.id).limit(1);
-    if (taken && taken.length) return cors({ error: 'email_taken' }, 409);
+    const { data: inUse } = await admin.rpc('auth_email_in_use', { p_email: email, p_exclude: user.id });
+    if (inUse) return cors({ error: 'email_taken' }, 409);
 
     const { data: prev } = await admin.from('email_verifications').select('created_at').eq('user_id', user.id).maybeSingle();
     if (prev && Date.now() - new Date(prev.created_at).getTime() < RESEND_COOLDOWN_MS) {
@@ -116,8 +116,8 @@ Deno.serve(async (req: Request) => {
       return cors({ error: 'wrong_code' }, 400);
     }
     // Re-check: someone may have claimed the address meanwhile.
-    const { data: taken } = await admin.from('profiles').select('id').ilike('email', row.email).neq('id', user.id).limit(1);
-    if (taken && taken.length) return cors({ error: 'email_taken' }, 409);
+    const { data: inUse } = await admin.rpc('auth_email_in_use', { p_email: row.email, p_exclude: user.id });
+    if (inUse) return cors({ error: 'email_taken' }, 409);
 
     const { error: updErr } = await admin.auth.admin.updateUserById(user.id, { email: row.email, email_confirm: true });
     if (updErr) return cors({ error: updErr.message }, 500);
