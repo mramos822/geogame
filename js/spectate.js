@@ -504,6 +504,8 @@ window.Spectate = (() => {
         if (_onScore) _onScore(_match.host_score, _match.guest_score);
       })
       .on('broadcast', { event: 'wrong' }, ({ payload }) => { if (_onWrong) _onWrong(payload && payload.role); })
+      // Spectators only WATCH manual emotes (js/emotes.js).
+      .on('broadcast', { event: 'emote' }, ({ payload }) => { if (window.Emotes) window.Emotes.showSpectator(payload); })
       .on('broadcast', { event: 'answer' }, ({ payload }) => { if (payload && _onAnswer) _onAnswer(payload); })
       .on('broadcast', { event: 'round' }, ({ payload }) => { if (payload && _onRound) _onRound(payload); })
       .on('broadcast', { event: 'tick' }, ({ payload }) => { if (payload && _onTick) _onTick(payload.timeLeft, payload.role); })
@@ -1200,6 +1202,7 @@ window.GroupSpectate = (() => {
       // general"). The uid is sent so the UI decides WHICH card row to
       // flash.
       .on('broadcast', { event: 'wrong' }, ({ payload }) => { if (payload && payload.uid && _onWrong) _onWrong(payload.uid); })
+      .on('broadcast', { event: 'emote' }, ({ payload }) => { if (window.Emotes) window.Emotes.showSpectator(payload); })
       // Live score of ANY member (not just the current POV) — for the side
       // card with all scores, same as the real player sees (see LB.onScore
       // in lobby.js, same 'lbscore' event).

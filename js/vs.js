@@ -154,6 +154,13 @@ window.VS = (() => {
       })
       // Opponent missed → visual cue on my screen
       .on('broadcast', { event: 'wrong' }, () => { if (_onWrong) _onWrong(); })
+      // Manual emote from the opponent (js/emotes.js): only the emote number is trusted;
+      // the name/avatar come from the local opponent data.
+      .on('broadcast', { event: 'emote' }, ({ payload }) => {
+        if (!payload || payload.role === _role || !window.Emotes) return;
+        const o = window._vsOpponent || {};
+        window.Emotes.show({ idx: Number(payload.e), name: o.name || 'Rival', avatar: o.avatar });
+      })
       // Opponent finished THEIR timer (see reportGameEnd/_vsHandleGameEnd) —
       // the "+5s" dot bonus runs independently on each player, so the two
       // clocks can desync: one can finish before the other. Without this
@@ -430,6 +437,12 @@ window.VS = (() => {
 
   function sendWrong() {
     if (_channel) { try { _channel.send({ type: 'broadcast', event: 'wrong', payload: { role: _role } }); } catch (e) {} }
+  }
+
+  // Manual emote (js/emotes.js). `name` lets spectators label who sent it.
+  function sendEmote(idx, name, avatar) {
+    if (!_channel || !_role) return false;
+    try { _channel.send({ type: 'broadcast', event: 'emote', payload: { role: _role, e: idx, n: name || '', a: avatar || '' } }); return true; } catch (e) { return false; }
   }
 
   // Announces that THIS client finished loading its heavy assets and can
@@ -772,6 +785,7 @@ window.VS = (() => {
     cancelInvite,
     reportScore,
     sendWrong,
+    sendEmote,
     reportReady,
     reportGqAbort,
     reportGqPhase,

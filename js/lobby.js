@@ -266,6 +266,12 @@ window.LB = (() => {
       // See the long comment in markExpectedLeave — must be registered BEFORE
       // the real presence 'leave' for that same uid arrives.
       .on('broadcast', { event: 'expectleave' }, ({ payload }) => { if (payload && payload.uid) _expectedLeaves.add(payload.uid); })
+      // Manual emote from another room member (js/emotes.js): only the number is trusted.
+      .on('broadcast', { event: 'emote' }, ({ payload }) => {
+        if (!payload || !payload.uid || payload.uid === _myId() || !window.Emotes) return;
+        const m = _members.find(x => x.id === payload.uid);
+        window.Emotes.show({ idx: Number(payload.e), name: m ? m.name : (payload.n || ''), avatar: m ? m.avatar : (payload.a || null) });
+      })
       // Synced countdown (ephemeral, doesn't touch the DB)
       .on('broadcast', { event: 'cd' },       ({ payload }) => { if (_onCountdown) _onCountdown(payload || {}); })
       // Clock-offset probe (see _sendHostClockPings' own comment) — only the
@@ -745,6 +751,7 @@ window.LB = (() => {
   function sendCancel()         { _bcast('cancel'); }
   function sendNotReady(name)   { _bcast('notready', { name }); }
   function sendWrong()          { _bcast('wrong', { uid: _myId() }); }
+  function sendEmote(idx, name, avatar) { if (!_channel) return false; _bcast('emote', { uid: _myId(), e: idx, n: name || '', a: avatar || '' }); return true; }
   function sendVisibility(pub)  { _bcast('visibility', { isPublic: !!pub }); }
   function sendName(name)       { _bcast('name', { name }); }
   function sendFinished(score)  { _bcast('finished', { uid: _myId(), score }); }
@@ -1030,7 +1037,7 @@ window.LB = (() => {
 
   return {
     create, joinByCode, joinById, leave, kick, start, reportScore, listPublic, cleanup, releaseChannel, markExpectedLeave,
-    sendCountdown, sendCancel, sendNotReady, sendWrong, sendVisibility, sendName, sendFinished, sendReveal, sendScore, setPublic, isPublic, restoreActive, transferHost, cleanupMine,
+    sendCountdown, sendCancel, sendNotReady, sendWrong, sendEmote, sendVisibility, sendName, sendFinished, sendReveal, sendScore, setPublic, isPublic, restoreActive, transferHost, cleanupMine,
     sendRound, sendTick, sendPregame, sendPostgame, sendAnswer, sendTimesUp, sendSplash, sendAdvancing, sendGq, sendGqGuesses,
     sendReady, sendLaunchGo,
     sendInvite, listenForInvites, setName, getName, setModes, getModes, sendModes, setGloboretoConfig, getGloboretoConfig,
