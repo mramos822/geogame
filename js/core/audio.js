@@ -98,6 +98,10 @@ function _loadVol(key) {
 }
 let musicVolumeLevel = _loadVol('musicVolumeLevel');
 let sfxVolumeLevel   = _loadVol('sfxVolumeLevel');
+// Platform-level mute (CrazyGames' own sound toggle, see setPlatformMuted
+// below). It overrides the player's in-game levels without touching them:
+// the saved levels and the slider icons stay as the player set them.
+let _platformMuted = false;
 let isMuted      = sfxVolumeLevel   <= 0; // legacy flag most old call sites read — now specifically SFX
 let isMusicMuted = musicVolumeLevel <= 0;
 
@@ -141,7 +145,7 @@ function _paintSlider(prefix, level) {
 }
 
 function applyMusicVolume() {
-  isMusicMuted = musicVolumeLevel <= 0;
+  isMusicMuted = musicVolumeLevel <= 0 || _platformMuted;
   localStorage.setItem('musicVolumeLevel', String(musicVolumeLevel));
   getMusicTracks().forEach(sfx => { sfx.volume = musicVolumeLevel; sfx.muted = isMusicMuted; });
   applyMusicMute(); // iOS: music runs through Web Audio (gain); no-op on PC
@@ -150,7 +154,7 @@ function applyMusicVolume() {
   _paintSlider('vol', musicVolumeLevel);
 }
 function applySfxVolume() {
-  isMuted = sfxVolumeLevel <= 0;
+  isMuted = sfxVolumeLevel <= 0 || _platformMuted;
   localStorage.setItem('sfxVolumeLevel', String(sfxVolumeLevel));
   getSfxTracks().forEach(sfx => { sfx.volume = sfxVolumeLevel; sfx.muted = isMuted; });
   const img = document.getElementById('sfx-img');
@@ -159,17 +163,32 @@ function applySfxVolume() {
 }
 // Exposed so any OTHER file that wants to respect the real level (instead of
 // the old binary isMuted) can.
-window.getMusicVolumeLevel = () => musicVolumeLevel;
-window.getSfxVolumeLevel   = () => sfxVolumeLevel;
+window.getMusicVolumeLevel = () => _platformMuted ? 0 : musicVolumeLevel;
+window.getSfxVolumeLevel   = () => _platformMuted ? 0 : sfxVolumeLevel;
 // Legacy name from before the split — kept pointing at SFX specifically,
 // since that's what almost every old `isMuted`-reading call site plays.
-window.getVolumeLevel = () => sfxVolumeLevel;
+window.getVolumeLevel = () => _platformMuted ? 0 : sfxVolumeLevel;
 function setMusicVolumeLevel(level) { musicVolumeLevel = Math.max(0, Math.min(1, level)); applyMusicVolume(); }
 function setSfxVolumeLevel(level)   { sfxVolumeLevel   = Math.max(0, Math.min(1, level)); applySfxVolume(); }
 window.setMusicVolumeLevel = setMusicVolumeLevel;
 window.setSfxVolumeLevel   = setSfxVolumeLevel;
 // Legacy name — kept pointing at SFX (see getVolumeLevel's own comment).
 window.setVolumeLevel = setSfxVolumeLevel;
+
+// Called by the CrazyGames build (crazygames-link.js) with the SDK's
+// settings.muteAudio, which must take priority over the in-game levels.
+// Every play() also re-applies it, so sounds created outside this file
+// (new Audio(...) in other modules) can't slip through while it's on.
+window.setPlatformMuted = function (muted) {
+  _platformMuted = !!muted;
+  applyMusicVolume();
+  applySfxVolume();
+};
+const _origMediaPlay = HTMLMediaElement.prototype.play;
+HTMLMediaElement.prototype.play = function () {
+  if (_platformMuted) this.muted = true;
+  return _origMediaPlay.apply(this, arguments);
+};
 
 // On iOS, currentTime=0 can reset the muted state. Always apply muted right
 // before play() so it persists. Auto-picks the right category — sfxPlay()
@@ -330,7 +349,7 @@ function iosCtx() {
 }
 
 function applyMusicMute() {
-  if (_iosGain) _iosGain.gain.value = (typeof musicVolumeLevel !== 'undefined') ? musicVolumeLevel : (isMusicMuted ? 0 : 1);
+  if (_iosGain) _iosGain.gain.value = _platformMuted ? 0 : ((typeof musicVolumeLevel !== 'undefined') ? musicVolumeLevel : (isMusicMuted ? 0 : 1));
 }
 
 function iosLoadBuf(url) {
