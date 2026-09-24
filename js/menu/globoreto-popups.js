@@ -171,6 +171,31 @@
     return true;
   }
 
+  // ── Menu button tag ────────────────────────────────────────────────────────
+  // A small static "NEW" tag on the GloboReto button until it's been opened
+  // once — quiet on purpose (no glow/animation; the invite popup above stays
+  // the only interruption).
+  (function injectNudgeCss() {
+    const st = document.createElement('style');
+    st.textContent =
+      '#globequiz-btn .gq-new-badge { position: absolute; top: -1.2cqmin; right: -1.4cqmin; z-index: 5; pointer-events: none;' +
+      " font-family: 'VAGRoundBold', 'Arial Black', sans-serif; font-size: 1.6cqmin; letter-spacing: 0.05em; color: #fff;" +
+      ' background: #e8504a; border: 0.3cqmin solid #a32a26; border-radius: 1cqmin; padding: 0.25cqmin 0.9cqmin;' +
+      ' box-shadow: 0 0.3cqmin 0.8cqmin rgba(0,0,0,0.25); }';
+    document.head.appendChild(st);
+  })();
+  function updateNudge() {
+    const btn = document.getElementById('globequiz-btn');
+    if (!btn) return;
+    const on = neverPlayedGloboReto();
+    let badge = btn.querySelector('.gq-new-badge');
+    if (on && !badge) { badge = document.createElement('div'); badge.className = 'gq-new-badge'; btn.appendChild(badge); }
+    if (badge) {
+      if (on) badge.textContent = (typeof window.getLang === 'function' && window.getLang() === 'en') ? 'NEW!' : '¡NUEVO!';
+      else badge.remove();
+    }
+  }
+
   // ── Back-to-menu detection ────────────────────────────────────────────────
   // #loading-screen hidden = a game/screen is up; shown again = back at the
   // menu. #globequiz-screen being visible in between = that round was
@@ -179,6 +204,10 @@
     const loading = document.getElementById('loading-screen');
     const gqScreen = document.getElementById('globequiz-screen');
     if (!loading) return;
+    updateNudge();
+    window.addEventListener('gqStreakUpdated', updateNudge);
+    document.getElementById('globequiz-btn')?.addEventListener('click', () => { lsSet(EVER_OPENED_KEY, '1'); updateNudge(); });
+    if (typeof window.onLangChange === 'function') window.onLangChange(updateNudge);
     let inGame = !visible(loading), gqThisRound = false;
     if (gqScreen) {
       new MutationObserver(() => {
@@ -192,6 +221,7 @@
       if (nowInGame) { gqThisRound = visible(gqScreen); return; }
       const wasGq = gqThisRound;
       gqThisRound = false;
+      setTimeout(updateNudge, 500);
       // Let end-of-game popups (results, founder, CrazyGames offer) go first.
       setTimeout(async () => {
         if (await maybeShowStreakStart()) return;
