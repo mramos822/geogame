@@ -890,7 +890,7 @@ const MODE_TABS = [
 const MODE_LABELS = { flags:'Banderas', shapes:'Figuras', cities:'Ciudades', monuments:'Monumentos', versus:'Versus', otro:'Otro' };
 const MODE_COLORS = { flags:'#ffe066', shapes:'#4aa3ff', cities:'#6fdf6f', monuments:'#ff7ad9' };
 const ACCOUNT_FILTERS = [
-  ['all','Todos'], ['active','Activos (<7d)'], ['stale','Inactivos (7-30d)'], ['churned','Perdidos (30d+)'], ['never','Nunca jugaron'],
+  ['all','Todos'], ['active','Activos (<7d)'], ['stale','Inactivos (7-30d)'], ['churned','Perdidos (30d+)'], ['never','Nunca jugaron'], ['crazygames','🎮 CrazyGames'],
 ];
 let accountsFilter = 'all';
 let accountsSort = { key:'last_active', dir:'desc' };
@@ -2257,6 +2257,7 @@ function applyAccountsView(){
   let rows = accountsData.filter(a=>{
     if(q && !(a.username||'').toLowerCase().includes(q)) return false;
     if(accountsFilter === 'all') return true;
+    if(accountsFilter === 'crazygames') return !!a.is_crazygames;
     return accountStatus(a).cls === accountsFilter;
   });
   const { key, dir } = accountsSort;
@@ -2288,7 +2289,7 @@ function drawAccounts(rows){
     return `
       <tr class="acc-row" data-idx="${i}">
         <td><span class="caret">▶</span></td>
-        <td>${escapeHtml(a.username||'—')}${a.is_supporter?' <span class="supporter-star">★</span>':''}</td>
+        <td>${escapeHtml(a.username||'—')}${a.is_supporter?' <span class="supporter-star">★</span>':''}${a.is_crazygames?' <span title="Cuenta creada desde CrazyGames" style="font-size:11px;color:var(--muted);white-space:nowrap">🎮 CrazyGames</span>':''}</td>
         <td style="white-space:nowrap">${country}</td>
         <td><span class="status-pill ${st.cls}"><span class="dotstat"></span>${st.label}</span></td>
         <td>${created}</td>

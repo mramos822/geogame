@@ -670,6 +670,8 @@ Deno.serve(async (req) => {
         id: p.id, username: p.username, created_at: p.created_at, last_active: p.last_active,
         play_count: p.play_count || 0, hs_total: p.hs_total || 0,
         vs_wins: p.vs_wins || 0, vs_losses: p.vs_losses || 0, is_supporter: !!p.is_supporter,
+        // Account created through the CrazyGames auto-login (see crazygames-auth).
+        is_crazygames: !!p.crazygames_user_id,
         // `profiles.country_code` es la fuente confiable (se backfillea una sola vez
         // al loguear, ver _ensureCountryCode en monuments.js); countryByUser (evento
         // más viejo con país en analytics_events) es solo fallback para cuentas que
