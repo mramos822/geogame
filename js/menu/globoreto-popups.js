@@ -179,9 +179,9 @@
     const st = document.createElement('style');
     st.textContent =
       '@keyframes gqNewBob { 0%,100% { transform: translateX(-50%) translateY(0) rotate(-3deg); } 50% { transform: translateX(-50%) translateY(-0.9cqmin) rotate(3deg); } }' +
-      '#globequiz-btn .gq-new-badge { position: absolute; top: -2.6cqmin; left: 50%; z-index: 5; pointer-events: none; white-space: nowrap;' +
-      " font-family: 'VAGRoundBold', 'Arial Black', sans-serif; font-size: 1.8cqmin; letter-spacing: 0.05em; color: #fff;" +
-      ' background: #e8504a; border: 0.3cqmin solid #a32a26; border-radius: 1cqmin; padding: 0.25cqmin 1cqmin;' +
+      '#globequiz-btn .gq-new-badge { position: absolute; top: -3.6cqmin; left: 50%; z-index: 5; pointer-events: none; white-space: nowrap;' +
+      " font-family: 'VAGRoundBold', 'Arial Black', sans-serif; font-size: 2.6cqmin; letter-spacing: 0.05em; color: #fff;" +
+      ' background: #e8504a; border: 0.4cqmin solid #a32a26; border-radius: 1.4cqmin; padding: 0.4cqmin 1.5cqmin;' +
       ' box-shadow: 0 0.3cqmin 0.8cqmin rgba(0,0,0,0.25); animation: gqNewBob 1.3s ease-in-out infinite; }';
     document.head.appendChild(st);
   })();
