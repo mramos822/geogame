@@ -1012,7 +1012,8 @@ const CHANGELOG = [
     'Ajustes en el otorgamiento de monedas y experiencia (XP) en partidas Versus.',
   ]],
   ['3.6.2','2026-09-10',44,[
-    'Mejoras de rendimiento en celulares.',
+    'Mejoras de rendimiento en celulares, incluyendo que las nubes de la pantalla de Monumentos se congelen al entrar para que no haya animaciones corriendo durante la carga.',
+    'Los mensajes grandes de correcto e incorrecto en Ciudades y Banderas ahora duran una décima menos, para que el juego se sienta más ágil.',
     'Corregida la sincronización de notificaciones y la presencia en el panel de Rankings.',
   ]],
   ['3.6.3','2026-09-10',45,['Liberación correcta de los recursos gráficos de GlobeQuiz al salir del modo, para evitar consumo de memoria innecesario.']],
@@ -1022,7 +1023,10 @@ const CHANGELOG = [
   ['3.6.7','2026-09-10',49,['El filtro de práctica de América ahora incluye también el Caribe.']],
   ['3.6.8','2026-09-11',50,['El puntaje más alto ahora se calcula como la mejor partida individual, no como la suma de los 4 modos.']],
   ['3.6.9','2026-09-11',51,['El puntaje más alto ahora es el mejor resultado de una Gira Mundial completa, no la suma de resultados sueltos por modo.']],
-  ['3.6.10','2026-09-11',52,['Agregada la variante "Por turnos" a GloboReto (en vez de por rapidez), con soporte completo para espectadores.']],
+  ['3.6.10','2026-09-11',52,[
+    'Agregada la variante "Por turnos" a GloboReto (en vez de por rapidez), con soporte completo para espectadores.',
+    'Corregida la animación de transición entre rondas (las "líneas"), que podía quedarse cerrada mucho más tiempo del debido para los espectadores.',
+  ]],
   ['3.6.11','2026-09-14',53,[
     'Agregado un marco exclusivo para el jugador Top 1 del ranking.',
     'Herramientas internas de desarrollo para practicar/probar el modo espectador.',
@@ -1045,7 +1049,7 @@ const CHANGELOG = [
   ['3.6.16','2026-09-15',58,[
     'Corregida la desincronización de relojes entre dispositivos durante la cuenta regresiva 3-2-1-YA vista por el espectador.',
     'Mejorado el reintento de confirmación para el Top 1 cuando pierde su puesto.',
-    'Corregido el reinicio de la animación de nubes.',
+    'Corregido el reinicio de la animación de nubes en la pantalla final, que se veía mal después de una partida con rango bajo.',
   ]],
   ['3.6.17','2026-09-15',59,[
     'En Ciudades, la pista del país ahora aparece a los 3 segundos.',
@@ -1117,6 +1121,7 @@ const CHANGELOG = [
     'Intercambiados los íconos de música y efectos de sonido.',
     'Corregido un error que rompía la sincronización del reloj en las salas de GloboReto.',
     'Panel de administración: los invitados que están jugando ahora se muestran en verde y con más espacio; las cuentas de CrazyGames se distinguen con una etiqueta y un filtro en la pestaña Cuentas.',
+    'Figuras y Monumentos: la silueta y la etiqueta del monumento ahora aparecen solo cuando la imagen terminó de cargar, para evitar animaciones cortadas o que se demoraban en aparecer.',
     'Reducidos los mensajes innecesarios en la consola del navegador.',
   ]],
 ];
