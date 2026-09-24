@@ -40,6 +40,11 @@ import { createPublicKey, createVerify } from 'node:crypto';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const REQUIRE_TOKEN = Deno.env.get('CG_REQUIRE_TOKEN') === 'true';
+// Optional: our CrazyGames gameId. When set, tokens for any other game are
+// rejected. The SDK's local/demo mode hands out a REAL signed sample token
+// (userId "idUser1", gameId "yourGameId") to anyone running the game outside
+// CrazyGames, so those are always rejected.
+const CG_GAME_ID = Deno.env.get('CG_GAME_ID') || '';
 const CG_PUBLIC_KEY_URL = 'https://sdk.crazygames.com/publicKey.json';
 
 let _cgKey: { pem: string; at: number } | null = null;
@@ -65,6 +70,9 @@ async function verifyCgToken(token: string): Promise<string | null> {
     if (!ok) return null;
     const payload = JSON.parse(new TextDecoder().decode(b64url(parts[1])));
     if (payload.exp && Date.now() / 1000 > payload.exp) return null;
+    if (payload.gameId === 'yourGameId') return null;
+    if (CG_GAME_ID && String(payload.gameId || '') !== CG_GAME_ID) return null;
+    console.log('cg token gameId:', payload.gameId);
     const id = payload.userId || payload.sub || payload.id;
     return id ? String(id) : null;
   } catch {
