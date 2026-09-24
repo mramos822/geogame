@@ -1601,6 +1601,13 @@
   // it's the one that actually secures the streak, see isNewDay) — shown by
   // GlobeQuiz's friends bar (buildGqFriendRows) to compare against each
   // friend's time for today.
+  // Tells js/menu/globoreto-popups.js a streak day was just secured; `first`
+  // = this account/device never had a streak before (shows "you started a
+  // streak" on leaving GloboReto).
+  function notifyStreak(streak, first) {
+    try { window.dispatchEvent(new CustomEvent('gqStreakUpdated', { detail: { streak, first } })); } catch (e) {}
+  }
+
   async function updateStreak(elapsedMs) {
     const userId = window._sbUserId;
     const profile = window._sbProfile;
@@ -1614,6 +1621,7 @@
       const lastStr = profile.gq_streak_last_date || null;
       let streak = profile.gq_streak_count || 0;
       if (lastStr === todayStr) return { streak, isNewDay: false }; // already counted today
+      const first = !lastStr && !(streak > 0);
       streak = (lastStr === yesterdayStr) ? streak + 1 : 1;
       profile.gq_streak_count = streak;
       profile.gq_streak_last_date = todayStr;
@@ -1623,12 +1631,14 @@
       } catch (e) {}
       if (typeof window.gqRefreshMenuStreakBadge === 'function') window.gqRefreshMenuStreakBadge();
       if (typeof window.gqRefreshProfileStreakBadge === 'function') window.gqRefreshProfileStreakBadge();
+      notifyStreak(streak, first);
       return { streak, isNewDay: true };
     }
 
     const lastStr = localStorage.getItem('gq_streak_last_date');
     let streak = parseInt(localStorage.getItem('gq_streak_count') || '0', 10) || 0;
     if (lastStr === todayStr) return { streak, isNewDay: false }; // already counted today
+    const first = !lastStr && !(streak > 0);
     streak = (lastStr === yesterdayStr) ? streak + 1 : 1;
     try {
       localStorage.setItem('gq_streak_count', String(streak));
@@ -1637,6 +1647,7 @@
     } catch (e) {}
     if (typeof window.gqRefreshMenuStreakBadge === 'function') window.gqRefreshMenuStreakBadge();
     if (typeof window.gqRefreshProfileStreakBadge === 'function') window.gqRefreshProfileStreakBadge();
+    notifyStreak(streak, first);
     return { streak, isNewDay: true };
   }
 

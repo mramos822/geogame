@@ -41,7 +41,7 @@ window.SoloSpectate = (() => {
       // haven't picked anything yet. On detecting their join, the last known
       // round/tick is resent.
       .on('presence', { event: 'join' }, ({ key }) => {
-        if (key && key.indexOf('spectator-') === 0) setTimeout(_resendStateTo, 150);
+        if (key && (key.indexOf('spectator-') === 0 || key.indexOf('stealth-') === 0)) setTimeout(_resendStateTo, 150);
       })
       // A spectator's clock-offset probe (see window.Spectate.watchSolo) —
       // echo our own clock reading so they can work out the offset between
@@ -61,7 +61,9 @@ window.SoloSpectate = (() => {
     if (!_channel) return;
     try {
       const state = _channel.presenceState();
-      const n = Object.keys(state).filter(k => k !== _myId()).length;
+      // 'stealth-' = the dev panel's hidden spectator (see watchSolo's
+      // opts.stealth): never shown in the eye badge.
+      const n = Object.keys(state).filter(k => k !== _myId() && k.indexOf('stealth-') !== 0).length;
       window._vsSpectatorCount = n;
       if (typeof window.refreshVsSpectatorBadge === 'function') window.refreshVsSpectatorBadge(n);
     } catch (e) {}
@@ -585,9 +587,15 @@ window.Spectate = (() => {
       return !!data;
     } catch (e) { return false; }
   }
-  async function watchSolo(userId) {
+  // opts.stealth (dev panel, js/menu/devpan.js): joins with a 'stealth-' key
+  // instead of 'spectator-' — the player's eye badge ignores it (see
+  // SoloSpectate._updateSpectatorCount) and so does every other viewer's.
+  // The dev account (window.DEV_UID) may watch anyone, not only friends.
+  async function watchSolo(userId, opts) {
     await stop();
-    if (!(await _isFriendOf(userId))) throw new Error('not_friends');
+    const stealth = !!(opts && opts.stealth);
+    const isDev = !!window.DEV_UID && _myId() === window.DEV_UID;
+    if (!isDev && !(await _isFriendOf(userId))) throw new Error('not_friends');
     _isSolo  = true;
     _matchId = userId;
     _match   = { mode: null, score: 0, solo: true };
@@ -595,7 +603,7 @@ window.Spectate = (() => {
 
     const uid = _myId();
     _channel = window.sb
-      .channel('solo-' + userId, { config: { presence: { key: 'spectator-' + (uid || Math.random().toString(36).slice(2)) } } }) // not private — see vs.js _subscribe; app-level _isFriendOf() still gates access
+      .channel('solo-' + userId, { config: { presence: { key: (stealth ? 'stealth-' : 'spectator-') + (uid || Math.random().toString(36).slice(2)) } } }) // not private — see vs.js _subscribe; app-level _isFriendOf() still gates access
       .on('broadcast', { event: 'specclockpong' }, ({ payload }) => _onClockPong(payload))
       // Same channel the real player sees (owner of 'solo-{userId}') — the
       // spectator also receives these presence events, so it can show how
@@ -615,7 +623,7 @@ window.Spectate = (() => {
         try {
           const state = _channel.presenceState();
           const n = Object.keys(state).filter(k => k.indexOf('spectator-') === 0).length;
-          if (_onSpectatorCount) _onSpectatorCount(n);
+          if (_onSpectatorCount) _onSpectatorCount(stealth ? 0 : n);
         } catch (e) {}
       })
       .on('broadcast', { event: 'round' }, ({ payload }) => { if (payload && _onRound) { _match.mode = payload.mode || _match.mode; _onRound(payload); } })
@@ -636,7 +644,7 @@ window.Spectate = (() => {
       .on('presence', { event: 'leave' }, ({ key }) => {
         // The only possible "player" in this channel is the owner (userId, no
         // 'spectator-' prefix); if they leave, they stopped playing.
-        if (key && key.indexOf('spectator-') !== 0) { if (_onEnd) _onEnd('finished'); stop(); }
+        if (key && key.indexOf('spectator-') !== 0 && key.indexOf('stealth-') !== 0) { if (_onEnd) _onEnd('finished'); stop(); }
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
@@ -650,7 +658,7 @@ window.Spectate = (() => {
             if (!_channel) return;
             try {
               const state = _channel.presenceState();
-              const hasOwner = Object.keys(state).some(k => k.indexOf('spectator-') !== 0);
+              const hasOwner = Object.keys(state).some(k => k.indexOf('spectator-') !== 0 && k.indexOf('stealth-') !== 0);
               if (!hasOwner) { if (_onEnd) _onEnd('gone'); stop(); }
             } catch (e) {}
           }, 4000);
@@ -2528,7 +2536,10 @@ window.GroupSpectate = (() => {
     // on starting any NEW session (real friend), so it doesn't stay stuck
     // from a previous session.
     const tagEl = document.getElementById('spectator-mini-tag');
-    if (tagEl) tagEl.textContent = (typeof t === 'function') ? t('spectator.watchingTag', 'ESPECTANDO') : 'ESPECTANDO';
+    if (tagEl) {
+      tagEl.textContent = (typeof t === 'function') ? t('spectator.watchingTag', 'ESPECTANDO') : 'ESPECTANDO';
+      tagEl.style.display = ''; // un-hide after a dev panel stealth session
+    }
     screen.style.display = 'none';
     screen.classList.remove('spectator-solo');
     titleEl.textContent  = title;
@@ -3257,11 +3268,16 @@ window.GroupSpectate = (() => {
 
   // userId: owner of a SOLO match (World Tour/solo mode, no `matches` row)
   // to watch. friend: { id, name, avatar }. Single-sided layout.
-  window.openSpectatorSolo = function (userId, friend) {
+  window.openSpectatorSolo = function (userId, friend, opts) {
     if (!window.Spectate) return;
     _resetPanel(friend, (typeof t === 'function')
       ? (friend && friend.name ? t('spectator.watchingFriend', { name: friend.name }) : t('spectator.watchingMatch'))
       : (friend && friend.name ? ('Mirando a ' + friend.name) : 'Mirando partida'));
+    // Dev panel stealth watch: no "SPECTATING" tag on this side either
+    // (_resetPanel shows it again for the next normal session).
+    const stealth = !!(opts && opts.stealth);
+    const specTagEl = document.getElementById('spectator-mini-tag');
+    if (specTagEl) specTagEl.style.display = stealth ? 'none' : '';
     screen.classList.add('spectator-solo');
     hostNameEl.textContent = friend && friend.name ? friend.name : 'Jugador';
     if (friend && friend.avatar) hostPic.src = friend.avatar;
@@ -3290,7 +3306,7 @@ window.GroupSpectate = (() => {
     });
     _wireCommonCallbacks();
 
-    window.Spectate.watchSolo(userId).catch(() => {
+    window.Spectate.watchSolo(userId, { stealth }).catch(() => {
       _hideLoading();
       screen.style.display = 'flex';
       statusEl.textContent = (typeof t === 'function') ? t('spectator.failedToOpen') : 'No se pudo abrir la partida.';

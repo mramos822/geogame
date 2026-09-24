@@ -902,7 +902,10 @@ async function _onSessionReady(userId) {
     // set in the campaign-complete branch of this file and consumed in
     // js/final.js) or the first GloboReto (checked in quitToMenu(), js/modes/
     // mapgame-core.js) and returning to the menu.
-    if (profile.is_founder && !profile.founder_popup_seen && ((profile.campaigns_completed || 0) > 0 || (profile.gq_streak_count || 0) > 0)) {
+    // CrazyGames accounts skip that gate: they already played there, and
+    // founder is only granted to them on logging in here (see
+    // grant_founder_on_web in js/sb.js), so it shows right away.
+    if (profile.is_founder && !profile.founder_popup_seen && ((profile.campaigns_completed || 0) > 0 || (profile.gq_streak_count || 0) > 0 || profile.crazygames_user_id)) {
       setTimeout(() => { if (typeof window.showFounderWelcomePopup === 'function') window.showFounderWelcomePopup(); }, 800);
     }
     // Top 1 popups: no campaigns_completed gate like Founder — is_top1 can

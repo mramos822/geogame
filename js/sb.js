@@ -799,6 +799,16 @@ sb.auth.onAuthStateChange((event, session) => {
       ? await window.withConnTimeout(profilePromise, 6000)
       : await profilePromise;
     if (profile) {
+      // CrazyGames accounts are created without founder (see
+      // handle_new_user); they become eligible the first time they log in
+      // here, on the official web. Awaited so the sbSessionReady refetch in
+      // _onSessionReady (js/profile/profile-account.js) already sees it.
+      if (profile.crazygames_user_id && !profile.is_founder && !profile.founder_popup_seen) {
+        try {
+          const { data: granted } = await sb.rpc('grant_founder_on_web');
+          if (granted) profile.is_founder = true;
+        } catch (e) {}
+      }
       window._sbProfile = profile;
       if (profile.username) localStorage.setItem('playerName', profile.username);
       if (profile.avatar_url) {

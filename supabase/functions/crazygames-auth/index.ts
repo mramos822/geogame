@@ -107,16 +107,24 @@ Deno.serve(async (req: Request) => {
 
   if (!userId) {
     // 2) First time this CrazyGames user shows up. The trigger creates the
-    // profile from user_metadata.username (see header). profiles.username is
-    // capped at 12 chars client-side (name prompt), so the base keeps 8 and
-    // leaves room for a 4-digit suffix.
-    const baseName = (username || 'Player').replace(/[^\w\-]/g, '').slice(0, 8) || 'Player';
+    // profile from user_metadata.username (see header). Same rules as the web
+    // register form (profile-account.js): 4-12 chars, letters/digits only.
+    // Their CrazyGames name is used as-is when free; digits are added only
+    // if it's already taken (case-insensitive, so "juan" doesn't sit next to
+    // an existing "Juan").
+    let cleanName = (username || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 12);
+    if (cleanName.length < 4) cleanName = 'Player';
+    const { data: taken } = await admin
+      .from('profiles').select('id').ilike('username', cleanName).limit(1);
+    const cleanFree = !taken || taken.length === 0;
     const MAX_ATTEMPTS = 8;
     let lastErr = 'unknown';
     for (let attempt = 0; attempt < MAX_ATTEMPTS && !userId; attempt++) {
-      const candidate = attempt < MAX_ATTEMPTS - 1
-        ? `${baseName}${Math.floor(1000 + Math.random() * 9000)}`
-        : `cg${crypto.randomUUID().replace(/-/g, '').slice(0, 10)}`; // last resort, effectively unique
+      // 1st try: the clean name (if free); then base (8 chars) + 4 digits,
+      // which still fits in 12; last resort: effectively unique.
+      const candidate = (attempt === 0 && cleanFree) ? cleanName
+        : attempt < MAX_ATTEMPTS - 1 ? `${cleanName.slice(0, 8)}${Math.floor(1000 + Math.random() * 9000)}`
+        : `cg${crypto.randomUUID().replace(/-/g, '').slice(0, 10)}`;
       const { data: created, error: createErr } = await admin.auth.admin.createUser({
         email: internalEmail,
         email_confirm: true, // they never touch email/password unless they choose to later
