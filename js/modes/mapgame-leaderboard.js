@@ -36,6 +36,7 @@ const EMOTE_SRCS = [
   'images/emotes/4.png',
   'images/emotes/5.png',
   'images/emotes/6.png',
+  'images/emotes/10.png',
 ];
 
 function spawnEmoteBubble(entryEl) {

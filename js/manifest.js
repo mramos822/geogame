@@ -487,6 +487,7 @@ window.ASSET_MANIFEST = {
     "images/emotes/7.png",
     "images/emotes/8.png",
     "images/emotes/9.png",
+    "images/emotes/10.png",
     "images/eye1.png",
     "images/eye2.png",
     "images/findluggage.png",

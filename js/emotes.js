@@ -17,10 +17,10 @@
 // from local data (opponent / room members); spectators get the sender's name
 // from the payload, shown as plain text and capped in length.
 (function () {
-  // Manual set: 1-9. The automatic card bubbles only use 1-6 (EMOTE_SRCS in
+  // Manual set: 1-10. The automatic card bubbles use 1-6 and 10 (EMOTE_SRCS in
   // js/modes/mapgame-leaderboard.js), so 7-9 are exclusive to this picker. Files that
   // don't exist yet are dropped from the panel automatically (see buildPicker).
-  const SRCS = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => 'images/emotes/' + n + '.png');
+  const SRCS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => 'images/emotes/' + n + '.png');
   const COOLDOWN_MS = 2000;
   const SHOW_MS = 2800;
   const MAX_FEED = 4;
