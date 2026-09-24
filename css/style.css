@@ -8611,6 +8611,81 @@ body.is-mobile #fs-btn  { left: calc(18% + 21cqmin); }
   -webkit-user-drag: none;
 }
 
+/* ── AD PANEL (placeholder — ver window.showEndOfSessionAd en core/adpanel.js) ──
+   Reusa el fondo de nubes + tablero (.results-table) + flightatt/globo de
+   texto de #results-screen (mismas clases), sin nada del contenido de
+   resultados. .loading-clouds/-b/-c necesitan su `top` reescrito acá igual
+   que #results-screen lo hace (ver más abajo) — sin esto quedan en el `top`
+   default de otro contexto (loading screen), no el de esta composición. */
+#ad-panel-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999998;
+  /* .results-sky (opaco, ver HTML) tapa TODO lo de atrás — así se ve como
+     su propia pantalla real, no como un overlay traslúcido encima del menú
+     (el pedido "que me lleve directamente... no que se coloque encima"). */
+  background: #04385c;
+  overflow: hidden;
+}
+#ad-panel-overlay .loading-clouds   { top: 40%; }
+#ad-panel-overlay .loading-clouds-b { top: 42%; }
+#ad-panel-overlay .loading-clouds-c { top: 60%; }
+#ad-panel-overlay .loading-clouds-fade  { top: 68%; }
+#ad-panel-overlay .loading-clouds-fade2 { top: 79%; }
+#ad-panel-overlay .loading-clouds-fade3 { top: 87%; }
+/* Tablero más grande y más a la izquierda que en #results-screen — override
+   SCOPED a este overlay (.results-table sola sigue igual para la pantalla
+   de resultados real). */
+#ad-panel-overlay .results-table {
+  left: 40%;
+  top: 50%; /* bajado — con el ancho más grande se pasaba por arriba */
+  width: 108cqmin;
+}
+/* Globo de texto y flightatt — SCOPED, .results-text3-wrap/.results-flightatt
+   solas siguen igual para la pantalla de resultados real. */
+#ad-panel-overlay .results-text3-wrap.active {
+  right: 6%; /* un poco más a la izquierda que el 1% base */
+}
+#ad-panel-overlay .results-text3-wrap {
+  width: 38cqmin; /* -5% sobre 40cqmin */
+  bottom: 40%; /* bajado desde el 48% base */
+}
+#ad-panel-overlay .results-rank-desc {
+  font-size: 2.2cqmin; /* más chico que el 2.85cqmin base */
+  padding-top: 2%; /* subido desde el 6% base — centrado (flex) se corre hacia arriba */
+}
+#ad-panel-overlay .results-flightatt  { height: 40%; }
+/* Sombra elíptica bajo el flightatt — #results-screen no tiene una propia
+   (mismo criterio/forma que .flightatt-loading-shadow, la de la pantalla de
+   carga), aproximada bajo su posición .active (right:5%; bottom:3%). */
+#ad-panel-fa-shadow {
+  position: absolute;
+  right: 9.2%;
+  bottom: 3.2%;
+  width: 5.6cqmin; /* -30% sobre 8cqmin */
+  height: 1.4cqmin; /* -30% sobre 2cqmin */
+  background: #000;
+  border-radius: 50%;
+  opacity: 0.5;
+  z-index: 15;
+  pointer-events: none;
+}
+#ad-panel-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  z-index: 20;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+}
+#ad-panel-close:hover { background: rgba(255,255,255,0.3); }
+
 /* ── FLAGS MODE OVERRIDES ─────────────────────────────── */
 #splash-screen.mode-flags .splash-text2-label        { padding-top: 20%; }
 #splash-screen.mode-flags .splash-text2-label.step2  { padding-top: 13%; }

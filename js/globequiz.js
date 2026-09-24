@@ -5708,6 +5708,10 @@
         const modal = document.getElementById('gq-endgame-modal');
         if (modal) modal.style.display = 'none';
         stopGqEndgameCountdown();
+        // End of a standalone GlobeQuiz session. End-of-session ad DISABLED on
+        // the main site for now (only wired for the GameDistribution build,
+        // in gd-build/) — see window.showEndOfSessionAd's own comment in
+        // core/adpanel.js.
         document.getElementById('gq-quit-confirm')?.click();
       });
       document.getElementById('gq-endgame-share')?.addEventListener('click', () => {

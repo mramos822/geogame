@@ -329,6 +329,11 @@ function updateHighscores() {
 }
 
 function showResultsScreen() {
+  // NOTE: the end-of-session ad does NOT fire here — this is only the first
+  // leg of the post-campaign flow (postgame → results → final → ad → menu).
+  // It fires from final.js's "final-confirm-back-wrap" handler, right before
+  // returning to the menu. See window.showEndOfSessionAd's own comment in
+  // core/adpanel.js.
   resultsScreen.style.display = 'block';
   const content = resultsScreen.querySelector('.results-content');
   if (content) content.style.visibility = '';

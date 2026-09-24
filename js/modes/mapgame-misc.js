@@ -167,6 +167,10 @@ document.querySelector('.gameover-confirm-wrap')?.addEventListener('click', () =
     return;
   }
 
+  // End of a STANDALONE mode (not chained in a Gira Mundial, that path
+  // returned above). End-of-session ad DISABLED on the main site for now
+  // (only wired for the GameDistribution build, in gd-build/) — see
+  // window.showEndOfSessionAd's own comment in core/adpanel.js.
   gameoverScreen.style.display = 'none';
   window._setPlaying(false);
   // Free the just-finished game's RAM before returning to the menu (the video

@@ -292,47 +292,59 @@ document.getElementById('final-confirm-back-wrap')?.addEventListener('click', ()
   setTimeout(() => w.classList.remove('confirm-pressed'), 50);
   if (typeof window.stopResultsMusic === 'function') window.stopResultsMusic();
   hideFinalScreen();
-  if (typeof window.startMenuMusic === 'function') window.startMenuMusic();
-  if (typeof window.resetEntranceElements === 'function') window.resetEntranceElements();
-  document.getElementById('loading-screen').style.display = '';
-  document.getElementById('loading-screen').classList.remove('table-shown');
-  document.getElementById('loading-table-group')?.classList.add('table-gone');
-  if (typeof window.replayEntranceAnimations === 'function') window.replayEntranceAnimations();
-  if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
-  // Free the just-finished campaign's RAM (backgrounds/characters/ranks/canvas/
-  // video). So the app doesn't accumulate memory between sessions and the next
-  // game or opening social starts with a low baseline, with no page reload.
-  if (typeof window.releaseGameMemory === 'function') window.releaseGameMemory();
-  if (!window._accountLoggedIn && localStorage.getItem('hideGuestRankPopup') !== '1') {
-    showGuestRankPopup(_finalTotal || 0);
-  }
-  // Founder popup: only here, back at the menu after finishing a full Gira
-  // Mundial (flag set in js/modes/mapgame-misc.js when the campaign closes) —
-  // window._sbProfile is already fresh from the results save (see
-  // js/results.js). Only unlocks, equips nothing (see showFounderWelcomePopup).
-  if (window._pendingFounderPopupCheck) {
-    window._pendingFounderPopupCheck = false;
-    const p = window._sbProfile;
-    if (p && p.is_founder && !p.founder_popup_seen && typeof window.showFounderWelcomePopup === 'function') {
-      setTimeout(() => window.showFounderWelcomePopup(), 500);
+
+  // Rest of the "back to menu" work, deferred until the end-of-session ad
+  // (below) has actually been dismissed — nothing here should run while the
+  // ad page is up (no menu music, no popups behind it).
+  function _goToMenuAfterAd() {
+    if (typeof window.startMenuMusic === 'function') window.startMenuMusic();
+    if (typeof window.resetEntranceElements === 'function') window.resetEntranceElements();
+    document.getElementById('loading-screen').style.display = '';
+    document.getElementById('loading-screen').classList.remove('table-shown');
+    document.getElementById('loading-table-group')?.classList.add('table-gone');
+    if (typeof window.replayEntranceAnimations === 'function') window.replayEntranceAnimations();
+    if (typeof window.refreshProfileStats === 'function') window.refreshProfileStats();
+    // Free the just-finished campaign's RAM (backgrounds/characters/ranks/canvas/
+    // video). So the app doesn't accumulate memory between sessions and the next
+    // game or opening social starts with a low baseline, with no page reload.
+    if (typeof window.releaseGameMemory === 'function') window.releaseGameMemory();
+    if (!window._accountLoggedIn && localStorage.getItem('hideGuestRankPopup') !== '1') {
+      showGuestRankPopup(_finalTotal || 0);
+    }
+    // Founder popup: only here, back at the menu after finishing a full Gira
+    // Mundial (flag set in js/modes/mapgame-misc.js when the campaign closes) —
+    // window._sbProfile is already fresh from the results save (see
+    // js/results.js). Only unlocks, equips nothing (see showFounderWelcomePopup).
+    if (window._pendingFounderPopupCheck) {
+      window._pendingFounderPopupCheck = false;
+      const p = window._sbProfile;
+      if (p && p.is_founder && !p.founder_popup_seen && typeof window.showFounderWelcomePopup === 'function') {
+        setTimeout(() => window.showFounderWelcomePopup(), 500);
+      }
+    }
+    // Top 1 popups: no "pending" flag gate like Founder — is_top1/
+    // top1_lost_pending are already correct by the time we're here (fresh
+    // window._sbProfile from the results save), and both show functions
+    // themselves refuse to fire while in-game (_top1PopupsBlocked in
+    // js/profile/profile-account.js), so calling unconditionally on every
+    // return to menu is safe — they no-op if there's nothing pending or the
+    // popup is already up. This is also the realtime handler's normal retry
+    // path if a promotion/loss happened while a game was in progress.
+    {
+      const p = window._sbProfile;
+      if (p && p.is_top1 && !p.top1_popup_seen && typeof window.showTop1WelcomePopup === 'function') {
+        setTimeout(() => window.showTop1WelcomePopup(), 500);
+      } else if (p && p.top1_lost_pending && typeof window.showTop1LostPopup === 'function') {
+        setTimeout(() => window.showTop1LostPopup(), 500);
+      }
     }
   }
-  // Top 1 popups: no "pending" flag gate like Founder — is_top1/
-  // top1_lost_pending are already correct by the time we're here (fresh
-  // window._sbProfile from the results save), and both show functions
-  // themselves refuse to fire while in-game (_top1PopupsBlocked in
-  // js/profile/profile-account.js), so calling unconditionally on every
-  // return to menu is safe — they no-op if there's nothing pending or the
-  // popup is already up. This is also the realtime handler's normal retry
-  // path if a promotion/loss happened while a game was in progress.
-  {
-    const p = window._sbProfile;
-    if (p && p.is_top1 && !p.top1_popup_seen && typeof window.showTop1WelcomePopup === 'function') {
-      setTimeout(() => window.showTop1WelcomePopup(), 500);
-    } else if (p && p.top1_lost_pending && typeof window.showTop1LostPopup === 'function') {
-      setTimeout(() => window.showTop1LostPopup(), 500);
-    }
-  }
+
+  // End-of-session ad DISABLED on the main site for now (only wired for the
+  // GameDistribution build, in gd-build/) — straight to the menu. To
+  // re-enable here: `if (typeof window.showEndOfSessionAd === 'function')
+  // window.showEndOfSessionAd(_goToMenuAfterAd); else _goToMenuAfterAd();`
+  _goToMenuAfterAd();
 });
 document.getElementById('final-confirm-back-wrap')?.addEventListener('mouseenter', () => { if (typeof playSelect === 'function') playSelect(); });
 document.getElementById('final-confirm-back-wrap')?.addEventListener('mouseleave', () => { if (typeof playSelect === 'function') playSelect(); });

@@ -130,6 +130,7 @@ const I18N = {
     // Splash / gameover / results
     'splash.timeUp': '¡Tiempo!', 'results.finalScore': 'Puntaje final', 'results.newRecord': '¡Nuevo récord!',
     'final.worldTour': 'Gira mundial',
+    'ads.sponsorMessage': '...ahora, un breve mensaje de nuestros auspiciantes. Volvemos enseguida con más de myGeoChallenge.',
     // Result labels (cities/monuments)
     'grade.perfect': 'Perfecto', 'grade.good': 'Bien', 'grade.fair': 'Regular', 'grade.wayoff': 'Muy lejos',
     // Per-mode splash dialogs (step 1 and step 2)
@@ -475,6 +476,7 @@ const I18N = {
     'confirm.block': 'Block {name}?', 'confirm.unblock': 'Unblock {name}?',
     'splash.timeUp': "Time's up!", 'results.finalScore': 'Final score', 'results.newRecord': 'New record!',
     'final.worldTour': 'World tour',
+    'ads.sponsorMessage': '...and now for a short message from our sponsors. We will take you back for more from myGeoChallenge shortly.',
     'grade.perfect': 'Perfect', 'grade.good': 'Good', 'grade.fair': 'Fair', 'grade.wayoff': 'Way Off',
     'splash.cities.1': "So, let's find out which city everyone is heading to! This is where you come in.",
     'splash.cities.2': "Stick a pin right in the map wherever you think each city is located. Click the GREEN button when you're ready!",
