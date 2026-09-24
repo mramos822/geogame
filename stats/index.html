@@ -611,6 +611,12 @@
 
   <main id="main">
     <section class="tab-page active" data-page="hoy">
+      <div class="insights" id="insights"></div>
+      <div class="section-title">Ahora mismo y totales</div>
+      <div class="cards" id="cards-total"></div>
+      <div class="section-title">En el período <span class="sub" id="period-sub"></span></div>
+      <div class="cards" id="cards-period"></div>
+
       <div class="box wide">
         <h2>Conectados ahora
           <span class="sub"><span class="help" title="Cuentas E invitados sin cuenta (en cursiva, marcados '(invitado)') con actividad en los últimos 5 minutos. 🎮 = está dentro de una partida ahora mismo; 🟢 = está en la app pero no en medio de un modo de juego. Se actualiza solo cada 15s.">ⓘ</span></span>
@@ -643,12 +649,6 @@
           <div class="activity-hint">💡 Haz clic en un punto de cualquier gráfico para ver el detalle de las partidas de ese momento.</div>
         </div>
       </div>
-
-      <div class="insights" id="insights"></div>
-      <div class="section-title">Ahora mismo y totales</div>
-      <div class="cards" id="cards-total"></div>
-      <div class="section-title">En el período <span class="sub" id="period-sub"></span></div>
-      <div class="cards" id="cards-period"></div>
       <div class="grid" style="margin-top:16px">
         <div class="box">
           <h2>Partidas por modo</h2>
@@ -1327,6 +1327,7 @@ const CHANGELOG = [
     'Corregido un error que recortaba a 1000 filas las consultas del panel y hacía que los períodos largos mostraran menos partidas, duelos y retención de los reales.',
   ]],
   ['3.8.12','2026-09-24',84,['Panel de estadísticas: en Hoy, "Conectados ahora" pasa al inicio y justo debajo va el gráfico de actividad.']],
+  ['3.8.13','2026-09-24',85,['Panel de estadísticas: en Hoy, "Conectados ahora" queda justo encima del gráfico de actividad, debajo de "Ahora mismo y totales" y del resumen del período.']],
 ];
 function renderChangelog(){
   const el = $('changelog-list');
