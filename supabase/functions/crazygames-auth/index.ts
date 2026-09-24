@@ -25,18 +25,52 @@
 // the trigger with that same generic error, so we just retry createUser with a
 // fresh suffix. The CrazyGames-specific columns are then set with an UPDATE.
 //
-// SECURITY NOTE: this trusts the crazygamesUserId the client sends as-is.
-// CrazyGames' SDK only exposes that id to code running inside their own
-// iframe/sandbox, so spoofing requires running outside it — acceptable risk
-// for a casual leaderboard/friends game. If that's ever a concern, add
-// server-side verification of the CrazyGames user token here before trusting
-// the id (check current CrazyGames SDK docs for their token-verification
-// endpoint — not wired in yet).
+// IDENTITY: the client sends the CrazyGames user token (a JWT signed by
+// CrazyGames, SDK.user.getUserToken()); it's verified here against their
+// public key (https://sdk.crazygames.com/publicKey.json, RS256) and the
+// userId is taken FROM THE TOKEN. Trusting a bare crazygamesUserId from the
+// body let anyone who knew someone's CrazyGames id log into their account.
+// Transition: builds before 3.8.2 don't send the token yet — they're still
+// accepted until the CG_REQUIRE_TOKEN secret is set to "true" (do it once the
+// new CrazyGames build is live: supabase secrets set CG_REQUIRE_TOKEN=true).
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createPublicKey, createVerify } from 'node:crypto';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const REQUIRE_TOKEN = Deno.env.get('CG_REQUIRE_TOKEN') === 'true';
+const CG_PUBLIC_KEY_URL = 'https://sdk.crazygames.com/publicKey.json';
+
+let _cgKey: { pem: string; at: number } | null = null;
+async function cgPublicKey(): Promise<string> {
+  if (_cgKey && Date.now() - _cgKey.at < 6 * 3600 * 1000) return _cgKey.pem;
+  const res = await fetch(CG_PUBLIC_KEY_URL);
+  const json = await res.json();
+  _cgKey = { pem: String(json.publicKey), at: Date.now() };
+  return _cgKey.pem;
+}
+const b64url = (s: string) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)), (c) => c.charCodeAt(0));
+
+// Returns the verified CrazyGames userId, or null if the token isn't a valid,
+// unexpired RS256 token signed by CrazyGames.
+async function verifyCgToken(token: string): Promise<string | null> {
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const header = JSON.parse(new TextDecoder().decode(b64url(parts[0])));
+    if (header.alg !== 'RS256') return null;
+    const key = createPublicKey(await cgPublicKey());
+    const ok = createVerify('RSA-SHA256').update(parts[0] + '.' + parts[1]).verify(key, b64url(parts[2]));
+    if (!ok) return null;
+    const payload = JSON.parse(new TextDecoder().decode(b64url(parts[1])));
+    if (payload.exp && Date.now() / 1000 > payload.exp) return null;
+    const id = payload.userId || payload.sub || payload.id;
+    return id ? String(id) : null;
+  } catch {
+    return null;
+  }
+}
 
 function cors(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -57,13 +91,22 @@ Deno.serve(async (req: Request) => {
   let crazygamesUserId: string | undefined;
   let username: string | undefined;
   let avatarUrl: string | undefined;
+  let userToken = '';
   try {
     const body = await req.json();
     crazygamesUserId = String(body.crazygamesUserId || '').trim();
+    userToken = String(body.userToken || '');
     username = body.username ? String(body.username).slice(0, 20) : undefined;
     avatarUrl = body.avatarUrl ? String(body.avatarUrl) : undefined;
   } catch {
     return cors({ error: 'invalid JSON body' }, 400);
+  }
+  if (userToken) {
+    const verifiedId = await verifyCgToken(userToken);
+    if (!verifiedId) return cors({ error: 'invalid_token' }, 401);
+    crazygamesUserId = verifiedId; // the token wins over whatever the body says
+  } else if (REQUIRE_TOKEN) {
+    return cors({ error: 'token_required' }, 401);
   }
   if (!crazygamesUserId) return cors({ error: 'crazygamesUserId is required' }, 400);
   // It's interpolated into an email and a PostgREST or() filter below — only
@@ -90,9 +133,13 @@ Deno.serve(async (req: Request) => {
   // Emails live only in auth.users (profiles.email was dropped: it was
   // publicly readable), so the account's current email comes from the Auth
   // admin API.
+  // profiles.crazygames_user_id stores idHash, never the raw id: profiles are
+  // publicly readable, and the raw id was enough to log in as that player
+  // while tokenless requests are still accepted. The raw value is matched too
+  // for rows tagged before the hashing migration.
   const findExisting = async (): Promise<{ id: string; email: string | null } | null> => {
     const { data: prof } = await admin
-      .from('profiles').select('id').eq('crazygames_user_id', crazygamesUserId).limit(1).maybeSingle();
+      .from('profiles').select('id').in('crazygames_user_id', [idHash, crazygamesUserId]).limit(1).maybeSingle();
     let id = prof?.id as string | undefined;
     if (!id) {
       const { data: byEmail } = await admin.rpc('auth_user_id_for_email', { p_email: internalEmail });
@@ -134,7 +181,7 @@ Deno.serve(async (req: Request) => {
       const { data: created, error: createErr } = await admin.auth.admin.createUser({
         email: internalEmail,
         email_confirm: true, // they never touch email/password unless they choose to later
-        user_metadata: { username: candidate, crazygames_user_id: crazygamesUserId },
+        user_metadata: { username: candidate, crazygames_user_id: idHash },
       });
       if (created?.user) { userId = created.user.id; break; }
       lastErr = createErr?.message || 'unknown';
@@ -152,7 +199,7 @@ Deno.serve(async (req: Request) => {
 
   // 3) Tag the profile as a CrazyGames account (idempotent — also repairs a
   // profile left untagged by an interrupted earlier attempt).
-  const patch: Record<string, unknown> = { crazygames_user_id: crazygamesUserId };
+  const patch: Record<string, unknown> = { crazygames_user_id: idHash };
   if (avatarUrl) patch.avatar_url = avatarUrl;
   const { error: tagErr } = await admin.from('profiles').update(patch).eq('id', userId).is('crazygames_user_id', null);
   if (tagErr) return cors({ error: 'profile update failed: ' + tagErr.message }, 500);
@@ -169,7 +216,6 @@ Deno.serve(async (req: Request) => {
 
   return cors({
     userId,
-    email: loginEmail,
     tokenHash: linkData.properties?.hashed_token,
   });
 });

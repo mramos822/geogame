@@ -506,13 +506,13 @@ window.sbSaveScores = async function(userId, scores, sessionId) {
 };
 
 // Records a versus game result in one's own profile (W or L). Each client
-// updates ONLY its own record based on its result.
+// updates ONLY its own record based on its result. Goes through the
+// record_versus_result RPC: vs_wins/vs_losses can't be written directly
+// (server-side rate limit, see protect_stat_columns).
 window.sbRecordVersusResult = async function(userId, won) {
-  const profile = await window.sbGetProfile(userId);
-  const updates = won
-    ? { vs_wins:   (profile.vs_wins   || 0) + 1 }
-    : { vs_losses: (profile.vs_losses || 0) + 1 };
-  await window.sbUpdateProfile(userId, updates);
+  const { data, error } = await sb.rpc('record_versus_result', { p_won: !!won });
+  if (error) throw error;
+  const updates = { vs_wins: data?.vs_wins || 0, vs_losses: data?.vs_losses || 0 };
   // Keep the local cache current so it shows in the profile without a reload
   if (window._sbProfile) Object.assign(window._sbProfile, updates);
   return updates;

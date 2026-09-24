@@ -10,31 +10,28 @@
 
 // Sync local data (scores/averages/plays) to the Supabase account on login.
 // Idempotent: if already synced (local=0 after last logout), does nothing.
+// Goes through the merge_local_stats RPC (stat columns can't be written
+// directly; the server caps the values since localStorage isn't trusted).
 async function syncLocalDataToAccount(userId) {
   try {
-    const profile = await window.sbGetProfile(userId);
-    const localHs = {
-      flags:     parseInt(localStorage.getItem('flagsHighscore')          || '0', 10),
-      shapes:    parseInt(localStorage.getItem('shapesHighscore')         || '0', 10),
-      cities:    parseInt(localStorage.getItem('geochallenge_highscore')  || '0', 10),
-      monuments: parseInt(localStorage.getItem('monumentsHighscore')      || '0', 10),
+    const num = (k) => parseInt(localStorage.getItem(k) || '0', 10) || 0;
+    const hs = {
+      flags:     num('flagsHighscore'),
+      shapes:    num('shapesHighscore'),
+      cities:    num('geochallenge_highscore'),
+      monuments: num('monumentsHighscore'),
     };
     const modeToLsKey = { flags: 'flags', shapes: 'shapes', cities: 'game', monuments: 'monuments' };
-    const updates = {};
-    Object.entries(localHs).forEach(([k, v]) => {
-      if (v > (profile['hs_' + k] || 0)) updates['hs_' + k] = v;
-    });
+    const sums = {}, counts = {};
     Object.entries(modeToLsKey).forEach(([dbKey, lsKey]) => {
-      const sum   = parseInt(localStorage.getItem('avgSum_'   + lsKey) || '0', 10);
-      const count = parseInt(localStorage.getItem('avgCount_' + lsKey) || '0', 10);
-      if (sum > 0 && count > 0) {
-        updates['avg_sum_'    + dbKey] = (profile['avg_sum_'    + dbKey] || 0) + sum;
-        updates['play_count_' + dbKey] = (profile['play_count_' + dbKey] || 0) + count;
-      }
+      sums[dbKey]   = num('avgSum_'   + lsKey);
+      counts[dbKey] = num('avgCount_' + lsKey);
     });
-    const localPlays = parseInt(localStorage.getItem('playCount') || '0', 10);
-    if (localPlays > 0) updates.play_count = (profile.play_count || 0) + localPlays;
-    if (Object.keys(updates).length > 0) await window.sbUpdateProfile(userId, updates);
+    const plays = num('playCount');
+    const hasData = plays > 0 || Object.values(hs).some(v => v > 0) || Object.values(counts).some(v => v > 0);
+    if (!hasData) return;
+    const { error } = await window.sb.rpc('merge_local_stats', { p_hs: hs, p_sums: sums, p_counts: counts, p_plays: plays });
+    if (error) throw error;
   } catch(e) { console.warn('[sync] error:', e.message); }
 }
 
