@@ -2,6 +2,18 @@
 const _SB_URL  = 'https://xituwurshmaqsnnnrdhx.supabase.co';
 const _SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhpdHV3dXJzaG1hcXNubm5yZGh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyMjU0OTUsImV4cCI6MjA5NjgwMTQ5NX0.jlT6O8dkuYXc8F3fOK_QXgH4Sqw6dAbhi2EIkvcS7Mk';
 
+// Third-party console noise we can't act on: supabase-js logs this whenever a
+// broadcast goes out before the channel finished joining (it falls back to REST
+// on its own), and three.min.js warns about its non-module build.
+(function () {
+  const _warn = console.warn;
+  console.warn = function () {
+    const m = arguments[0];
+    if (typeof m === 'string' && (m.startsWith('Realtime send() is automatically falling back') || m.includes('are deprecated with r150+'))) return;
+    return _warn.apply(console, arguments);
+  };
+})();
+
 // CrazyGames profile pictures (imgs.crazygames.com, stored in avatar_url by
 // crazygames-auth) are generic stock avatars that make those players look
 // like bots here, so they're only shown inside the CrazyGames build. On any
@@ -779,7 +791,6 @@ function _showRecoveryModal() {
 
 // Supabase v2: PASSWORD_RECOVERY event
 sb.auth.onAuthStateChange((event, session) => {
-  console.log('[auth] event:', event, session?.user?.id);
   if (event === 'PASSWORD_RECOVERY') _showRecoveryModal();
 });
 

@@ -108,7 +108,7 @@
       background: #fff3c4; border: 0.3cqmin solid #e3c56a; border-radius: 1cqmin; padding: 0.3cqmin 1cqmin;
     }
     #devpan-modal .loading-social-list { height: 22cqmin; width: 100%; border-radius: 1.2cqmin; box-sizing: border-box; }
-    #devpan-modal .loading-social-list.devpan-guests { height: auto; max-height: 10cqmin; }
+    #devpan-modal .loading-social-list.devpan-guests { height: auto; max-height: 16cqmin; gap: 0.7cqmin; padding: 0.8cqmin; }
     /* Own right-hand block (not .loading-social-score, which is centered for
        the narrower friends list and ended up covering the status text). */
     #devpan-modal .loading-social-row, #devpan-banned-modal .loading-social-row { position: relative; padding-right: 27cqmin; cursor: pointer; }
@@ -153,10 +153,11 @@
       font-size: 1.3cqmin; background: rgba(0,0,0,0.12);
     }
     #devpan-modal .devpan-guest-row {
-      display: flex; justify-content: space-between; gap: 1cqmin; padding: 0.6cqmin 1cqmin;
+      display: flex; justify-content: space-between; gap: 1cqmin; padding: 0.9cqmin 1.2cqmin;
       background: #fffbe6; border-radius: 0.8cqmin; font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
       font-size: 1.7cqmin; color: #5a4400;
     }
+    #devpan-modal .devpan-guest-row.is-playing { background: #d4f5dc; color: #14602a; }
   `;
   document.head.appendChild(style);
 
@@ -436,7 +437,7 @@
     q('guestsTitle').textContent = `${tx('guests')} (${guests.length})`;
     const gl = q('guests');
     gl.innerHTML = guests.length ? guests.map((g) =>
-      `<div class="devpan-guest-row"><span>${flag(g.country_code)} ${esc(g.guest_name || tx('guest'))}</span>` +
+      `<div class="devpan-guest-row${g.is_playing ? ' is-playing' : ''}"><span>${flag(g.country_code)} ${esc(g.guest_name || tx('guest'))}</span>` +
       `<span>${g.is_playing ? '🎮 ' + esc(g.playing_mode || tx('playing')) : esc(tx('idle'))} · ${esc(PLATFORM[g.platform] || g.platform)} · ${esc(g.device || '—')} · ${ago(g.last_active)}</span></div>`
     ).join('') : `<div class="loading-social-empty">${esc(tx('none'))}</div>`;
   }

@@ -122,6 +122,35 @@ window.LB = (() => {
   function getId()       { return _lobbyId; }
   function getSeed()     { return _seed; }
 
+  // ── Clock-offset probe (host ↔ me) — kept for other callers, unused by the
+  // start countdown below any more (see _startCountdown's own comment).
+  let _hostClockOffsetMs = 0;
+  let _hostClockOffsetBestRtt = Infinity;
+  function _onHostClockPong(payload) {
+    if (!payload || typeof payload.t0 !== 'number' || typeof payload.t1 !== 'number') return;
+    const now = Date.now();
+    const rtt = now - payload.t0;
+    if (rtt < 0 || rtt > 10000) return;
+    if (rtt < _hostClockOffsetBestRtt) {
+      _hostClockOffsetBestRtt = rtt;
+      _hostClockOffsetMs = payload.t1 - (payload.t0 + rtt / 2);
+    }
+  }
+  // 3 samples, spread out — the host alone answers (see the 'clockping'
+  // listener on _channel), so every guest's estimate is specifically against
+  // the ONE clock that actually stamped `until`. A no-op for the host itself
+  // (isHost() guard) — their own clock IS the reference, nothing to correct.
+  function _sendHostClockPings() {
+    if (!_channel || isHost()) return;
+    _hostClockOffsetMs = 0; _hostClockOffsetBestRtt = Infinity;
+    for (let i = 0; i < 3; i++) {
+      setTimeout(() => {
+        if (!_channel) return;
+        try { _channel.send({ type: 'broadcast', event: 'clockping', payload: { t0: Date.now(), from: _myId() } }); } catch (e) {}
+      }, i * 350);
+    }
+  }
+
   function _genCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I/O/0/1 (ambiguous)
     let c = '';
@@ -522,16 +551,6 @@ window.LB = (() => {
         let q = window.sb.from('lobbies').delete().eq('host_id', uid).in('status', ['waiting', 'closed', 'active']);
         if (_lobbyId) q = q.neq('id', _lobbyId);
         await q;
-        // Delete my own terminal matches (with the same 30-min cutoff as the
-        // global fallback below, so as not to destroy recent history right
-        // when the next room is created — stat counts no longer depend on
-        // this table, but it's best not to be more aggressive than needed).
-        await window.sb.from('matches').delete().eq('player1_id', uid)
-          .in('status', ['abandoned', 'declined', 'expired', 'finished', 'cancelled'])
-          .lt('created_at', cutoff30m);
-        await window.sb.from('matches').delete().eq('player2_id', uid)
-          .in('status', ['abandoned', 'declined', 'expired', 'finished', 'cancelled'])
-          .lt('created_at', cutoff30m);
       }
       // Attempt global deletion via RPC (SECURITY DEFINER, bypasses RLS)
       try { await window.sb.rpc('cleanup_stale_lobbies'); } catch (_) {}
@@ -1088,6 +1107,7 @@ window.LB = (() => {
     onGq:         cb => { _onGq = cb; },
     onReadyMember: cb => { _onReadyMember = cb; },
     onLaunchGo:    cb => { _onLaunchGo = cb; },
+    getHostClockOffsetMs: () => _hostClockOffsetMs,
   };
 })();
 
@@ -1282,35 +1302,6 @@ window.Lobby = (() => {
   let _pendingModesOrder = []; // picker state before saving
   let _savedLobbyModes  = []; // modes confirmed by broadcast; more reliable than the DB at start
   let _lastEnteredLobbyId = null; // see enterLobby's own reset guard below
-
-  // ── Clock-offset probe (host ↔ me) — kept for other callers, unused by the
-  // start countdown below any more (see _startCountdown's own comment).
-  let _hostClockOffsetMs = 0;
-  let _hostClockOffsetBestRtt = Infinity;
-  function _onHostClockPong(payload) {
-    if (!payload || typeof payload.t0 !== 'number' || typeof payload.t1 !== 'number') return;
-    const now = Date.now();
-    const rtt = now - payload.t0;
-    if (rtt < 0 || rtt > 10000) return;
-    if (rtt < _hostClockOffsetBestRtt) {
-      _hostClockOffsetBestRtt = rtt;
-      _hostClockOffsetMs = payload.t1 - (payload.t0 + rtt / 2);
-    }
-  }
-  // 3 samples, spread out — the host alone answers (see the 'clockping'
-  // listener on _channel), so every guest's estimate is specifically against
-  // the ONE clock that actually stamped `until`. A no-op for the host itself
-  // (isHost() guard) — their own clock IS the reference, nothing to correct.
-  function _sendHostClockPings() {
-    if (!_channel || window.LB.isHost()) return;
-    _hostClockOffsetMs = 0; _hostClockOffsetBestRtt = Infinity;
-    for (let i = 0; i < 3; i++) {
-      setTimeout(() => {
-        if (!_channel) return;
-        try { _channel.send({ type: 'broadcast', event: 'clockping', payload: { t0: Date.now(), from: _myId() } }); } catch (e) {}
-      }, i * 350);
-    }
-  }
 
   // ── Start countdown (10s, cancelable) ────────────────────────────────────────
   let _counting = false;
@@ -3786,6 +3777,6 @@ window.Lobby = (() => {
     // access to it) so any OTHER shared countdown stamped with the host's
     // Date.now() (e.g. GloboReto's post-first-solve 20s window,
     // _gqGroupCountdownEndsAt in globequiz.js) can correct for it too.
-    getHostClockOffsetMs: () => _hostClockOffsetMs,
+    getHostClockOffsetMs: () => window.LB.getHostClockOffsetMs(),
   };
 })();

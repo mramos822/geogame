@@ -150,7 +150,7 @@ function applyMusicVolume() {
   getMusicTracks().forEach(sfx => { sfx.volume = musicVolumeLevel; sfx.muted = isMusicMuted; });
   applyMusicMute(); // iOS: music runs through Web Audio (gain); no-op on PC
   const img = document.getElementById('vol-img');
-  if (img) img.src = volIconForLevel(musicVolumeLevel);
+  if (img) img.src = sfxIconForLevel(musicVolumeLevel);
   _paintSlider('vol', musicVolumeLevel);
 }
 function applySfxVolume() {
@@ -158,7 +158,7 @@ function applySfxVolume() {
   localStorage.setItem('sfxVolumeLevel', String(sfxVolumeLevel));
   getSfxTracks().forEach(sfx => { sfx.volume = sfxVolumeLevel; sfx.muted = isMuted; });
   const img = document.getElementById('sfx-img');
-  if (img) img.src = sfxIconForLevel(sfxVolumeLevel);
+  if (img) img.src = volIconForLevel(sfxVolumeLevel);
   _paintSlider('sfx', sfxVolumeLevel);
 }
 // Exposed so any OTHER file that wants to respect the real level (instead of
@@ -241,13 +241,22 @@ function _initVolSliderPopup(prefix, getLevel, setLevel) {
   btn.addEventListener('wheel', (e) => {
     e.preventDefault();
     const dir = e.deltaY < 0 ? 1 : -1; // arriba = sube, abajo = baja
-    setLevel(getLevel() + dir * VOL_WHEEL_STEP);
+    _set(getLevel() + dir * VOL_WHEEL_STEP);
   }, { passive: false });
 
+  // Last non-zero level, restored when the icon un-mutes. Updated on every
+  // slider/wheel change so it always holds the last position before muting.
+  let remembered = getLevel() > 0 ? getLevel() : 1;
+  const _set = (v) => { setLevel(v); if (getLevel() > 0) remembered = getLevel(); };
+
+  // Closed: opens the bar. Open: mutes (level 0, bar stays open so it can be
+  // dragged again); clicking again at 0 restores the remembered level.
   img.addEventListener('click', (e) => {
     e.stopPropagation();
     sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
-    popup.classList.toggle('open');
+    if (!popup.classList.contains('open')) { popup.classList.add('open'); return; }
+    if (getLevel() > 0) { remembered = getLevel(); setLevel(0); }
+    else setLevel(remembered);
   });
 
   // Invertido a pedido: 0 (menos) ARRIBA, 1 (más) ABAJO — misma convención
@@ -261,10 +270,10 @@ function _initVolSliderPopup(prefix, getLevel, setLevel) {
   track.addEventListener('pointerdown', (e) => {
     dragging = true;
     try { track.setPointerCapture(e.pointerId); } catch (err) {}
-    setLevel(levelFromPointer(e.clientY));
+    _set(levelFromPointer(e.clientY));
   });
   track.addEventListener('pointermove', (e) => {
-    if (dragging) setLevel(levelFromPointer(e.clientY));
+    if (dragging) _set(levelFromPointer(e.clientY));
   });
   ['pointerup', 'pointercancel'].forEach(ev => track.addEventListener(ev, () => { dragging = false; }));
 
