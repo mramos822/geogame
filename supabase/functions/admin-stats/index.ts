@@ -78,6 +78,21 @@ function bucketByKey(rows: { created_at: string }[], labels: string[], granulari
   return labels.map((l) => map[l] || 0);
 }
 
+// PostgREST devuelve como máximo `max_rows` filas por consulta (1000 por defecto en
+// Supabase) aunque se pida .limit(50000): las consultas grandes se recortaban en
+// silencio y las estadísticas de períodos largos salían subcontadas. Esto recorre
+// la consulta por páginas (ordenada por id, único) hasta traer todo.
+async function paged(builder: any, pageSize = 1000, maxRows = 60000): Promise<{ data: any[] | null; error: any }> {
+  const out: any[] = [];
+  for (let from = 0; from < maxRows; from += pageSize) {
+    const { data, error } = await builder.range(from, from + pageSize - 1);
+    if (error) return { data: out.length ? out : null, error };
+    if (data) out.push(...data);
+    if (!data || data.length < pageSize) break;
+  }
+  return { data: out, error: null };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
 
@@ -293,38 +308,38 @@ Deno.serve(async (req) => {
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true }).gte('last_active', dauISO)),
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true }).gte('last_active', wauISO)),
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true }).gte('last_active', mauISO)),
-      sb.from('profiles')
+      paged(sb.from('profiles')
         .select('id, username, created_at, last_active, play_count, hs_total, vs_wins, vs_losses, is_supporter')
-        .gte('created_at', windowISO).limit(50000),
-      sb.from('analytics_events').select('created_at, type, mode, score, user_id, visitor_id, country_code, session_type, guest_name, device, platform')
-        .in('type', ['game', 'versus']).gte('created_at', windowISO).limit(50000),
-      sb.from('analytics_events').select('created_at, visitor_id, country_code, user_id, guest_name, device, source, platform')
-        .eq('type', 'visit').gte('created_at', windowISO).limit(50000),
-      sb.from('analytics_events').select('created_at, score, user_id, visitor_id, country_code, guest_name, device, platform')
-        .eq('type', 'campaign').gte('created_at', windowISO).limit(50000),
-      sb.from('analytics_events').select('created_at, score, user_id, visitor_id, country_code, duration_ms, streak, guest_name, device, platform')
-        .eq('type', 'globequiz').gte('created_at', windowISO).limit(50000),
-      sb.from('profiles').select('username, hs_flags').order('hs_flags', { ascending: false }).limit(10),
-      sb.from('profiles').select('username, hs_shapes').order('hs_shapes', { ascending: false }).limit(10),
-      sb.from('profiles').select('username, hs_cities').order('hs_cities', { ascending: false }).limit(10),
-      sb.from('profiles').select('username, hs_monuments').order('hs_monuments', { ascending: false }).limit(10),
-      sb.from('profiles').select('username, hs_total').order('hs_total', { ascending: false }).limit(10),
-      sb.from('profiles').select('username, vs_wins, vs_losses').order('vs_wins', { ascending: false }).limit(10),
-      sb.from('profiles')
-        .select('id, username, created_at, last_active, play_count, hs_total, vs_wins, vs_losses, is_supporter, country_code, crazygames_user_id')
+        .gte('created_at', windowISO).order('id', { ascending: true })),
+      paged(sb.from('analytics_events').select('created_at, type, mode, score, user_id, visitor_id, country_code, session_type, guest_name, device, platform')
+        .in('type', ['game', 'versus']).gte('created_at', windowISO).order('id', { ascending: true })),
+      paged(sb.from('analytics_events').select('created_at, visitor_id, country_code, user_id, guest_name, device, source, platform')
+        .eq('type', 'visit').gte('created_at', windowISO).order('id', { ascending: true })),
+      paged(sb.from('analytics_events').select('created_at, score, user_id, visitor_id, country_code, guest_name, device, platform')
+        .eq('type', 'campaign').gte('created_at', windowISO).order('id', { ascending: true })),
+      paged(sb.from('analytics_events').select('created_at, score, user_id, visitor_id, country_code, duration_ms, streak, guest_name, device, platform')
+        .eq('type', 'globequiz').gte('created_at', windowISO).order('id', { ascending: true })),
+      sb.from('profiles').select('username, hs_flags, country_code').order('hs_flags', { ascending: false }).limit(25),
+      sb.from('profiles').select('username, hs_shapes, country_code').order('hs_shapes', { ascending: false }).limit(25),
+      sb.from('profiles').select('username, hs_cities, country_code').order('hs_cities', { ascending: false }).limit(25),
+      sb.from('profiles').select('username, hs_monuments, country_code').order('hs_monuments', { ascending: false }).limit(25),
+      sb.from('profiles').select('username, hs_total, country_code').order('hs_total', { ascending: false }).limit(25),
+      sb.from('profiles').select('username, vs_wins, vs_losses, country_code').order('vs_wins', { ascending: false }).limit(25),
+      paged(sb.from('profiles')
+        .select('id, username, created_at, last_active, play_count, hs_total, hs_flags, hs_shapes, hs_cities, hs_monuments, vs_wins, vs_losses, is_supporter, country_code, crazygames_user_id')
         .order('last_active', { ascending: false, nullsFirst: false })
-        .limit(2000),
-      sb.from('analytics_events')
+        .order('id', { ascending: true }), 1000, 20000),
+      paged(sb.from('analytics_events')
         .select('user_id, country_code, created_at')
         .not('user_id', 'is', null)
         .not('country_code', 'is', null)
         .order('created_at', { ascending: true })
-        .limit(50000),
-      sb.from('analytics_events')
+        .order('id', { ascending: true })),
+      paged(sb.from('analytics_events')
         .select('created_at, user_id, type, session_type')
         .in('type', ['game', 'versus'])
         .not('user_id', 'is', null)
-        .limit(50000),
+        .order('id', { ascending: true })),
       // ── Fundador (primeros 100 RECLAMOS, no primeras 100 cuentas) ──────────
       // elegibles = is_founder=true todavía sin reclamar (pueden confirmar el
       // popup y equiparse); claimed = ya confirmaron (founder_popup_seen=true,
@@ -341,9 +356,9 @@ Deno.serve(async (req) => {
       // ── Funnel de invitaciones VS (ver logVersusFunnel en js/analytics.js) ──
       // session_type acá guarda el outcome (sent/accepted/declined/expired/
       // abandoned), no el tipo de sesión de partida individual como en 'game'.
-      sb.from('analytics_events')
+      paged(sb.from('analytics_events')
         .select('created_at, session_type, mode, user_id')
-        .eq('type', 'versus_funnel').gte('created_at', windowISO).limit(50000),
+        .eq('type', 'versus_funnel').gte('created_at', windowISO).order('id', { ascending: true })),
       // ── Amistades: para detectar spam de solicitudes y medir conectividad ──
       sb.from('friendships')
         .select('user_a, user_b, status, initiated_by, created_at'),
@@ -360,33 +375,33 @@ Deno.serve(async (req) => {
       // ── Economía (XP/monedas) — sistema todavía en diseño (ver
       // xp_system_config), pero el tracking crudo ya corre en vivo desde
       // js/analytics.js (logCampaignCurrency/logGlobequizCurrency).
-      sb.from('currency_ledger')
+      paged(sb.from('currency_ledger')
         .select('user_id, coins, xp, reason, ref_value, created_at')
-        .gte('created_at', windowISO).limit(50000),
+        .gte('created_at', windowISO).order('id', { ascending: true })),
       sb.from('xp_system_config').select('rule_key, rule_value, description, status').order('id', { ascending: true }),
       // ── Cálculo EN VIVO (no una foto fija) de lo que cada cuenta debería
       // tener según el historial real de partidas — TODO el historial, sin
       // recortar por rango, porque un total acumulado no tiene sentido
       // "por período". Se recalcula en cada carga del panel.
-      sb.from('analytics_events').select('score, user_id').eq('type', 'campaign').not('user_id', 'is', null).limit(50000),
-      sb.from('analytics_events').select('streak, user_id').eq('type', 'globequiz').not('user_id', 'is', null).limit(50000),
+      paged(sb.from('analytics_events').select('score, user_id').eq('type', 'campaign').not('user_id', 'is', null).order('id', { ascending: true })),
+      paged(sb.from('analytics_events').select('streak, user_id').eq('type', 'globequiz').not('user_id', 'is', null).order('id', { ascending: true })),
       // Todo lo que currency_ledger tiene acumulado ALGUNA VEZ para cada
       // cuenta (no solo el rango elegido) — para poder comparar contra el
       // esperado y detectar inserts manipulados (alguien pegándose monedas
       // desde la consola del navegador, ya que el insert es anon sin
       // validación de monto del lado del server).
-      sb.from('currency_ledger').select('user_id, coins, xp').limit(50000),
+      paged(sb.from('currency_ledger').select('user_id, coins, xp').order('id', { ascending: true })),
       // ── Puente visitor_id → cuenta: el visitor_id NO cambia al crear
       // cuenta (sigue viajando en cada evento, ver js/analytics.js), así
       // que si el mismo visitor_id de un invitado aparece en algún evento
       // CON user_id puesto, es prueba casi certera de que es la misma
       // persona/dispositivo — mucho más fuerte que adivinar por nombre.
       // Todo el historial, sin recortar por rango.
-      sb.from('analytics_events')
+      paged(sb.from('analytics_events')
         .select('visitor_id, user_id')
         .not('visitor_id', 'is', null)
         .not('user_id', 'is', null)
-        .limit(50000),
+        .order('id', { ascending: true })),
       // ── Invitados conectados AHORA (ver guest_presence, js/analytics.js
       // guestHeartbeat) — sin esto, "Quién está conectado ahora" solo podía
       // ver profiles.last_active, que no existe para nadie sin cuenta.
@@ -405,9 +420,9 @@ Deno.serve(async (req) => {
       // heartbeat de guest_presence (cada ~15-25s mientras navega) lo captura
       // fresco mucho antes, así que la pestaña "Invitados" ya no se queda
       // pegada en "Sin nombre puesto" hasta que la persona termine de jugar.
-      sb.from('guest_presence')
+      paged(sb.from('guest_presence')
         .select('visitor_id, last_active, guest_name, country_code')
-        .gte('last_active', windowISO).limit(50000),
+        .gte('last_active', windowISO).order('id', { ascending: true })),
       // ── Cuentas marcadas "verificadas" a mano (ver acción verify_account
       // más arriba) — integrityFlags las salta más abajo aunque su patrón de
       // juego siga viéndose estadísticamente raro.
@@ -1099,6 +1114,79 @@ Deno.serve(async (req) => {
       topPendingSenders: topSenders,
     };
 
+    // ── Estadísticas extra (rankings, versus, social) ────────────────────────
+    // Todo sale de datos que ya se cargaron (perfiles + amistades): no suma
+    // consultas nuevas.
+    // Si algo de esto falla, el resto del panel sigue funcionando (extra = {error}).
+    let extraOut: any = null;
+    try {
+    const profs = allProfiles as any[];
+    const pct = (arr: number[], q: number) => (arr.length ? arr[Math.min(arr.length - 1, Math.floor(q * arr.length))] : 0);
+    const scored = profs.filter((p) => (p.hs_total || 0) > 0);
+    const scoredTotals = scored.map((p) => p.hs_total as number).sort((a, b) => a - b);
+    const scoreBuckets: [number, number, string][] = [[0, 5000, '0 – 5 mil'], [5000, 10000, '5 – 10 mil'], [10000, 20000, '10 – 20 mil'], [20000, 40000, '20 – 40 mil'], [40000, Infinity, '40 mil o más']];
+    const bestByMode: Record<string, { username: string; score: number } | null> = {};
+    for (const [mode, col] of [['flags', 'hs_flags'], ['shapes', 'hs_shapes'], ['cities', 'hs_cities'], ['monuments', 'hs_monuments']] as [string, string][]) {
+      let best: any = null;
+      for (const p of profs) if ((p[col] || 0) > (best ? best[col] : 0)) best = p;
+      bestByMode[mode] = best ? { username: best.username, score: best[col] } : null;
+    }
+    const byCountryScore: Record<string, { n: number; sum: number }> = {};
+    for (const p of scored) {
+      if (!p.country_code) continue;
+      const c = (byCountryScore[p.country_code] = byCountryScore[p.country_code] || { n: 0, sum: 0 });
+      c.n++; c.sum += p.hs_total;
+    }
+    const rankingsExtra = {
+      players: scored.length,
+      avg: scored.length ? Math.round(scoredTotals.reduce((a, b) => a + b, 0) / scored.length) : 0,
+      median: pct(scoredTotals, 0.5),
+      p90: pct(scoredTotals, 0.9),
+      best: scoredTotals.length ? scoredTotals[scoredTotals.length - 1] : 0,
+      distribution: scoreBuckets.map(([lo, hi, label]) => ({ label, count: scored.filter((p) => p.hs_total >= lo && p.hs_total < hi).length })),
+      bestByMode,
+      byCountry: Object.entries(byCountryScore)
+        .map(([country, v]) => ({ country, players: v.n, avg: Math.round(v.sum / v.n) }))
+        .sort((a, b) => b.players - a.players).slice(0, 8),
+    };
+
+    const vsPlayers = profs.filter((p) => (p.vs_wins || 0) + (p.vs_losses || 0) > 0);
+    const vsWinsSum = vsPlayers.reduce((a, p) => a + (p.vs_wins || 0), 0);
+    const vsGamesSum = vsPlayers.reduce((a, p) => a + (p.vs_wins || 0) + (p.vs_losses || 0), 0);
+    const vsRow = (p: any) => ({ username: p.username, wins: p.vs_wins || 0, losses: p.vs_losses || 0, country: p.country_code || null });
+    const versusExtra = {
+      players: vsPlayers.length,
+      matches: vsWinsSum,
+      avgGames: vsPlayers.length ? Math.round((vsGamesSum / vsPlayers.length) * 10) / 10 : 0,
+      topWinRate: vsPlayers.filter((p) => (p.vs_wins || 0) + (p.vs_losses || 0) >= 5)
+        .map((p) => ({ ...vsRow(p), rate: Math.round(((p.vs_wins || 0) / ((p.vs_wins || 0) + (p.vs_losses || 0))) * 100) }))
+        .sort((a, b) => b.rate - a.rate || b.wins - a.wins).slice(0, 10),
+      mostActive: vsPlayers.map((p) => ({ ...vsRow(p), games: (p.vs_wins || 0) + (p.vs_losses || 0) }))
+        .sort((a, b) => b.games - a.games).slice(0, 10),
+    };
+
+    const acceptedRows = friendshipRows.filter((f) => f.status === 'accepted');
+    const friendCountByUser: Record<string, number> = {};
+    for (const f of acceptedRows) {
+      friendCountByUser[f.user_a] = (friendCountByUser[f.user_a] || 0) + 1;
+      friendCountByUser[f.user_b] = (friendCountByUser[f.user_b] || 0) + 1;
+    }
+    const withFriends = Object.keys(friendCountByUser).length;
+    const newFriendRows = acceptedRows.filter((f) => f.created_at && f.created_at >= windowISO);
+    const socialExtra = {
+      accountsWithFriends: withFriends,
+      pctWithFriends: profs.length ? Math.round((withFriends / profs.length) * 100) : 0,
+      avgFriends: withFriends ? Math.round(((acceptedRows.length * 2) / withFriends) * 10) / 10 : 0,
+      acceptanceRate: (friendCounts.accepted + friendCounts.pending) ? Math.round((friendCounts.accepted / (friendCounts.accepted + friendCounts.pending)) * 100) : 0,
+      newInPeriod: newFriendRows.length,
+      newSeries: bucketByKey(newFriendRows, labels, granularity),
+      topConnected: Object.entries(friendCountByUser)
+        .map(([uid, n]) => ({ username: usernameById[uid] || uid, friends: n }))
+        .sort((a, b) => b.friends - a.friends).slice(0, 10),
+    };
+    extraOut = { rankings: rankingsExtra, versus: versusExtra, social: socialExtra };
+    } catch (e) { extraOut = { error: String(e) }; }
+
     // ── Economía (XP/monedas): sistema todavía sin lanzar (ver
     // xp_system_config), esto es solo el historial crudo acumulado hasta
     // ahora para poder ver cómo viene creciendo antes de armar la UI real.
@@ -1329,6 +1417,7 @@ Deno.serve(async (req) => {
       versusByMode,
       versusFunnel,
       social,
+      extra: extraOut,
       economy,
       integrityFlags,
       verifiedAccounts,
@@ -1342,12 +1431,12 @@ Deno.serve(async (req) => {
       atRisk,
       insights,
       leaderboards: {
-        total:     (lbTotal.data     || []).map((p: any) => ({ username: p.username, score: p.hs_total     || 0 })),
-        flags:     (lbFlags.data     || []).map((p: any) => ({ username: p.username, score: p.hs_flags     || 0 })),
-        shapes:    (lbShapes.data    || []).map((p: any) => ({ username: p.username, score: p.hs_shapes    || 0 })),
-        cities:    (lbCities.data    || []).map((p: any) => ({ username: p.username, score: p.hs_cities    || 0 })),
-        monuments: (lbMonuments.data || []).map((p: any) => ({ username: p.username, score: p.hs_monuments || 0 })),
-        versus:    (lbVersus.data    || []).map((p: any) => ({ username: p.username, wins: p.vs_wins || 0, losses: p.vs_losses || 0 })),
+        total:     (lbTotal.data     || []).map((p: any) => ({ username: p.username, score: p.hs_total     || 0, country: p.country_code || null })),
+        flags:     (lbFlags.data     || []).map((p: any) => ({ username: p.username, score: p.hs_flags     || 0, country: p.country_code || null })),
+        shapes:    (lbShapes.data    || []).map((p: any) => ({ username: p.username, score: p.hs_shapes    || 0, country: p.country_code || null })),
+        cities:    (lbCities.data    || []).map((p: any) => ({ username: p.username, score: p.hs_cities    || 0, country: p.country_code || null })),
+        monuments: (lbMonuments.data || []).map((p: any) => ({ username: p.username, score: p.hs_monuments || 0, country: p.country_code || null })),
+        versus:    (lbVersus.data    || []).map((p: any) => ({ username: p.username, wins: p.vs_wins || 0, losses: p.vs_losses || 0, country: p.country_code || null })),
       },
       accounts,
       founder: {
