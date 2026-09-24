@@ -556,6 +556,13 @@
           </h2>
           <div class="table-scroll"><table id="tbl-sources"><tbody></tbody></table></div>
         </div>
+        <div class="box">
+          <h2>Por plataforma
+            <span class="sub"><span class="help" title="Dónde se jugó cada evento: Web (mygeochallenge.com), CrazyGames o GameDistribution. Los eventos anteriores al 23-sep-2026 no tenían este dato y cuentan como Web. Partidas = Giras Mundiales completas + versus + GloboReto (misma definición que el total). Cuentas nuevas en CrazyGames = cuentas creadas con el login automático de CrazyGames.">ⓘ</span></span>
+          </h2>
+          <div class="table-scroll"><table id="tbl-platforms"><tbody></tbody></table></div>
+          <div class="modes-total" id="platform-accounts-note"></div>
+        </div>
       </div>
     </section>
 
@@ -1213,6 +1220,7 @@ function render(data){
   renderHourly(data.hourly||[]);
   renderCountries(data.topCountries||[]);
   renderSources(data.topSources||[]);
+  renderPlatforms(data.platforms||[], data.platformAccounts);
   renderRetention(data.retention||{});
   renderFunnel(data.funnel||{});
   renderActiveUsers(data.series||{});
@@ -1419,7 +1427,7 @@ function openDayPanel(rawKey, granularity){
       const modeLabel = e.type === 'campaign' ? '🌍 Gira Mundial' : e.type === 'globequiz' ? '🌎 GlobeQuiz' : (MODE_LABELS[e.mode] || e.mode || '—');
       const modePillClass = e.type === 'campaign' || e.type === 'globequiz' ? 'session-campaign' : (e.mode||'');
       const score = eventScoreCell(e);
-      return `<tr><td>${hora}</td><td>${playerCell(e.username, e.guest_name)}</td><td>${countryCell(e.country_code)}</td><td>${deviceIcon(e.device)}</td>` +
+      return `<tr><td>${hora}</td><td>${playerCell(e.username, e.guest_name)}</td><td>${countryCell(e.country_code)}</td><td>${deviceIcon(e.device)}${platTag(e.platform)}</td>` +
         `<td><span class="mode-pill ${modePillClass}">${modeLabel}</span></td><td>${contextBadge(e)}</td><td class="n">${score}</td></tr>`;
     }).join('');
   }
@@ -1430,7 +1438,7 @@ function openDayPanel(rawKey, granularity){
   } else {
     vb.innerHTML = visits.map(v=>{
       const hora = new Date(v.created_at).toLocaleTimeString('es', { hour:'2-digit', minute:'2-digit' });
-      return `<tr><td>${hora}</td><td>${playerCell(v.username, v.guest_name)}</td><td>${countryCell(v.country_code)}</td><td>${deviceIcon(v.device)}</td></tr>`;
+      return `<tr><td>${hora}</td><td>${playerCell(v.username, v.guest_name)}</td><td>${countryCell(v.country_code)}</td><td>${deviceIcon(v.device)}${platTag(v.platform)}</td></tr>`;
     }).join('');
   }
 
@@ -1497,6 +1505,8 @@ function timeAgo(iso){
   const hrs = Math.round(mins/60);
   return `hace ${hrs}h`;
 }
+// Only non-web platforms get a tag, so the common case stays uncluttered.
+function platTag(p){ return (p && p !== 'web') ? ' · ' + platformLabel(p) : ''; }
 function deviceIcon(device){
   if(device === 'mobile') return '📱 Celular';
   if(device === 'pc') return '💻 PC';
@@ -1508,8 +1518,8 @@ function renderOnlineUsers(rows){
   const playing = rows.filter(r=>r.is_playing);
   const idle = rows.filter(r=>!r.is_playing);
   tb.innerHTML = '<tr><th>Usuario</th><th>Estado</th><th>Dispositivo</th><th style="text-align:right">Última actividad</th></tr>' +
-    playing.map(r=>`<tr><td>${playerCell(r.username, r.guest_name)}</td><td><span class="status-pill active"><span class="dotstat"></span>🎮 Jugando${r.playing_mode?' · '+escapeHtml(r.playing_mode):''}</span></td><td>${deviceIcon(r.device)}</td><td class="n">${timeAgo(r.last_active)}</td></tr>`).join('') +
-    idle.map(r=>`<tr><td>${playerCell(r.username, r.guest_name)}</td><td><span class="status-pill stale"><span class="dotstat"></span>🟢 Conectado</span></td><td>${deviceIcon(r.device)}</td><td class="n">${timeAgo(r.last_active)}</td></tr>`).join('');
+    playing.map(r=>`<tr><td>${playerCell(r.username, r.guest_name)}</td><td><span class="status-pill active"><span class="dotstat"></span>🎮 Jugando${r.playing_mode?' · '+escapeHtml(r.playing_mode):''}</span></td><td>${deviceIcon(r.device)}${platTag(r.platform)}</td><td class="n">${timeAgo(r.last_active)}</td></tr>`).join('') +
+    idle.map(r=>`<tr><td>${playerCell(r.username, r.guest_name)}</td><td><span class="status-pill stale"><span class="dotstat"></span>🟢 Conectado</span></td><td>${deviceIcon(r.device)}${platTag(r.platform)}</td><td class="n">${timeAgo(r.last_active)}</td></tr>`).join('');
 }
 
 function renderModes(m){
@@ -2026,6 +2036,22 @@ function renderSources(rows){
   if(!rows.length){ tb.innerHTML = '<tr><td class="empty">Sin datos en este período</td></tr>'; return; }
   tb.innerHTML = '<tr><th>Fuente</th><th style="text-align:right">Visitantes</th><th style="text-align:right">Jugaron</th><th style="text-align:right">% jugó</th></tr>' +
     rows.map(r=>`<tr><td>${escapeHtml(r.source)}</td><td class="n">${r.visitors.toLocaleString('es')}</td><td class="n">${r.played.toLocaleString('es')}</td><td class="n">${r.rate}%</td></tr>`).join('');
+}
+
+const PLATFORM_LABEL = { web: '🌐 Web', crazygames: '🎮 CrazyGames', gd: '🕹️ GameDistribution' };
+function platformLabel(p){ return PLATFORM_LABEL[p] || escapeHtml(p || 'web'); }
+
+function renderPlatforms(rows, accounts){
+  const tb = $('tbl-platforms').querySelector('tbody');
+  $('platform-accounts-note').textContent = accounts
+    ? `Cuentas creadas desde CrazyGames (histórico): ${(accounts.crazygamesTotal||0).toLocaleString('es')}`
+    : '';
+  if(!rows.length){ tb.innerHTML = '<tr><td class="empty">Sin datos en este período</td></tr>'; return; }
+  const n = v => (v||0).toLocaleString('es');
+  tb.innerHTML = '<tr><th>Plataforma</th><th style="text-align:right">Visitantes</th><th style="text-align:right">Jugadores</th><th style="text-align:right">Partidas</th><th style="text-align:right">Modos jugados</th><th style="text-align:right">Cuentas nuevas</th></tr>' +
+    rows.map(r=>`<tr><td>${platformLabel(r.platform)}</td><td class="n">${n(r.visitors)}</td><td class="n">${n(r.players)}</td>` +
+      `<td class="n" title="Giras: ${n(r.campaigns)} · Versus: ${n(r.versus)} · GloboReto: ${n(r.globequiz)}">${n(r.games)}</td>` +
+      `<td class="n">${n(r.modeGames)}</td><td class="n">${n(r.newAccounts)}</td></tr>`).join('');
 }
 
 function renderRetention(r){

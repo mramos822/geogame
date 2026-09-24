@@ -296,13 +296,13 @@ Deno.serve(async (req) => {
       sb.from('profiles')
         .select('id, username, created_at, last_active, play_count, hs_total, vs_wins, vs_losses, is_supporter')
         .gte('created_at', windowISO).limit(50000),
-      sb.from('analytics_events').select('created_at, type, mode, score, user_id, visitor_id, country_code, session_type, guest_name, device')
+      sb.from('analytics_events').select('created_at, type, mode, score, user_id, visitor_id, country_code, session_type, guest_name, device, platform')
         .in('type', ['game', 'versus']).gte('created_at', windowISO).limit(50000),
-      sb.from('analytics_events').select('created_at, visitor_id, country_code, user_id, guest_name, device, source')
+      sb.from('analytics_events').select('created_at, visitor_id, country_code, user_id, guest_name, device, source, platform')
         .eq('type', 'visit').gte('created_at', windowISO).limit(50000),
-      sb.from('analytics_events').select('created_at, score, user_id, visitor_id, country_code, guest_name, device')
+      sb.from('analytics_events').select('created_at, score, user_id, visitor_id, country_code, guest_name, device, platform')
         .eq('type', 'campaign').gte('created_at', windowISO).limit(50000),
-      sb.from('analytics_events').select('created_at, score, user_id, visitor_id, country_code, duration_ms, streak, guest_name, device')
+      sb.from('analytics_events').select('created_at, score, user_id, visitor_id, country_code, duration_ms, streak, guest_name, device, platform')
         .eq('type', 'globequiz').gte('created_at', windowISO).limit(50000),
       sb.from('profiles').select('username, hs_flags').order('hs_flags', { ascending: false }).limit(10),
       sb.from('profiles').select('username, hs_shapes').order('hs_shapes', { ascending: false }).limit(10),
@@ -311,7 +311,7 @@ Deno.serve(async (req) => {
       sb.from('profiles').select('username, hs_total').order('hs_total', { ascending: false }).limit(10),
       sb.from('profiles').select('username, vs_wins, vs_losses').order('vs_wins', { ascending: false }).limit(10),
       sb.from('profiles')
-        .select('id, username, created_at, last_active, play_count, hs_total, vs_wins, vs_losses, is_supporter, country_code')
+        .select('id, username, created_at, last_active, play_count, hs_total, vs_wins, vs_losses, is_supporter, country_code, crazygames_user_id')
         .order('last_active', { ascending: false, nullsFirst: false })
         .limit(2000),
       sb.from('analytics_events')
@@ -395,7 +395,7 @@ Deno.serve(async (req) => {
       // latido cada ~15-25s) — se reduce a la más reciente por visitor_id
       // más abajo, por eso el límite es generoso.
       sb.from('guest_presence')
-        .select('visitor_id, last_active, is_playing, playing_mode, guest_name, device')
+        .select('visitor_id, last_active, is_playing, playing_mode, guest_name, device, platform')
         .gte('last_active', onlineISO)
         .order('last_active', { ascending: false })
         .limit(5000),
@@ -493,6 +493,38 @@ Deno.serve(async (req) => {
       })
       .sort((a, b) => b.visitors - a.visitors);
 
+    // ── Breakdown by platform (web / crazygames / gd, see detectPlatform in
+    // js/analytics.js). Events from before the `platform` column existed are
+    // NULL and count as 'web' — the portal builds weren't live yet.
+    // Accounts use profiles.crazygames_user_id (set by crazygames-auth): it
+    // marks where the account was CREATED, not where it plays now.
+    const platOf = (r: any): string => r.platform || 'web';
+    const platformStats: Record<string, {
+      visitors: Set<string>; players: Set<string>; visits: number;
+      games: number; campaigns: number; versus: number; globequiz: number;
+    }> = {};
+    const plat = (k: string) => platformStats[k] ||= {
+      visitors: new Set(), players: new Set(), visits: 0, games: 0, campaigns: 0, versus: 0, globequiz: 0,
+    };
+    for (const r of visitRows as any[]) { const p = plat(platOf(r)); p.visits++; p.visitors.add(r.visitor_id || '?'); }
+    for (const r of singleRows as any[])    { const p = plat(platOf(r)); p.games++;     p.players.add(r.user_id || r.visitor_id || '?'); }
+    for (const r of versusRows as any[])    { const p = plat(platOf(r)); p.versus++;    p.players.add(r.user_id || r.visitor_id || '?'); }
+    for (const r of campaignRows as any[])  { const p = plat(platOf(r)); p.campaigns++; p.players.add(r.user_id || r.visitor_id || '?'); }
+    for (const r of globequizRows as any[]) { const p = plat(platOf(r)); p.globequiz++; p.players.add(r.user_id || r.visitor_id || '?'); }
+    const cgAccountsAll = (allProfilesRes.data || []).filter((p: any) => p.crazygames_user_id);
+    const cgAccountsInRange = cgAccountsAll.filter((p: any) => p.created_at >= windowISO).length;
+    const platforms = Object.entries(platformStats)
+      .map(([platform, p]) => ({
+        platform,
+        visitors: p.visitors.size, players: p.players.size, visits: p.visits,
+        games: p.campaigns + p.versus + p.globequiz, // same definition as period.games
+        modeGames: p.games, campaigns: p.campaigns, versus: p.versus, globequiz: p.globequiz,
+        newAccounts: platform === 'crazygames' ? cgAccountsInRange
+          : platform === 'web' ? regRows.length - cgAccountsInRange : 0,
+      }))
+      .sort((a, b) => b.visitors - a.visitors);
+    const platformAccounts = { crazygamesTotal: cgAccountsAll.length };
+
     // ── Funnel: visitantes únicos -> registros -> jugaron al menos 1 partida ──
     const uniqueVisitors = new Set(visitRows.map((r: any) => r.visitor_id || '?')).size;
     const registrations = regRows.length;
@@ -566,7 +598,7 @@ Deno.serve(async (req) => {
         username: r.user_id ? (usernameById[r.user_id] || null) : null,
         guest_name: r.user_id ? null : (r.guest_name || null),
         country_code: r.country_code || null,
-        device: r.device || null,
+        device: r.device || null, platform: r.platform || 'web',
         duration_ms: null, streak: null,
       })),
       // Giras Mundiales completas y partidas de GlobeQuiz ganadas — antes solo
@@ -578,7 +610,7 @@ Deno.serve(async (req) => {
         username: r.user_id ? (usernameById[r.user_id] || null) : null,
         guest_name: r.user_id ? null : (r.guest_name || null),
         country_code: r.country_code || null,
-        device: r.device || null,
+        device: r.device || null, platform: r.platform || 'web',
         duration_ms: null, streak: null,
       })),
       ...(globequizRows as any[]).map((r) => ({
@@ -587,7 +619,7 @@ Deno.serve(async (req) => {
         username: r.user_id ? (usernameById[r.user_id] || null) : null,
         guest_name: r.user_id ? null : (r.guest_name || null),
         country_code: r.country_code || null,
-        device: r.device || null,
+        device: r.device || null, platform: r.platform || 'web',
         duration_ms: r.duration_ms ?? null, streak: r.streak ?? null,
       })),
     ];
@@ -598,7 +630,7 @@ Deno.serve(async (req) => {
       username: r.user_id ? (usernameById[r.user_id] || null) : null,
       guest_name: r.user_id ? null : (r.guest_name || null),
       country_code: r.country_code || null,
-      device: r.device || null,
+      device: r.device || null, platform: r.platform || 'web',
     }));
     // Registros (cuentas creadas) de la ventana, para el mismo panel de detalle.
     const registrationsList = (regRows as any[]).map((r) => ({
@@ -1230,6 +1262,7 @@ Deno.serve(async (req) => {
       ...onlineGuestRows.map((g: any) => ({
         username: null, guest_name: g.guest_name || null, is_playing: !!g.is_playing,
         playing_mode: g.playing_mode || null, last_active: g.last_active, device: g.device || null,
+        platform: g.platform || 'web',
       })),
     ].sort((a, b) => {
       if (!!a.is_playing !== !!b.is_playing) return a.is_playing ? -1 : 1;
@@ -1270,6 +1303,8 @@ Deno.serve(async (req) => {
       guests,
       topCountries,
       topSources,
+      platforms,
+      platformAccounts,
       cohortRetention,
       playBuckets,
       atRisk,

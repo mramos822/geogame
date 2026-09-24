@@ -88,13 +88,27 @@
     } catch (e) { return null; }
   }
 
+  // Which build is running: 'web' (mygeochallenge.com), 'crazygames' or 'gd'
+  // (GameDistribution). Portal builds set window.GC_PLATFORM explicitly in
+  // their index.html; the SDK globals are a fallback in case a build is
+  // regenerated without it. Unlike getSource() this is NOT first-touch: the
+  // same device can play on both sites, and each event records where it
+  // actually happened.
+  function detectPlatform() {
+    if (typeof window.GC_PLATFORM === 'string' && window.GC_PLATFORM) return window.GC_PLATFORM;
+    if (window.CrazyGames) return 'crazygames';
+    if (window.GD_OPTIONS) return 'gd';
+    return 'web';
+  }
+  const platform = detectPlatform();
+
   async function insertEvent(row, table) {
     const sb = window.sb;
     if (!sb) return;
     try {
-      // 'device' only makes sense for game/visit events (not for
+      // 'device'/'platform' only make sense for game/visit events (not for
       // currency_ledger, which uses the same insertEvent with table='currency_ledger').
-      const full = (table && table !== 'analytics_events') ? row : { ...row, device: deviceType() };
+      const full = (table && table !== 'analytics_events') ? row : { ...row, device: deviceType(), platform };
       await sb.from(table || 'analytics_events').insert(full);
     } catch (e) { /* silent: must never affect the game */ }
   }
@@ -286,6 +300,7 @@
         guest_name: guestName(),
         country_code: cc,
         device: deviceType(),
+        platform,
       });
     } catch (e) { /* silent, like the rest of analytics.js */ }
   }

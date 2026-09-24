@@ -1,3 +1,11 @@
 *.psd
 js/devstats.js
 supabase/.temp/
+
+# Platform-specific export builds (GameDistribution, CrazyGames, etc.) —
+# generated copies for third-party portal submission, not part of the main
+# site. Regenerated from the main repo whenever needed, never committed.
+/gd-build/
+/gd-build.zip
+/crazy-build/
+/crazy-build.zip
