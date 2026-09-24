@@ -8670,21 +8670,20 @@ body.is-mobile #fs-btn  { left: calc(18% + 21cqmin); }
   z-index: 15;
   pointer-events: none;
 }
+/* Same back button as the menu panels (.loading-panel2-back): back1 + the
+   back2 arrow that shows on hover, hidden again while pressed. */
 #ad-panel-close {
   position: absolute;
-  top: 12px;
-  right: 14px;
+  top: 13cqmin;
+  left: 17cqmin;
+  width: 15.3cqmin;
   z-index: 20;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(255,255,255,0.15);
-  color: #fff;
-  font-size: 16px;
   cursor: pointer;
 }
-#ad-panel-close:hover { background: rgba(255,255,255,0.3); }
+#ad-panel-close .loading-play-confirm2 { opacity: 0; transition: opacity 0.08s; }
+#ad-panel-close:hover .loading-play-confirm2,
+#ad-panel-close:active .loading-play-confirm2 { opacity: 1; }
+#ad-panel-close.confirm-pressed .loading-play-confirm2 { opacity: 0; }
 
 /* ── FLAGS MODE OVERRIDES ─────────────────────────────── */
 #splash-screen.mode-flags .splash-text2-label        { padding-top: 20%; }
