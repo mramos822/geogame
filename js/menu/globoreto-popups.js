@@ -172,16 +172,17 @@
   }
 
   // ── Menu button tag ────────────────────────────────────────────────────────
-  // A small static "NEW" tag on the GloboReto button until it's been opened
-  // once — quiet on purpose (no glow/animation; the invite popup above stays
-  // the only interruption).
+  // A small "NEW" tag centered above the GloboReto button until it's been
+  // opened once. It only bobs gently (no glow) so it draws the eye without
+  // being pushy; the invite popup above stays the only interruption.
   (function injectNudgeCss() {
     const st = document.createElement('style');
     st.textContent =
-      '#globequiz-btn .gq-new-badge { position: absolute; top: -1.2cqmin; right: -1.4cqmin; z-index: 5; pointer-events: none;' +
-      " font-family: 'VAGRoundBold', 'Arial Black', sans-serif; font-size: 1.6cqmin; letter-spacing: 0.05em; color: #fff;" +
-      ' background: #e8504a; border: 0.3cqmin solid #a32a26; border-radius: 1cqmin; padding: 0.25cqmin 0.9cqmin;' +
-      ' box-shadow: 0 0.3cqmin 0.8cqmin rgba(0,0,0,0.25); }';
+      '@keyframes gqNewBob { 0%,100% { transform: translateX(-50%) translateY(0) rotate(-3deg); } 50% { transform: translateX(-50%) translateY(-0.9cqmin) rotate(3deg); } }' +
+      '#globequiz-btn .gq-new-badge { position: absolute; top: -2.6cqmin; left: 50%; z-index: 5; pointer-events: none; white-space: nowrap;' +
+      " font-family: 'VAGRoundBold', 'Arial Black', sans-serif; font-size: 1.8cqmin; letter-spacing: 0.05em; color: #fff;" +
+      ' background: #e8504a; border: 0.3cqmin solid #a32a26; border-radius: 1cqmin; padding: 0.25cqmin 1cqmin;' +
+      ' box-shadow: 0 0.3cqmin 0.8cqmin rgba(0,0,0,0.25); animation: gqNewBob 1.3s ease-in-out infinite; }';
     document.head.appendChild(st);
   })();
   function updateNudge() {
