@@ -119,8 +119,8 @@
     const allIds = myId ? [...new Set([...friendIds, myId])] : friendIds;
     if (!allIds.length) { _rankingsCache.friends = []; return []; }
     const res = typeof window.withConnCheck === 'function'
-      ? await window.withConnCheck(window.sb.from('profiles').select(SEL).in('id', allIds), 6000)
-      : await window.sb.from('profiles').select(SEL).in('id', allIds);
+      ? await window.withConnCheck(window.sb.from('profiles').select(SEL).in('id', allIds).eq('hidden_from_rankings', false), 6000)
+      : await window.sb.from('profiles').select(SEL).in('id', allIds).eq('hidden_from_rankings', false);
     if (!res) return [];
     const data = res.data;
     const rows = _sortAndRank(data || []);
@@ -161,6 +161,11 @@
     return row ? row.rank : null;
   }
   window.getGlobalRankForId = getGlobalRankForId;
+  // For js/menu/devpan.js: open any account's profile from a raw profiles row
+  // (same shape openFriendProfile gets from a rankings row), and drop cached
+  // rankings after a ban/unban so positions and the profile cup recompute.
+  window._rankingsToRow = _toRow;
+  window.resetRankingsCache = () => { _rankingsCache = {}; _rankingsRawMap = {}; _allGlobalRows = null; };
 
   // ── cup by rank ───────────────────────────────────────────────────────────────
   function _cupForRank(rank) {

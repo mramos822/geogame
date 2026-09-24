@@ -104,7 +104,7 @@ function showFinalScreen() {
     });
   }
 
-  const friends = (window._accountLoggedIn && typeof getFriends === 'function') ? getFriends() : [];
+  const friends = (window._accountLoggedIn && typeof getRankedFriends === 'function') ? getRankedFriends() : [];
   const ranking = [...friends, { name: playerName, score: total }]
     .sort((a, b) => b.score - a.score);
   const pos = ranking.findIndex(p => p.name === playerName && p.score === total) + 1;

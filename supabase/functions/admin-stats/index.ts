@@ -321,7 +321,7 @@ Deno.serve(async (req) => {
         .order('created_at', { ascending: true })
         .limit(50000),
       sb.from('analytics_events')
-        .select('created_at, user_id')
+        .select('created_at, user_id, type, session_type')
         .in('type', ['game', 'versus'])
         .not('user_id', 'is', null)
         .limit(50000),
@@ -546,6 +546,31 @@ Deno.serve(async (req) => {
     // Trae todas las cuentas (no solo las creadas en la ventana) para poder ver
     // el historial de partidas de cualquier usuario en el período elegido.
     const allProfiles = allProfilesRes.data || [];
+
+    // ── All-time activity per account, from the raw events ────────────────
+    // profiles.play_count only grows when a FULL Gira Mundial is saved
+    // (add_game_score, js/results.js), so anyone who played standalone modes,
+    // left a Gira half-way or only plays GloboReto showed "0 games / never
+    // played" while their game list wasn't empty. Completed games use the
+    // same definition as the dashboard totals (campaign + versus + GloboReto);
+    // modes = individual mode games (practice excluded).
+    const activityByUser: Record<string, { campaigns: number; versus: number; globequiz: number; modes: number }> = {};
+    const act = (id: string) => activityByUser[id] ||= { campaigns: 0, versus: 0, globequiz: 0, modes: 0 };
+    for (const e of (allEventsRes.data || []) as any[]) {
+      if (!e.user_id) continue;
+      if (e.type === 'versus') act(e.user_id).versus++;
+      else if (e.type === 'game' && e.session_type !== 'practice') act(e.user_id).modes++;
+    }
+    for (const e of (allCampaignsForXpRes.data || []) as any[]) if (e.user_id) act(e.user_id).campaigns++;
+    for (const e of (allGlobequizForXpRes.data || []) as any[]) if (e.user_id) act(e.user_id).globequiz++;
+    const completedOf = (id: string) => {
+      const a = activityByUser[id];
+      return a ? a.campaigns + a.versus + a.globequiz : 0;
+    };
+    const playedAny = (id: string) => {
+      const a = activityByUser[id];
+      return !!a && (a.campaigns + a.versus + a.globequiz + a.modes) > 0;
+    };
     const gamesByUser: Record<string, any[]> = {};
     for (const r of gameRows as any[]) {
       if (!r.user_id) continue;
@@ -651,6 +676,9 @@ Deno.serve(async (req) => {
         // por lo que sea todavía no lo tienen seteado ahí.
         country_code: p.country_code || countryByUser[p.id] || null,
         games_in_range: games.length, games,
+        completed_games: completedOf(p.id),
+        activity: activityByUser[p.id] || { campaigns: 0, versus: 0, globequiz: 0, modes: 0 },
+        played_any: playedAny(p.id),
       };
     });
 
@@ -706,8 +734,9 @@ Deno.serve(async (req) => {
     // ── Profundidad de enganche: ¿la gente vuelve después de la 1ra partida? ──
     const playBuckets = { one: 0, few: 0, mid: 0, many: 0 };
     for (const p of allProfiles as any[]) {
-      const pc = p.play_count || 0;
-      if (pc <= 0) continue;
+      if (!playedAny(p.id)) continue;
+      // Buckets by completed games; someone with only loose modes counts as 1.
+      const pc = Math.max(1, completedOf(p.id));
       if (pc === 1) playBuckets.one++;
       else if (pc <= 5) playBuckets.few++;
       else if (pc <= 15) playBuckets.mid++;
@@ -716,9 +745,9 @@ Deno.serve(async (req) => {
 
     // ── Cuentas en riesgo / perdidas: jugaron alguna vez pero no volvieron ────
     const atRisk = (allProfiles as any[])
-      .filter((p) => (p.play_count || 0) > 0 && p.last_active)
+      .filter((p) => playedAny(p.id) && p.last_active)
       .map((p) => ({
-        username: p.username, play_count: p.play_count || 0, hs_total: p.hs_total || 0,
+        username: p.username, play_count: completedOf(p.id), hs_total: p.hs_total || 0,
         last_active: p.last_active,
         days_inactive: Math.floor((nowMs - new Date(p.last_active).getTime()) / 86400000),
       }))
@@ -1227,7 +1256,7 @@ Deno.serve(async (req) => {
     };
 
     // ── Insights narrativos (todos all-time, sirven para el resumen ejecutivo) ─
-    const everPlayed = (allProfiles as any[]).filter((p) => (p.play_count || 0) > 0).length;
+    const everPlayed = (allProfiles as any[]).filter((p) => playedAny(p.id)).length;
     const neverPlayedCount = allProfiles.length - everPlayed;
     const insights = {
       totalUsersAllTime: allProfiles.length,

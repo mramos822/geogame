@@ -300,13 +300,27 @@ window.sbChangeEmail = async function(newEmail) {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) throw new Error('No session');
   if (user.email === newEmail) throw new Error('__same_email__');
+  // The function identifies the user from this session token (never from the
+  // body) and emails a confirmation link to the NEW address; the change is
+  // applied when that link is opened (?email_token=, js/profile/crazygames-web.js).
+  const { data: { session } } = await sb.auth.getSession();
   const res = await fetch(`${_SB_URL}/functions/v1/send-change-email`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'apikey': _SB_ANON },
-    body: JSON.stringify({ userId: user.id, newEmail }),
+    headers: { 'Content-Type': 'application/json', 'apikey': _SB_ANON, 'Authorization': 'Bearer ' + (session?.access_token || '') },
+    body: JSON.stringify({ newEmail }),
   });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error || 'Error al enviar el correo.');
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    if (json.error === '__same_email__') throw new Error('__same_email__');
+    const en = typeof window.getLang === 'function' && window.getLang() === 'en';
+    const msg = {
+      email_taken:  en ? 'That email is already used by another account.' : 'Ese correo ya está en uso por otra cuenta.',
+      too_soon:     en ? 'Wait a minute before trying again.' : 'Espera un minuto antes de intentarlo de nuevo.',
+      invalid_email: en ? 'Invalid email.' : 'Correo no válido.',
+      send_failed:  en ? "Couldn't send the email. Please try again." : 'No se pudo enviar el correo. Intenta de nuevo.',
+    }[json.error];
+    throw new Error(msg || (en ? "Couldn't send the email." : 'Error al enviar el correo.'));
+  }
 };
 
 // Limit of 1 change every 30 days: NOT enforced only here — a trigger
@@ -619,8 +633,8 @@ window.sbUploadAvatar = async function(userId, blob) {
 window.sbLoadSocialData = async function(userId) {
   const { data, error } = await sb.from('friendships')
     .select(`id, status, initiated_by, user_a, user_b,
-      pa:user_a(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing,is_practicing,vs_wins,vs_losses,is_supporter,avg_sum_flags,avg_sum_shapes,avg_sum_cities,avg_sum_monuments,play_count_flags,play_count_shapes,play_count_cities,play_count_monuments,country_code,is_founder,cell_code,frame_code,card_code,panel_code,gq_streak_count,gq_streak_last_date,gq_today_time_ms),
-      pb:user_b(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing,is_practicing,vs_wins,vs_losses,is_supporter,avg_sum_flags,avg_sum_shapes,avg_sum_cities,avg_sum_monuments,play_count_flags,play_count_shapes,play_count_cities,play_count_monuments,country_code,is_founder,cell_code,frame_code,card_code,panel_code,gq_streak_count,gq_streak_last_date,gq_today_time_ms)`)
+      pa:user_a(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing,is_practicing,vs_wins,vs_losses,is_supporter,avg_sum_flags,avg_sum_shapes,avg_sum_cities,avg_sum_monuments,play_count_flags,play_count_shapes,play_count_cities,play_count_monuments,country_code,is_founder,cell_code,frame_code,card_code,panel_code,gq_streak_count,gq_streak_last_date,gq_today_time_ms,hidden_from_rankings),
+      pb:user_b(id,username,avatar_url,hs_flags,hs_shapes,hs_cities,hs_monuments,hs_total,play_count,last_active,is_playing,is_practicing,vs_wins,vs_losses,is_supporter,avg_sum_flags,avg_sum_shapes,avg_sum_cities,avg_sum_monuments,play_count_flags,play_count_shapes,play_count_cities,play_count_monuments,country_code,is_founder,cell_code,frame_code,card_code,panel_code,gq_streak_count,gq_streak_last_date,gq_today_time_ms,hidden_from_rankings)`)
     .or(`user_a.eq.${userId},user_b.eq.${userId}`);
   if (error) throw error;
   function toEntry(row) {
@@ -651,6 +665,9 @@ window.sbLoadSocialData = async function(userId) {
       gqStreakCount: p.gq_streak_count || 0,
       gqStreakLastDate: p.gq_streak_last_date || null,
       gqTodayTimeMs: (typeof p.gq_today_time_ms === 'number') ? p.gq_today_time_ms : null,
+      // Banned from rankings (dev panel Ban / test accounts) — kept out of
+      // every leaderboard via getRankedFriends() (js/friends.js).
+      banned: !!p.hidden_from_rankings,
     };
   }
   const rows = data || [];

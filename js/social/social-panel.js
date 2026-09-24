@@ -635,6 +635,10 @@ function openFriendProfile(friend) {
     _applyFriendPanelStatus(friend);
   }
   if (friend.id) _startFriendStatusPoll(friend.id);
+  // Lets add-ons react to whichever profile is showing (e.g. the dev panel's
+  // Ban button, js/menu/devpan.js) without wrapping this function — it's
+  // called directly from the friends list, not only via window.
+  document.dispatchEvent(new CustomEvent('friendProfileOpened', { detail: friend }));
 }
 window.openFriendProfile = openFriendProfile;
 

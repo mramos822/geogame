@@ -10,6 +10,9 @@
 let _friendsCache = [];
 
 function getFriends() { return _friendsCache; }
+// Same list minus accounts banned from rankings (hidden_from_rankings) — what
+// every in-game leaderboard / friends bar should rank against.
+function getRankedFriends() { return _friendsCache.filter(f => !f.banned); }
 
 const _friendsListeners = [];
 function onFriendsUpdate(cb) { if (typeof cb === 'function') _friendsListeners.push(cb); }
@@ -46,6 +49,7 @@ async function loadFriends() {
       gqStreakCount: f.gqStreakCount || 0,
       gqStreakLastDate: f.gqStreakLastDate || null,
       gqTodayTimeMs: (typeof f.gqTodayTimeMs === 'number') ? f.gqTodayTimeMs : null,
+      banned: !!f.banned,
     }));
   } catch (e) {
     console.warn('[friends] error loading:', e.message);

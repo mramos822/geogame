@@ -2367,7 +2367,7 @@
       playerTimeEl.textContent = '0:00';
     }
     const todayStr = dateKey(new Date());
-    const friends = (typeof getFriends === 'function' ? getFriends() : [])
+    const friends = (typeof getRankedFriends === 'function' ? getRankedFriends() : [])
       .filter(f => f.gqStreakLastDate === todayStr && typeof f.gqTodayTimeMs === 'number');
     gqFriendPlayers = friends.map((f, i) => ({
       id: 'gqf' + i, timeMs: f.gqTodayTimeMs, name: f.name,

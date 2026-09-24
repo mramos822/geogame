@@ -1,5 +1,5 @@
-// ── DEVPAN (dev account only) ───────────────────────────────────────────────
-// "DEVPAN" button above the menu logo, drawn only for window.DEV_UID
+// ── Dev. Panel (dev account only) ───────────────────────────────────────────
+// "Dev. Panel" button above the menu logo, drawn only for window.DEV_UID
 // (BlueLite, see js/sb.js). Opens a panel with a quick stats summary and who
 // is connected right now — accounts in the same rows as the friends list
 // (cell, frame, status) plus guests — refreshed every 10s while open.
@@ -19,7 +19,9 @@
 
   const TEXT = {
     es: {
-      title: 'DEVPAN', refresh: 'Actualizar', updated: 'Actualizado',
+      title: 'Dev. Panel', refresh: 'Actualizar', updated: 'Actualizado',
+      ban: 'Ban', unban: 'Quitar ban', banSure: '¿Seguro? Banear', banned: 'Baneados',
+      bannedTitle: 'Baneados del ranking', bannedNone: 'No hay cuentas baneadas', banErr: 'No se pudo cambiar el ban.',
       users: 'Cuentas', cg: 'De CrazyGames', founders: 'Fundadores', gamesTotal: 'Partidas (total)',
       period: { '1d': 'Últimas 24 h', '7d': 'Últimos 7 días', '30d': 'Últimos 30 días', '90d': 'Últimos 90 días', '365d': 'Último año', all: 'Desde el inicio' },
       rangeAll: 'TODO', visitors: 'Visitantes', games: 'Partidas', modeGames: 'Modos jugados',
@@ -30,7 +32,9 @@
       guest: 'Invitado', error: 'No se pudo cargar el panel.',
     },
     en: {
-      title: 'DEVPAN', refresh: 'Refresh', updated: 'Updated',
+      title: 'Dev. Panel', refresh: 'Refresh', updated: 'Updated',
+      ban: 'Ban', unban: 'Unban', banSure: 'Sure? Ban', banned: 'Banned',
+      bannedTitle: 'Banned from rankings', bannedNone: 'No banned accounts', banErr: "Couldn't change the ban.",
       users: 'Accounts', cg: 'From CrazyGames', founders: 'Founders', gamesTotal: 'Games (total)',
       period: { '1d': 'Last 24 h', '7d': 'Last 7 days', '30d': 'Last 30 days', '90d': 'Last 90 days', '365d': 'Last year', all: 'All time' },
       rangeAll: 'ALL', visitors: 'Visitors', games: 'Games', modeGames: 'Modes played',
@@ -59,7 +63,10 @@
   }
   function ago(iso) {
     const s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
-    return s < 60 ? s + 's' : Math.round(s / 60) + 'm';
+    if (s < 60) return s + 's';
+    if (s < 3600) return Math.round(s / 60) + 'm';
+    if (s < 48 * 3600) return Math.round(s / 3600) + 'h';
+    return Math.round(s / 86400) + 'd';
   }
 
   const style = document.createElement('style');
@@ -104,10 +111,30 @@
     #devpan-modal .loading-social-list.devpan-guests { height: auto; max-height: 10cqmin; }
     /* Own right-hand block (not .loading-social-score, which is centered for
        the narrower friends list and ended up covering the status text). */
-    #devpan-modal .loading-social-row { position: relative; padding-right: 17cqmin; }
-    #devpan-modal .loading-social-info { min-width: 0; flex: 1; }
-    #devpan-modal .loading-social-name-row { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    #devpan-modal .loading-social-status { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #devpan-modal .loading-social-row, #devpan-banned-modal .loading-social-row { position: relative; padding-right: 27cqmin; cursor: pointer; }
+    #devpan-modal .loading-social-info, #devpan-banned-modal .loading-social-info { min-width: 0; flex: 1; }
+    #devpan-modal .loading-social-name-row, #devpan-banned-modal .loading-social-name-row { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #devpan-modal .loading-social-status, #devpan-banned-modal .loading-social-status { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* Same points plaque as the friends rows, but in flow inside our block. */
+    .devpan-right .loading-social-score { position: relative; left: auto; top: auto; transform: none; }
+    #devpan-banned-modal .account-modal-box { max-width: 80cqmin; width: 74cqmin; }
+    #devpan-banned-modal .loading-social-list { height: 44cqmin; width: 100%; border-radius: 1.2cqmin; box-sizing: border-box; }
+    #devpan-banned-modal .devpan-right { position: absolute; right: 2cqmin; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 1cqmin; }
+    .devpan-unban { width: auto; padding: 0.5cqmin 1.6cqmin; font-size: 1.6cqmin; }
+    #devpan-ban-btn {
+      position: absolute; top: 88.5%; left: calc(50% - 28cqmin); transform: translate(-50%, -50%);
+      z-index: 214; display: none; cursor: pointer;
+      font-family: 'VAGRoundBold', 'Arial Black', sans-serif; font-size: 2cqmin; letter-spacing: 0.08em;
+      color: #fff; background: #e8504a; border: 0.45cqmin solid #a32a26; border-radius: 1.2cqmin;
+      padding: 0.5cqmin 2.4cqmin; box-shadow: 0 0.5cqmin 1.2cqmin rgba(0,0,0,0.3); transition: transform 0.1s;
+    }
+    #devpan-ban-btn.is-banned { background: #2bd14b; border-color: #1c8a32; }
+    #devpan-ban-btn.confirming { background: #a32a26; }
+    #devpan-ban-btn:hover  { transform: translate(-50%, -50%) scale(1.06); }
+    #devpan-ban-btn:active { transform: translate(-50%, -50%) scale(0.95); }
+    body.devpan-on #devpan-ban-btn.for-profile { display: block; }
+    #devpan-banned-btn { display: none; }
+    body.devpan-on #devpan-banned-btn { display: inline-block; background: #e8504a; color: #fff; }
     #devpan-modal .devpan-right {
       position: absolute; right: 2cqmin; top: 50%; transform: translateY(-50%);
       display: flex; align-items: center; gap: 1cqmin;
@@ -117,7 +144,7 @@
     #devpan-modal .devpan-right .devpan-eye:hover { transform: scale(1.2); }
     #devpan-modal .devpan-guest-row > span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #devpan-modal .devpan-guest-row > span:last-child { white-space: nowrap; flex-shrink: 0; }
-    #devpan-modal .devpan-flag {
+    .devpan-flag {
       width: 2.2cqmin; height: 2.2cqmin; border-radius: 50%; object-fit: cover;
       vertical-align: middle; margin-right: 0.5cqmin; pointer-events: none;
     }
@@ -190,6 +217,161 @@
     return `<div class="devpan-card"><b>${Number(value || 0).toLocaleString()}</b><span>${esc(label)}</span></div>`;
   }
 
+  // Points plaque exactly like the friends/rankings rows.
+  function pointsHtml(n) {
+    return '<div class="loading-social-score">' +
+      '<img class="loading-social-points" src="images/points.png" alt="" draggable="false" oncontextmenu="return false">' +
+      `<span class="loading-social-score-val">${Number(n || 0).toLocaleString()}</span></div>`;
+  }
+
+  // Opens any account's profile (the same panel as a rankings row click).
+  // fromPanel: reopen the Dev. Panel once that profile is closed (back
+  // button), so browsing several accounts doesn't mean reopening it each time.
+  let reopenAfterProfile = false;
+  async function openProfile(id, fromPanel) {
+    if (!id || typeof window.openFriendProfile !== 'function') return;
+    if (id === window._sbUserId) return;
+    reopenAfterProfile = !!fromPanel;
+    try {
+      const { data: p, error } = await window.sb.from('profiles').select('*').eq('id', id).single();
+      if (error || !p) throw error;
+      if (window._accountLoggedIn && !window._socialDataFetched && typeof loadSocialData === 'function') await loadSocialData(false);
+      window.openFriendProfile(window._rankingsToRow ? window._rankingsToRow(p) : { id: p.id, name: p.username, avatar: p.avatar_url });
+    } catch (e) { console.warn('[devpan] profile', e); }
+  }
+
+  // ── Ban (profile panel button + banned list in Rankings) ────────────────
+  // dev_set_banned() flips profiles.hidden_from_rankings server-side (dev
+  // only). A banned account drops out of every ranking/leaderboard, so it has
+  // no position: the cup + "#N" badge vanishes from its profile for everyone.
+  async function setBanned(id, banned) {
+    const { data, error } = await window.sb.rpc('dev_set_banned', { p_user_id: id, p_banned: banned });
+    if (error || !data) throw error || new Error('not found');
+    window.resetRankingsCache?.();
+    if (typeof loadFriends === 'function') loadFriends(); // in-game leaderboards
+  }
+
+  let profileFriend = null, banBtn = null, confirmTimer = null;
+  async function refreshBanBtn() {
+    if (!banBtn || !profileFriend) return;
+    banBtn.classList.remove('confirming');
+    let banned = false;
+    try {
+      const { data } = await window.sb.from('profiles').select('hidden_from_rankings').eq('id', profileFriend.id).single();
+      banned = !!data?.hidden_from_rankings;
+    } catch (e) {}
+    banBtn.dataset.banned = banned ? '1' : '';
+    banBtn.classList.toggle('is-banned', banned);
+    banBtn.textContent = tx(banned ? 'unban' : 'ban');
+    banBtn.classList.add('for-profile');
+  }
+  function initBanButton() {
+    const group = document.getElementById('loading-friend-group');
+    if (!group || document.getElementById('devpan-ban-btn')) return;
+    banBtn = document.createElement('button');
+    banBtn.id = 'devpan-ban-btn';
+    banBtn.type = 'button';
+    group.appendChild(banBtn);
+    // Fired by openFriendProfile (js/social/social-panel.js) for every
+    // profile opened, from friends, rankings or this panel.
+    new MutationObserver(() => {
+      if (reopenAfterProfile && group.classList.contains('table-gone')) { reopenAfterProfile = false; open(); }
+    }).observe(group, { attributes: true, attributeFilter: ['class'] });
+    document.addEventListener('friendProfileOpened', (e) => {
+      const friend = e.detail;
+      profileFriend = friend && friend.id ? friend : null;
+      banBtn.classList.remove('for-profile');
+      if (profileFriend && isDev()) refreshBanBtn();
+    });
+    banBtn.addEventListener('click', async () => {
+      if (!profileFriend || !isDev()) return;
+      click();
+      const banned = !!banBtn.dataset.banned;
+      // Banning takes a second click within 3s (no native confirm dialogs).
+      if (!banned && !banBtn.classList.contains('confirming')) {
+        banBtn.classList.add('confirming');
+        banBtn.textContent = tx('banSure');
+        clearTimeout(confirmTimer);
+        confirmTimer = setTimeout(refreshBanBtn, 3000);
+        return;
+      }
+      clearTimeout(confirmTimer);
+      try {
+        await setBanned(profileFriend.id, !banned);
+        // Re-open so the cup/#N badge reflects the new state right away.
+        window.openFriendProfile(profileFriend);
+      } catch (e) {
+        window.showGlobalToast?.(tx('banErr'));
+        refreshBanBtn();
+      }
+    });
+  }
+
+  let bannedModal = null;
+  async function openBannedList() {
+    if (!isDev()) return;
+    click();
+    if (!bannedModal) {
+      bannedModal = document.createElement('div');
+      bannedModal.className = 'account-modal';
+      bannedModal.id = 'devpan-banned-modal';
+      bannedModal.innerHTML =
+        '<div class="account-modal-box">' +
+        '  <button class="account-modal-close" type="button" data-act="close">✕</button>' +
+        '  <span class="account-modal-title" data-t="title" style="text-align:center"></span>' +
+        '  <div class="loading-social-list" data-t="list"></div>' +
+        '</div>';
+      const ref = document.getElementById('account-modal');
+      if (ref && ref.parentNode) ref.parentNode.insertBefore(bannedModal, ref);
+      else document.body.appendChild(bannedModal);
+      bannedModal.querySelector('[data-act="close"]').addEventListener('click', () => { click(); bannedModal.classList.remove('open'); });
+    }
+    bannedModal.querySelector('[data-t="title"]').textContent = tx('bannedTitle');
+    const list = bannedModal.querySelector('[data-t="list"]');
+    list.innerHTML = '';
+    const box = bannedModal.querySelector('.account-modal-box');
+    if (box) { box.style.animation = 'none'; box.offsetWidth; box.style.animation = ''; }
+    bannedModal.classList.add('open');
+    const { data } = await window.sb.from('profiles')
+      .select('id, username, avatar_url, frame_code, cell_code, hs_total, country_code, last_active')
+      .eq('hidden_from_rankings', true).order('hs_total', { ascending: false });
+    const rows = data || [];
+    if (!rows.length) { list.innerHTML = `<div class="loading-social-empty">${esc(tx('bannedNone'))}</div>`; return; }
+    rows.forEach((u) => {
+      const row = document.createElement('div');
+      // 'online' styling on purpose: 'offline' greys the whole row out.
+      row.className = 'loading-social-row status-online' + (window.CUSTOMIZE_CELL_LIGHT_TEXT?.has(u.cell_code) ? ' cell-light-text' : '');
+      window.CustomizeAssets?.applyCellForStatus(row, u.cell_code, 'online');
+      row.innerHTML =
+        (window._socialAvatarHtml ? window._socialAvatarHtml(u.avatar_url, u.frame_code) : '') +
+        '<div class="loading-social-info"><div class="loading-social-name-row">' +
+        `<span class="loading-social-name">${flag(u.country_code)} ${esc(u.username)}</span></div>` +
+        `<span class="loading-social-status">${u.last_active ? ago(u.last_active) : '—'}</span></div>` +
+        '<div class="devpan-right">' + pointsHtml(u.hs_total) +
+        `<button class="account-modal-opt account-modal-login devpan-unban" type="button">${esc(tx('unban'))}</button></div>`;
+      row.addEventListener('click', () => { click(); bannedModal.classList.remove('open'); openProfile(u.id); });
+      row.querySelector('.devpan-unban').addEventListener('click', async (e) => {
+        e.stopPropagation();
+        click();
+        try { await setBanned(u.id, false); row.remove(); }
+        catch (err) { window.showGlobalToast?.(tx('banErr')); }
+        if (!list.querySelector('.loading-social-row')) list.innerHTML = `<div class="loading-social-empty">${esc(tx('bannedNone'))}</div>`;
+      });
+      list.appendChild(row);
+    });
+  }
+  function initBannedTab() {
+    const tabs = document.querySelector('#loading-rankings-group .loading-social-tabs');
+    if (!tabs || document.getElementById('devpan-banned-btn')) return;
+    const b = document.createElement('button');
+    b.id = 'devpan-banned-btn';
+    b.type = 'button';
+    b.className = 'loading-social-tab';
+    b.textContent = tx('banned');
+    b.addEventListener('click', openBannedList);
+    tabs.appendChild(b);
+  }
+
   function accountRow(u) {
     const status = u.is_playing ? 'playing' : 'online';
     const row = document.createElement('div');
@@ -212,8 +394,9 @@
       '</div>' +
       '<div class="devpan-right">' +
       (canWatch ? '<img class="devpan-eye" src="images/spectate.png" alt="" draggable="false" oncontextmenu="return false" title="Spectate (stealth)">' : '') +
-      `  <span>${Number(u.hs_total || 0).toLocaleString()} pts</span>` +
+      pointsHtml(u.hs_total) +
       '</div>';
+    row.addEventListener('click', () => { click(); close(); openProfile(u.id, true); });
     if (u.is_playing && !canWatch) row.title = tx('noSpectate');
     row.querySelector('.devpan-eye')?.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -296,9 +479,11 @@
     const btn = document.createElement('button');
     btn.id = 'devpan-btn';
     btn.type = 'button';
-    btn.textContent = 'DEVPAN';
+    btn.textContent = 'Dev. Panel';
     logo.parentNode.insertBefore(btn, logo);
     btn.addEventListener('click', open);
+    initBanButton();
+    initBannedTab();
     const sync = () => document.body.classList.toggle('devpan-on', isDev());
     document.addEventListener('sbSessionReady', sync);
     sync();

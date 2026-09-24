@@ -770,7 +770,7 @@
               <th>Estado</th>
               <th class="sortable" data-sort="created_at">Registro <span class="arrow">↕</span></th>
               <th class="sortable" data-sort="last_active">Última act. <span class="arrow">↕</span></th>
-              <th class="sortable" data-sort="play_count" style="text-align:right" title="Total histórico (play_count del perfil). Pasá el mouse por el número para ver cuántas fueron en el período elegido.">Partidas <span class="arrow">↕</span></th>
+              <th class="sortable" data-sort="completed_games" style="text-align:right" title="Total histórico de partidas terminadas: Giras Mundiales completas + versus + GloboReto. Debajo, los modos sueltos o de Giras sin terminar. Pasa el mouse por el número para ver el desglose y cuántas fueron en el período elegido.">Partidas <span class="arrow">↕</span></th>
               <th class="sortable" data-sort="hs_total" style="text-align:right">Score total <span class="arrow">↕</span></th>
               <th style="text-align:right">Versus</th>
             </tr></thead>
@@ -895,9 +895,19 @@ const ACCOUNT_FILTERS = [
 let accountsFilter = 'all';
 let accountsSort = { key:'last_active', dir:'desc' };
 
+function accountGamesTitle(a){
+  const x = a.activity;
+  if(!x) return `${a.games_in_range||0} en el período elegido`;
+  return `Giras completas: ${x.campaigns} · Versus: ${x.versus} · GloboReto: ${x.globequiz}
+Modos jugados (incluye Giras sin terminar): ${x.modes}
+${a.games_in_range||0} en el período elegido`;
+}
 function daysSince(iso){ return iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 86400000) : null; }
 function accountStatus(a){
-  if(!a.play_count) return { cls:'never', label:'Nunca jugó' };
+  // played_any (admin-stats) counts every finished mode, not only full Giras
+  // Mundiales like profiles.play_count — which left players of loose modes
+  // or GloboReto marked as "never played".
+  if(!(a.played_any ?? a.play_count)) return { cls:'never', label:'Nunca jugó' };
   const d = daysSince(a.last_active);
   if(d === null) return { cls:'never', label:'Nunca jugó' };
   if(d < 7) return { cls:'active', label:'Activo' };
@@ -2283,7 +2293,7 @@ function drawAccounts(rows){
         <td><span class="status-pill ${st.cls}"><span class="dotstat"></span>${st.label}</span></td>
         <td>${created}</td>
         <td>${active}</td>
-        <td class="n" title="${a.games_in_range||0} en el período elegido">${a.play_count||0}</td>
+        <td class="n" title="${accountGamesTitle(a)}">${(a.completed_games ?? a.play_count ?? 0).toLocaleString('es')}${a.activity && a.activity.modes ? `<div style="font-size:11px;color:var(--muted)">+${a.activity.modes} modos</div>` : ''}</td>
         <td class="n">${(a.hs_total||0).toLocaleString('es')}</td>
         <td class="n">${versusRec}</td>
       </tr>

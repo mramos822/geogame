@@ -38,7 +38,7 @@ function buildFriendPlayers() {
       cardCode: o.cardCode || '0001',
     }];
   }
-  const src = (typeof getFriends === 'function') ? getFriends() : [];
+  const src = (typeof getRankedFriends === 'function') ? getRankedFriends() : [];
   return src.map((f, i) => ({
     id: `friend${i}`,
     name: f.name,
