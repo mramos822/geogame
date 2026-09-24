@@ -85,6 +85,7 @@
       if (old) old.remove();
       item.appendChild(makeBubble(idx));   // fresh element => the pop animation restarts
       item.classList.remove('out');
+      item.classList.remove('pulse'); void item.offsetWidth; item.classList.add('pulse');
       clearTimeout(item._tOut); clearTimeout(item._tGone);
     } else {
       while (f.children.length >= MAX_FEED) {
@@ -157,15 +158,26 @@
       '#emote-picker-panel img{width:100%;display:block;pointer-events:none;transform:scaleX(-1);}' +
       '@keyframes emotePanelIn{from{opacity:0;transform:translateX(-1cqmin) scale(.96);}to{opacity:1;transform:none;}}' +
       '#emote-feed{position:absolute;left:calc(15% + 1.6cqmin);bottom:9.6cqmin;z-index:1400;display:flex;flex-direction:column-reverse;gap:1cqmin;pointer-events:none;}' +
-      '.emote-shout{position:relative;width:8.4cqmin;height:8.4cqmin;animation:emoteShoutIn .25s ease-out;transition:opacity .3s,transform .3s;}' +
+      '.emote-shout{position:relative;width:8.4cqmin;height:8.4cqmin;animation:emoteShoutIn .22s ease-out;transition:opacity .3s,transform .3s;}' +
       '.emote-shout.out{opacity:0;transform:translateY(-1.2cqmin);}' +
+      '.emote-shout.pulse{animation:emoteShoutPulse .24s ease-out;}' +
       '.emote-shout-photo{width:100%;height:100%;border-radius:50%;object-fit:cover;background:#fff;border:0.4cqmin solid #fff;box-shadow:0 0.5cqmin 1.4cqmin rgba(0,0,0,.4);}' +
       '.emote-shout-bubble{position:absolute;left:5.6cqmin;top:-4.6cqmin;width:9.4cqmin;transform-origin:15% 90%;animation:emoteBubblePop 3s ease-out both;' +
       'filter:drop-shadow(0 0.4cqmin 0.8cqmin rgba(0,0,0,.35));}' +
       '.emote-shout-bubble img{width:100%;height:auto;display:block;transform:scaleX(-1);}' +
-      '@keyframes emoteShoutIn{from{opacity:0;transform:scale(.7);}to{opacity:1;transform:none;}}' +
-      '@keyframes emoteBubblePop{0%{opacity:0;transform:scale(.2) rotate(-12deg);}12%{opacity:1;transform:scale(1.18) rotate(6deg);}22%{transform:scale(.96) rotate(-3deg);}' +
-      '32%{transform:scale(1) rotate(0);}82%{opacity:1;transform:translateY(-0.6cqmin) scale(1);}100%{opacity:0;transform:translateY(-1.6cqmin) scale(1);}}';
+      '.emote-shout-bubble::before{content:"";position:absolute;left:8%;top:12%;width:84%;height:70%;border-radius:50%;border:0.6cqmin solid rgba(255,255,255,.95);' +
+      'box-shadow:0 0 1.2cqmin rgba(80,170,255,.8);pointer-events:none;animation:emoteBurst .42s ease-out both;}' +
+      '@keyframes emoteShoutIn{0%{opacity:0;transform:scale(.4);}55%{opacity:1;transform:scale(1.16);}100%{opacity:1;transform:scale(1);}}' +
+      '@keyframes emoteShoutPulse{0%{transform:scale(1);}35%{transform:scale(1.14);}100%{transform:scale(1);}}' +
+      '@keyframes emoteBubblePop{0%{opacity:0;transform:scale(0) rotate(-24deg);}' +
+      '6%{opacity:1;transform:scale(1.4) rotate(9deg);}' +
+      '11%{transform:scale(.86) rotate(-5deg);}' +
+      '16%{transform:scale(1.1) rotate(3deg);}' +
+      '21%{transform:scale(1) rotate(0);}' +
+      '55%{transform:scale(1.04) rotate(-1.5deg);}' +
+      '88%{opacity:1;transform:scale(1) rotate(0);}' +
+      '100%{opacity:0;transform:scale(.85) translateY(-1cqmin);}}' +
+      '@keyframes emoteBurst{0%{opacity:.95;transform:scale(.3);}100%{opacity:0;transform:scale(1.7);}}';
     document.head.appendChild(st);
 
     btn = document.createElement('button');
