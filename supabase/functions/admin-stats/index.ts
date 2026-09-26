@@ -461,6 +461,7 @@ Deno.serve(async (req) => {
       const m = (r.mode as string) || 'otro';
       byMode[m] = (byMode[m] || 0) + 1;
     }
+    byMode.globequiz = globequizRows.length;
 
     // Versus por modo (dentro de la ventana)
     const versusByMode: Record<string, number> = { flags: 0, shapes: 0, cities: 0, monuments: 0 };
@@ -1389,9 +1390,66 @@ Deno.serve(async (req) => {
       return new Date(b.last_active).getTime() - new Date(a.last_active).getTime();
     });
 
+    // ── GloboReto: todo lo exclusivo del modo. score = intentos, duration_ms =
+    // tiempo total hasta acertar (no se guarda el tiempo de cada intento por
+    // separado, así que el promedio por intento es duración / intentos).
+    const nyFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' });
+    const todayNY = nyFmt.format(now);
+    const yesterdayNY = nyFmt.format(new Date(now.getTime() - 86400000));
+    const { data: streakProfiles } = await sb.from('profiles')
+      .select('username, country_code, gq_streak_count, gq_streak_last_date, gq_today_time_ms')
+      .gt('gq_streak_count', 0).gte('gq_streak_last_date', yesterdayNY)
+      .order('gq_streak_count', { ascending: false }).limit(200);
+    const gqActiveStreaks = (streakProfiles || []).map((p: any) => ({
+      username: p.username, country: p.country_code || null, streak: p.gq_streak_count,
+      last_date: p.gq_streak_last_date, playedToday: p.gq_streak_last_date === todayNY,
+      todaySeconds: p.gq_today_time_ms != null ? Math.round(p.gq_today_time_ms / 100) / 10 : null,
+    }));
+    const gqDay: Record<string, { accounts: Set<string>; guests: Set<string>; games: number }> = {};
+    const gqPlayers = new Set<string>();
+    const gqSecs: number[] = [];
+    let gqAttempts = 0, gqAttemptsN = 0;
+    for (const r of globequizRows as any[]) {
+      const day = nyFmt.format(new Date(r.created_at));
+      const d = gqDay[day] ||= { accounts: new Set(), guests: new Set(), games: 0 };
+      d.games++;
+      if (r.user_id) d.accounts.add(r.user_id); else d.guests.add(r.visitor_id || '?');
+      gqPlayers.add(r.user_id || r.visitor_id || '?');
+      if (typeof r.score === 'number') { gqAttempts += r.score; gqAttemptsN++; }
+      if (typeof r.duration_ms === 'number') gqSecs.push(r.duration_ms / 1000);
+    }
+    gqSecs.sort((a, b) => a - b);
+    const gqDays = Object.keys(gqDay).sort();
+    const globequiz = {
+      total: globequizRows.length,
+      players: gqPlayers.size,
+      avgAttempts: gqAttemptsN ? Math.round(gqAttempts / gqAttemptsN * 10) / 10 : null,
+      avgSeconds: gqSecs.length ? Math.round(gqSecs.reduce((a, b) => a + b, 0) / gqSecs.length * 10) / 10 : null,
+      medianSeconds: gqSecs.length ? Math.round(gqSecs[Math.floor(gqSecs.length / 2)] * 10) / 10 : null,
+      activeStreaks: gqActiveStreaks,
+      daily: {
+        labels: gqDays,
+        accounts: gqDays.map((k) => gqDay[k].accounts.size),
+        guests: gqDays.map((k) => gqDay[k].guests.size),
+        games: gqDays.map((k) => gqDay[k].games),
+      },
+      recent: (globequizRows as any[]).slice(-150).reverse().map((r) => ({
+        created_at: r.created_at,
+        username: r.user_id ? (usernameById[r.user_id] || null) : null,
+        guest_name: r.guest_name || null,
+        country: r.country_code || null,
+        attempts: r.score ?? null,
+        seconds: r.duration_ms != null ? Math.round(r.duration_ms / 100) / 10 : null,
+        perAttempt: r.duration_ms != null && r.score ? Math.round(r.duration_ms / r.score / 100) / 10 : null,
+        streak: r.streak ?? null,
+        platform: r.platform || 'web',
+      })),
+    };
+
     return new Response(JSON.stringify({
       ok: true,
       generated_at: now.toISOString(),
+      globequiz,
       range,
       totals: {
         totalUsers, onlineNow: onlineNow + onlineGuestsCount, playingNow: playingNow + playingGuestsCount,

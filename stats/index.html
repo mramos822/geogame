@@ -756,6 +756,23 @@
         </div>
       </div>
       </div>
+      <div class="sub-page" data-sub="globoreto">
+      <div class="cards" id="cards-gq"></div>
+      <div class="grid">
+        <div class="box wide">
+          <h2>Jugadores por día <span class="sub">cuentas vs invitados · día de Nueva York <span class="help" title="Personas distintas que ganaron GloboReto cada día. Se cuenta por cuenta o, si es invitado, por dispositivo.">ⓘ</span></span></h2>
+          <div class="chart-wrap short"><canvas id="chart-gq-daily"></canvas></div>
+        </div>
+        <div class="box">
+          <h2>Rachas activas <span class="sub" id="gq-streaks-sub"></span></h2>
+          <div class="table-scroll"><table id="tbl-gq-streaks"><tbody></tbody></table></div>
+        </div>
+        <div class="box">
+          <h2>Cada partida ganada <span class="sub">últimas 150 <span class="help" title="Se guarda el tiempo total hasta acertar y la cantidad de intentos; el tiempo por intento es el promedio (total ÷ intentos), no se registra cada intento por separado.">ⓘ</span></span></h2>
+          <div class="table-scroll"><table id="tbl-gq-recent"><tbody></tbody></table></div>
+        </div>
+      </div>
+      </div>
       <div class="sub-page" data-sub="versus">
       <div class="cards" id="cards-versus"></div>
       <div class="grid">
@@ -1052,7 +1069,7 @@ const RANGE_LABEL = Object.fromEntries(RANGES);
 const NAV = [
   ['hoy',         '🏠', 'Hoy',         null],
   ['jugadores',   '👥', 'Jugadores',   [['cuentas','Cuentas'], ['invitados','Invitados'], ['fundador','Fundadores']]],
-  ['juego',       '🎮', 'Juego',       [['leaderboards','Rankings'], ['versus','Versus'], ['social','Social']]],
+  ['juego',       '🎮', 'Juego',       [['leaderboards','Rankings'], ['globoreto','GloboReto'], ['versus','Versus'], ['social','Social']]],
   ['crecimiento', '📈', 'Crecimiento', [['resumen','Resumen'], ['retencion','Retención'], ['trafico','Tráfico']]],
   ['admin',       '🛠️', 'Admin',       [['integridad','Integridad'], ['economia','Economía'], ['mensajes','Mensajes'], ['changelog','Novedades']]],
 ];
@@ -1069,7 +1086,7 @@ const MODE_TABS = [
   ['total','Total'], ['flags','Banderas'], ['shapes','Figuras'], ['cities','Ciudades'], ['monuments','Monumentos'],
 ];
 const MODE_LABELS = { flags:'Banderas', shapes:'Figuras', cities:'Ciudades', monuments:'Monumentos', versus:'Versus', otro:'Otro' };
-const MODE_COLORS = { flags:'#ffe066', shapes:'#4aa3ff', cities:'#6fdf6f', monuments:'#ff7ad9' };
+const MODE_COLORS = { flags:'#ffe066', shapes:'#4aa3ff', cities:'#6fdf6f', monuments:'#ff7ad9', globequiz:'#ff9d4a' };
 const ACCOUNT_FILTERS = [
   ['all','Todos'], ['active','Activos (<7d)'], ['stale','Inactivos (7-30d)'], ['churned','Perdidos (30d+)'], ['never','Nunca jugaron'], ['crazygames','🎮 CrazyGames'],
 ];
@@ -1342,6 +1359,7 @@ const CHANGELOG = [
   ['3.9.3','2026-09-24',89,['Emotes: la animación al enviarlos ahora es mucho más rápida y con más golpe: el emote sale como una exclamación con rebote y un anillo de impacto, al estilo Clash Royale, y la foto da un pequeño salto cuando llega otro emote.']],
   ['3.9.4','2026-09-24',90,['Emotes: quitado el anillo que aparecía alrededor del emote al enviarlo.']],
   ['3.9.5','2026-09-24',91,['Emotes: actualizado el arte del emote 7.']],
+  ['3.9.6','2026-09-26',92,['Panel de estadísticas: nueva pestaña GloboReto en Juego, con partidas ganadas, tiempos, intentos, rachas activas, jugadores por día y las últimas partidas; además GloboReto aparece en el gráfico de modos.']],
 ];
 function renderChangelog(){
   const el = $('changelog-list');
@@ -1605,6 +1623,7 @@ function render(data){
   renderAtRisk(data.atRisk||[]);
   renderLeaderboardTabs();
   renderLeaderboard(data.leaderboards||{});
+  renderGlobequiz(data.globequiz||{});
   renderVersusCards(data.totals||{}, data.period||{}, rl);
   renderVersusModes(data.versusByMode||{});
   renderVersusFunnel(data.versusFunnel||{}, rl);
@@ -1689,6 +1708,49 @@ function renderLeaderboard(lbs){
   tb.innerHTML = '<tr><th>#</th><th>Jugador</th><th style="text-align:right">Puntaje</th></tr>' +
     rows.map((r,i)=>`<tr><td><span class="rank-badge ${rankClass(i)}">${i+1}</span></td><td>${nameFlag(r.username, r.country)}</td>` +
       `<td class="n bar-cell"><span class="bar-bg" style="width:${Math.round((r.score||0)/max*100)}%"></span><span class="bar-val">${fmtN(r.score)}</span></td></tr>`).join('');
+}
+
+// ── GloboReto ─────────────────────────────────────────────────────────────────
+function renderGlobequiz(g){
+  const fmtS = (s)=> s==null ? '—' : (s>=60 ? `${Math.floor(s/60)}m ${Math.round(s%60)}s` : `${s}s`);
+  $('cards-gq').innerHTML = kpiCards([
+    ['🌎', fmtN(g.total), 'Partidas ganadas'],
+    ['👥', fmtN(g.players), 'Jugadores distintos'],
+    ['🎯', g.avgAttempts ?? '—', 'Intentos promedio'],
+    ['⏱️', fmtS(g.avgSeconds), 'Tiempo promedio'],
+    ['⏱️', fmtS(g.medianSeconds), 'Tiempo mediano'],
+    ['🔥', fmtN((g.activeStreaks||[]).length), 'Rachas activas'],
+  ]);
+  const d = g.daily || {labels:[]};
+  const cfg = {
+    type:'bar',
+    data:{ labels:(d.labels||[]).map(l=>l.slice(5)), datasets:[
+      { label:'Cuentas', data:d.accounts||[], backgroundColor:'#4aa3ff', borderRadius:3, stack:'s' },
+      { label:'Invitados', data:d.guests||[], backgroundColor:'#ff9d4a', borderRadius:3, stack:'s' },
+    ] },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ ...chartDefaults.plugins, legend:{ position:'bottom', labels:{ color:'#cce0ff', boxWidth:12, font:{size:11} } } },
+      scales:{
+        x:{ stacked:true, ticks:{ color:'#5a7da6', maxRotation:0, autoSkip:true, font:{size:9} }, grid:{ display:false } },
+        y:{ stacked:true, beginAtZero:true, ticks:{ color:'#5a7da6', precision:0, font:{size:10} }, grid:{ color:'#16263f' } },
+      } }
+  };
+  if(charts.gqDaily){ charts.gqDaily.data = cfg.data; charts.gqDaily.update('none'); }
+  else charts.gqDaily = new Chart($('chart-gq-daily'), cfg);
+
+  const st = g.activeStreaks || [];
+  $('gq-streaks-sub').textContent = st.length ? `${st.length} cuentas` : '';
+  const ts = $('tbl-gq-streaks').querySelector('tbody');
+  ts.innerHTML = !st.length ? emptyRow('Nadie tiene racha activa') :
+    '<tr><th>#</th><th>Jugador</th><th style="text-align:right">Racha</th><th style="text-align:right">Hoy</th></tr>' +
+    st.map((r,i)=>`<tr><td><span class="rank-badge ${rankClass(i)}">${i+1}</span></td><td>${nameFlag(r.username, r.country)}</td>` +
+      `<td class="n">🔥 ${r.streak}</td><td class="n">${r.playedToday ? '✅ '+fmtS(r.todaySeconds) : '<span style="color:var(--dim)">pendiente</span>'}</td></tr>`).join('');
+
+  const rc = g.recent || [];
+  const tr = $('tbl-gq-recent').querySelector('tbody');
+  tr.innerHTML = !rc.length ? emptyRow('Sin partidas en este período') :
+    '<tr><th>Jugador</th><th style="text-align:right">Intentos</th><th style="text-align:right">Total</th><th style="text-align:right">Por intento</th><th style="text-align:right">Racha</th><th style="text-align:right">Cuándo</th></tr>' +
+    rc.map(r=>`<tr><td>${playerCell(r.username, r.guest_name)}${platTag(r.platform)}</td><td class="n">${r.attempts ?? '—'}</td><td class="n">${fmtS(r.seconds)}</td><td class="n">${fmtS(r.perAttempt)}</td><td class="n">${r.streak!=null ? '🔥'+r.streak : '—'}</td><td class="n">${timeAgo(r.created_at)}</td></tr>`).join('');
 }
 
 // ── Versus ────────────────────────────────────────────────────────────────────
@@ -2068,13 +2130,13 @@ function renderOnlineUsers(rows){
 }
 
 function renderModes(m){
-  const labels = ['Banderas','Figuras','Ciudades','Monumentos'];
-  const vals = [m.flags||0, m.shapes||0, m.cities||0, m.monuments||0];
+  const labels = ['Banderas','Figuras','Ciudades','Monumentos','GloboReto'];
+  const vals = [m.flags||0, m.shapes||0, m.cities||0, m.monuments||0, m.globequiz||0];
   const total = vals.reduce((a,b)=>a+b,0);
   const cfg = {
     type:'doughnut',
     data:{ labels, datasets:[{ data:vals,
-      backgroundColor:[MODE_COLORS.flags,MODE_COLORS.shapes,MODE_COLORS.cities,MODE_COLORS.monuments],
+      backgroundColor:[MODE_COLORS.flags,MODE_COLORS.shapes,MODE_COLORS.cities,MODE_COLORS.monuments,MODE_COLORS.globequiz],
       borderColor:'#111d35', borderWidth:2, hoverOffset:6 }] },
     options:{ responsive:true, maintainAspectRatio:false, cutout:'62%',
       plugins:{ ...chartDefaults.plugins, legend:{ position:'bottom', labels:{ color:'#cce0ff', boxWidth:12, font:{size:11} } },
