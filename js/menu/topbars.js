@@ -56,7 +56,7 @@
   // retroactive economy) for the logged-in account; guests see 0.
   let _pending = false;
   async function refreshTopbars() {
-    if (_pending || _rewardPlaying) return;
+    if (_pending || _rewardPlaying || _hold) return;
     if (!window.sb) { window.setTopbars({}); return; }
     _pending = true;
     if (!window._sbUserId) {
@@ -92,6 +92,9 @@
     sync();
   })();
 
+  // While the daily-bonus claim animation runs, the HUD must not jump to the server's new total early.
+  let _hold = false;
+  window.holdTopbars = (v) => { _hold = !!v; };
   window.refreshTopbars = refreshTopbars;
 
   // GloboReto reward on returning to the menu: coins and XP burst out of the GloboReto

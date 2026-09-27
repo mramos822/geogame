@@ -67,6 +67,10 @@
         if (busy || performance.now() < armedAt) return;
         busy = true;
         try { if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); } } catch (e) {}
+        // The coins are only applied to the HUD on claim: freeze HUD refreshes from here until the coin
+        // animation has finished, and remember the balance from BEFORE the claim.
+        const start0 = window.__topbarsCoins || 0;
+        if (window.holdTopbars) window.holdTopbars(true);
         let res = null;
         try { const r = await (_ident.uid ? window.sb.rpc('claim_daily_bonus') : window.sb.rpc('claim_daily_bonus_guest', { p_visitor: _ident.vid })); res = r && r.data; } catch (e) {}
         const coin = el.querySelector('.daily-day.today .daily-day-coin');
@@ -74,7 +78,7 @@
         const rect = { left: cr.left, top: cr.top, width: cr.width, height: cr.height, right: cr.right, bottom: cr.bottom };
         el.classList.add('out');
         setTimeout(() => el.remove(), 250);
-        resolve({ res, rect });
+        resolve({ res, rect, start0 });
       });
     });
   }
@@ -98,16 +102,20 @@
     let state = null;
     try { const r = await (uid ? window.sb.rpc('get_daily_bonus') : window.sb.rpc('get_daily_bonus_guest', { p_visitor: vid })); state = r && r.data; } catch (e) {}
     if (!state || !state.claimable) return;
-    const { res, rect } = await showPopup(state);
-    if (!res || !res.claimed || !(res.coins > 0)) return;
-    const ls = document.getElementById('loading-screen');
-    const start = window.__topbarsCoins || 0;
-    if (ls && window.playHudReward) {
-      try { await window.playHudReward('coins', { screen: ls, from: { getBoundingClientRect: () => rect }, amount: res.coins, start, radial: true }); } catch (e) {}
+    const { res, rect, start0 } = await showPopup(state);
+    try {
+      if (!res || !res.claimed || !(res.coins > 0)) return;
+      const ls = document.getElementById('loading-screen');
+      const start = start0;
+      if (ls && window.playHudReward) {
+        try { await window.playHudReward('coins', { screen: ls, from: { getBoundingClientRect: () => rect }, amount: res.coins, start, radial: true }); } catch (e) {}
+      }
+      window.setTopbars({ xp: window.__topbarsXp || 0, coins: start + res.coins });
+      window.__topbarsFloor = { xp: window.__topbarsXp || 0, coins: start + res.coins, t: Date.now() };
+    } finally {
+      if (window.holdTopbars) window.holdTopbars(false);
+      if (window.refreshTopbars) window.refreshTopbars();
     }
-    window.setTopbars({ xp: window.__topbarsXp || 0, coins: start + res.coins });
-    window.__topbarsFloor = { xp: window.__topbarsXp || 0, coins: start + res.coins, t: Date.now() };
-    if (window.refreshTopbars) window.refreshTopbars();
   }
 
   // Keeps trying (every second, no limit) until the check has been done: the menu is on screen and free
