@@ -442,7 +442,7 @@ Deno.serve(async (req) => {
         .order('id', { ascending: true })),
       paged(sb.from('analytics_events')
         .select('created_at, user_id, type, session_type')
-        .in('type', ['game', 'versus'])
+        .in('type', ['game', 'versus', 'versus_join'])
         .not('user_id', 'is', null)
         .order('id', { ascending: true })),
       // ── Fundador (primeros 100 RECLAMOS, no primeras 100 cuentas) ──────────
@@ -679,7 +679,7 @@ Deno.serve(async (req) => {
     const act = (id: string) => activityByUser[id] ||= { campaigns: 0, versus: 0, globequiz: 0, modes: 0 };
     for (const e of (allEventsRes.data || []) as any[]) {
       if (!e.user_id) continue;
-      if (e.type === 'versus') act(e.user_id).versus++;
+      if (e.type === 'versus' || e.type === 'versus_join') act(e.user_id).versus++;
       else if (e.type === 'game' && e.session_type !== 'practice') act(e.user_id).modes++;
     }
     for (const e of (allCampaignsForXpRes.data || []) as any[]) if (e.user_id) act(e.user_id).campaigns++;
@@ -1568,6 +1568,27 @@ Deno.serve(async (req) => {
       last_date: p.gq_streak_last_date, playedToday: p.gq_streak_last_date === todayNY,
       todaySeconds: p.gq_today_time_ms != null ? Math.round(p.gq_today_time_ms / 100) / 10 : null,
     }));
+    // Rachas perdidas pero todavía recuperables: last_date < ayer (ya se
+    // perdió) y today <= last_date + 3 (ventana de 48h después del día
+    // fallado, ver get_gq_streak_status en 20260920190000_gq_streak_restore.sql),
+    // con al menos 1 de los 3 recuperos del mes NY sin usar.
+    const monthNY = todayNY.slice(0, 7);
+    const restoreCutoffNY = nyFmt.format(new Date(now.getTime() - 3 * 86400000));
+    const { data: lostStreakProfiles } = await sb.from('profiles')
+      .select('username, country_code, gq_streak_count, gq_streak_last_date, gq_restores_month, gq_restores_used')
+      .gt('gq_streak_count', 0).lt('gq_streak_last_date', yesterdayNY).gte('gq_streak_last_date', restoreCutoffNY)
+      .order('gq_streak_last_date', { ascending: false }).limit(200);
+    const gqRestorableStreaks = (lostStreakProfiles || [])
+      .map((p: any) => {
+        const used = p.gq_restores_month === monthNY ? (p.gq_restores_used || 0) : 0;
+        const deadline = new Date(new Date(p.gq_streak_last_date + 'T00:00:00Z').getTime() + 3 * 86400000)
+          .toISOString().slice(0, 10);
+        return {
+          username: p.username, country: p.country_code || null, streak: p.gq_streak_count,
+          last_date: p.gq_streak_last_date, restoresLeft: Math.max(3 - used, 0), deadline,
+        };
+      })
+      .filter((r: any) => r.restoresLeft > 0);
     const gqDay: Record<string, { accounts: Set<string>; guests: Set<string>; games: number }> = {};
     const gqPlayers = new Set<string>();
     const gqSecs: number[] = [];
@@ -1590,6 +1611,7 @@ Deno.serve(async (req) => {
       avgSeconds: gqSecs.length ? Math.round(gqSecs.reduce((a, b) => a + b, 0) / gqSecs.length * 10) / 10 : null,
       medianSeconds: gqSecs.length ? Math.round(gqSecs[Math.floor(gqSecs.length / 2)] * 10) / 10 : null,
       activeStreaks: gqActiveStreaks,
+      restorableStreaks: gqRestorableStreaks,
       daily: {
         labels: gqDays,
         accounts: gqDays.map((k) => gqDay[k].accounts.size),
