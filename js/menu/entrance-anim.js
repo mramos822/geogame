@@ -44,6 +44,7 @@ window.resetEntranceElements = function () {
   if (lg) { lg.classList.remove('logo-ready','panel2-logo'); lg.style.opacity = '0'; lg.style.transform = 'translateX(-50%) scale(1.5)'; lg.style.display = ''; }
   if (pl) { pl.classList.remove('planet-ready');          pl.style.opacity = '0'; pl.style.transform = 'translateX(-50%) scale(1.25)'; }
   // Restore first-panel elements that Play may have hidden
+  document.getElementById('loading-topbars')?.classList.remove('topbars-in', 'topbars-static');
   const ver = document.getElementById('loading-version');
   if (ver) ver.style.display = '';
   const back2 = document.getElementById('loading-panel2-back');
@@ -87,6 +88,8 @@ window.showEntranceElementsStatic = function () {
 
   const ver = document.getElementById('loading-version');
   if (ver) ver.style.display = '';
+
+  document.getElementById('loading-topbars')?.classList.add('topbars-in', 'topbars-static');
 
   // Hide panel1 actions; show panel2 directly
   document.getElementById('loading-actions') && (document.getElementById('loading-actions').style.display = 'none');
@@ -165,6 +168,18 @@ window.replayEntranceAnimations = function () {
 
   const resultsBtn = document.getElementById('loading-results-btn');
   if (resultsBtn) resultsBtn.style.display = 'block';
+
+  window.__resultsTest = false; // back on the menu: the results test button's dry-run is over
+
+  // Pending GloboReto reward (coins/XP): once the buttons have popped in, they burst
+  // out of the GloboReto button into the HUD bars (see playMenuRewards in menu/topbars.js).
+  if (window.__gqPendingReward) setTimeout(() => { if (window.playMenuRewards) window.playMenuRewards(); }, 550);
+  // Level-up earned on the results screen: its panel + bonus coins come here, on the menu.
+  if (window.__pendingLevelUp) setTimeout(() => { if (window.playMenuLevelUp) window.playMenuLevelUp(); }, 700);
+
+  // Top bars pop in with the buttons (restart the animation from a clean state)
+  const topbars = document.getElementById('loading-topbars');
+  if (topbars) { topbars.classList.remove('topbars-in', 'topbars-static'); void topbars.offsetWidth; topbars.classList.add('topbars-in'); }
 
   // Restore first-panel elements (may have been hidden by panel2)
   const actions = document.getElementById('loading-actions');

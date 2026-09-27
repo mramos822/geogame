@@ -1,6 +1,7 @@
 // ── VERSUS MODE ───────────────────────────────────────────────────────────────
 // Matchmaking, Realtime channel, and 1v1 match logic.
 let _vsCurrentMode = 'flags';
+const _gqLoggedRooms = new Set(); // match ids already counted in analytics
 // GloboReto has two duel variants ('globequiz' = por rapidez, 'globequiz_turns'
 // = por turnos) that share the exact same engine/seed/UI plumbing — this
 // helper is the single place that treats them as "the same underlying mode"
@@ -730,11 +731,10 @@ window.VS = (() => {
     const winnerId = m.host_score >= m.guest_score ? m.host_id : m.guest_id;
     await window.sb.from('matches')
       .update({ status: 'finished', winner_id: winnerId }).eq('id', _matchId);
-    // GloboReto logs one 'versus' analytics event PER ROUND (see
-    // _showGqVsResult) since it can rematch on the same match row — don't
-    // also log here on the final leave.
+    // GloboReto logs its 'versus' analytics event once per match room (see
+    // _showGqVsResult) — don't also log here on the final leave.
     if (!_isGqMode(m.mode) && window.Analytics && typeof window.Analytics.logVersus === 'function') {
-      window.Analytics.logVersus(m.mode || null);
+      window.Analytics.logVersus(m.mode || null, '1v1');
     }
   }
 
@@ -2036,13 +2036,15 @@ window.refreshVsSpectatorBadge = function (n) {
     }
     screen.style.display = 'flex';
 
-    // Count this round as one individual versus game in analytics (host only,
-    // same as VS.finish() does for the other modes — one 'versus' event per
-    // finished round; not on an abandonment, like the other modes). The
-    // profile W/L + head-to-head are recorded per round in _showVsResult / above.
+    // Count the match ROOM once in analytics (host only, not on an abandonment).
+    // Rematches reuse the same match row, so they don't add more events.
+    // The profile W/L + head-to-head are recorded per round in _showVsResult / above.
+    const _gqRoomId = window.VS && window.VS.getMatchId && window.VS.getMatchId();
     if (reason !== 'abandon' && window.VS && window.VS.isHost && window.VS.isHost()
-        && window.Analytics && typeof window.Analytics.logVersus === 'function') {
-      try { window.Analytics.logVersus(_vsCurrentMode); } catch (e) {}
+        && window.Analytics && typeof window.Analytics.logVersus === 'function'
+        && _gqRoomId && !_gqLoggedRooms.has(_gqRoomId)) {
+      _gqLoggedRooms.add(_gqRoomId);
+      try { window.Analytics.logVersus(_vsCurrentMode, '1v1'); } catch (e) {}
     }
 
     // Feed a spectator's own copy of this panel — CANONICAL host/guest form

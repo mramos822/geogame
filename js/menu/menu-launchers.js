@@ -51,6 +51,28 @@ document.getElementById('loading-play-btn').addEventListener('click', () => {
   });
 });
 
+// TEMP test button: Results screen with random scores. __resultsTest stops it from
+// touching the real highscore/playCount/averages/uploads; cleared on return to the menu.
+// (The random post-GloboReto panel test is still available as window._gqTestEndgame().)
+document.getElementById('dev-results-test')?.addEventListener('click', () => {
+  const rnd = (a, b) => Math.round(a + Math.random() * (b - a));
+  window.__resultsTest = true;
+  window._scoresUploadedThisGame = true;
+  window.campaign = window.campaign || {};
+  window.campaign.scores = { flags: rnd(1500, 9000), shapes: rnd(1500, 9000), game: rnd(1500, 9000), monuments: rnd(1500, 9000) };
+  sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
+  document.getElementById('loading-screen').style.display = 'none';
+  if (typeof showResultsScreen === 'function') showResultsScreen();
+});
+document.getElementById('gq-endgame-confirm')?.addEventListener('click', (e) => {
+  if (!window.__gqTestPanel) return;
+  e.stopImmediatePropagation();
+  window.__gqTestPanel = false;
+  window._gqTestEndgameClose?.();
+  const ls = document.getElementById('loading-screen'); if (ls) ls.style.display = 'flex';
+  setTimeout(() => { if (window.playMenuRewards) window.playMenuRewards(); }, 250);
+}, true);
+
 document.getElementById('loading-results-btn')?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   document.getElementById('loading-screen').style.display = 'none';

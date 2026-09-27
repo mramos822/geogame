@@ -18,7 +18,7 @@ function buildResultsMessage(total) {
   const playerName = localStorage.getItem('playerName') || 'John';
   const prevBest   = (resultsScreen._prevBest !== undefined) ? resultsScreen._prevBest : (parseInt(localStorage.getItem(TOTAL_HS_KEY)) || 0);
   const isNewBest  = total > prevBest;
-  if (isNewBest) localStorage.setItem(TOTAL_HS_KEY, total);
+  if (isNewBest && !window.__resultsTest) localStorage.setItem(TOTAL_HS_KEY, total);
 
   if (isNewBest) {
     return t('results.newRecordMsg', { name: playerName });
@@ -253,6 +253,31 @@ resultsConfirm?.addEventListener('click', () => {
   sfxCheck.currentTime = 0; sfxPlay(sfxCheck);
   resultsConfirm.classList.add('confirm-pressed');
   setTimeout(() => resultsConfirm.classList.remove('confirm-pressed'), 50);
+  // Coins earned this run burst out of the "+N" on the board and fly into a coin
+  // bar (js/coins-reward.js); only then does the screen move on.
+  const earned = resultsScreen._coinsEarned || 0;
+  const xpEarned = resultsScreen._xpEarned || 0;
+  const src = document.querySelector('.results-earn-coins img');
+  const xpSrc = document.querySelector('.results-earn-xp img');
+  if ((earned > 0 || xpEarned > 0) && src && xpSrc && typeof window.playRewardPair === 'function') {
+    // Starts synchronously (origin measured before the board hides) and runs in
+    // parallel with the rank reveal — it doesn't hold the flow up. Level-ups open a popup
+    // (with the level's coin bonus) and pause the XP bar until it is closed.
+    // The menu HUD is hidden right now: bring it to its final values straight away, so it is
+    // already correct the moment the player is back on the menu (no flash of the old XP).
+    const xpStart0 = window.__topbarsXp || 0, coinsStart0 = window.__topbarsCoins || 0;   // captured BEFORE the HUD is bumped
+    if (window.setTopbars) window.setTopbars({ xp: xpStart0 + xpEarned, coins: coinsStart0 + earned });
+    // for a minute, a HUD refresh from the server can't show less than this (its data may lag the game)
+    window.__topbarsFloor = { xp: xpStart0 + xpEarned, coins: coinsStart0 + earned, t: Date.now() };
+    window.playRewardPair({ screen: resultsScreen, fromCoins: src, fromXp: xpSrc, coins: earned, xp: xpEarned,
+      coinsStart: coinsStart0, xpStart: xpStart0, deferLevelUp: true })
+      .then((res) => { if (res && window.setTopbars) window.setTopbars({ xp: res.xp, coins: res.coins }); })   // menu HUD already up to date on return
+      .catch(() => {});
+  }
+  _leaveResultsBoard();
+});
+
+function _leaveResultsBoard() {
   resultsConfirm.classList.add('slide-out');
   resultsScreen.classList.remove('results-animating');
   resultsScreen.classList.add('results-exiting');
@@ -271,7 +296,7 @@ resultsConfirm?.addEventListener('click', () => {
     resultsPointsWrap.classList.add('visible');
     setTimeout(() => animateTotal(resultsScreen._total || 0), 300);
   }, 100);
-});
+}
 
 resultsConfirm?.addEventListener('mouseenter', playSelect);
 resultsConfirm?.addEventListener('mouseleave', playSelect);
@@ -324,6 +349,14 @@ function updateHighscores() {
   const total = hs[1] + hs[2] + hs[3] + hs[4];
   resultsScreen._prevBest = parseInt(localStorage.getItem(TOTAL_HS_KEY)) || 0;
   resultsScreen._total = total;
+  // Coins / XP this run earned (same formula as Analytics.coinsFromScore/xpFromScore:
+  // 10 coins + 1 per 250 pts, 50 XP + 3 per 250 pts).
+  const steps = Math.floor(total / 250);
+  const ec = document.getElementById('results-earn-coins'), ex = document.getElementById('results-earn-xp');
+  resultsScreen._coinsEarned = 10 + steps;
+  resultsScreen._xpEarned = 50 + steps * 3;
+  if (ec) ec.textContent = '+' + (10 + steps).toLocaleString('en-US');
+  if (ex) ex.textContent = '+' + (50 + steps * 3);
   const totalEl = document.getElementById('results-total-score');
   if (totalEl) renderDigits(totalEl, 0);
 }

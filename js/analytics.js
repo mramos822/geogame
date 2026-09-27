@@ -156,11 +156,14 @@
   // Separate from `matches`: that table is ephemeral state and its 'finished'
   // rows are deleted in the room cleanup (see lobby.js _cleanupStale), so it's
   // no use as a history source for the stats panel.
-  async function logVersus(mode) {
+  // `kind` is '1v1' | 'group'. One event per ROOM / match session (host only),
+  // never per player: a group room of 8 is 1 versus, not 8.
+  async function logVersus(mode, kind) {
     const cc = (localStorage.getItem('_an_country') || null) || null;
     insertEvent({
       type: 'versus',
       mode: mode || null,
+      session_type: kind || '1v1',
       visitor_id: visitorId,
       country_code: cc,
       user_id: window._sbUserId || null,

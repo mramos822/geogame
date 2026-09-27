@@ -791,6 +791,7 @@
         <div class="box">
           <h2>Duelos por modo</h2>
           <div class="chart-wrap short"><canvas id="chart-versus-modes"></canvas></div>
+          <div class="modes-total" id="versus-kind-note"></div>
         </div>
         <div class="box">
           <h2>Ranking por victorias <span class="sub">top 25</span></h2>
@@ -830,6 +831,23 @@
     <!-- ── CRECIMIENTO ── -->
     <section class="tab-page" data-page="crecimiento">
       <div class="subnav" data-for="crecimiento"></div>
+      <div class="sub-page" data-sub="categoria">
+      <div class="retention-note" style="margin:0 0 12px">Métricas tipo panel de categoría de CrazyGames, calculadas <b>en vivo solo con datos de CrazyGames</b> (no incluye el tráfico de la web). Una "sesión" es una racha de actividad de un mismo jugador sin pausas de más de 30 min; su duración es estimada.</div>
+      <div class="subtabs" id="cat-dev" style="margin-bottom:12px"></div>
+      <div class="section-title">Como en CrazyGames <span class="sub">(últimos 30 días, en vivo)</span></div>
+      <div class="cards" id="cat-kpis"></div>
+      <div class="section-title">Requisitos de Basic Launch <span class="sub">(mismo umbral que muestra CrazyGames)</span></div>
+      <div class="cards" id="cat-req"></div>
+      <div class="retention-note">No medibles desde aquí (solo los tiene CrazyGames): impresiones, CTR, rating, tiempo de carga y tasa de crashes.</div>
+      <div class="section-title">Ahora mismo <span class="sub" id="cat-upd"></span></div>
+      <div class="cards" id="cat-live"></div>
+      <div class="box wide"><h2>Visitantes cada 5 min (última hora)</h2><div class="chart-wrap short"><canvas id="chart-cat-live"></canvas></div></div>
+      <div class="section-title">Comparativa por período</div>
+      <div class="box wide"><div class="table-scroll"><table id="tbl-cat"><tbody></tbody></table></div></div>
+      <div class="section-title">Retención por visitante</div>
+      <div class="cards" id="cat-ret"></div>
+      <div class="box wide" style="margin-top:16px"><h2>Últimos 14 días</h2><div class="chart-wrap short"><canvas id="chart-cat-series"></canvas></div></div>
+      </div>
       <div class="sub-page" data-sub="resumen">
       <div class="growth-hero" id="growth-hero"></div>
       <div class="insights" id="growth-read"></div>
@@ -1070,11 +1088,11 @@ const NAV = [
   ['hoy',         '🏠', 'Hoy',         null],
   ['jugadores',   '👥', 'Jugadores',   [['cuentas','Cuentas'], ['invitados','Invitados'], ['fundador','Fundadores']]],
   ['juego',       '🎮', 'Juego',       [['leaderboards','Rankings'], ['globoreto','GloboReto'], ['versus','Versus'], ['social','Social']]],
-  ['crecimiento', '📈', 'Crecimiento', [['resumen','Resumen'], ['retencion','Retención'], ['trafico','Tráfico']]],
+  ['crecimiento', '📈', 'Crecimiento', [['categoria','Categoría CG'], ['resumen','Resumen'], ['retencion','Retención'], ['trafico','Tráfico']]],
   ['admin',       '🛠️', 'Admin',       [['integridad','Integridad'], ['economia','Economía'], ['mensajes','Mensajes'], ['changelog','Novedades']]],
 ];
 // Sub-pestañas donde el período elegido no cambia nada: se oculta el selector.
-const NO_RANGE_SUBS = ['cuentas','fundador','mensajes','changelog','economia'];
+const NO_RANGE_SUBS = ['categoria','cuentas','fundador','mensajes','changelog','economia'];
 const PAGE_LABEL = Object.fromEntries(NAV.map(n => [n[0], n[2]]));
 const SUBS = Object.fromEntries(NAV.filter(n => n[3]).map(n => [n[0], n[3]]));
 // Claves de la versión anterior del panel → (sección, sub-pestaña) actual.
@@ -1360,6 +1378,13 @@ const CHANGELOG = [
   ['3.9.4','2026-09-24',90,['Emotes: quitado el anillo que aparecía alrededor del emote al enviarlo.']],
   ['3.9.5','2026-09-24',91,['Emotes: actualizado el arte del emote 7.']],
   ['3.9.6','2026-09-26',92,['Panel de estadísticas: nueva pestaña GloboReto en Juego, con partidas ganadas, tiempos, intentos, rachas activas, jugadores por día y las últimas partidas; además GloboReto aparece en el gráfico de modos.']],
+  ['3.9.7','2026-09-27',93,[
+    'Nuevo sistema de monedas y XP en el menú: barra de nivel (con estrella) y contador de monedas con los datos reales de cada cuenta. Al pasar el cursor sobre la barra de XP se ve cuánto falta para el siguiente nivel.',
+    'Al terminar una Gira Mundial o un GloboReto, las monedas y el XP ganados salen en explosión y vuelan hacia las barras, que se van llenando; al subir de nivel el nivel de la estrella sube uno a uno y aparece el panel "¡Subiste de nivel!" con su bonificación de monedas.',
+    'Nueva bonificación diaria de monedas al entrar: sube cada día seguido (10, 15, 20, 30, 40, 50) y desde el día 7 siempre da 75. Si te saltas un día, la racha empieza de nuevo.',
+    'Los versus ahora se cuentan por sala o sesión (no por jugador), incluyendo los versus de grupo y GloboReto 1v1, que antes no se registraban bien.',
+    'Panel de estadísticas: nueva pestaña "Categoría CG" (en Crecimiento) con métricas en vivo solo de CrazyGames: tiempo de juego, conversión, retención D1/D7/D30, sesiones y requisitos de Basic Launch.',
+  ]],
 ];
 function renderChangelog(){
   const el = $('changelog-list');
@@ -1463,6 +1488,7 @@ function goPage(k, sub){
   applyNav();
   window.scrollTo({ top:0 });
   if(activeSub()==='mensajes') loadMessages();
+  if(currentPage==='crecimiento' && activeSub()==='categoria') loadCategory();
 }
 function buildTabsNav(){
   migrateLegacyPage();
@@ -1539,6 +1565,7 @@ function enterDashboard(data){
   render(data);
   renderChangelog();
   if(activeSub()==='mensajes') loadMessages();
+  if(currentPage==='crecimiento' && activeSub()==='categoria') loadCategory();
   startPolling();
 }
 
@@ -1566,6 +1593,71 @@ function buildRangeBar(){
 function startPolling(){ stopPolling(); timer = setInterval(refresh, 15000); }
 function stopPolling(){ if(timer){ clearInterval(timer); timer = null; } }
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && creds) refresh(); });
+
+// ── Categoría CrazyGames (en vivo) ────────────────────────────────────────────
+async function loadCategory(){
+  if(!creds) return;
+  try {
+    const res = await fetch(FN_URL, { method:'POST', headers:{ 'Content-Type':'application/json', 'apikey':ANON, 'Authorization':'Bearer '+ANON },
+      body: JSON.stringify({ user:creds.user, pass:creds.pass, action:'category' }) });
+    const j = await res.json();
+    if(j && j.ok) renderCategory(j);
+  } catch(e){}
+}
+function fmtDur(s){ if(!s) return '—'; const m=Math.floor(s/60); return m ? `${m}m ${String(s%60).padStart(2,'0')}s` : `${s}s`; }
+let _catJ = null, _catDev = 'all';
+function renderCategory(j){
+  if(j) _catJ = j; else j = _catJ; if(!j) return;
+  const d = j.data[_catDev], n = fmtN;
+  $('cat-dev').innerHTML = [['all','Todos'],['pc','Desktop'],['mobile','Móvil / Tablet']].map(([k,l])=>`<button class="subtab${k===_catDev?' active':''}" data-dev="${k}">${l}</button>`).join('');
+  $('cat-dev').querySelectorAll('button').forEach(b=>b.onclick=()=>{ _catDev=b.dataset.dev; renderCategory(); });
+  $('cat-upd').textContent = '— ' + new Date(j.generated_at).toLocaleTimeString('es');
+  const card = (i,v,l,h)=>`<div class="card"><div class="icon">${i}</div><div class="v">${v}</div><div class="l">${l}${h?` <span class="help" title="${h}">ⓘ</span>`:''}</div></div>`;
+  $('cat-live').innerHTML = card('🟢',n(d.live.last5),'Activos (5 min)') + card('🕐',n(d.live.last30),'Activos (30 min)') + card('⏱',n(d.live.last60),'Activos (1 h)');
+  const pct = v => v==null ? '—' : v+'%';
+  const ret7ret = d.nr7.newVisitors + d.nr7.returning;
+  $('cat-kpis').innerHTML =
+    card('🎯','' + n(d.d30.starts),'Partidas totales','Partidas de modo iniciadas y guardadas (eventos de partida) en 30 días.') +
+    card('👥','' + n(d.d30.players),'Jugadores totales','Visitantes únicos que jugaron al menos una partida en 30 días.') +
+    card('⏱','' + fmtDur(d.s30.avgSessionSec),'Tiempo de juego medio','Duración media de sesión, estimada (ver nota arriba).') +
+    card('▶️','' + d.d3.conv + '%','Gameplay Conversion (3 días)','Jugadores que jugaron ≥1 partida ÷ visitantes únicos, en los últimos 3 días (igual que CrazyGames).') +
+    card('🔁','' + pct(d.ret1.pct),'Retención D1') + card('🔁','' + pct(d.ret7.pct),'Retención D7') +
+    card('↩️', ret7ret ? Math.round(d.nr7.returning/ret7ret*100)+'%' : '—','Usuarios que vuelven (7 días)','Visitantes de los últimos 7 días que ya habían aparecido antes.') +
+    card('🆕','' + n(d.nr7.newVisitors),'Nuevos (7 días)');
+  const reqScore = (v, steps) => { let sc = 0; for (const [th,pts] of steps) if (v!=null && v>=th) sc = pts; return sc; };
+  const REQ = { pc:{ t:419, r:3.06, c:63.15 }, mobile:{ t:161, r:0, c:34.24 } };
+  const rq = REQ[_catDev==='mobile'?'mobile':'pc'];
+  const rcard = (l, v, thr, txt, ok)=>`<div class="card"><div class="icon">${ok?'✅':'⚠️'}</div><div class="v">${txt}</div><div class="l">${l} · mínimo ${thr} <span class="help" title="${ok?'Supera':'No llega a'} el umbral mínimo de CrazyGames para esta plataforma.">ⓘ</span></div></div>`;
+  const tOk = d.s30.avgSessionSec >= rq.t, rOk = d.ret1.pct!=null && d.ret1.pct > rq.r, cOk = d.d3.conv >= rq.c;
+  $('cat-req').innerHTML = rcard('Tiempo de juego', 0, fmtDur(rq.t), fmtDur(d.s30.avgSessionSec), tOk) + rcard('Retención D1', 0, rq.r+'%', pct(d.ret1.pct), rOk) + rcard('Gameplay Conversion', 0, rq.c+'%', d.d3.conv+'%', cOk);
+  const rows = [
+    ['Visitantes únicos', p=>n(p.visitors), 'd'],
+    ['Jugadores (jugaron ≥1 partida)', p=>n(p.players), 'd'],
+    ['Partidas completas', p=>n(p.plays), 'd'],
+    ['Tasa de rebote (no jugaron)', p=>pct(p.bounce), 'd'],
+    ['Sesiones', p=>n(p.sessions), 's'],
+    ['Duración media de sesión', p=>fmtDur(p.avgSessionSec), 's'],
+    ['Sesiones por visitante', p=>p.sessionsPerVisitor||'—', 's'],
+    ['Partidas por sesión', p=>p.avgEventsPerSession||'—', 's'],
+    ['Visitantes nuevos', p=>n(p.newVisitors), 'n'],
+    ['Visitantes que vuelven', p=>n(p.returning), 'n'],
+  ];
+  const P = [['24 h', d.d1, d.s1, d.nr1], ['7 días', d.d7, d.s7, d.nr7], ['30 días', d.d30, d.s30, null]];
+  $('tbl-cat').querySelector('tbody').innerHTML = '<tr><th>Métrica</th>' + P.map(x=>`<th style="text-align:right">${x[0]}</th>`).join('') + '</tr>' +
+    rows.map(([l,f,k])=>`<tr><td>${l}</td>` + P.map(x=>{ const o = k==='d'?x[1]:k==='s'?x[2]:x[3]; return `<td class="n">${o ? f(o) : '—'}</td>`; }).join('') + '</tr>').join('');
+  const rc = (l,r)=>card('🔁',pct(r.pct),l,`${r.back} de ${r.size} visitantes que llegaron hace al menos ese tiempo volvieron exactamente ese día.`);
+  $('cat-ret').innerHTML = rc('Retención D1',d.ret1) + rc('Retención D7',d.ret7) + rc('Retención D30',d.ret30) + card('🌍','' + fmtDur(d.avgGlobequizSec),'Duración media GloboReto');
+  const bl = d.live.buckets.map((_,i)=>i===11 ? 'ahora' : `-${(11-i)*5}m`);
+  upsertChart('catLive','chart-cat-live',{ type:'bar', data:{ labels:bl, datasets:[{ label:'Visitantes', data:d.live.buckets, backgroundColor:'#4aa3ff', borderRadius:3 }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false}, tooltip:chartDefaults.plugins.tooltip },
+      scales:{ x:axisX, y:{ beginAtZero:true, ticks:{ color:'#5a7da6', precision:0, font:{size:10} }, grid:{ color:'#16263f' } } } } });
+  const sl = d.series.map(x=>new Date(x.day).toLocaleDateString('es',{day:'2-digit',month:'short',timeZone:'UTC'}));
+  upsertChart('catSeries','chart-cat-series',{ type:'line', data:{ labels:sl, datasets:[
+      lineDS('Visitantes', d.series.map(x=>x.visitors), '#4aa3ff'), lineDS('Jugadores', d.series.map(x=>x.players), '#6fdf6f'), lineDS('Partidas', d.series.map(x=>x.plays), '#ffb020') ] },
+    options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false}, plugins:{ legend:{ labels:{ color:'#8aa0c2', boxWidth:10 } }, tooltip:chartDefaults.plugins.tooltip },
+      scales:{ x:axisX, y:{ beginAtZero:true, ticks:{ color:'#5a7da6', precision:0, font:{size:10} }, grid:{ color:'#16263f' } } } } });
+}
+setInterval(()=>{ if(creds && !document.hidden && currentPage==='crecimiento' && activeSub()==='categoria') loadCategory(); }, 15000);
 
 async function refresh(){
   if(!creds) return;
@@ -1625,7 +1717,7 @@ function render(data){
   renderLeaderboard(data.leaderboards||{});
   renderGlobequiz(data.globequiz||{});
   renderVersusCards(data.totals||{}, data.period||{}, rl);
-  renderVersusModes(data.versusByMode||{});
+  renderVersusModes(data.versusByMode||{}, data.versusByKind);
   renderVersusFunnel(data.versusFunnel||{}, rl);
   renderVersusTop((data.leaderboards||{}).versus||[]);
   renderVerifiedAccounts(data.verifiedAccounts||[]);
@@ -2168,13 +2260,15 @@ function renderHourly(hourly){
   else charts.hourly = new Chart($('chart-hourly'), cfg);
 }
 
-function renderVersusModes(m){
-  const labels = ['Banderas','Figuras','Ciudades','Monumentos'];
-  const vals = [m.flags||0, m.shapes||0, m.cities||0, m.monuments||0];
+function renderVersusModes(m, kind){
+  const kn = $('versus-kind-note');
+  if(kn && kind) kn.textContent = `Cuenta salas/sesiones, no jugadores: ${kind.oneVsOne||0} en 1v1 · ${kind.group||0} en grupo`;
+  const labels = ['Banderas','Figuras','Ciudades','Monumentos','GloboReto'];
+  const vals = [m.flags||0, m.shapes||0, m.cities||0, m.monuments||0, (m.globequiz||0)+(m.globequiz_turns||0)];
   const cfg = {
     type:'bar',
     data:{ labels, datasets:[{ label:'Versus', data:vals,
-      backgroundColor:[MODE_COLORS.flags,MODE_COLORS.shapes,MODE_COLORS.cities,MODE_COLORS.monuments], borderRadius:4 }] },
+      backgroundColor:[MODE_COLORS.flags,MODE_COLORS.shapes,MODE_COLORS.cities,MODE_COLORS.monuments,MODE_COLORS.globequiz||'#9b6bff'], borderRadius:4 }] },
     options:{ responsive:true, maintainAspectRatio:false,
       plugins:{ legend:{ display:false }, tooltip: chartDefaults.plugins.tooltip },
       scales:{

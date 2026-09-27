@@ -138,6 +138,8 @@
           barFill.closest('.loading-bar-track')?.classList.add('bar-done');
           pctEl?.classList.add('bar-done');
         });
+        document.getElementById('loading-topbars')?.classList.add('topbars-in');
+        { const _t = document.getElementById('dev-results-test'); if (_t) _t.style.display = 'block'; }
         const actions = document.getElementById('loading-actions');
         if (actions) actions.style.display = 'flex';
         document.getElementById('loading-play-wrap').style.display = 'flex';

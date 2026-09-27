@@ -239,6 +239,111 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: true, messages }), { headers: CORS });
     }
 
+    // ── Category panel (CrazyGames-style portal metrics, but live) ────────────
+    // Everything is derived from analytics_events over the last 40 days, per
+    // platform. "Session" = a run of events from the
+    // same visitor with no gap over 30 min; its length is estimated from the first
+    // to the last event, so it undercounts a little (nothing logs a "leave" event).
+    if (action === 'category') {
+      const t0 = Date.now();
+      const DAY = 86400000, GAP = 30 * 60000;
+      const sinceISO = new Date(t0 - 40 * DAY).toISOString();
+      const { data: evs } = await paged(sb.from('analytics_events')
+        .select('created_at, type, visitor_id, user_id, platform, duration_ms, device')
+        .in('type', ['visit', 'game', 'campaign', 'versus', 'globequiz'])
+        .gte('created_at', sinceISO).order('id', { ascending: true }));
+      const rows = (evs || []).map((r: any) => ({
+        t: new Date(r.created_at).getTime(), type: r.type,
+        who: r.visitor_id || r.user_id || null, plat: r.platform || 'web', dur: r.duration_ms || 0, dev: r.device === 'mobile' ? 'mobile' : 'pc',
+      })).filter((r) => r.who);
+      const isPlay = (ty: string) => ty !== 'visit';
+      const dayKey = (ms: number) => Math.floor(ms / DAY);
+      const todayK = dayKey(t0);
+
+      const compute = (list: typeof rows) => {
+        const byWho = new Map<string, typeof rows>();
+        for (const r of list) { const a = byWho.get(r.who!); if (a) a.push(r); else byWho.set(r.who!, [r]); }
+        const win = (ms: number) => {
+          const from = t0 - ms; const vis = new Set<string>(), players = new Set<string>();
+          let plays = 0, starts = 0;
+          for (const r of list) if (r.t >= from) {
+            vis.add(r.who!); if (r.type !== 'visit') { players.add(r.who!); if (r.type !== 'game') plays++; else starts++; }
+          }
+          return { visitors: vis.size, players: players.size, plays, starts, conv: vis.size ? +(players.size / vis.size * 100).toFixed(2) : 0, bounce: vis.size ? Math.round((1 - players.size / vis.size) * 100) : 0 };
+        };
+        // sessions
+        const sess: { start: number; len: number; plays: number; who: string }[] = [];
+        let firstSeen = new Map<string, number>();
+        for (const [who, arr] of byWho) {
+          arr.sort((a, b) => a.t - b.t); firstSeen.set(who, arr[0].t);
+          let s = arr[0].t, last = arr[0].t, p = isPlay(arr[0].type) ? 1 : 0;
+          for (let i = 1; i < arr.length; i++) {
+            if (arr[i].t - last > GAP) { sess.push({ start: s, len: last - s, plays: p, who }); s = arr[i].t; p = 0; }
+            last = arr[i].t; if (isPlay(arr[i].type)) p++;
+          }
+          sess.push({ start: s, len: last - s, plays: p, who });
+        }
+        const sessIn = (ms: number) => {
+          const ss = sess.filter((x) => x.start >= t0 - ms);
+          const timed = ss.filter((x) => x.len > 0);
+          return {
+            sessions: ss.length,
+            avgSessionSec: timed.length ? Math.round(timed.reduce((a, x) => a + x.len, 0) / timed.length / 1000) : 0,
+            avgEventsPerSession: ss.length ? +(ss.reduce((a, x) => a + x.plays, 0) / ss.length).toFixed(2) : 0,
+            sessionsPerVisitor: new Set(ss.map((x) => x.who)).size ? +(ss.length / new Set(ss.map((x) => x.who)).size).toFixed(2) : 0,
+          };
+        };
+        // new vs returning in last 24h / 7d (first seen within the 40d window; older ones count as returning)
+        const newRet = (ms: number) => {
+          let n = 0, r = 0; const from = t0 - ms;
+          for (const [who, arr] of byWho) {
+            if (!arr.some((e) => e.t >= from)) continue;
+            if (firstSeen.get(who)! >= from) n++; else r++;
+          }
+          return { newVisitors: n, returning: r };
+        };
+        // D1 / D7 / D30 retention by first-seen day cohort (only cohorts old enough)
+        const ret = (d: number) => {
+          let size = 0, back = 0;
+          for (const [who, arr] of byWho) {
+            const k0 = dayKey(firstSeen.get(who)!);
+            if (todayK - k0 < d) continue;
+            size++;
+            if (arr.some((e) => dayKey(e.t) === k0 + d)) back++;
+          }
+          return { size, back, pct: size ? Math.round(back / size * 100) : null };
+        };
+        // live: visitors per 5-min bucket for the last hour + windows
+        const live: number[] = Array(12).fill(0);
+        const sets: Set<string>[] = Array.from({ length: 12 }, () => new Set());
+        for (const r of list) { const ago = t0 - r.t; if (ago >= 0 && ago < 3600000) sets[11 - Math.floor(ago / 300000)].add(r.who!); }
+        sets.forEach((s, i) => live[i] = s.size);
+        const inLast = (ms: number) => new Set(list.filter((r) => r.t >= t0 - ms).map((r) => r.who)).size;
+        // 14-day daily series (visitors, players, plays)
+        const series: { day: number; visitors: number; players: number; plays: number }[] = [];
+        for (let i = 13; i >= 0; i--) {
+          const k = todayK - i; const v = new Set<string>(), p = new Set<string>(); let pl = 0;
+          for (const r of list) if (dayKey(r.t) === k) { v.add(r.who!); if (r.type !== 'visit') { p.add(r.who!); if (r.type !== 'game') pl++; } }
+          series.push({ day: k * DAY, visitors: v.size, players: p.size, plays: pl });
+        }
+        const gq = list.filter((r) => r.type === 'globequiz' && r.dur > 0);
+        return {
+          d1: win(DAY), d3: win(3 * DAY), d7: win(7 * DAY), d30: win(30 * DAY),
+          s1: sessIn(DAY), s7: sessIn(7 * DAY), s30: sessIn(30 * DAY),
+          nr1: newRet(DAY), nr7: newRet(7 * DAY),
+          ret1: ret(1), ret7: ret(7), ret30: ret(30),
+          live: { last5: inLast(5 * 60000), last30: inLast(30 * 60000), last60: inLast(3600000), buckets: live },
+          series,
+          avgGlobequizSec: gq.length ? Math.round(gq.reduce((a, r) => a + r.dur, 0) / gq.length / 1000) : 0,
+        };
+      };
+
+      // CrazyGames only: the site's own traffic would skew every number.
+      const cg = rows.filter((r) => r.plat === 'crazygames');
+      const data = { all: compute(cg), pc: compute(cg.filter((r) => r.dev === 'pc')), mobile: compute(cg.filter((r) => r.dev === 'mobile')) };
+      return new Response(JSON.stringify({ ok: true, generated_at: new Date().toISOString(), data }), { headers: CORS });
+    }
+
     const now = new Date();
     const nowMs = now.getTime();
     const onlineISO = new Date(nowMs - 5 * 60 * 1000).toISOString();
@@ -1473,6 +1578,7 @@ Deno.serve(async (req) => {
       registrationsList,
       gamesByMode: byMode,
       versusByMode,
+      versusByKind: { group: versusRows.filter((r: any) => r.session_type === 'group').length, oneVsOne: versusRows.filter((r: any) => r.session_type !== 'group').length },
       versusFunnel,
       social,
       extra: extraOut,

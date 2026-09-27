@@ -1293,6 +1293,7 @@ window.Lobby = (() => {
 
   // ── Multi-mode state ─────────────────────────────────────────────────────────
   let _currentModeIdx  = 0;
+  let _loggedLobbyId   = null; // last room already counted in analytics
   let _lobbyModes      = [];  // mode sequence for the current game session
   let _baseSeed        = null;
   let _modeAccScore    = 0;   // local player's accumulated score across all modes
@@ -2278,6 +2279,15 @@ window.Lobby = (() => {
       window.LB.onPlayerBack(null);
       window.LB.resetToWaiting?.();
     } catch (e) { console.warn('[LB] final cleanup failed:', e); }
+    // One analytics 'versus' event per group room session (host only, once per
+    // room, not per player).
+    try {
+      const _rid = window.LB.getId && window.LB.getId();
+      if (window.LB.isHost() && _rid && _rid !== _loggedLobbyId && window.Analytics && window.Analytics.logVersus) {
+        _loggedLobbyId = _rid;
+        window.Analytics.logVersus((_lobbyModes && _lobbyModes[0]) || null, 'group');
+      }
+    } catch (e) {}
     // Reset multi-mode state for the next match
     _currentModeIdx = 0; _lobbyModes = []; _baseSeed = null; _modeAccScore = 0;
     try {
