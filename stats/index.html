@@ -1412,6 +1412,12 @@ const CHANGELOG = [
   ['3.9.9','2026-09-27',95,['La bonificación diaria ya no interrumpe a un jugador nuevo nada más entrar: espera a que termine su primera partida. Además, si estás en el menú cuando se reinicia el día (00:00 UTC), el aviso te sale en ese momento; si estás jugando, te sale al volver al menú.']],
   ['3.9.10','2026-09-27',96,['Panel de estadísticas: nueva página "Bono diario" en Admin con el historial de reclamos de cada cuenta (racha, día, monedas, hora), en vivo. Además, el botón ✓ de los paneles de bonificación diaria y subida de nivel ahora espera un instante antes de responder, para no reclamar por accidente con un clic dirigido al menú.']],
   ['3.9.11','2026-09-27',97,['La bonificación diaria de monedas ahora también la reciben los invitados (sin cuenta): su racha se guarda por dispositivo y, cuando crean su cuenta, se pasa a ella. Sus monedas ya se ven en la barra del menú. En el panel de stats, el historial de "Bono diario" incluye a los invitados.']],
+  ['4.0.0','2026-09-27',98,[
+    'Versión 4.0: llegan las monedas y el XP. Cada cuenta tiene ahora su nivel y su saldo de monedas en el menú, con barras animadas.',
+    'Al terminar una Gira Mundial o un GloboReto, las monedas y el XP ganados explotan y vuelan hacia las barras; al subir de nivel aparece el panel "¡Subiste de nivel!" con su bonificación.',
+    'Bonificación diaria de monedas al entrar (también para invitados): crece cada día seguido y desde el día 7 siempre da lo máximo.',
+    'Los versus se cuentan por sala, y el panel de estadísticas suma las nuevas páginas "Categoría CG" y "Bono diario". La versión de CrazyGames carga más rápido.',
+  ]],
 ];
 function renderChangelog(){
   const el = $('changelog-list');
