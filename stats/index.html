@@ -7,6 +7,7 @@
 <title>myGeoChallenge · Panel de Stats</title>
 <link rel="icon" href="../images/logo.png">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="../js/ranks.js"></script>
 <style>
   /* ═══════════════════════════════════════════════════════════════════════
      Panel de Stats — sistema de diseño v2
@@ -188,6 +189,9 @@
   .insight-card.ok{border-left-color:var(--green);}
   .insight-card.warn{border-left-color:var(--accent);}
   .insight-card.crit{border-left-color:var(--red);}
+
+  .acct-link{color:var(--text);text-decoration:none;border-bottom:1px dashed var(--muted);cursor:pointer;}
+  .acct-link:hover{color:var(--accent);border-bottom-color:var(--accent);}
 
   /* ── Ayuda (ⓘ) ── */
   .help{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;
@@ -1097,6 +1101,33 @@
         <table id="tbl-econ-modal">
           <thead><tr><th>Fecha</th><th>Fuente</th><th style="text-align:right">Monedas</th><th style="text-align:right">XP</th></tr></thead>
           <tbody id="econ-modal-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="acct-modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="acct-modal-title">Perfil de cuenta</h3>
+      <button class="modal-close" id="acct-modal-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="acct-modal-sub" class="modal-subtitle" style="margin-bottom:10px"></div>
+      <div class="insights" id="acct-modal-cards" style="margin-bottom:14px"></div>
+      <div class="modal-subtitle">🎮 Puntajes por modo</div>
+      <div class="table-scroll" style="margin-bottom:14px">
+        <table id="tbl-acct-modes">
+          <thead><tr><th>Modo</th><th style="text-align:right">Récord</th><th style="text-align:right">Promedio</th><th style="text-align:right">Partidas</th></tr></thead>
+          <tbody id="acct-modal-modes"></tbody>
+        </table>
+      </div>
+      <div class="modal-subtitle">💰 Últimos movimientos de monedas/XP <span id="acct-modal-econ-count"></span></div>
+      <div class="table-scroll">
+        <table id="tbl-acct-econ">
+          <thead><tr><th>Fecha</th><th>Fuente</th><th style="text-align:right">Monedas</th><th style="text-align:right">XP</th></tr></thead>
+          <tbody id="acct-modal-econ-body"></tbody>
         </table>
       </div>
     </div>
@@ -2229,6 +2260,72 @@ $('day-modal-close').addEventListener('click', closeDayPanel);
 $('day-modal').addEventListener('click', (e)=>{ if(e.target.id === 'day-modal') closeDayPanel(); });
 document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') { closeDayPanel(); closeEconDetail(); } });
 
+// ── Perfil de una cuenta conectada ahora ────────────────────────────────────
+// Se abre al hacer click en un nombre de "Conectados ahora" — reúne, en un
+// solo lugar, lo mismo que el jugador ve de sí mismo en el panel de perfil
+// in-game (récords/promedios por modo, rango, versus, amigos, racha de
+// GloboReto) más el cálculo de monedas/XP (economía, ya viene en
+// lastData.economy.retroactive — historial completo, no recortado por rango).
+// Los datos de la fila ya llegaron con la carga principal (ver select
+// ampliado de onlineUsersRes en admin-stats), así que no hace falta pedirle
+// nada nuevo al backend para abrir esto.
+function openAccountProfile(username){
+  const row = (window._onlineUsersByUsername || {})[username];
+  const p = row && row.profile;
+  if(!p) return;
+  $('acct-modal-title').textContent = username;
+
+  const created = p.created_at ? new Date(p.created_at).toLocaleDateString('es') : '—';
+  const badges = [
+    p.is_founder ? '👑 Founder' : null,
+    p.is_supporter ? '💛 Supporter' : null,
+    p.hidden_from_rankings ? '🚫 Oculta de rankings (test)' : null,
+  ].filter(Boolean).join(' · ');
+  $('acct-modal-sub').innerHTML = `${countryCell(p.country_code)} · Cuenta creada el ${created}${badges ? ' · ' + badges : ''}`;
+
+  const rk = (typeof getRank === 'function') ? getRank(p.hs.total || 0) : null;
+  const vsTotal = (p.vs_wins||0) + (p.vs_losses||0);
+  const vsPct = vsTotal ? Math.round(p.vs_wins/vsTotal*100) : null;
+  const econ = ((lastData && lastData.economy && lastData.economy.retroactive) || []).find(r => r.username === username);
+
+  const cards = [
+    ['🏅', rk ? rk.name : '—', `Rango (${(p.hs.total||0).toLocaleString('es')} pts totales)`],
+    ['🎮', (p.play_count||0).toLocaleString('es'), 'Partidas jugadas (todo el historial)'],
+    ['🌍', (p.campaigns_completed||0).toLocaleString('es'), 'Giras Mundiales completas'],
+    ['⚔️', vsTotal ? `${p.vs_wins}V / ${p.vs_losses}D${vsPct!=null?' ('+vsPct+'%)':''}` : 'Sin partidas', 'Récord Versus'],
+    ['🔥', (p.gq_streak_count||0).toLocaleString('es'), 'Racha actual de GloboReto'],
+    ['👥', (p.friends||0).toLocaleString('es'), 'Amigos aceptados'],
+    ['🖥️', `${deviceIcon(row.device)}${platTag(row.platform)}`, `${row.is_playing ? 'Jugando ahora'+(row.playing_mode?' · '+escapeHtml(row.playing_mode):'') : 'Conectado'} · ${timeAgo(row.last_active)}`],
+  ];
+  if(econ){
+    cards.push(['🪙', (econ.totalCoins||0).toLocaleString('es'), `Nivel ${econ.level} · monedas acumuladas`]);
+    cards.push(['✨', (econ.totalXp||0).toLocaleString('es'), 'XP acumulado (historial completo)']);
+    if(econ.suspicious) cards.push(['🚨', '+' + (econ.suspiciousCoins||0).toLocaleString('es'), 'Monedas sin explicar en el ledger — ver pestaña Integridad']);
+  }
+  $('acct-modal-cards').innerHTML = cards.map(([icon,v,l])=>`<div class="insight-card"><b>${icon} ${v}</b><br>${l}</div>`).join('');
+
+  const modes = [
+    ['🚩 Banderas', p.hs.flags, p.avg.flags, p.plays?.flags],
+    ['🧩 Figuras', p.hs.shapes, p.avg.shapes, p.plays?.shapes],
+    ['🏙️ Ciudades', p.hs.cities, p.avg.cities, p.plays?.cities],
+    ['🗿 Monumentos', p.hs.monuments, p.avg.monuments, p.plays?.monuments],
+  ];
+  $('acct-modal-modes').innerHTML = modes.map(([label,hs,avg,plays])=>
+    `<tr><td>${label}</td><td class="n">${(hs||0).toLocaleString('es')}</td><td class="n">${(avg||0).toLocaleString('es')}</td><td class="n">${(plays||0).toLocaleString('es')}</td></tr>`
+  ).join('');
+
+  const hist = (econ && econ.history) || [];
+  $('acct-modal-econ-count').textContent = `(${hist.length})`;
+  $('acct-modal-econ-body').innerHTML = hist.length
+    ? hist.slice(0,30).map(h=>`<tr><td style="white-space:nowrap">${new Date(h.created_at).toLocaleString('es')}</td><td>${ECONOMY_REASON_LABELS[h.reason]||escapeHtml(h.reason)}</td><td class="n">${h.coins.toLocaleString('es')}</td><td class="n">${h.xp.toLocaleString('es')}</td></tr>`).join('')
+    : '<tr><td class="empty" colspan="4">Sin movimientos registrados.</td></tr>';
+
+  $('acct-modal').style.display = 'flex';
+}
+function closeAccountProfile(){ const m = $('acct-modal'); if(m) m.style.display = 'none'; }
+$('acct-modal-close')?.addEventListener('click', closeAccountProfile);
+$('acct-modal')?.addEventListener('click', (e)=>{ if(e.target.id === 'acct-modal') closeAccountProfile(); });
+
 // ── Detalle de una fila de "Cálculo en vivo por cuenta" (Economía) ─────────
 // Se abre al hacer click en el pill de estado (OK / ⚠️ sin explicar) — antes
 // la alerta no daba más contexto que el número; acá se ve el desglose
@@ -2285,11 +2382,19 @@ function deviceIcon(device){
 function renderOnlineUsers(rows){
   const tb = $('tbl-online');
   if(!rows.length){ tb.innerHTML = '<tr><td class="empty">Nadie conectado en este momento.</td></tr>'; return; }
+  // Guardadas por username para abrir el detalle al hacer click (ver
+  // openAccountProfile) sin tener que volver a pedirle datos al backend.
+  window._onlineUsersByUsername = {};
+  rows.forEach(r => { if (r.username) window._onlineUsersByUsername[r.username] = r; });
   const playing = rows.filter(r=>r.is_playing);
   const idle = rows.filter(r=>!r.is_playing);
+  const cell = r => r.username
+    ? `<a href="javascript:void(0)" class="acct-link" data-acct="${escapeHtml(r.username)}">${escapeHtml(r.username)}</a>`
+    : playerCell(r.username, r.guest_name);
   tb.innerHTML = '<tr><th>Usuario</th><th>Estado</th><th>Dispositivo</th><th style="text-align:right">Última actividad</th></tr>' +
-    playing.map(r=>`<tr><td>${playerCell(r.username, r.guest_name)}</td><td><span class="status-pill active"><span class="dotstat"></span>🎮 Jugando${r.playing_mode?' · '+escapeHtml(r.playing_mode):''}</span></td><td>${deviceIcon(r.device)}${platTag(r.platform)}</td><td class="n">${timeAgo(r.last_active)}</td></tr>`).join('') +
-    idle.map(r=>`<tr><td>${playerCell(r.username, r.guest_name)}</td><td><span class="status-pill stale"><span class="dotstat"></span>🟢 Conectado</span></td><td>${deviceIcon(r.device)}${platTag(r.platform)}</td><td class="n">${timeAgo(r.last_active)}</td></tr>`).join('');
+    playing.map(r=>`<tr><td>${cell(r)}</td><td><span class="status-pill active"><span class="dotstat"></span>🎮 Jugando${r.playing_mode?' · '+escapeHtml(r.playing_mode):''}</span></td><td>${deviceIcon(r.device)}${platTag(r.platform)}</td><td class="n">${timeAgo(r.last_active)}</td></tr>`).join('') +
+    idle.map(r=>`<tr><td>${cell(r)}</td><td><span class="status-pill stale"><span class="dotstat"></span>🟢 Conectado</span></td><td>${deviceIcon(r.device)}${platTag(r.platform)}</td><td class="n">${timeAgo(r.last_active)}</td></tr>`).join('');
+  tb.querySelectorAll('.acct-link').forEach(a => a.addEventListener('click', () => openAccountProfile(a.dataset.acct)));
 }
 
 function renderModes(m){

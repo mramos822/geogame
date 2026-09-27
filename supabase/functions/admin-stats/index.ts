@@ -471,8 +471,17 @@ Deno.serve(async (req) => {
       // Lista real (no solo el conteo de onlineNow/playingNow arriba) para
       // que el panel pueda mostrar nombres, no solo un número — antes no
       // había forma de saber QUIÉN está online desde /stats.
+      // Trae también todo lo necesario para el detalle de cuenta que se abre
+      // al hacer click en un nombre en "Conectados ahora" (ver acctProfileCell
+      // / openAccountProfile en stats/index.html) — así no hace falta una
+      // consulta aparte por cada click.
       sb.from('profiles')
-        .select('username, is_playing, playing_mode, last_active, device, last_platform')
+        .select('id, username, is_playing, playing_mode, last_active, device, last_platform, ' +
+          'country_code, is_supporter, is_founder, created_at, hidden_from_rankings, ' +
+          'hs_flags, hs_shapes, hs_cities, hs_monuments, hs_total, ' +
+          'avg_sum_flags, avg_sum_shapes, avg_sum_cities, avg_sum_monuments, ' +
+          'play_count, play_count_flags, play_count_shapes, play_count_cities, play_count_monuments, ' +
+          'vs_wins, vs_losses, gq_streak_count, campaigns_completed')
         .gte('last_active', onlineISO)
         .order('is_playing', { ascending: false })
         .order('last_active', { ascending: false })
@@ -1219,6 +1228,14 @@ Deno.serve(async (req) => {
       blocked: friendCounts.blocked || 0,
       topPendingSenders: topSenders,
     };
+    // Amigos aceptados por cuenta (id -> conteo) — usado en el detalle de
+    // cuenta de "Conectados ahora" (ver mergedOnlineUsers más abajo).
+    const acceptedFriendCountById: Record<string, number> = {};
+    for (const f of friendshipRows) {
+      if (f.status !== 'accepted') continue;
+      acceptedFriendCountById[f.user_a] = (acceptedFriendCountById[f.user_a] || 0) + 1;
+      acceptedFriendCountById[f.user_b] = (acceptedFriendCountById[f.user_b] || 0) + 1;
+    }
 
     // ── Estadísticas extra (rankings, versus, social) ────────────────────────
     // Todo sale de datos que ya se cargaron (perfiles + amistades): no suma
@@ -1542,6 +1559,26 @@ Deno.serve(async (req) => {
         username: p.username, guest_name: null, is_playing: !!p.is_playing,
         playing_mode: p.playing_mode || null, last_active: p.last_active, device: p.device || null,
         platform: p.last_platform || 'web',
+        // Detalle de cuenta (ver openAccountProfile en stats/index.html):
+        // todo lo que el panel de perfil in-game también muestra.
+        profile: {
+          id: p.id, country_code: p.country_code || null,
+          is_supporter: !!p.is_supporter, is_founder: !!p.is_founder,
+          created_at: p.created_at, hidden_from_rankings: !!p.hidden_from_rankings,
+          hs: { flags: p.hs_flags || 0, shapes: p.hs_shapes || 0, cities: p.hs_cities || 0, monuments: p.hs_monuments || 0, total: p.hs_total || 0 },
+          avg: {
+            flags:     p.avg_sum_flags     && (p.play_count_flags     || p.play_count) ? Math.round(p.avg_sum_flags     / (p.play_count_flags     || p.play_count)) : 0,
+            shapes:    p.avg_sum_shapes    && (p.play_count_shapes    || p.play_count) ? Math.round(p.avg_sum_shapes    / (p.play_count_shapes    || p.play_count)) : 0,
+            cities:    p.avg_sum_cities    && (p.play_count_cities    || p.play_count) ? Math.round(p.avg_sum_cities    / (p.play_count_cities    || p.play_count)) : 0,
+            monuments: p.avg_sum_monuments && (p.play_count_monuments || p.play_count) ? Math.round(p.avg_sum_monuments / (p.play_count_monuments || p.play_count)) : 0,
+          },
+          plays: { flags: p.play_count_flags || 0, shapes: p.play_count_shapes || 0, cities: p.play_count_cities || 0, monuments: p.play_count_monuments || 0 },
+          play_count: p.play_count || 0,
+          vs_wins: p.vs_wins || 0, vs_losses: p.vs_losses || 0,
+          gq_streak_count: p.gq_streak_count || 0,
+          campaigns_completed: p.campaigns_completed || 0,
+          friends: acceptedFriendCountById[p.id] || 0,
+        },
       })),
       ...onlineGuestRows.map((g: any) => ({
         username: null, guest_name: g.guest_name || null, is_playing: !!g.is_playing,
