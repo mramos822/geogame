@@ -57,8 +57,13 @@
       stage.appendChild(el);
       try { if (typeof sfxBonus !== 'undefined') { sfxBonus.currentTime = 0; sfxPlay(sfxBonus); } } catch (e) {}
       let busy = false;
-      el.querySelector('.daily-claim').addEventListener('click', async () => {
-        if (busy) return;
+      // The ✓ appears right where the player's cursor usually rests on the menu (Jugar): ignore clicks
+      // for the first moments so a click meant for the menu can't claim the bonus by accident.
+      const claimBtn = el.querySelector('.daily-claim');
+      const armedAt = performance.now() + 900;
+      setTimeout(() => claimBtn.classList.add('armed'), 900);
+      claimBtn.addEventListener('click', async () => {
+        if (busy || performance.now() < armedAt) return;
         busy = true;
         try { if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); } } catch (e) {}
         let res = null;

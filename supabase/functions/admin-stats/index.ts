@@ -1353,6 +1353,48 @@ Deno.serve(async (req) => {
       }
       return total;
     }
+    // ── Daily login bonus (table daily_bonus_claims): every account's claims, recalculated on each
+    // panel refresh so the Admin > "Bono diario" page is live. The coins also count in the expected
+    // balance below (they are real balance for the player but never touch currency_ledger).
+    const { data: dbData } = await paged(sb.from('daily_bonus_claims')
+      .select('user_id, claim_date, day_number, coins, created_at')
+      .order('created_at', { ascending: false }));
+    const dbRows = (dbData || []) as any[];
+    const todayUTC = new Date().toISOString().slice(0, 10);
+    const yestUTC = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const dbByUser: Record<string, any[]> = {};
+    for (const r of dbRows) (dbByUser[r.user_id] = dbByUser[r.user_id] || []).push(r);
+    const dbAccounts = Object.entries(dbByUser).map(([uid, list]) => {
+      list.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));   // newest first
+      const last = list[0];
+      return {
+        username: usernameById[uid] || uid,
+        lastDate: last.claim_date, lastAt: last.created_at, day: last.day_number,
+        claimedToday: last.claim_date === todayUTC,
+        streakAlive: last.claim_date === todayUTC || last.claim_date === yestUTC,
+        claims: list.length,
+        totalCoins: list.reduce((a, r) => a + (r.coins || 0), 0),
+        history: list.slice(0, 60).map((r) => ({ date: r.claim_date, day: r.day_number, coins: r.coins, at: r.created_at })),
+      };
+    }).sort((a, b) => (a.lastAt < b.lastAt ? 1 : -1));
+    const dbByDay: { date: string; claims: number; coins: number }[] = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+      const rows = dbRows.filter((r) => r.claim_date === d);
+      dbByDay.push({ date: d, claims: rows.length, coins: rows.reduce((a, r) => a + (r.coins || 0), 0) });
+    }
+    const dailyBonus = {
+      today: todayUTC,
+      rewards: [10, 15, 20, 30, 40, 50, 75],
+      claimsToday: dbRows.filter((r) => r.claim_date === todayUTC).length,
+      coinsToday: dbRows.filter((r) => r.claim_date === todayUTC).reduce((a, r) => a + (r.coins || 0), 0),
+      activeStreaks: dbAccounts.filter((a) => a.streakAlive).length,
+      accounts: dbAccounts.length,
+      totalClaims: dbRows.length,
+      totalCoins: dbRows.reduce((a, r) => a + (r.coins || 0), 0),
+      byDay: dbByDay,
+      list: dbAccounts,
+    };
     const expectedByUser: Record<string, { coins: number; xp: number }> = {};
     for (const r of (allCampaignsForXpRes.data || []) as any[]) {
       const steps = Math.floor((r.score || 0) / 250);
@@ -1385,6 +1427,10 @@ Deno.serve(async (req) => {
       (allLedgerHistoryByUser[r.user_id] = allLedgerHistoryByUser[r.user_id] || []).push({
         reason: r.reason || 'otro', coins: r.coins || 0, xp: r.xp || 0, ref_value: r.ref_value ?? null, created_at: r.created_at,
       });
+    }
+    for (const r of dbRows) {
+      const u = expectedByUser[r.user_id] = expectedByUser[r.user_id] || { coins: 0, xp: 0 };
+      u.coins += r.coins || 0;
     }
     const xpRetroactive = Object.entries(expectedByUser)
       .map(([uid, exp]) => {
@@ -1583,6 +1629,7 @@ Deno.serve(async (req) => {
       social,
       extra: extraOut,
       economy,
+      dailyBonus,
       integrityFlags,
       verifiedAccounts,
       guests,

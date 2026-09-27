@@ -960,6 +960,29 @@
         </div>
       </div>
       </div>
+      <div class="sub-page" data-sub="bonodiario">
+      <div class="insights" id="dbonus-status"></div>
+      <div class="cards" id="cards-dbonus"></div>
+      <div class="grid">
+        <div class="box wide">
+          <h2>Reclamos por día <span class="sub">últimos 14 días (día UTC) · se actualiza solo cada 15 s</span></h2>
+          <div class="chart-wrap short"><canvas id="chart-dbonus"></canvas></div>
+        </div>
+        <div class="box wide">
+          <h2>Historial por cuenta
+            <span class="sub">toca una fila para ver todos sus reclamos
+              <span class="help" title="Bonificación diaria de monedas: una vez por día UTC por cuenta. 'Día' es la racha de días seguidos (de 7 en adelante siempre paga lo máximo). Si una cuenta se salta un día, su racha vuelve al día 1. Los datos vienen directo de la tabla daily_bonus_claims.">ⓘ</span></span>
+          </h2>
+          <div class="table-scroll"><table id="tbl-dbonus" data-nort="1"><tbody></tbody></table></div>
+        </div>
+        <div class="box wide">
+          <details class="fold">
+            <summary>Tabla de premios <span class="sub">10 · 15 · 20 · 30 · 40 · 50 · 75 (día 7 en adelante) · toca para ver</span></summary>
+            <div class="table-scroll" style="margin-top:12px"><table id="tbl-dbonus-rewards"><tbody></tbody></table></div>
+          </details>
+        </div>
+      </div>
+      </div>
       <div class="sub-page" data-sub="mensajes">
       <div class="box wide">
         <h2>✉️ Enviar mensaje del creador
@@ -1089,10 +1112,10 @@ const NAV = [
   ['jugadores',   '👥', 'Jugadores',   [['cuentas','Cuentas'], ['invitados','Invitados'], ['fundador','Fundadores']]],
   ['juego',       '🎮', 'Juego',       [['leaderboards','Rankings'], ['globoreto','GloboReto'], ['versus','Versus'], ['social','Social']]],
   ['crecimiento', '📈', 'Crecimiento', [['categoria','Categoría CG'], ['resumen','Resumen'], ['retencion','Retención'], ['trafico','Tráfico']]],
-  ['admin',       '🛠️', 'Admin',       [['integridad','Integridad'], ['economia','Economía'], ['mensajes','Mensajes'], ['changelog','Novedades']]],
+  ['admin',       '🛠️', 'Admin',       [['integridad','Integridad'], ['economia','Economía'], ['bonodiario','Bono diario'], ['mensajes','Mensajes'], ['changelog','Novedades']]],
 ];
 // Sub-pestañas donde el período elegido no cambia nada: se oculta el selector.
-const NO_RANGE_SUBS = ['categoria','cuentas','fundador','mensajes','changelog','economia'];
+const NO_RANGE_SUBS = ['bonodiario','categoria','cuentas','fundador','mensajes','changelog','economia'];
 const PAGE_LABEL = Object.fromEntries(NAV.map(n => [n[0], n[2]]));
 const SUBS = Object.fromEntries(NAV.filter(n => n[3]).map(n => [n[0], n[3]]));
 // Claves de la versión anterior del panel → (sección, sub-pestaña) actual.
@@ -1387,6 +1410,7 @@ const CHANGELOG = [
   ]],
   ['3.9.8','2026-09-27',94,['Limpieza interna: retirado un botón de pruebas del menú. En la versión de CrazyGames el juego carga más rápido: los datos pesados de GloboReto y la música del juego ya no bloquean la pantalla de carga.']],
   ['3.9.9','2026-09-27',95,['La bonificación diaria ya no interrumpe a un jugador nuevo nada más entrar: espera a que termine su primera partida. Además, si estás en el menú cuando se reinicia el día (00:00 UTC), el aviso te sale en ese momento; si estás jugando, te sale al volver al menú.']],
+  ['3.9.10','2026-09-27',96,['Panel de estadísticas: nueva página "Bono diario" en Admin con el historial de reclamos de cada cuenta (racha, día, monedas, hora), en vivo. Además, el botón ✓ de los paneles de bonificación diaria y subida de nivel ahora espera un instante antes de responder, para no reclamar por accidente con un clic dirigido al menú.']],
 ];
 function renderChangelog(){
   const el = $('changelog-list');
@@ -1729,6 +1753,7 @@ function render(data){
   renderSocialExtra(data.extra, data.series||{});
   renderGrowth(data);
   renderEconomy(data.economy||{}, rl);
+  renderDailyBonus(data.dailyBonus||{});
   renderIntegrity(data.integrityFlags||[], rl);
   renderGuests(data.guests||[], rl);
   renderAccounts(data.accounts||[]);
@@ -2432,6 +2457,54 @@ function renderEconomy(e, rl){
 }
 
 const INTEGRITY_TYPE_LABELS = { game:'Modo suelto', campaign:'🌍 Gira Mundial', globequiz:'🌎 GlobeQuiz' };
+// ── Bonificación diaria: historial por cuenta (en vivo) ─────────────────────
+const _dbOpen = new Set();   // usernames whose history is expanded — kept across the 15 s refreshes
+function renderDailyBonus(d){
+  const n = v => (v||0).toLocaleString('es');
+  const dayLabel = x => x>=7 ? 'Día 7+' : 'Día '+x;
+  const list = d.list || [];
+  $('dbonus-status').innerHTML = list.length
+    ? `<div class="insight ok"><b>${n(d.claimsToday)}</b> ${d.claimsToday===1?'cuenta reclamó':'cuentas reclamaron'} hoy (${escapeHtml(d.today||'')} UTC) · <b>${n(d.activeStreaks)}</b> rachas vivas de <b>${n(d.accounts)}</b> cuentas que han reclamado alguna vez.</div>`
+    : '<div class="insight">Todavía nadie ha reclamado la bonificación diaria.</div>';
+  const cards = [
+    ['🎁','Reclamaron hoy', d.claimsToday], ['🪙','Monedas dadas hoy', d.coinsToday], ['🔥','Rachas vivas', d.activeStreaks],
+    ['👥','Cuentas que reclamaron', d.accounts], ['🧾','Reclamos totales', d.totalClaims], ['💰','Monedas totales', d.totalCoins],
+  ];
+  $('cards-dbonus').innerHTML = cards.map(([i,l,v])=>`<div class="card"><div class="icon">${i}</div><div class="v">${n(v)}</div><div class="l">${l}</div></div>`).join('');
+
+  const by = d.byDay || [];
+  upsertChart('dbonus','chart-dbonus',{ type:'bar',
+    data:{ labels:by.map(x=>x.date.slice(5)), datasets:[{ label:'Reclamos', data:by.map(x=>x.claims), backgroundColor:'#ffb020', borderRadius:4 }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false}, tooltip:chartDefaults.plugins.tooltip },
+      scales:{ x:axisX, y:{ beginAtZero:true, ticks:{ color:'#5a7da6', precision:0, font:{size:10} }, grid:{ color:'#16263f' } } } } });
+
+  const tb = $('tbl-dbonus');
+  if(!list.length){ tb.innerHTML = '<tr><td class="empty">Sin reclamos todavía.</td></tr>'; }
+  else {
+    tb.innerHTML = '<tr><th></th><th>Jugador</th><th>Racha</th><th>Hoy</th><th>Último reclamo</th><th style="text-align:right">Reclamos</th><th style="text-align:right">Monedas</th></tr>' +
+      list.map((a,i)=>{
+        const streak = a.streakAlive ? dayLabel(a.day) : '—';
+        const today = a.claimedToday
+          ? '<span class="status-pill active"><span class="dotstat"></span>✔ Reclamó</span>'
+          : (a.streakAlive ? '<span class="status-pill"><span class="dotstat"></span>Pendiente</span>' : '<span class="status-pill churned"><span class="dotstat"></span>Racha perdida</span>');
+        const open = _dbOpen.has(a.username);
+        const row = `<tr class="acc-row${open?' open':''}" data-name="${escapeHtml(a.username)}" data-idx="db-${i}"><td><span class="caret">▶</span></td><td>${escapeHtml(a.username)}</td><td>${streak}</td><td>${today}</td><td style="white-space:nowrap">${new Date(a.lastAt).toLocaleString('es')}</td><td class="n">${n(a.claims)}</td><td class="n">${n(a.totalCoins)}</td></tr>`;
+        const inner = '<table><tr><th>Día UTC</th><th>Racha</th><th style="text-align:right">Monedas</th><th>Hora</th></tr>' +
+          (a.history||[]).map(h=>`<tr><td>${escapeHtml(h.date)}</td><td>${dayLabel(h.day)}</td><td class="n">+${n(h.coins)}</td><td style="white-space:nowrap">${new Date(h.at).toLocaleTimeString('es')}</td></tr>`).join('') + '</table>';
+        return row + `<tr class="acc-games${open?' open':''}" id="db-games-db-${i}"><td colspan="7"><div class="acc-games-inner table-scroll">${inner}</div></td></tr>`;
+      }).join('');
+    tb.querySelectorAll('.acc-row').forEach(row=>{
+      row.addEventListener('click', ()=>{
+        row.classList.toggle('open');
+        document.getElementById('db-games-'+row.dataset.idx)?.classList.toggle('open');
+        if(row.classList.contains('open')) _dbOpen.add(row.dataset.name); else _dbOpen.delete(row.dataset.name);
+      });
+    });
+  }
+  const rw = d.rewards || [10,15,20,30,40,50,75];
+  $('tbl-dbonus-rewards').querySelector('tbody').innerHTML = '<tr>' + rw.map((_,i)=>`<th style="text-align:center">${dayLabel(i+1)}</th>`).join('') + '</tr><tr>' + rw.map(v=>`<td class="n" style="text-align:center">+${v}</td>`).join('') + '</tr>';
+}
+
 function renderIntegrity(flags, rl){
   const critCount = flags.filter(f=>f.severity==='crit').length;
   const warnCount = flags.filter(f=>f.severity==='warn').length;

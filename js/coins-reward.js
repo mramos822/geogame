@@ -381,8 +381,11 @@
       stage.appendChild(el);
       try { if (typeof sfxBonus !== 'undefined') { sfxBonus.currentTime = 0; sfxPlay(sfxBonus); } } catch (e) {}
       let done = false;
-      el.querySelector('.levelup-confirm').addEventListener('click', () => {
-        if (done) return;
+      const confirmBtn = el.querySelector('.levelup-confirm');
+      const armedAt = performance.now() + 900;                 // ignore clicks meant for what was under the popup
+      setTimeout(() => confirmBtn.classList.add('armed'), 900);
+      confirmBtn.addEventListener('click', () => {
+        if (done || performance.now() < armedAt) return;
         done = true;
         try { if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); } } catch (e) {}
         const r = el.querySelector('.levelup-coin').getBoundingClientRect();

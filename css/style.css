@@ -13427,3 +13427,7 @@ body.is-mobile .lobby-gq-stepper-val { min-width: 6.5cqmin; font-size: 2.9cqmin;
 /* While the GloboReto menu panel is open (class toggled by js/menu/topbars.js), the HUD bars sit above its
    scroll (board z-index 210, parts up to 213). Every other panel keeps covering them. */
 #loading-screen.gq-menu-panel .loading-topbars { z-index: 214; }
+
+/* the ✓ of the daily-bonus / level-up panels only responds after a short delay (see dailybonus.js, coins-reward.js) */
+.levelup-confirm:not(.armed) { opacity: 0.45; filter: grayscale(0.5); }
+.levelup-confirm { transition: opacity 0.25s, filter 0.25s; }
