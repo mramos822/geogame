@@ -10,3 +10,6 @@ supabase/.temp/
 /crazy-build/
 /crazy-build.zip
 /crazy-upload/
+
+# Reference screenshots the user drops here for the assistant to look at — local only, never published
+/images/prompt/
