@@ -9,7 +9,7 @@
 (function () {
   const REWARDS = [10, 15, 20, 30, 40, 50, 75];
   const tt = (k, v) => (typeof t === 'function' ? t(k, v) : k);
-  let _checked = false, _tries = 0;
+  let _checked = false;
 
   function menuIsFree() {
     const ls = document.getElementById('loading-screen');
@@ -73,6 +73,18 @@
     });
   }
 
+  // A brand-new player (no finished game yet) is not interrupted right after entering: the popup waits
+  // until they have finished their first game and are back on the menu. Everyone else gets it as soon
+  // as the menu is free.
+  function hasPlayedBefore() {
+    try { if (parseInt(localStorage.getItem('playCount') || '0', 10) > 0) return true; } catch (e) {}
+    const pr = window._sbProfile;
+    return !!(pr && (pr.play_count || 0) > 0);
+  }
+
+  const utcDay = () => new Date().toISOString().slice(0, 10);
+  let _day = utcDay();          // the UTC day the current check belongs to
+
   async function run() {
     if (_checked) return;
     if (!window._sbUserId || !window.sb) return;
@@ -92,12 +104,35 @@
     if (window.refreshTopbars) window.refreshTopbars();
   }
 
-  // Poll until the menu is on screen and free (loaded, logged in, no other popup on top).
+  // Keeps trying (every second, no limit) until the check has been done: the menu is on screen and free
+  // (loaded, logged in, no other popup on top) and, for a new player, the first game is behind them.
+  let _polling = false;
   function poll() {
-    if (_checked || _tries++ > 90) return;
-    if (window._sbUserId && menuIsFree()) run();
-    else setTimeout(poll, 700);
+    if (_checked) { _polling = false; return; }
+    _polling = true;
+    if (window._sbUserId && menuIsFree() && hasPlayedBefore()) { _polling = false; run(); }
+    else setTimeout(poll, 1000);
   }
-  window.maybeDailyBonus = function () { _tries = 0; poll(); };
-  setTimeout(poll, 2500);
+  function startPolling() { if (!_polling && !_checked) poll(); }
+
+  // New UTC day (the daily reset): if the player is on the menu right now the popup comes up on the
+  // spot; if they are in a game it waits until they are back on the menu.
+  function newDayCheck() {
+    const d = utcDay();
+    if (d === _day) return;
+    _day = d;
+    _checked = false;
+    startPolling();
+  }
+  function scheduleMidnight() {
+    const n = new Date();
+    const next = Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate() + 1, 0, 0, 2);   // 2 s after 00:00 UTC
+    setTimeout(() => { newDayCheck(); scheduleMidnight(); }, Math.max(1000, next - n.getTime()));
+  }
+  // a sleeping tab / laptop can miss the timer: re-check whenever the tab comes back
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) newDayCheck(); });
+
+  window.maybeDailyBonus = function () { startPolling(); };
+  scheduleMidnight();
+  setTimeout(startPolling, 2500);
 })();
