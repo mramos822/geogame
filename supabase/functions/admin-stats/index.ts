@@ -504,7 +504,10 @@ Deno.serve(async (req) => {
       // esperado y detectar inserts manipulados (alguien pegándose monedas
       // desde la consola del navegador, ya que el insert es anon sin
       // validación de monto del lado del server).
-      paged(sb.from('currency_ledger').select('user_id, coins, xp').order('id', { ascending: true })),
+      // reason/ref_value/created_at hacen falta para el detalle del historial
+      // completo por cuenta (ver allLedgerHistoryByUser más abajo) — antes solo
+      // traía user_id/coins/xp y el historial salía con "Invalid Date"/"otro".
+      paged(sb.from('currency_ledger').select('user_id, coins, xp, reason, ref_value, created_at').order('id', { ascending: true })),
       // ── Puente visitor_id → cuenta: el visitor_id NO cambia al crear
       // cuenta (sigue viajando en cada evento, ver js/analytics.js), así
       // que si el mismo visitor_id de un invitado aparece en algún evento
