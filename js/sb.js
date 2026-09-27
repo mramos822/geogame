@@ -584,12 +584,26 @@ window.sbRecordVersusH2H = async function(opponentId, mode, won) {
   catch (e) {}
 };
 
-// Coins/XP for a finished versus round (1v1 or group). The server caps it at
-// 10 grants/day (see grant_versus_currency). Winner 20c/10xp, loser 5c/2xp.
-// Fire-and-forget; logged-in only.
-window.sbGrantVersusCurrency = async function(won) {
-  if (!window._sbUserId) return;
-  try { await sb.rpc('grant_versus_currency', { p_won: !!won }); } catch (e) {}
+// Records MY OWN row of a finished versus round (1v1 or group) into
+// versus_matches AND grants coins/XP in the same server-side step (see
+// record_versus_result — replaces the old grant_versus_currency, which stays
+// in the DB unused in case something else still calls it). The server caps
+// grants at 10/day (America/New_York); the match row is saved either way, so
+// the history never loses a game even once the daily cap is hit.
+// `matchKey` ties together every player's row of the SAME match (see the
+// callers in vs.js/lobby.js for how it's built for 1v1 vs. group).
+// Fire-and-forget; logged-in only. Returns {granted, coins, xp} (or null on
+// any failure) in case a caller wants to reflect the real granted amount.
+window.sbRecordVersusMatch = async function(matchKey, kind, mode, score, won) {
+  if (!window._sbUserId || !matchKey || !kind) return null;
+  try {
+    const { data, error } = await sb.rpc('record_versus_result', {
+      p_match_key: matchKey, p_kind: kind, p_mode: mode || null,
+      p_score: Math.round(score) || 0, p_won: !!won,
+    });
+    if (error) throw error;
+    return data || null;
+  } catch (e) { return null; }
 };
 
 // ── FRIENDS ─────────────────────────────────────────────────────────────────

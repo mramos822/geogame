@@ -396,6 +396,7 @@ Deno.serve(async (req) => {
       visitorUserBridgeRes,
       onlineGuestsRes, guestPresenceHistoryRes,
       verifiedAccountsRes,
+      versusMatchesRes,
     ] = await Promise.all([
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true })),
       cnt(sb.from('profiles').select('*', { count: 'exact', head: true }).gte('last_active', onlineISO)),
@@ -544,6 +545,14 @@ Deno.serve(async (req) => {
       // más arriba) — integrityFlags las salta más abajo aunque su patrón de
       // juego siga viéndose estadísticamente raro.
       sb.from('verified_accounts').select('user_id, verified_at'),
+      // ── Historial real de cada versus (ver versus_matches / record_versus_result)
+      // — 1 fila por JUGADOR por partida; las filas con el mismo match_key son
+      // la misma partida (1v1 = 2 filas, grupo = tantas como participantes).
+      // Todo el historial, no solo la ventana elegida, para que el detalle de
+      // una cuenta ("cuando clickees Versus") no dependa del rango del dashboard.
+      paged(sb.from('versus_matches')
+        .select('match_key, kind, mode, user_id, score, is_winner, coins, xp, created_at')
+        .order('id', { ascending: false }), 1000, 20000),
     ]);
 
     const regRows      = profilesRes.data || [];
@@ -1209,6 +1218,31 @@ Deno.serve(async (req) => {
     }
     const versusFunnel = { ...funnelCounts, finished: versusRows.length };
 
+    // ── Historial real de cada versus (ver versus_matches / record_versus_result
+    // más arriba) — agrupa las filas por match_key: cada grupo ES una partida,
+    // con sus jugadores (nombre, puntaje, si ganó, coins/xp que se llevó) tal
+    // como pasó, no una aproximación. Ordenado por fecha, más reciente primero.
+    const versusMatchGroups: Record<string, any[]> = {};
+    for (const r of (versusMatchesRes.data || []) as any[]) {
+      (versusMatchGroups[r.match_key] = versusMatchGroups[r.match_key] || []).push(r);
+    }
+    const versusMatches = Object.entries(versusMatchGroups)
+      .map(([matchKey, rows]) => {
+        const sorted = rows.slice().sort((a, b) => (b.is_winner ? 1 : 0) - (a.is_winner ? 1 : 0) || b.score - a.score);
+        return {
+          match_key: matchKey,
+          kind: rows[0].kind,
+          mode: rows[0].mode,
+          created_at: rows.map((r) => r.created_at).sort()[0], // la más vieja de las filas del grupo
+          players: sorted.map((r) => ({
+            username: usernameById[r.user_id] || null,
+            score: r.score, is_winner: r.is_winner, coins: r.coins, xp: r.xp,
+          })),
+        };
+      })
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 500);
+
     // ── Amistades: pendientes vs aceptadas + quién manda solicitudes en masa ──
     // (detecta el patrón "una cuenta le pide amistad a toda la tabla de una",
     // que infla 'pending' sin ser actividad social real).
@@ -1700,6 +1734,7 @@ Deno.serve(async (req) => {
       versusByMode,
       versusByKind: { group: versusRows.filter((r: any) => r.session_type === 'group').length, oneVsOne: versusRows.filter((r: any) => r.session_type !== 'group').length },
       versusFunnel,
+      versusMatches,
       social,
       extra: extraOut,
       economy,

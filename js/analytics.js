@@ -170,6 +170,21 @@
     });
   }
 
+  // Non-host participant of a versus room (1v1 guest / group member). The room itself
+  // is counted once by logVersus (host only); this event only credits the player's own
+  // account (played-any checks, per-account games) and is NOT counted in room totals.
+  async function logVersusJoin(mode, kind) {
+    const cc = (localStorage.getItem('_an_country') || null) || null;
+    insertEvent({
+      type: 'versus_join',
+      mode: mode || null,
+      session_type: kind || '1v1',
+      visitor_id: visitorId,
+      country_code: cc,
+      user_id: window._sbUserId || null,
+    });
+  }
+
   // 1v1 invite funnel: 1 event per match state transition
   // (sent/accepted/declined/expired/abandoned). `matches` is ephemeral state
   // (deleted in the room cleanup, see logVersus above) so without this there's
@@ -325,7 +340,7 @@
   function guestPing() { guestHeartbeat(); }
 
   window.Analytics = {
-    logVisit, logGame, logVersus, logVersusFunnel, logCampaign, logGlobequiz,
+    logVisit, logGame, logVersus, logVersusJoin, logVersusFunnel, logCampaign, logGlobequiz,
     logCampaignCurrency, logGlobequizCurrency, resetVisitorId, guestSetPlaying, guestPing,
   };
 

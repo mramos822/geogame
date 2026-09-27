@@ -2045,6 +2045,11 @@ window.refreshVsSpectatorBadge = function (n) {
         && _gqRoomId && !_gqLoggedRooms.has(_gqRoomId)) {
       _gqLoggedRooms.add(_gqRoomId);
       try { window.Analytics.logVersus(_vsCurrentMode, '1v1'); } catch (e) {}
+    } else if (reason !== 'abandon' && window.VS && window.VS.isHost && !window.VS.isHost()
+        && window.Analytics && typeof window.Analytics.logVersusJoin === 'function'
+        && _gqRoomId && !_gqLoggedRooms.has(_gqRoomId)) {
+      _gqLoggedRooms.add(_gqRoomId);
+      try { window.Analytics.logVersusJoin(_vsCurrentMode, '1v1'); } catch (e) {}
     }
 
     // Feed a spectator's own copy of this panel — CANONICAL host/guest form
@@ -2893,7 +2898,11 @@ window.refreshVsSpectatorBadge = function (n) {
     if (!_matchResultRecorded && window._sbUserId && typeof window.sbRecordVersusResult === 'function') {
       _matchResultRecorded = true;
       window.sbRecordVersusResult(window._sbUserId, false).catch(() => {});
-      if (typeof window.sbGrantVersusCurrency === 'function') window.sbGrantVersusCurrency(false);
+      // Grab the match id BEFORE VS.abandon() (below) tears it down.
+      const matchId = window.VS && window.VS.getMatchId && window.VS.getMatchId();
+      if (matchId && typeof window.sbRecordVersusMatch === 'function') {
+        window.sbRecordVersusMatch('1v1:' + matchId, '1v1', _vsCurrentMode, _getLiveScore(), false);
+      }
     }
     if (window.VS && typeof window.VS.abandon === 'function') window.VS.abandon();
     _teardownVsOpponent();
@@ -2958,6 +2967,9 @@ window.refreshVsSpectatorBadge = function (n) {
       if (isHost && !_endedByAbandon && !_isGqMode(_vsCurrentMode)
           && typeof window.VS.finish === 'function') {
         try { window.VS.finish(); } catch (e) {}
+      } else if (!isHost && !_endedByAbandon && !_isGqMode(_vsCurrentMode)
+          && window.Analytics && typeof window.Analytics.logVersusJoin === 'function') {
+        try { window.Analytics.logVersusJoin(_vsCurrentMode, '1v1'); } catch (e) {}
       }
     }
     // Hide all HUD elements that could appear above the result overlay
@@ -2978,8 +2990,12 @@ window.refreshVsSpectatorBadge = function (n) {
         && typeof window.sbRecordVersusResult === 'function') {
       _matchResultRecorded = true;
       window.sbRecordVersusResult(window._sbUserId, outcome === 'win').catch(() => {});
-      // Coins/XP for this versus round (server caps at 10/day).
-      if (typeof window.sbGrantVersusCurrency === 'function') window.sbGrantVersusCurrency(outcome === 'win');
+      // Coins/XP for this versus round (server caps at 10/day) + my own row in
+      // the permanent match history (see versus_matches / record_versus_result).
+      const matchId = window.VS && window.VS.getMatchId && window.VS.getMatchId();
+      if (matchId && typeof window.sbRecordVersusMatch === 'function') {
+        window.sbRecordVersusMatch('1v1:' + matchId, '1v1', _vsCurrentMode, myScore, outcome === 'win');
+      }
     }
     const T = (k, d) => (typeof t === 'function' ? t(k) : d);
     const screen = document.getElementById('vs-result-screen');

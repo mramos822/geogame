@@ -192,6 +192,8 @@
 
   .acct-link{color:var(--text);text-decoration:none;border-bottom:1px dashed var(--muted);cursor:pointer;}
   .acct-link:hover{color:var(--accent);border-bottom-color:var(--accent);}
+  .acct-vs-card{cursor:pointer;transition:border-color .15s,transform .15s;}
+  .acct-vs-card:hover{border-left-color:var(--accent);transform:translateX(2px);}
 
   /* ── Ayuda (ⓘ) ── */
   .help{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;
@@ -834,6 +836,10 @@
           <h2>Los que más han duelado</h2>
           <div class="table-scroll"><table id="tbl-versus-active"><tbody></tbody></table></div>
         </div>
+        <div class="box wide">
+          <h2>Duelos recientes <span class="sub">últimos 100 <span class="help" title="Cada fila es UNA partida real (no un agregado): jugadores, puntaje de cada uno, quién ganó y cuánto se llevó cada uno en monedas/XP. Un grupo puede jugar muchas rondas — cada ronda es su propia fila.">ⓘ</span></span></h2>
+          <div class="table-scroll"><table id="tbl-versus-recent"><tbody></tbody></table></div>
+        </div>
       </div>
       </div>
       <div class="sub-page" data-sub="social">
@@ -1128,6 +1134,24 @@
         <table id="tbl-acct-econ">
           <thead><tr><th>Fecha</th><th>Fuente</th><th style="text-align:right">Monedas</th><th style="text-align:right">XP</th></tr></thead>
           <tbody id="acct-modal-econ-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="vs-history-modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="vs-history-title">Historial de Versus</h3>
+      <button class="modal-close" id="vs-history-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="vs-history-sub" class="modal-subtitle" style="margin-bottom:10px"></div>
+      <div class="table-scroll">
+        <table id="tbl-vs-history">
+          <thead><tr><th>Fecha</th><th>Modo</th><th>Jugadores</th><th style="text-align:right">Monedas</th><th style="text-align:right">XP</th></tr></thead>
+          <tbody id="vs-history-body"></tbody>
         </table>
       </div>
     </div>
@@ -1816,6 +1840,7 @@ function render(data){
   renderSocial(data.social||{});
   renderRankingsExtra(data.extra);
   renderVersusExtra(data.extra, data.series||{});
+  renderVersusRecent(data.versusMatches||[]);
   renderSocialExtra(data.extra, data.series||{});
   renderGrowth(data);
   renderEconomy(data.economy||{}, rl);
@@ -1982,6 +2007,29 @@ function renderVersusExtra(x, series){
     ? '<tr><th>#</th><th>Jugador</th><th style="text-align:right">Duelos</th></tr>' +
       v.mostActive.map((r,i)=>`<tr><td><span class="rank-badge ${rankClass(i)}">${i+1}</span></td><td>${nameFlag(r.username, r.country)}</td><td class="n bar-cell"><span class="bar-bg" style="width:${Math.round(r.games/max*100)}%"></span><span class="bar-val">${r.games}</span></td></tr>`).join('')
     : emptyRow('Sin datos aún');
+}
+// Cada partida real (ver versus_matches / match_key en admin-stats), no un
+// agregado: fecha, modo, todos los jugadores con su puntaje y quién ganó, y
+// cuánto se llevó en total esa ronda entre todos (suma de coins/xp de las
+// filas). Un click en un nombre abre el historial de ESA cuenta (mismo modal
+// que "Récord Versus" en el perfil).
+function renderVersusRecent(matches){
+  const tb = $('tbl-versus-recent');
+  if(!matches.length){ tb.innerHTML = emptyRow('Sin duelos registrados todavía.'); return; }
+  tb.innerHTML = '<tr><th>Fecha</th><th>Modo</th><th>Jugadores</th><th style="text-align:right">Monedas</th><th style="text-align:right">XP</th></tr>' +
+    matches.slice(0,100).map(m=>{
+      const players = m.players.map(pl =>
+        `<a href="javascript:void(0)" class="acct-link vs-recent-player" data-acct="${escapeHtml(pl.username||'')}"${pl.is_winner?' style="color:var(--green);font-weight:700"':''}>${pl.is_winner?'🏆 ':''}${escapeHtml(pl.username || '—')} (${(pl.score||0).toLocaleString('es')})</a>`
+      ).join(' vs ');
+      const coins = m.players.reduce((a,pl)=>a+(pl.coins||0),0);
+      const xp = m.players.reduce((a,pl)=>a+(pl.xp||0),0);
+      return `<tr><td style="white-space:nowrap">${new Date(m.created_at).toLocaleString('es')}</td>` +
+        `<td>${vsModeLabel(m.mode)}${m.kind==='group'?' · grupo':''}</td>` +
+        `<td>${players}</td><td class="n">${coins.toLocaleString('es')}</td><td class="n">${xp.toLocaleString('es')}</td></tr>`;
+    }).join('');
+  tb.querySelectorAll('.vs-recent-player').forEach(a => {
+    if(a.dataset.acct) a.addEventListener('click', () => openVersusHistory(a.dataset.acct));
+  });
 }
 
 // ── Social ────────────────────────────────────────────────────────────────────
@@ -2258,7 +2306,7 @@ function openDayPanel(rawKey, granularity){
 function closeDayPanel(){ $('day-modal').style.display = 'none'; }
 $('day-modal-close').addEventListener('click', closeDayPanel);
 $('day-modal').addEventListener('click', (e)=>{ if(e.target.id === 'day-modal') closeDayPanel(); });
-document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') { closeDayPanel(); closeEconDetail(); } });
+document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') { closeDayPanel(); closeEconDetail(); closeAccountProfile(); closeVersusHistory(); } });
 
 // ── Perfil de una cuenta conectada ahora ────────────────────────────────────
 // Se abre al hacer click en un nombre de "Conectados ahora" — reúne, en un
@@ -2292,7 +2340,8 @@ function openAccountProfile(username){
     ['🏅', rk ? rk.name : '—', `Rango (${(p.hs.total||0).toLocaleString('es')} pts totales)`],
     ['🎮', (p.play_count||0).toLocaleString('es'), 'Partidas jugadas (todo el historial)'],
     ['🌍', (p.campaigns_completed||0).toLocaleString('es'), 'Giras Mundiales completas'],
-    ['⚔️', vsTotal ? `${p.vs_wins}V / ${p.vs_losses}D${vsPct!=null?' ('+vsPct+'%)':''}` : 'Sin partidas', 'Récord Versus'],
+    // clickable: abre SOLO el historial de versus de esta cuenta (ver openVersusHistory)
+    ['⚔️', vsTotal ? `${p.vs_wins}V / ${p.vs_losses}D${vsPct!=null?' ('+vsPct+'%)':''}` : 'Sin partidas', 'Récord Versus · click para ver cada duelo', true],
     ['🔥', (p.gq_streak_count||0).toLocaleString('es'), 'Racha actual de GloboReto'],
     ['👥', (p.friends||0).toLocaleString('es'), 'Amigos aceptados'],
     ['🖥️', `${deviceIcon(row.device)}${platTag(row.platform)}`, `${row.is_playing ? 'Jugando ahora'+(row.playing_mode?' · '+escapeHtml(row.playing_mode):'') : 'Conectado'} · ${timeAgo(row.last_active)}`],
@@ -2302,7 +2351,10 @@ function openAccountProfile(username){
     cards.push(['✨', (econ.totalXp||0).toLocaleString('es'), 'XP acumulado (historial completo)']);
     if(econ.suspicious) cards.push(['🚨', '+' + (econ.suspiciousCoins||0).toLocaleString('es'), 'Monedas sin explicar en el ledger — ver pestaña Integridad']);
   }
-  $('acct-modal-cards').innerHTML = cards.map(([icon,v,l])=>`<div class="insight-card"><b>${icon} ${v}</b><br>${l}</div>`).join('');
+  $('acct-modal-cards').innerHTML = cards.map(([icon,v,l,clickable])=>
+    `<div class="insight-card${clickable?' acct-vs-card':''}"><b>${icon} ${v}</b><br>${l}</div>`
+  ).join('');
+  $('acct-modal-cards').querySelector('.acct-vs-card')?.addEventListener('click', ()=>openVersusHistory(username));
 
   const modes = [
     ['🚩 Banderas', p.hs.flags, p.avg.flags, p.plays?.flags],
@@ -2325,6 +2377,41 @@ function openAccountProfile(username){
 function closeAccountProfile(){ const m = $('acct-modal'); if(m) m.style.display = 'none'; }
 $('acct-modal-close')?.addEventListener('click', closeAccountProfile);
 $('acct-modal')?.addEventListener('click', (e)=>{ if(e.target.id === 'acct-modal') closeAccountProfile(); });
+
+// ── Historial de Versus (solo versus, nada más) ─────────────────────────────
+// Se abre al hacer click en el Récord Versus del perfil de una cuenta —
+// muestra cada duelo por separado (1 fila de tabla = 1 partida real, no un
+// agregado): fecha, modo, TODOS los jugadores con su puntaje (el/los
+// ganador(es) resaltados), y cuánto ganó en monedas/XP esa cuenta puntual en
+// esa partida. Un versus es individual por sesión — un grupo puede jugar
+// muchas rondas, cada una es su propia fila acá (ver versus_matches /
+// match_key en admin-stats).
+const VS_MODE_LABELS = { flags: '🚩 Banderas', shapes: '🧩 Figuras', cities: '🏙️ Ciudades', monuments: '🗿 Monumentos', globequiz: '🌎 GlobeQuiz' };
+function vsModeLabel(mode){
+  if(!mode) return '—';
+  return mode.split('+').map(m => VS_MODE_LABELS[m] || m).join(' + ');
+}
+function openVersusHistory(username){
+  const all = (lastData && lastData.versusMatches) || [];
+  const matches = username ? all.filter(m => m.players.some(pl => pl.username === username)) : all;
+  $('vs-history-title').textContent = username ? `Versus de ${username}` : 'Todos los duelos';
+  $('vs-history-sub').textContent = `${matches.length} partida${matches.length===1?'':'s'} · cada partida es una fila, con sus jugadores y quién ganó`;
+  $('vs-history-body').innerHTML = matches.length ? matches.map(m => {
+    const players = m.players.map(pl =>
+      `<span${pl.is_winner ? ' style="color:var(--green);font-weight:700"' : ''}>${pl.is_winner?'🏆 ':''}${escapeHtml(pl.username || '—')} (${(pl.score||0).toLocaleString('es')})</span>`
+    ).join(' vs ');
+    const mine = username ? m.players.find(pl => pl.username === username) : null;
+    return `<tr><td style="white-space:nowrap">${new Date(m.created_at).toLocaleString('es')}</td>` +
+      `<td>${vsModeLabel(m.mode)}${m.kind==='group'?' · grupo':''}</td>` +
+      `<td>${players}</td>` +
+      `<td class="n">${mine ? (mine.coins||0).toLocaleString('es') : '—'}</td>` +
+      `<td class="n">${mine ? (mine.xp||0).toLocaleString('es') : '—'}</td></tr>`;
+  }).join('') : '<tr><td class="empty" colspan="5">Sin duelos registrados todavía.</td></tr>';
+  $('vs-history-modal').style.display = 'flex';
+}
+function closeVersusHistory(){ const m = $('vs-history-modal'); if(m) m.style.display = 'none'; }
+$('vs-history-close')?.addEventListener('click', closeVersusHistory);
+$('vs-history-modal')?.addEventListener('click', (e)=>{ if(e.target.id === 'vs-history-modal') closeVersusHistory(); });
 
 // ── Detalle de una fila de "Cálculo en vivo por cuenta" (Economía) ─────────
 // Se abre al hacer click en el pill de estado (OK / ⚠️ sin explicar) — antes

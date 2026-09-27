@@ -2286,6 +2286,9 @@ window.Lobby = (() => {
       if (window.LB.isHost() && _rid && _rid !== _loggedLobbyId && window.Analytics && window.Analytics.logVersus) {
         _loggedLobbyId = _rid;
         window.Analytics.logVersus((_lobbyModes && _lobbyModes[0]) || null, 'group');
+      } else if (!window.LB.isHost() && _rid && _rid !== _loggedLobbyId && window.Analytics && window.Analytics.logVersusJoin) {
+        _loggedLobbyId = _rid;
+        window.Analytics.logVersusJoin((_lobbyModes && _lobbyModes[0]) || null, 'group');
       }
     } catch (e) {}
     // Reset multi-mode state for the next match
@@ -2600,11 +2603,15 @@ window.Lobby = (() => {
         : T('lobby.placed', 'Quedaste #{n}').replace('{n}', myRank);
       title.className = 'vs-result-title ' + (myRank === 1 ? 'win' : 'lose');
     }
-    // Coins/XP for this group match (server caps at 10 versus grants/day) —
-    // rank 1 = winner. _presentFinalResult's _resultPresented guard means this
-    // runs once per match.
-    if (myRank >= 1 && window._sbUserId && typeof window.sbGrantVersusCurrency === 'function') {
-      window.sbGrantVersusCurrency(myRank === 1);
+    // Coins/XP for this group match (server caps at 10 versus grants/day) +
+    // my own row in the permanent match history (versus_matches /
+    // record_versus_result) — rank 1 = winner. _presentFinalResult's
+    // _resultPresented guard means this runs once per match. match_key ties
+    // together every member's row of THIS round: a lobby can play many
+    // rounds, each with its own seed, so lobby_id alone isn't enough.
+    if (myRank >= 1 && window._sbUserId && typeof window.sbRecordVersusMatch === 'function' && _lobbyId && _baseSeed != null) {
+      const myScore = (members.find(m => m.id === myId) || {}).score || 0;
+      window.sbRecordVersusMatch('grp:' + _lobbyId + ':' + _baseSeed, 'group', _lobbyModes.join('+') || null, myScore, myRank === 1);
     }
     const medals = ['🥇', '🥈', '🥉'];
     const tiebreakLoserIds = new Set(tiebreakLosers || (window._gqTurnsTiebreakLosers ? Array.from(window._gqTurnsTiebreakLosers) : []));
