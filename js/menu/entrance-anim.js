@@ -169,8 +169,6 @@ window.replayEntranceAnimations = function () {
   const resultsBtn = document.getElementById('loading-results-btn');
   if (resultsBtn) resultsBtn.style.display = 'block';
 
-  window.__resultsTest = false; // back on the menu: the results test button's dry-run is over
-
   // Pending GloboReto reward (coins/XP): once the buttons have popped in, they burst
   // out of the GloboReto button into the HUD bars (see playMenuRewards in menu/topbars.js).
   if (window.__gqPendingReward) setTimeout(() => { if (window.playMenuRewards) window.playMenuRewards(); }, 550);

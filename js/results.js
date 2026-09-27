@@ -18,7 +18,7 @@ function buildResultsMessage(total) {
   const playerName = localStorage.getItem('playerName') || 'John';
   const prevBest   = (resultsScreen._prevBest !== undefined) ? resultsScreen._prevBest : (parseInt(localStorage.getItem(TOTAL_HS_KEY)) || 0);
   const isNewBest  = total > prevBest;
-  if (isNewBest && !window.__resultsTest) localStorage.setItem(TOTAL_HS_KEY, total);
+  if (isNewBest) localStorage.setItem(TOTAL_HS_KEY, total);
 
   if (isNewBest) {
     return t('results.newRecordMsg', { name: playerName });

@@ -5440,60 +5440,6 @@
     }
     _gqTurnsPositionLb(false); // fresh build, nothing to slide from yet
   };
-  // TEMP test: shows the solo end-of-game panel (the post-GloboReto one) with random
-  // data — no streak update, no analytics, no currency. Driven by the "Test" button on
-  // the menu (see js/menu/menu-launchers.js); confirm just returns to the menu.
-  window._gqTestEndgame = function () {
-    const modal = document.getElementById('gq-endgame-modal');
-    const gqScreen = document.getElementById('globequiz-screen');
-    const list = ((window.GQ_COUNTRIES_DATA && window.GQ_COUNTRIES_DATA.features) || []).map(f => f.properties).filter(p => p && p.name);
-    if (!modal || !gqScreen || list.length < 12) return false;
-    const pick = () => list[Math.floor(Math.random() * list.length)];
-    const target = pick();
-    const flagOf = (c) => (c && c.iso2 && window.flagUrlForCountryCode) ? window.flagUrlForCountryCode(c.iso2) : '';
-    const rnd = (a, b) => Math.floor(a + Math.random() * (b - a + 1));
-    const attempts = rnd(2, 9);
-    const elapsedMs = rnd(8000, 140000);
-    const isNewDay = Math.random() < 0.5;
-    const streak = rnd(1, 120);
-    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-    set('gq-endgame-streak-num', String(streak));
-    _gqShowEarned(streak, isNewDay, { coins: rnd(10, 120), xp: rnd(20, 320) });
-    set('gq-endgame-country-label', displayName(target));
-    const flag = document.getElementById('gq-endgame-flag');
-    if (flag) { const u = flagOf(target); flag.style.display = u ? 'block' : 'none'; flag.src = u || ''; }
-    set('gq-endgame-time', Math.floor(elapsedMs / 1000) + ':' + String(Math.floor((elapsedMs % 1000) / 10)).padStart(2, '0'));
-    set('gq-endgame-attempts', String(attempts));
-    const table = document.getElementById('gq-endgame-table');
-    if (table) {
-      table.innerHTML = '';
-      const rows = [];
-      for (let i = 0; i < attempts - 1; i++) { const c = pick(); rows.push({ c, km: rnd(150, 16000) }); }
-      rows.sort((a, b) => a.km - b.km).forEach(({ c, km }) => {
-        const row = document.createElement('div');
-        row.className = 'gq-endgame-row';
-        const u = flagOf(c);
-        if (u) { const img = document.createElement('img'); img.className = 'gq-endgame-row-flag'; img.src = u; img.alt = ''; img.draggable = false; row.appendChild(img); }
-        const name = document.createElement('span'); name.className = 'gq-endgame-row-name'; name.textContent = displayName(c);
-        const dist = document.createElement('span'); dist.className = 'gq-endgame-row-dist'; dist.textContent = km + ' km';
-        row.appendChild(name); row.appendChild(dist);
-        table.appendChild(row);
-      });
-    }
-    set('gq-endgame-msg-title', t(isNewDay ? 'globequiz.streakGainedTitle' : 'globequiz.streakAlreadyTitle'));
-    set('gq-endgame-msg-sub', t(isNewDay ? 'globequiz.streakGainedSub' : 'globequiz.streakAlreadySub'));
-    const cd = document.getElementById('gq-endgame-countdown'); if (cd) cd.style.display = 'inline';
-    startGqEndgameCountdown();
-    window.__gqTestPanel = true;
-    gqScreen.style.display = 'block';
-    modal.style.display = 'flex';
-    return true;
-  };
-  window._gqTestEndgameClose = function () {
-    stopGqEndgameCountdown();
-    const modal = document.getElementById('gq-endgame-modal'); if (modal) modal.style.display = 'none';
-    const gqScreen = document.getElementById('globequiz-screen'); if (gqScreen) gqScreen.style.display = 'none';
-  };
   window._gqTurnsDebugPreviewClose = function () {
     const gqScreen = document.getElementById('globequiz-screen');
     if (gqScreen) gqScreen.style.display = 'none';

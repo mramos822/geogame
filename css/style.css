@@ -13188,22 +13188,6 @@ body.is-mobile .lobby-gq-stepper-val { min-width: 6.5cqmin; font-size: 2.9cqmin;
   border-top: 0.35cqmin solid #fff;
 }
 .loading-topbar-xp:hover .loading-topbar-tip { opacity: 1; transform: translate(-50%, 0); }
-/* TEMP: test button in the middle of the menu, jumps to Results with random scores. */
-#dev-results-test {
-  display: none; /* shown by loading-boot.js once loading finishes */
-  position: absolute;
-  left: 50%; top: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 20;
-  padding: 1.2cqmin 2.6cqmin;
-  border: 0.45cqmin solid #fff;
-  border-radius: 1.8cqmin;
-  background: linear-gradient(#e0473f, #a3231d);
-  color: #fff;
-  font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
-  font-size: 3cqmin;
-  cursor: pointer;
-}
 /* Entrance like the menu buttons (pop-in with overshoot): hidden until the
    loading reaches 100% (loading-boot.js adds .topbars-in), coins first, then XP. */
 .loading-topbar { opacity: 0; }

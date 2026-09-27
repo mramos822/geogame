@@ -33,7 +33,7 @@ function showFinalScreen() {
   // the real engagement signal we chose to use instead of just starting a game.
   // typeof-check in case an ad blocker stops gtag.js from loading — it must not
   // break the rest of the final screen.
-  if (typeof gtag === 'function' && !window.__resultsTest) {
+  if (typeof gtag === 'function') {
     gtag('event', 'conversion', {
       'send_to': 'AW-18355179202/cZ38COS379ccEMKdt7BE',
       'value': 0.0,
@@ -44,7 +44,7 @@ function showFinalScreen() {
   if (typeof window._setPlaying === 'function') window._setPlaying(false);
   // Local mirror ALWAYS (with or without an account): if the server save fails
   // (offline), the profile must not show 0 — it falls back to this.
-  if (!window.__resultsTest) localStorage.setItem('playCount', String(parseInt(localStorage.getItem('playCount') || '0', 10) + 1));
+  localStorage.setItem('playCount', String(parseInt(localStorage.getItem('playCount') || '0', 10) + 1));
   const backWrap = document.getElementById('final-confirm-back-wrap');
   if (backWrap) {
     backWrap.classList.remove('visible');
@@ -59,7 +59,6 @@ function showFinalScreen() {
   // Accumulate for per-mode averages (second loading column) — local mirror
   // always, same reason as playCount above.
   [['flags', hs1], ['shapes', hs2], ['game', hs3], ['monuments', hs4]].forEach(([k, v]) => {
-    if (window.__resultsTest) return;
     localStorage.setItem('avgSum_' + k,   String(parseInt(localStorage.getItem('avgSum_' + k)   || '0', 10) + v));
     localStorage.setItem('avgCount_' + k, String(parseInt(localStorage.getItem('avgCount_' + k) || '0', 10) + 1));
   });
