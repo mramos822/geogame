@@ -1418,6 +1418,7 @@ const CHANGELOG = [
     'Bonificación diaria de monedas al entrar (también para invitados): crece cada día seguido y desde el día 7 siempre da lo máximo.',
     'Los versus se cuentan por sala, y el panel de estadísticas suma las nuevas páginas "Categoría CG" y "Bono diario". La versión de CrazyGames carga más rápido.',
   ]],
+  ['4.0.1','2026-09-27',99,['Corregido: la bonificación diaria no aparecía a quien solo había jugado GloboReto, versus o un modo suelto (solo contaba la Gira Mundial completa). Ahora el servidor decide si el jugador ya jugó alguna partida.']],
 ];
 function renderChangelog(){
   const el = $('changelog-list');

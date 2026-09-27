@@ -80,8 +80,9 @@
   }
 
   // A brand-new player (no finished game yet) is not interrupted right after entering: the popup waits
-  // until they have finished their first game and are back on the menu. Everyone else gets it as soon
-  // as the menu is free.
+  // until they have finished their first game (of any mode — the server decides, see `played` in
+  // get_daily_bonus) and are back on the menu. Everyone else gets it as soon as the menu is free.
+  // hasPlayedBefore() is only the quick local hint (Gira Mundial counter / profile play_count).
   function hasPlayedBefore() {
     try { if (parseInt(localStorage.getItem('playCount') || '0', 10) > 0) return true; } catch (e) {}
     const pr = window._sbProfile;
@@ -92,6 +93,7 @@
   let _day = utcDay();          // the UTC day the current check belongs to
 
   let _ident = { uid: null, vid: null };
+  let _nextTry = 0;
   async function run() {
     if (_checked) return;
     if (!window.sb) return;
@@ -105,6 +107,12 @@
     let state = null;
     try { const r = await (uid ? window.sb.rpc('get_daily_bonus') : window.sb.rpc('get_daily_bonus_guest', { p_visitor: vid })); state = r && r.data; } catch (e) {}
     if (!state || !state.claimable) return;
+    // Brand-new player (no finished game of any kind yet, as the SERVER sees it): wait, look again later.
+    if (state.played === false && !hasPlayedBefore()) {
+      _checked = false; _nextTry = Date.now() + 8000;
+      startPolling();
+      return;
+    }
     const { res, rect } = await showPopup(state);
     if (!res || !res.claimed || !(res.coins > 0)) return;
     const ls = document.getElementById('loading-screen');
@@ -123,7 +131,7 @@
   function poll() {
     if (_checked) { _polling = false; return; }
     _polling = true;
-    if (menuIsFree() && hasPlayedBefore() && performance.now() > 5000) { _polling = false; run(); }   // >5s: give the saved login time to restore
+    if (menuIsFree() && Date.now() >= _nextTry && performance.now() > 5000) { _polling = false; run(); }   // >5s: give the saved login time to restore
     else setTimeout(poll, 1000);
   }
   function startPolling() { if (!_polling && !_checked) poll(); }
