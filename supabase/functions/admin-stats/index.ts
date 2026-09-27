@@ -1357,18 +1357,29 @@ Deno.serve(async (req) => {
     // panel refresh so the Admin > "Bono diario" page is live. The coins also count in the expected
     // balance below (they are real balance for the player but never touch currency_ledger).
     const { data: dbData } = await paged(sb.from('daily_bonus_claims')
-      .select('user_id, claim_date, day_number, coins, created_at')
+      .select('user_id, visitor_id, claim_date, day_number, coins, created_at')
       .order('created_at', { ascending: false }));
     const dbRows = (dbData || []) as any[];
+    // guests (no account yet): show their name from guest_presence, keyed by visitor id
+    const dbGuestIds = [...new Set(dbRows.filter((r) => !r.user_id && r.visitor_id).map((r) => r.visitor_id as string))];
+    const dbGuestNames: Record<string, string> = {};
+    if (dbGuestIds.length) {
+      const { data: gn } = await sb.from('guest_presence').select('visitor_id, guest_name, last_active')
+        .in('visitor_id', dbGuestIds).order('last_active', { ascending: false });
+      for (const g of (gn || []) as any[]) if (g.guest_name && !dbGuestNames[g.visitor_id]) dbGuestNames[g.visitor_id] = g.guest_name;
+    }
     const todayUTC = new Date().toISOString().slice(0, 10);
     const yestUTC = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
     const dbByUser: Record<string, any[]> = {};
-    for (const r of dbRows) (dbByUser[r.user_id] = dbByUser[r.user_id] || []).push(r);
+    for (const r of dbRows) { const k = r.user_id || ('v:' + r.visitor_id); (dbByUser[k] = dbByUser[k] || []).push(r); }
     const dbAccounts = Object.entries(dbByUser).map(([uid, list]) => {
       list.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));   // newest first
       const last = list[0];
+      const isGuest = uid.startsWith('v:');
+      const vid = isGuest ? uid.slice(2) : '';
       return {
-        username: usernameById[uid] || uid,
+        username: isGuest ? ('👤 ' + (dbGuestNames[vid] || 'Invitado') + ' · ' + vid.slice(-6)) : (usernameById[uid] || uid),
+        isGuest,
         lastDate: last.claim_date, lastAt: last.created_at, day: last.day_number,
         claimedToday: last.claim_date === todayUTC,
         streakAlive: last.claim_date === todayUTC || last.claim_date === yestUTC,
@@ -1429,6 +1440,7 @@ Deno.serve(async (req) => {
       });
     }
     for (const r of dbRows) {
+      if (!r.user_id) continue;   // guest claims aren't part of any account's balance (until they register)
       const u = expectedByUser[r.user_id] = expectedByUser[r.user_id] || { coins: 0, xp: 0 };
       u.coins += r.coins || 0;
     }

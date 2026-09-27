@@ -5,7 +5,8 @@
 //
 // Everything that matters is server-side (get_daily_bonus / claim_daily_bonus RPCs, table
 // daily_bonus_claims — see supabase/migrations/20260927000000_daily_bonus.sql): the amounts shown here
-// are only for display, the claimed amount comes from the server. Guests get no bonus.
+// are only for display, the claimed amount comes from the server. Guests (no account) get it too,
+// keyed by their anonymous visitor id; their claims move to the account when they log in / register.
 (function () {
   const REWARDS = [10, 15, 20, 30, 40, 50, 75];
   const tt = (k, v) => (typeof t === 'function' ? t(k, v) : k);
@@ -67,7 +68,7 @@
         busy = true;
         try { if (typeof sfxCheck !== 'undefined') { sfxCheck.currentTime = 0; sfxPlay(sfxCheck); } } catch (e) {}
         let res = null;
-        try { const r = await window.sb.rpc('claim_daily_bonus'); res = r && r.data; } catch (e) {}
+        try { const r = await (_ident.uid ? window.sb.rpc('claim_daily_bonus') : window.sb.rpc('claim_daily_bonus_guest', { p_visitor: _ident.vid })); res = r && r.data; } catch (e) {}
         const coin = el.querySelector('.daily-day.today .daily-day-coin');
         const cr = coin.getBoundingClientRect();
         const rect = { left: cr.left, top: cr.top, width: cr.width, height: cr.height, right: cr.right, bottom: cr.bottom };
@@ -90,12 +91,19 @@
   const utcDay = () => new Date().toISOString().slice(0, 10);
   let _day = utcDay();          // the UTC day the current check belongs to
 
+  let _ident = { uid: null, vid: null };
   async function run() {
     if (_checked) return;
-    if (!window._sbUserId || !window.sb) return;
+    if (!window.sb) return;
     _checked = true;
+    // Who is playing: an account (the session may not have set window._sbUserId yet) or a guest.
+    let uid = window._sbUserId || null;
+    if (!uid) { try { const { data } = await window.sb.auth.getSession(); if (data && data.session) uid = data.session.user.id; } catch (e) {} }
+    let vid = null; try { vid = localStorage.getItem('_devstats_vid'); } catch (e) {}
+    if (!uid && !vid) return;
+    _ident = { uid, vid };
     let state = null;
-    try { const r = await window.sb.rpc('get_daily_bonus'); state = r && r.data; } catch (e) {}
+    try { const r = await (uid ? window.sb.rpc('get_daily_bonus') : window.sb.rpc('get_daily_bonus_guest', { p_visitor: vid })); state = r && r.data; } catch (e) {}
     if (!state || !state.claimable) return;
     const { res, rect } = await showPopup(state);
     if (!res || !res.claimed || !(res.coins > 0)) return;
@@ -115,7 +123,7 @@
   function poll() {
     if (_checked) { _polling = false; return; }
     _polling = true;
-    if (window._sbUserId && menuIsFree() && hasPlayedBefore()) { _polling = false; run(); }
+    if (menuIsFree() && hasPlayedBefore() && performance.now() > 5000) { _polling = false; run(); }   // >5s: give the saved login time to restore
     else setTimeout(poll, 1000);
   }
   function startPolling() { if (!_polling && !_checked) poll(); }

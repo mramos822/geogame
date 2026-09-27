@@ -57,8 +57,21 @@
   let _pending = false;
   async function refreshTopbars() {
     if (_pending || _rewardPlaying) return;
-    if (!window._sbUserId || !window.sb) { window.setTopbars({}); return; }
+    if (!window.sb) { window.setTopbars({}); return; }
     _pending = true;
+    if (!window._sbUserId) {
+      // guest: only the coins from their own daily-bonus claims (get_guest_economy)
+      try {
+        const vid = localStorage.getItem('_devstats_vid');
+        const { data } = await window.sb.rpc('get_guest_economy', { p_visitor: vid });
+        let coins = (data && Number(data.coins)) || 0;
+        const f = window.__topbarsFloor;
+        if (f && Date.now() - f.t < 60000) coins = Math.max(coins, f.coins);
+        window.setTopbars({ xp: 0, coins });
+      } catch (e) { /* keep whatever is shown */ }
+      _pending = false;
+      return;
+    }
     try {
       const { data, error } = await window.sb.rpc('get_my_economy');
       if (!error && data) {
