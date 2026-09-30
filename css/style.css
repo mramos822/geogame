@@ -5786,36 +5786,24 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   transform: translateZ(0);
   backface-visibility: hidden;
 }
-/* Botón de Mensajes, arriba del de GloboReto — mismo centro horizontal
-   (left + width/2 igual al de .globequiz-btn-wrap), suficiente separación
-   en `bottom` para no pisar la insignia de racha (.loading-globequiz-streak,
-   que sobresale top:-7cqmin por ENCIMA del botón de GloboReto). */
+/* Botón de Mensajes en el perfil propio, abajo de los marks — misma posición
+   vertical y mismo tamaño que los íconos de .loading-friend-actions en el
+   perfil de amigos, corrido hacia la izquierda del centro. */
 .loading-messages-btn-wrap {
   position: absolute;
-  bottom: 70cqmin;
-  left: calc(50% + 50cqmin);
-  width: 14cqmin;
-  z-index: 205;
+  top: 80%;
+  left: calc(50% - 40cqmin);
+  width: 12cqmin;
+  z-index: 213;
   cursor: pointer;
   pointer-events: all;
-  /* display:none por defecto, igual que .globequiz-btn-wrap — sin esto
-     aparecía desde el arranque mismo de la carga, antes que el resto de
-     los botones (el reportado); el JS lo pone en 'block' en los mismos 3
-     puntos donde ya se muestran perfil/globoreto (ver monuments.js). */
-  display: none;
+  transform: translate(-50%, -50%);
   transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1);
-  transform: translateZ(0);
-  backface-visibility: hidden;
 }
-.loading-messages-btn-wrap:hover { transform: translateZ(0) scale(1.08); }
+.loading-messages-btn-wrap:hover { transform: translate(-50%, -50%) scale(1.08); }
 /* Label "Mensajes" en blanco+celeste (no el amarillo/marrón por defecto de
    .profile-btn-label) — mismo criterio de color pedido para las burbujas
    del chat, acá aplicado al label del botón. */
-#loading-messages-btn .profile-btn-label {
-  color: #ffffff;
-  -webkit-text-stroke: 0.5cqmin #1a5fc4;
-}
-#loading-screen.table-shown .loading-messages-btn-wrap { pointer-events: none; }
 .loading-messages-btn-wrap img {
   display: block;
   width: 100%;
@@ -10620,8 +10608,7 @@ body.is-mobile .lobby-gq-stepper-val { min-width: 6.5cqmin; font-size: 2.9cqmin;
 #loading-screen.lobby-interim-bg .loading-panel2-back,
 #loading-screen.lobby-interim-bg #loading-panel2-back,
 #loading-screen.lobby-interim-bg .profile-account-wrap,
-#loading-screen.lobby-interim-bg .globequiz-btn-wrap,
-#loading-screen.lobby-interim-bg .loading-messages-btn-wrap {
+#loading-screen.lobby-interim-bg .globequiz-btn-wrap {
   display: none !important;
 }
 
@@ -13431,3 +13418,4 @@ body.is-mobile .lobby-gq-stepper-val { min-width: 6.5cqmin; font-size: 2.9cqmin;
 /* the ✓ of the daily-bonus / level-up panels only responds after a short delay (see dailybonus.js, coins-reward.js) */
 .levelup-confirm:not(.armed) { opacity: 0.45; filter: grayscale(0.5); }
 .levelup-confirm { transition: opacity 0.25s, filter 0.25s; }
+

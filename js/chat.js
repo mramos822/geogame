@@ -313,32 +313,43 @@ window.Chat = (() => {
     badge.innerHTML = '<span class="notif-badge-num">' + _badgeLabel(n) + '</span>';
   }
 
-  // ── Notification bubble on the loading "Messages" button ──────────────────
+  // ── Notification bubble on the "Messages" button + on the "Profile" button ──
+  // The Messages button now lives inside the own-profile panel (not the main
+  // menu), so unread messages also need a badge on #loading-profile-btn —
+  // otherwise a player would never notice new messages without opening Perfil.
   // Simple count (head:true, fetches no rows) — doesn't depend on having loaded
   // the inbox or any conversation history, so it works even if the panel was
   // never opened in the session.
   async function refreshUnreadBadge() {
     const uid = _myId();
     const badge = document.getElementById('messages-notif-badge');
-    if (!badge) return;
-    if (!uid || !window.sb) { badge.style.display = 'none'; return; }
+    const profileBadge = document.getElementById('profile-messages-notif-badge');
+    if (!badge && !profileBadge) return;
+    if (!uid || !window.sb) {
+      if (badge) badge.style.display = 'none';
+      if (profileBadge) profileBadge.style.display = 'none';
+      return;
+    }
     const { count, error } = await window.sb
       .from('direct_messages')
       .select('id', { count: 'exact', head: true })
       .eq('receiver_id', uid)
       .is('read_at', null);
     if (error) { console.warn('[chat] refreshUnreadBadge:', error.message); return; }
-    if (count > 0) {
-      _setBadgeCount(badge, count);
-      if (badge.style.display === 'none') {
-        badge.style.display = 'flex';
-        badge.style.animation = 'none';
-        void badge.offsetWidth;
-        badge.style.animation = '';
+    [badge, profileBadge].forEach(b => {
+      if (!b) return;
+      if (count > 0) {
+        _setBadgeCount(b, count);
+        if (b.style.display === 'none') {
+          b.style.display = 'flex';
+          b.style.animation = 'none';
+          void b.offsetWidth;
+          b.style.animation = '';
+        }
+      } else {
+        b.style.display = 'none';
       }
-    } else {
-      badge.style.display = 'none';
-    }
+    });
   }
 
   function _renderChatHeaderStatus(friend) {

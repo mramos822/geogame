@@ -156,8 +156,6 @@
         if (accountWrap) accountWrap.style.display = 'block';
         const globequizWrap = document.getElementById('globequiz-btn');
         if (globequizWrap) globequizWrap.style.display = 'block';
-        const messagesWrap = document.getElementById('loading-messages-btn');
-        if (messagesWrap) messagesWrap.style.display = 'block';
         if (typeof window.gqRefreshMenuStreakBadge === 'function') window.gqRefreshMenuStreakBadge();
         const resultsBtn = document.getElementById('loading-results-btn');
         if (resultsBtn) resultsBtn.style.display = 'block';

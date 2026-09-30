@@ -66,7 +66,6 @@ document.getElementById('loading-play-single')?.addEventListener('click', () => 
     document.querySelector('.loading-plane-wrap'),
     document.getElementById('profile-account-btn'),
     document.getElementById('globequiz-btn'),
-    document.getElementById('loading-messages-btn'),
   ].forEach(el => { if (el) el.style.display = 'none'; });
   const lg = document.querySelector('.loading-logo');
   if (lg) {
@@ -99,7 +98,6 @@ document.getElementById('globequiz-btn')?.addEventListener('click', () => {
     document.querySelector('.loading-plane-wrap'),
     document.getElementById('profile-account-btn'),
     document.getElementById('globequiz-btn'),
-    document.getElementById('loading-messages-btn'),
   ].forEach(el => { if (el) el.style.display = 'none'; });
   const lg = document.querySelector('.loading-logo');
   if (lg) {
@@ -328,8 +326,6 @@ document.getElementById('loading-panel2-back')?.addEventListener('click', () => 
   if (acct) acct.style.display = 'block';
   const gq = document.getElementById('globequiz-btn');
   if (gq) gq.style.display = 'block';
-  const msgsBtn = document.getElementById('loading-messages-btn');
-  if (msgsBtn) msgsBtn.style.display = 'block';
   const pw = document.querySelector('.loading-plane-wrap');
   if (pw) { pw.style.display = ''; pw.style.opacity = '1'; pw.style.transform = 'translate(-50%,-50%) translateY(0)'; pw.classList.add('plane-above'); }
   const lg = document.querySelector('.loading-logo');

@@ -42,7 +42,7 @@
   <meta name="twitter:description"  content="Identify cities on maps, recognize country flags, match country shapes and name world landmarks. Compete with friends online.">
   <meta name="twitter:image"        content="https://mygeochallenge.com/images/og-preview.png">
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6238929099865050" crossorigin="anonymous"></script>
-  <link rel="stylesheet" href="css/style.css?v=3.9.10">
+  <link rel="stylesheet" href="css/style.css?v=4.0.4">
   <link rel="preload" href="images/characters/men3.png" as="image">
   <link rel="preload" href="images/characters/men4.png" as="image">
   <link rel="preload" href="images/characters/girl3.png" as="image">
@@ -169,6 +169,7 @@
         </div>
         <div class="loading-secondary-btn" id="loading-profile-btn">
           <img src="images/buttons/es-profile.png" alt="Perfil" draggable="false" oncontextmenu="return false">
+          <div class="social-notif-badge" id="profile-messages-notif-badge" style="display:none">0</div>
         </div>
       </div>
     </div>
@@ -288,13 +289,14 @@
         <img class="loading-profile-streak-img" src="images/streak.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
     </div>
-    </div>
-
+    <!-- Bot�n de Mensajes: perfil propio, abajo de las stats (misma posici�n
+         que .loading-friend-actions en el perfil de amigos) -->
     <div class="loading-messages-btn-wrap" id="loading-messages-btn">
-      <span class="profile-btn-label" data-i18n="chat.title">Mensajes</span>
       <img src="images/message1.png" alt="Mensajes" draggable="false" oncontextmenu="return false">
       <div class="social-notif-badge" id="messages-notif-badge" style="display:none">0</div>
     </div>
+    </div>
+
     <div class="globequiz-btn-wrap" id="globequiz-btn">
       <img src="images/buttons/es-globequiz.png" alt="Globequiz" draggable="false" oncontextmenu="return false">
       <div class="loading-globequiz-streak" id="loading-globequiz-streak" style="display:none">
@@ -1501,7 +1503,7 @@
         <img class="loading-play-confirm2" src="images/back2.png" alt="" draggable="false" oncontextmenu="return false">
       </div>
     </div>
-    <div id="loading-version">Ver. 4.0.3</div>
+    <div id="loading-version">Ver. 4.0.4</div>
   </div>
 
   <!-- Pantalla de resultado versus (W/L) — fuera del loading-screen para verse tras la partida -->
@@ -2569,8 +2571,8 @@
   <script src="js/menu/dailybonus.js?v=4.0.3"></script>
 
   <!-- ── Menú del loading screen ─────────────────────────────────────────── -->
-  <script src="js/menu/entrance-anim.js?v=3.9.8"></script>
-  <script src="js/menu/loading-boot.js?v=3.9.8"></script>
+  <script src="js/menu/entrance-anim.js?v=4.0.4"></script>
+  <script src="js/menu/loading-boot.js?v=4.0.4"></script>
   <script src="js/menu/rankings-panel.js?v=3.8.1"></script>
   <script src="js/menu/customize-panel.js?v=3.6.11"></script>
 
@@ -2592,7 +2594,7 @@
   <script src="js/spectate.js?v=3.9.0"></script>
   <script src="js/lobby.js?v=3.9.7"></script>
   <script src="js/emotes.js?v=3.9.4"></script>
-  <script src="js/chat.js?v=3.7.0"></script>
+  <script src="js/chat.js?v=4.0.4"></script>
 
   <!-- ── Otros modos ─────────────────────────────────────────────────────── -->
   <script src="js/flags.js?v=3.8.1"></script>
@@ -2600,7 +2602,7 @@
   <script src="js/globequiz.js?v=3.9.8"></script>
 
   <!-- ── Launchers del menú + IIFEs de UI global ─────────────────────────── -->
-  <script src="js/menu/menu-launchers.js?v=3.9.8"></script>
+  <script src="js/menu/menu-launchers.js?v=4.0.4"></script>
   <script src="js/menu/misc.js?v=3.7.4"></script>
 
   <!-- ── Pantallas de resultados ────────────────────────────────────────── -->

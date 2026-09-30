@@ -109,8 +109,6 @@ window.showEntranceElementsStatic = function () {
   if (acct) acct.style.display = 'none';
   const gq = document.getElementById('globequiz-btn');
   if (gq) gq.style.display = 'none';
-  const msgsBtn = document.getElementById('loading-messages-btn');
-  if (msgsBtn) msgsBtn.style.display = 'none';
   const resultsBtn = document.getElementById('loading-results-btn');
   if (resultsBtn) resultsBtn.style.display = 'none';
 };
@@ -186,8 +184,6 @@ window.replayEntranceAnimations = function () {
   if (acct) acct.style.display = 'block';
   const gq = document.getElementById('globequiz-btn');
   if (gq) gq.style.display = 'block';
-  const msgsBtn = document.getElementById('loading-messages-btn');
-  if (msgsBtn) msgsBtn.style.display = 'block';
   if (typeof window.gqRefreshMenuStreakBadge === 'function') window.gqRefreshMenuStreakBadge();
   const ver = document.getElementById('loading-version');
   if (ver) ver.style.display = '';
