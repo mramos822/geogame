@@ -1937,6 +1937,10 @@ window.refreshVsSpectatorBadge = function (n) {
   let _gqvrWired = false;
   function _showGqVsResult(outcome, d, reason) {
     if (_resultShown) return;
+    // Finishing a GloboReto versus duel counts as having played GloboReto for
+    // the founder popup gate (checked in quitToMenu, js/modes/mapgame-core.js),
+    // since winners/losers here never go through updateStreak().
+    window.__gqVsPlayed = true;
     _showVsResult(outcome, 0, 0);
     const shared = document.getElementById('vs-result-screen');
     if (shared) shared.style.display = 'none';

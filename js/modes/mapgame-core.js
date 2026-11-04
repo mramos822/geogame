@@ -131,7 +131,7 @@ function quitToMenu() {
   // time a match is finished, see the shared gate in js/profile/profile-account.js).
   {
     const p = window._sbProfile;
-    if (p && p.is_founder && !p.founder_popup_seen && (p.gq_streak_count || 0) > 0 && typeof window.showFounderWelcomePopup === 'function') {
+    if (p && p.is_founder && !p.founder_popup_seen && ((p.gq_streak_count || 0) > 0 || window.__gqVsPlayed) && typeof window.showFounderWelcomePopup === 'function') {
       setTimeout(() => window.showFounderWelcomePopup(), 500);
     }
   }
