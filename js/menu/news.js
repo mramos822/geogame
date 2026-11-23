@@ -84,8 +84,8 @@
       '#news-list{min-height:0;flex:1 1 auto;}' +
       /* Phones (short landscape or narrow): compact card that always fits the screen */
       '@media (max-height:520px),(max-width:520px){' +
-      '#news-overlay{padding:8px !important;}' +
-      '#news-overlay .news-card{max-height:calc(100dvh - 16px) !important;max-height:calc(100vh - 16px) !important;padding:12px 12px 10px !important;border-width:3px !important;border-radius:14px !important;}' +
+      '#news-overlay{padding:8px !important;align-items:center !important;}' +
+      '#news-overlay .news-card{max-height:calc(100vh - 16px) !important;max-height:calc(100dvh - 16px) !important;max-height:calc(var(--vvh,100vh) - 16px) !important;padding:12px 12px 10px !important;border-width:3px !important;border-radius:14px !important;}' +
       '#news-overlay .news-logo{display:none !important;}' +
       '#news-overlay .news-h{font-size:19px !important;margin-top:0 !important;}' +
       '#news-overlay .news-sub{font-size:12px !important;}' +
@@ -93,7 +93,7 @@
       '#news-overlay .news-foot{font-size:11px !important;margin-top:6px !important;}' +
       '.news-month{font-size:12px;margin:8px 0 2px;padding:2px 10px;}' +
       '.news-item{padding:7px 10px 8px;margin-top:6px;border-width:2px;border-radius:11px;}' +
-      '.news-title{font-size:15px;}.news-desc{font-size:12px;line-height:1.35;}' +
+      '.news-title{font-size:14px;}.news-desc{font-size:11.5px;line-height:1.3;}' +
       '.news-ver{font-size:11px;padding:0 7px;}.news-day{font-size:11px;}.news-tag{font-size:10px;}' +
       '}' +
       '#news-list::-webkit-scrollbar{width:8px;}#news-list::-webkit-scrollbar-thumb{background:#c9b15a;border-radius:6px;}';
@@ -195,6 +195,8 @@
     card.appendChild(sub); card.appendChild(list); card.appendChild(foot);
     overlay.appendChild(card);
     document.body.appendChild(overlay);
+    function vv() { var h = (window.visualViewport ? window.visualViewport.height : window.innerHeight); overlay.style.setProperty('--vvh', h + 'px'); }
+    vv(); if (window.visualViewport) window.visualViewport.addEventListener('resize', vv); window.addEventListener('resize', vv);
   }
 
   // Click sounds, same as the other menu buttons (sfxCheck = main menu click,

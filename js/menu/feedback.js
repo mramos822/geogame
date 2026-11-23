@@ -55,7 +55,7 @@
       /* Phones (short landscape or narrow): compact card that always fits the screen */
       '@media (max-height:520px),(max-width:520px){' +
       '#feedback-overlay{padding:8px !important;}' +
-      '#feedback-overlay .fb-card{max-height:calc(100vh - 16px) !important;max-height:calc(100dvh - 16px) !important;overflow-y:auto !important;' +
+      '#feedback-overlay .fb-card{max-height:calc(100vh - 16px) !important;max-height:calc(100dvh - 16px) !important;max-height:calc(var(--vvh,100vh) - 16px) !important;overflow-y:auto !important;' +
       'padding:12px 14px 10px !important;gap:6px !important;border-width:3px !important;border-radius:14px !important;}' +
       '#feedback-overlay .fb-logo{display:none !important;}' +
       '#feedback-overlay .fb-h{font-size:17px !important;}' +
@@ -176,6 +176,8 @@
     card.appendChild(ta); card.appendChild(msg); card.appendChild(row);
     overlay.appendChild(card);
     document.body.appendChild(overlay);
+    function vv() { var h = (window.visualViewport ? window.visualViewport.height : window.innerHeight); overlay.style.setProperty('--vvh', h + 'px'); }
+    vv(); if (window.visualViewport) window.visualViewport.addEventListener('resize', vv); window.addEventListener('resize', vv);
     setTimeout(function () { try { ta.focus(); } catch (e) {} }, 50);
   }
 
