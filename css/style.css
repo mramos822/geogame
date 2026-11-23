@@ -6401,38 +6401,82 @@ body.is-mobile #screen-warning-icon {
   font-size: 0;
 }
 .sw-phone {
+  position: relative;
   display: block;
   box-sizing: border-box;
-  width: 38%;
-  height: 72%;
-  border: 0.9vmin solid #fff;
-  border-radius: 14%;
-  background: rgba(255,255,255,0.1);
-  box-shadow: 0 0 18px rgba(255,255,255,0.25);
-  animation: rotate-hint 2s ease-in-out infinite;
-  padding: 7%;
+  height: 82%;
+  aspect-ratio: 9 / 19;
+  padding: 3.4%;
+  border-radius: 22% / 10.5%;
+  background: #121214;
+  border: 0.45vmin solid #8e8e93; /* titanium edge */
+  box-shadow: 0 0 0 0.25vmin #2c2c2e, 0 1.4vmin 3vmin rgba(0,0,0,0.55), 0 0 22px rgba(255,255,255,0.18);
+  animation: rotate-hint 2.4s ease-in-out infinite;
 }
+/* side buttons: action + volume on the left, power on the right */
+.sw-phone::before, .sw-phone::after {
+  content: '';
+  position: absolute;
+  width: 3.2%;
+  background: #8e8e93;
+  border-radius: 2px;
+}
+.sw-phone::before { left: -6.5%; top: 17%; height: 24%; box-shadow: 0 0 0 0 #8e8e93; }
+.sw-phone::after  { right: -6.5%; top: 26%; height: 15%; }
 .sw-phone-screen {
+  position: relative;
   display: block;
   width: 100%;
   height: 100%;
-  border-radius: 8%;
-  background: linear-gradient(160deg, #4ec9e0, #2a78c8);
+  overflow: hidden;
+  border-radius: 18% / 8.5%;
+  background: linear-gradient(165deg, #5bc0ee 0%, #2a78c8 60%, #1b4f94 100%);
 }
+.sw-island {
+  position: absolute;
+  top: 3.2%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 34%;
+  height: 4.6%;
+  border-radius: 99px;
+  background: #000;
+}
+.sw-globe {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 70%;
+  height: auto;
+  transform: translate(-50%, -50%);
+  opacity: 0.95;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.35));
+}
+.sw-homebar {
+  position: absolute;
+  bottom: 2.6%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 36%;
+  height: 1.8%;
+  border-radius: 99px;
+  background: rgba(255,255,255,0.85);
+}
+/* Curved arrow showing the turn direction */
 .sw-arrow {
   position: absolute;
-  top: -22%;
-  right: -16%;
-  font-size: min(9vmin, 44px);
-  line-height: 1;
-  color: #ffd54a;
-  font-family: Arial, sans-serif;
-  animation: sw-arrow-pulse 2s ease-in-out infinite;
+  top: -16%;
+  right: -34%;
+  width: 62%;
+  height: 62%;
+  overflow: visible;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.45));
+  animation: sw-arrow-pulse 2.4s ease-in-out infinite;
 }
 
 @keyframes rotate-hint {
   0%, 15%   { transform: rotate(0deg); }
-  50%, 85%  { transform: rotate(-90deg); }
+  50%, 85%  { transform: rotate(90deg); }
   100%      { transform: rotate(0deg); }
 }
 @keyframes sw-arrow-pulse {
