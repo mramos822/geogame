@@ -58,6 +58,8 @@
 
   /* ── Estructura general ── */
   #dash{display:none;min-height:100vh;}
+  /* A saved session exists: never flash the login form while the dashboard boots */
+  html.has-session #login{display:none;}
   .sidebar{position:fixed;left:0;top:0;bottom:0;width:var(--sidebar-w);background:var(--surface2);
     border-right:1px solid var(--line);display:flex;flex-direction:column;padding:18px 12px;z-index:30;overflow-y:auto;}
   .brand{display:flex;align-items:center;gap:11px;padding:4px 8px 18px;}
@@ -328,6 +330,14 @@
   #skeleton .spin{width:28px;height:28px;border:3px solid var(--line);border-top-color:var(--primary);
     border-radius:50%;margin:0 auto 14px;animation:spin .7s linear infinite;}
   @keyframes spin{to{transform:rotate(360deg);}}
+  #skeleton .ld-text{font-size:15px;font-weight:600;color:var(--text);margin-bottom:14px;}
+  #skeleton .ld-bar{width:min(360px,80%);height:12px;margin:0 auto;border-radius:20px;background:var(--surface2);
+    border:1px solid var(--line2);overflow:hidden;position:relative;}
+  #skeleton .ld-fill{height:100%;width:0%;border-radius:20px;transition:width .35s ease-out;
+    background:linear-gradient(90deg,var(--primary),#8fb0ff,var(--primary));background-size:200% 100%;
+    animation:ldShine 1.2s linear infinite;}
+  @keyframes ldShine{to{background-position:-200% 0;}}
+  #skeleton .ld-pct{margin-top:8px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;}
 
   /* ── Modal ── */
   .modal-overlay{display:none;position:fixed;inset:0;z-index:60;background:rgba(4,9,18,.66);
@@ -376,6 +386,46 @@
   #tbl-cohort th:nth-child(2),#tbl-cohort td:nth-child(2){width:46px;}
 
   /* Tablas → tarjetas apiladas en celular (data-label lo pone makeTablesResponsive) */
+
+  /* ── Cuentas y sus amigos (Juego → Social) ── */
+  .af-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:4px 0 14px;}
+  .af-search{flex:1 1 220px;min-width:180px;background:var(--surface2);border:1px solid var(--line);color:var(--text);
+    border-radius:10px;padding:10px 14px;font-size:14px;outline:none;}
+  .af-search:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft);}
+  .af-seg{display:flex;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:3px;gap:2px;flex-wrap:wrap;}
+  .af-seg button{background:none;border:none;color:var(--muted);font-size:13px;font-weight:600;padding:7px 12px;
+    border-radius:8px;cursor:pointer;white-space:nowrap;}
+  .af-seg button:hover{color:var(--text);}
+  .af-seg button.on{background:var(--primary);color:#fff;}
+  .af-sort{background:var(--surface2);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:9px 10px;font-size:13px;}
+  .af-layout{display:grid;grid-template-columns:minmax(240px,340px) 1fr;gap:14px;align-items:start;}
+  .af-list{max-height:560px;overflow-y:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface2);}
+  .af-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer;}
+  .af-row:last-child{border-bottom:none;}
+  .af-row:hover{background:var(--surface3);}
+  .af-row.sel{background:var(--primary-soft);box-shadow:inset 3px 0 0 var(--primary);}
+  .af-avatar{flex:none;width:34px;height:34px;border-radius:50%;background:var(--surface3);border:1px solid var(--line2);
+    display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--accent);font-size:14px;}
+  .af-name{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .af-pill{flex:none;font-size:12px;font-weight:700;border-radius:20px;padding:2px 9px;background:var(--surface3);color:var(--muted);}
+  .af-pill.fr{background:rgba(111,223,111,.15);color:var(--green);}
+  .af-pill.bl{background:rgba(255,122,122,.15);color:var(--red);margin-left:4px;}
+  .af-detail{border:1px solid var(--line);border-radius:12px;background:var(--surface2);padding:16px 18px;min-height:200px;}
+  .af-empty{color:var(--muted);text-align:center;padding:40px 10px;}
+  .af-dhead{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
+  .af-dhead .af-avatar{width:48px;height:48px;font-size:20px;}
+  .af-dname{font-size:18px;font-weight:700;color:#fff;}
+  .af-dmeta{font-size:12px;color:var(--muted);}
+  .af-sec{margin-top:14px;}
+  .af-sec h4{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);}
+  .af-chips{display:flex;flex-wrap:wrap;gap:6px;}
+  .af-chip{background:var(--surface3);border:1px solid var(--line2);color:var(--text);border-radius:20px;padding:5px 12px;
+    font-size:13px;cursor:pointer;}
+  .af-chip:hover{border-color:var(--primary);color:#fff;}
+  .af-chip.red{border-color:rgba(255,122,122,.45);color:var(--red);}
+  .af-chip.dim{opacity:.7;}
+  .af-none{color:var(--dim);font-size:13px;}
+  @media (max-width:820px){.af-layout{grid-template-columns:1fr;}.af-list{max-height:320px;}}
   @media (max-width:760px){
     table.rt{min-width:0;display:block;width:100%;}
     table.rt thead,table.rt tr.rt-head{display:none;}
@@ -596,6 +646,13 @@
 </style>
 </head>
 <body>
+<script>
+// Saved admin session (valid for 90 days from the last real login): skip the login form from the first paint.
+try {
+  var _c = localStorage.getItem('_admin_creds'), _t = parseInt(localStorage.getItem('_admin_creds_at') || '0', 10);
+  if (_c && (!_t || Date.now() - _t < 90 * 86400000)) document.documentElement.classList.add('has-session');
+} catch (e) {}
+</script>
 
 <div id="login">
   <form id="login-form" autocomplete="off">
@@ -634,7 +691,11 @@
     </div>
   </header>
 
-  <div id="skeleton"><div class="spin"></div>Cargando datos…</div>
+  <div id="skeleton">
+    <div class="ld-text" id="ld-text">Cargando datos…</div>
+    <div class="ld-bar"><div class="ld-fill" id="ld-fill"></div></div>
+    <div class="ld-pct" id="ld-pct">0%</div>
+  </div>
 
   <main id="main">
     <section class="tab-page active" data-page="hoy">
@@ -859,6 +920,27 @@
           </h2>
           <div class="table-scroll"><table id="tbl-friend-senders"><tbody></tbody></table></div>
         </div>
+        <div class="box wide af-box">
+          <h2>Cuentas y sus amigos <span class="sub" id="acc-friends-count"></span></h2>
+          <div class="af-toolbar">
+            <input id="acc-friends-search" class="af-search" type="search" placeholder="🔍  Buscar una cuenta…" autocomplete="off">
+            <div class="af-seg" id="af-filter">
+              <button data-f="all" class="on">Todas</button>
+              <button data-f="friends">Con amigos</button>
+              <button data-f="none">Sin amigos</button>
+              <button data-f="blocks">Con bloqueos</button>
+            </div>
+            <select id="af-sort" class="af-sort" title="Ordenar">
+              <option value="friends">Más amigos</option>
+              <option value="recent">Más nuevas</option>
+              <option value="az">A–Z</option>
+            </select>
+          </div>
+          <div class="af-layout">
+            <div class="af-list" id="af-list"></div>
+            <div class="af-detail" id="af-detail"></div>
+          </div>
+        </div>
       </div>
       </div>
     </section>
@@ -1052,6 +1134,18 @@
         </div>
       </div>
       </div>
+      <div class="sub-page" data-sub="opiniones">
+      <div class="box wide">
+        <h2>💬 Opiniones de los jugadores <span class="sub">botón "Tu opinión" del menú · últimas 300</span></h2>
+        <div class="msg-compose-row" id="fb-filter" style="margin-bottom:10px"></div>
+        <div class="table-scroll">
+          <table id="tbl-feedback">
+            <thead><tr><th>Tipo</th><th>Mensaje</th><th>De</th><th>Enviado</th><th></th></tr></thead>
+            <tbody id="feedback-body"></tbody>
+          </table>
+        </div>
+      </div>
+      </div>
       <div class="sub-page" data-sub="changelog">
       <div class="changelog-list" id="changelog-list"></div>
       </div>
@@ -1192,10 +1286,10 @@ const NAV = [
   ['jugadores',   '👥', 'Jugadores',   [['cuentas','Cuentas'], ['invitados','Invitados'], ['fundador','Fundadores']]],
   ['juego',       '🎮', 'Juego',       [['leaderboards','Rankings'], ['globoreto','GloboReto'], ['versus','Versus'], ['social','Social']]],
   ['crecimiento', '📈', 'Crecimiento', [['categoria','Categoría CG'], ['resumen','Resumen'], ['retencion','Retención'], ['trafico','Tráfico']]],
-  ['admin',       '🛠️', 'Admin',       [['integridad','Integridad'], ['economia','Economía'], ['bonodiario','Bono diario'], ['mensajes','Mensajes'], ['changelog','Novedades']]],
+  ['admin',       '🛠️', 'Admin',       [['integridad','Integridad'], ['economia','Economía'], ['bonodiario','Bono diario'], ['mensajes','Mensajes'], ['opiniones','Opiniones'], ['changelog','Novedades']]],
 ];
 // Sub-pestañas donde el período elegido no cambia nada: se oculta el selector.
-const NO_RANGE_SUBS = ['bonodiario','categoria','cuentas','fundador','mensajes','changelog','economia'];
+const NO_RANGE_SUBS = ['bonodiario','categoria','cuentas','fundador','mensajes','opiniones','changelog','economia'];
 const PAGE_LABEL = Object.fromEntries(NAV.map(n => [n[0], n[2]]));
 const SUBS = Object.fromEntries(NAV.filter(n => n[3]).map(n => [n[0], n[3]]));
 // Claves de la versión anterior del panel → (sección, sub-pestaña) actual.
@@ -1503,6 +1597,14 @@ const CHANGELOG = [
   ['4.0.4','2026-09-30',102,['El botón de Mensajes pasó del menú principal al perfil propio (abajo de las stats); una insignia de mensajes sin leer aparece en el botón Perfil del menú.']],
   ['4.0.3','2026-09-27',101,['Bonificación diaria: las monedas se suman en la barra solo cuando el jugador presiona el ✓ del panel; la barra del menú no se adelanta mientras corre la animación del reclamo.']],
   ['4.0.5','2026-11-04',103,['Corregido: el paquete de Fundador no aparecía al volver al menú después de un duelo versus de GloboReto (solo salía tras una partida en solitario).']],
+  ['4.0.6','2026-11-22',104,[
+    'Nuevos botones redondos arriba a la derecha del menú: idioma, Feedback y Novedades. Solo se ven en el menú principal y quedan bloqueados mientras hay un panel abierto.',
+    'Ventana de Feedback: los jugadores eligen una categoría y escriben qué les gustaría ver en el juego (máximo 5 mensajes al día por jugador).',
+    'Ventana de Novedades dentro del juego, con la versión, un título y una descripción de cada cambio.',
+    'En el panel GloboReto del menú ya no se muestran las barras de monedas y XP.',
+    'Ícono de inicio de iOS y Android (thumb6) y manifiesto web para instalar el juego como app.',
+    'Panel de stats: nueva pestaña Opiniones (Admin) con filtros por categoría; en Juego → Social, la sección "Cuentas y sus amigos" con lista, ficha, bloqueos y fechas de creación; el acceso pide contraseña solo cada 90 días, sin parpadeo del login, y la carga ahora tiene barra de progreso.',
+  ]],
 ];
 function renderChangelog(){
   const el = $('changelog-list');
@@ -1606,6 +1708,8 @@ function goPage(k, sub){
   applyNav();
   window.scrollTo({ top:0 });
   if(activeSub()==='mensajes') loadMessages();
+  if(activeSub()==='opiniones') loadFeedback();
+  if(activeSub()==='social') loadAccFriends();
   if(currentPage==='crecimiento' && activeSub()==='categoria') loadCategory();
 }
 function buildTabsNav(){
@@ -1656,6 +1760,7 @@ $('login-form').addEventListener('submit', async (e)=>{
     const data = await callStats(user, pass);
     creds = { user, pass };
     localStorage.setItem('_admin_creds', JSON.stringify(creds));
+    localStorage.setItem('_admin_creds_at', String(Date.now())); // asked again in 3 months
     enterDashboard(data);
   } catch(err){
     $('login-err').textContent = err.message || 'Error';
@@ -1665,7 +1770,8 @@ $('login-form').addEventListener('submit', async (e)=>{
 });
 
 $('logout-btn').addEventListener('click', ()=>{
-  localStorage.removeItem('_admin_creds');
+  localStorage.removeItem('_admin_creds'); localStorage.removeItem('_admin_creds_at');
+  document.documentElement.classList.remove('has-session');
   creds = null; stopPolling();
   $('dash').style.display = 'none';
   $('login').style.display = 'flex';
@@ -1683,6 +1789,8 @@ function enterDashboard(data){
   render(data);
   renderChangelog();
   if(activeSub()==='mensajes') loadMessages();
+  if(activeSub()==='opiniones') loadFeedback();
+  if(activeSub()==='social') loadAccFriends();
   if(currentPage==='crecimiento' && activeSub()==='categoria') loadCategory();
   startPolling();
 }
@@ -1782,6 +1890,8 @@ async function refresh(){
   // La pestaña de mensajes tiene su propia carga; refrescarla en cada tick
   // para que el estado "leído" se actualice sin recargar la página.
   if(activeSub()==='mensajes') loadMessages();
+  if(activeSub()==='opiniones') loadFeedback();
+  if(activeSub()==='social') loadAccFriends();
   try { render(await callStats(creds.user, creds.pass, currentRange)); }
   catch(e){
     if(/incorrect|unauthor/i.test(e.message)){ $('logout-btn').click(); }
@@ -1798,8 +1908,31 @@ const CARD_DEFS_TOTAL = [
   ['versusTotal','⚔️','Versus totales',false],
 ];
 
+// ── Barra de carga ── (una sola petición: el avance es estimado y se completa al llegar los datos)
+let _ldTimer = null, _ldPct = 0;
+function _ldSet(p, txt){
+  _ldPct = p;
+  const f = $('ld-fill'), t = $('ld-pct'), x = $('ld-text');
+  if(f) f.style.width = p + '%';
+  if(t) t.textContent = Math.round(p) + '%';
+  if(x && txt) x.textContent = txt;
+}
+function startLoadBar(){
+  clearInterval(_ldTimer);
+  _ldSet(3, 'Conectando…');
+  _ldTimer = setInterval(()=>{
+    // avanza rápido al inicio y se frena cerca del 92% hasta que lleguen los datos
+    _ldSet(_ldPct + (92 - _ldPct) * 0.06, _ldPct < 25 ? 'Conectando…' : _ldPct < 70 ? 'Cargando datos…' : 'Procesando estadísticas…');
+  }, 160);
+}
+function finishLoadBar(){
+  clearInterval(_ldTimer); _ldTimer = null;
+  _ldSet(100, '¡Listo!');
+}
+
 function render(data){
   lastData = data;
+  finishLoadBar();
   $('skeleton').style.display = 'none';
   $('main').style.display = 'block';
 
@@ -3064,6 +3197,141 @@ function renderMessages(rows){
   }).join('');
 }
 
+
+// ── Opiniones de jugadores (player_feedback) ──
+const FB_CATS = { idea:'💡 Idea', mode:'🎮 Modo nuevo', bug:'🐞 Error', other:'💬 Otro' };
+let fbRows = [], fbCat = 'all';
+async function fbCall(action, extra){
+  const res = await fetch(FN_URL, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'apikey':ANON, 'Authorization':'Bearer '+ANON },
+    body: JSON.stringify(Object.assign({ user:creds.user, pass:creds.pass, action }, extra||{})),
+  });
+  const json = await res.json().catch(()=>({}));
+  if(!res.ok || !json.ok) throw new Error(json.error || 'Error');
+  return json;
+}
+async function loadFeedback(){
+  if(!creds) return;
+  const tb = $('feedback-body');
+  if(!fbRows.length) tb.innerHTML = '<tr><td colspan="5" class="empty">Cargando…</td></tr>';
+  try { fbRows = (await fbCall('list_feedback')).feedback || []; renderFeedback(); }
+  catch(e){ tb.innerHTML = `<tr><td colspan="5" class="empty">No se pudo cargar: ${escapeHtml(e.message||String(e))}</td></tr>`; }
+}
+function renderFeedback(){
+  const counts = { all: fbRows.length };
+  fbRows.forEach(r => { counts[r.category] = (counts[r.category]||0) + 1; });
+  $('fb-filter').innerHTML = [['all','Todas']].concat(Object.entries(FB_CATS)).map(([k,l]) =>
+    `<button class="guest-link-btn" data-fbcat="${k}" style="${fbCat===k?'':'opacity:.55'}">${l} · ${counts[k]||0}</button>`).join('');
+  $('fb-filter').querySelectorAll('[data-fbcat]').forEach(b => b.onclick = () => { fbCat = b.dataset.fbcat; renderFeedback(); });
+  const tb = $('feedback-body');
+  const rows = fbRows.filter(r => fbCat==='all' || r.category===fbCat);
+  if(!rows.length){ tb.innerHTML = '<tr><td colspan="5" class="empty">Todavía no hay opiniones</td></tr>'; return; }
+  tb.innerHTML = rows.map(r => {
+    const who = r.who ? `👤 ${escapeHtml(r.who)}` : `👻 ${escapeHtml((r.visitor_id||'—').slice(0,8))}`;
+    return `<tr>
+      <td>${FB_CATS[r.category]||escapeHtml(r.category)}</td>
+      <td class="msg-body-cell">${escapeHtml(r.message)}</td>
+      <td>${who}<div class="msg-target-tag">${escapeHtml((r.platform||'web')+' · '+(r.lang||'').toUpperCase())}</div></td>
+      <td class="n">${timeAgo(r.created_at)}</td>
+      <td><button class="guest-link-btn" data-fbdel="${r.id}" title="Borrar">🗑</button></td>
+    </tr>`;
+  }).join('');
+  tb.querySelectorAll('[data-fbdel]').forEach(b => b.onclick = async () => {
+    if(!confirm('¿Borrar esta opinión?')) return;
+    try { await fbCall('delete_feedback', { feedback_id:Number(b.dataset.fbdel) }); fbRows = fbRows.filter(r => r.id !== Number(b.dataset.fbdel)); renderFeedback(); }
+    catch(e){ alert('No se pudo borrar: '+(e.message||e)); }
+  });
+}
+
+
+// ── Cuentas y sus amigos (Juego → Social) ──
+let accFriends = null, accFriendsWired = false, afFilter = 'all', afSel = null;
+async function loadAccFriends(){
+  if(!creds) return;
+  wireAccFriends();
+  if(!accFriends) $('af-list').innerHTML = '<div class="af-empty">Cargando…</div>';
+  try { accFriends = (await fbCall('list_accounts_friends')).accounts || []; renderAccFriends(); }
+  catch(e){ $('af-list').innerHTML = `<div class="af-empty">No se pudo cargar: ${escapeHtml(e.message||String(e))}</div>`; }
+}
+function wireAccFriends(){
+  if(accFriendsWired) return; accFriendsWired = true;
+  $('acc-friends-search').addEventListener('input', renderAccFriends);
+  $('af-sort').addEventListener('change', renderAccFriends);
+  $('af-filter').addEventListener('click', e => {
+    const b = e.target.closest('button[data-f]'); if(!b) return;
+    afFilter = b.dataset.f;
+    $('af-filter').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    renderAccFriends();
+  });
+  $('af-list').addEventListener('click', e => {
+    const r = e.target.closest('.af-row'); if(r){ afSel = r.dataset.u; renderAccFriends(); }
+  });
+  $('af-detail').addEventListener('click', e => {
+    const c = e.target.closest('.af-chip'); if(!c) return;
+    afSel = c.dataset.u;
+    $('acc-friends-search').value = ''; afFilter = 'all';
+    $('af-filter').querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.f === 'all'));
+    renderAccFriends();
+    const row = $('af-list').querySelector('.af-row.sel'); if(row) row.scrollIntoView({block:'nearest'});
+  });
+}
+function afMatches(a){
+  if(afFilter==='friends' && !a.friends.length) return false;
+  if(afFilter==='none' && a.friends.length) return false;
+  if(afFilter==='blocks' && !(a.blocks.length || a.blockedBy.length)) return false;
+  return true;
+}
+function renderAccFriends(){
+  if(!accFriends) return;
+  const q = $('acc-friends-search').value.trim().toLowerCase();
+  const sort = $('af-sort').value;
+  let rows = accFriends.filter(a => afMatches(a) && (!q || a.username.toLowerCase().includes(q)));
+  rows.sort((x,y) => sort==='az' ? x.username.localeCompare(y.username)
+    : sort==='recent' ? new Date(y.created_at) - new Date(x.created_at)
+    : (y.friends.length - x.friends.length) || x.username.localeCompare(y.username));
+  const withF = accFriends.filter(a => a.friends.length).length;
+  const nBlock = accFriends.filter(a => a.blocks.length).length;
+  $('acc-friends-count').textContent = `${accFriends.length} cuentas · ${withF} con amigos · ${nBlock} con bloqueos`;
+  if(!afSel || !accFriends.some(a => a.username === afSel)) afSel = rows[0] ? rows[0].username : null;
+  $('af-list').innerHTML = rows.length ? rows.slice(0, 400).map(a => `
+    <div class="af-row${a.username===afSel?' sel':''}" data-u="${escapeHtml(a.username)}">
+      <div class="af-avatar">${escapeHtml(a.username.charAt(0).toUpperCase())}</div>
+      <div class="af-name">${escapeHtml(a.username)}</div>
+      <span class="af-pill${a.friends.length?' fr':''}" title="Amigos">👥 ${a.friends.length}</span>${(a.blocks.length||a.blockedBy.length)?'<span class="af-pill bl" title="Tiene bloqueos">🚫</span>':''}
+    </div>`).join('') + (rows.length>400 ? `<div class="af-empty">Mostrando 400 de ${rows.length}. Usa el buscador.</div>` : '')
+    : '<div class="af-empty">Ninguna cuenta coincide</div>';
+  renderAfDetail();
+}
+function afDateTime(iso){
+  const d = new Date(iso); if(isNaN(d)) return '—';
+  const dia = d.toLocaleDateString('es', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  const hora = d.toLocaleTimeString('es', { hour:'2-digit', minute:'2-digit' });
+  return `${dia.charAt(0).toUpperCase()+dia.slice(1)} · ${hora}`;
+}
+function renderAfDetail(){
+  const el = $('af-detail');
+  const a = accFriends.find(x => x.username === afSel);
+  if(!a){ el.innerHTML = '<div class="af-empty">Elige una cuenta de la lista para ver sus amigos</div>'; return; }
+  const exists = new Set(accFriends.map(x => x.username));
+  const chips = (arr, cls) => arr.map(n => exists.has(n)
+    ? `<button class="af-chip ${cls||''}" data-u="${escapeHtml(n)}">${escapeHtml(n)}</button>`
+    : `<span class="af-chip dim ${cls||''}" style="cursor:default">${escapeHtml(n)}</span>`).join('');
+  const sec = (title, arr, cls, emptyTxt) => `<div class="af-sec"><h4>${title}${arr.length?` · ${arr.length}`:''}</h4>` +
+    (arr.length ? `<div class="af-chips">${chips(arr, cls)}</div>` : `<div class="af-none">${emptyTxt}</div>`) + '</div>';
+  el.innerHTML = `
+    <div class="af-dhead">
+      <div class="af-avatar">${escapeHtml(a.username.charAt(0).toUpperCase())}</div>
+      <div><div class="af-dname">${escapeHtml(a.username)}${a.platform==='crazygames'?' <span class="msg-target-tag">CrazyGames</span>':''}</div>
+      <div class="af-dmeta">📅 Creada el ${afDateTime(a.created_at)}</div>
+      ${a.last_active?`<div class="af-dmeta">🕒 Última actividad: ${afDateTime(a.last_active)}</div>`:''}</div>
+    </div>
+    ${sec('👥 Amigos', a.friends, '', 'Todavía no tiene amigos')}
+    ${a.pending ? `<div class="af-sec"><h4>⏳ Solicitudes pendientes</h4><div class="af-none" style="color:var(--text)">${a.pending} sin responder</div></div>` : ''}
+    ${sec('🚫 Ha bloqueado a', a.blocks, 'red', 'No ha bloqueado a nadie')}
+    ${sec('⛔ Lo han bloqueado', a.blockedBy, 'red', 'Nadie lo ha bloqueado')}`;
+}
+
 function renderCountries(rows){
   const tb = $('tbl-countries').querySelector('tbody');
   if(!rows.length){ tb.innerHTML = '<tr><td class="empty">Sin datos en este período</td></tr>'; return; }
@@ -3367,8 +3635,23 @@ document.addEventListener('click', (e)=>{
 async function _bootSavedSession(){
   const saved = localStorage.getItem('_admin_creds');
   if(!saved) return;
+  // Password is only asked again after 90 days from the last successful login.
+  // Sessions saved before this stamp existed get a fresh 90 days.
+  const DAY90 = 90 * 86400000;
+  let at = parseInt(localStorage.getItem('_admin_creds_at') || '0', 10);
+  if(!at){ at = Date.now(); localStorage.setItem('_admin_creds_at', String(at)); }
+  const backToLogin = ()=>{
+    localStorage.removeItem('_admin_creds'); localStorage.removeItem('_admin_creds_at');
+    document.documentElement.classList.remove('has-session');
+    $('skeleton').style.display = 'none'; $('dash').style.display = 'none';
+    $('login').style.display = 'flex'; creds = null;
+  };
+  if(Date.now() - at >= DAY90){ backToLogin(); return; }
+  // Show the dashboard shell with its loading skeleton instead of the login form.
+  $('dash').style.display = 'block';
   $('skeleton').style.display = 'block';
   $('main').style.display = 'none';
+  startLoadBar();
   creds = JSON.parse(saved);
   const MAX_ATTEMPTS = 5;
   for(let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++){
@@ -3377,18 +3660,16 @@ async function _bootSavedSession(){
       enterDashboard(data);
       return;
     } catch(e){
-      if(e.isAuthError){
-        $('skeleton').style.display = 'none';
-        localStorage.removeItem('_admin_creds'); creds = null;
-        return;
-      }
+      if(e.isAuthError){ backToLogin(); return; }
       if(attempt === MAX_ATTEMPTS){
         // Give up retrying automatically, but KEEP the creds — a manual
         // "Refrescar" (or just reopening the page once back online) picks
         // up right where it left off instead of demanding the password again.
+        clearInterval(_ldTimer);
         $('skeleton').innerHTML = '<div class="spin"></div>No se pudo conectar. Revisa tu conexión — <a href="#" onclick="location.reload();return false;">reintentar</a>.';
         return;
       }
+      const tx = $('ld-text'); if(tx) tx.textContent = `Reintentando… (${attempt}/${MAX_ATTEMPTS})`;
       await new Promise(r => setTimeout(r, Math.min(1500 * attempt, 6000)));
     }
   }

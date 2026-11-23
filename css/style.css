@@ -908,7 +908,7 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   position: absolute;
   top: 1.4cqmin;
   right: 16%;            /* arriba a la derecha del área visible (como el original) */
-  z-index: 230;
+  z-index: 8;      /* behind the profile / social / rankings panels (z 210), like .loading-topbars */
   pointer-events: auto;
   font-family: 'VAGRoundBold', 'Arial Black', sans-serif;
 }
@@ -930,6 +930,44 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
   transition: background 0.15s;
 }
 .loading-lang-toggle:hover { background: rgba(30, 90, 145, 0.75); }
+/* Botón redondo con ícono (idioma / feedback / novedades) */
+.loading-lang-toggle.loading-icon-btn,
+.loading-icon-btn {
+  min-width: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 50%;
+  display: block;
+  width: 7cqmin;
+  height: 7cqmin;
+  cursor: pointer;
+  transition: transform 0.12s;
+}
+.loading-icon-btn img { display: block; width: 100%; height: 100%; pointer-events: none; user-select: none; }
+.loading-lang-toggle.loading-icon-btn:hover,
+.loading-icon-btn:hover { background: none; transform: scale(1.1); }
+.loading-icon-btn:active { transform: scale(0.92); }
+/* Hover: the icon wiggles and glows (on the <img> so it never fights the button's pop-in / scale) */
+.loading-icon-btn img { transition: filter 0.15s; }
+.loading-icon-btn:hover img {
+  filter: brightness(1.12) drop-shadow(0 0 0.9cqmin rgba(255, 255, 255, 0.85));
+  animation: iconWiggle 0.55s ease-in-out;
+}
+#loading-lang-toggle:hover img { animation: iconSpin 0.6s ease-in-out; }
+@keyframes iconWiggle {
+  0%   { transform: rotate(0); }
+  20%  { transform: rotate(-14deg) scale(1.05); }
+  45%  { transform: rotate(11deg) scale(1.05); }
+  70%  { transform: rotate(-6deg); }
+  100% { transform: rotate(0); }
+}
+@keyframes iconSpin {
+  0%   { transform: rotate(0) scale(1); }
+  50%  { transform: rotate(180deg) scale(1.08); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+.loading-lang-menu { right: 0; }
 .loading-lang-caret {
   font-size: 1.5cqmin;
   line-height: 1;
@@ -13411,9 +13449,9 @@ body.is-mobile .lobby-gq-stepper-val { min-width: 6.5cqmin; font-size: 2.9cqmin;
 }
 @keyframes daily-today { 0%, 100% { transform: scale(1.14); } 50% { transform: scale(1.2); } }
 
-/* While the GloboReto menu panel is open (class toggled by js/menu/topbars.js), the HUD bars sit above its
-   scroll (board z-index 210, parts up to 213). Every other panel keeps covering them. */
-#loading-screen.gq-menu-panel .loading-topbars { z-index: 214; }
+/* While the GloboReto menu panel is open (class toggled by js/menu/topbars.js), the coin / XP HUD bars are
+   hidden (visibility keeps their layout for the reward animations that fly into them on the main menu). */
+#loading-screen.gq-menu-panel .loading-topbars { visibility: hidden; pointer-events: none; }
 
 /* the ✓ of the daily-bonus / level-up panels only responds after a short delay (see dailybonus.js, coins-reward.js) */
 .levelup-confirm:not(.armed) { opacity: 0.45; filter: grayscale(0.5); }

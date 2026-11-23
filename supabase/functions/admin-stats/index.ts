@@ -239,6 +239,73 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: true, messages }), { headers: CORS });
     }
 
+    // ── Cuentas existentes + a quién tienen de amigos (Juego → Social) ───
+    if (action === 'list_accounts_friends') {
+      const { data: profs } = await paged(sb.from('profiles')
+        .select('id, username, created_at, last_active, last_platform, crazygames_user_id')
+        .order('created_at', { ascending: false }));
+      const { data: fr } = await paged(sb.from('friendships')
+        .select('id, user_a, user_b, status, initiated_by, created_at').order('created_at', { ascending: true }));
+      const nameById: Record<string, string> = {};
+      for (const p of profs || []) nameById[p.id] = p.username;
+      const byUser: Record<string, { accepted: any[]; pending: any[]; blocks: string[]; blockedBy: string[] }> = {};
+      const slot = (id: string) => (byUser[id] ||= { accepted: [], pending: [], blocks: [], blockedBy: [] });
+      for (const f of fr || []) {
+        const nA = nameById[f.user_a], nB = nameById[f.user_b];
+        if (f.status === 'accepted') {
+          slot(f.user_a).accepted.push({ name: nB || '?', since: f.created_at });
+          slot(f.user_b).accepted.push({ name: nA || '?', since: f.created_at });
+        } else if (f.status === 'pending') {
+          slot(f.user_a).pending.push({ name: nB || '?' });
+          slot(f.user_b).pending.push({ name: nA || '?' });
+        } else if (f.status === 'blocked') {
+          // initiated_by = quien bloqueó (ver blockUser en js/sb.js)
+          const blocker = f.initiated_by === f.user_b ? f.user_b : f.user_a;
+          const blocked = blocker === f.user_a ? f.user_b : f.user_a;
+          slot(blocker).blocks.push(nameById[blocked] || '?');
+          slot(blocked).blockedBy.push(nameById[blocker] || '?');
+        }
+      }
+      const accounts = (profs || []).map((p: any) => {
+        const u = byUser[p.id] || { accepted: [], pending: [], blocks: [], blockedBy: [] };
+        return {
+          username: p.username, created_at: p.created_at, last_active: p.last_active,
+          platform: p.crazygames_user_id ? 'crazygames' : (p.last_platform || 'web'),
+          friends: u.accepted.map((x: any) => x.name).sort((a: string, b: string) => a.localeCompare(b)),
+          pending: u.pending.length, blocks: u.blocks, blockedBy: u.blockedBy,
+        };
+      });
+      return new Response(JSON.stringify({ ok: true, accounts }), { headers: CORS });
+    }
+
+    // ── Player feedback (ventana "Tu opinión" del menú) ──────────────────
+    // Lee public.player_feedback (sin policies: solo accesible con service role).
+    if (action === 'list_feedback') {
+      const { data: fb } = await sb.from('player_feedback')
+        .select('id, created_at, user_id, visitor_id, category, message, lang, platform')
+        .order('created_at', { ascending: false }).limit(300);
+      const rows = fb || [];
+      const uids = [...new Set(rows.map((m: any) => m.user_id).filter(Boolean))];
+      const nameByUid: Record<string, string> = {};
+      if (uids.length) {
+        const { data: ps } = await sb.from('profiles').select('id, username').in('id', uids);
+        for (const p of ps || []) nameByUid[p.id] = p.username;
+      }
+      const feedback = rows.map((m: any) => ({
+        id: m.id, created_at: m.created_at, category: m.category, message: m.message,
+        lang: m.lang, platform: m.platform, visitor_id: m.visitor_id,
+        who: m.user_id ? (nameByUid[m.user_id] || m.user_id) : null,
+      }));
+      return new Response(JSON.stringify({ ok: true, feedback }), { headers: CORS });
+    }
+    if (action === 'delete_feedback') {
+      const id = Number((body || {}).feedback_id);
+      if (!id) return new Response(JSON.stringify({ error: 'missing_params' }), { status: 400, headers: CORS });
+      const { error: dErr } = await sb.from('player_feedback').delete().eq('id', id);
+      if (dErr) return new Response(JSON.stringify({ error: String(dErr.message || dErr) }), { status: 500, headers: CORS });
+      return new Response(JSON.stringify({ ok: true }), { headers: CORS });
+    }
+
     // ── Category panel (CrazyGames-style portal metrics, but live) ────────────
     // Everything is derived from analytics_events over the last 40 days, per
     // platform. "Session" = a run of events from the
