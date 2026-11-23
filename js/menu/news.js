@@ -81,6 +81,21 @@
       '.news-tag.new{background:#2e9e4f;}.news-tag.fix{background:#e08a00;}' +
       '#news-dot{position:absolute;top:-1px;right:-1px;width:2.4cqmin;height:2.4cqmin;border-radius:50%;' +
       'background:#e8504a;border:0.3cqmin solid #fff;pointer-events:none;}' +
+      '#news-list{min-height:0;flex:1 1 auto;}' +
+      /* Phones (short landscape or narrow): compact card that always fits the screen */
+      '@media (max-height:520px),(max-width:520px){' +
+      '#news-overlay{padding:8px !important;}' +
+      '#news-overlay .news-card{max-height:calc(100dvh - 16px) !important;max-height:calc(100vh - 16px) !important;padding:12px 12px 10px !important;border-width:3px !important;border-radius:14px !important;}' +
+      '#news-overlay .news-logo{display:none !important;}' +
+      '#news-overlay .news-h{font-size:19px !important;margin-top:0 !important;}' +
+      '#news-overlay .news-sub{font-size:12px !important;}' +
+      '#news-overlay .news-x{width:36px !important;height:36px !important;font-size:20px !important;top:-9px !important;left:-9px !important;border-width:3px !important;}' +
+      '#news-overlay .news-foot{font-size:11px !important;margin-top:6px !important;}' +
+      '.news-month{font-size:12px;margin:8px 0 2px;padding:2px 10px;}' +
+      '.news-item{padding:7px 10px 8px;margin-top:6px;border-width:2px;border-radius:11px;}' +
+      '.news-title{font-size:15px;}.news-desc{font-size:12px;line-height:1.35;}' +
+      '.news-ver{font-size:11px;padding:0 7px;}.news-day{font-size:11px;}.news-tag{font-size:10px;}' +
+      '}' +
       '#news-list::-webkit-scrollbar{width:8px;}#news-list::-webkit-scrollbar-thumb{background:#c9b15a;border-radius:6px;}';
     document.head.appendChild(st);
   }
@@ -106,6 +121,7 @@
     overlay.style.cssText = 'position:fixed;inset:0;z-index:9100;display:flex;align-items:center;' +
       'justify-content:center;padding:28px;background:rgba(0,0,0,0.5);font-family:' + FONT + ';';
     var card = document.createElement('div');
+    card.className = 'news-card';
     card.style.cssText = 'position:relative;width:100%;max-width:500px;max-height:86vh;background:#fffbe6;' +
       'color:#5a4400;border:4px solid #8b6a00;border-radius:18px;box-shadow:0 8px 22px rgba(0,0,0,0.4);' +
       'padding:22px 20px 16px;text-align:center;display:flex;flex-direction:column;align-items:center;' +
@@ -113,7 +129,7 @@
 
     // Red round close button, same as .account-modal-close (top-left corner).
     var x = document.createElement('button');
-    x.type = 'button'; x.textContent = '\u2715';
+    x.type = 'button'; x.textContent = '\u2715'; x.className = 'news-x';
     x.style.cssText = 'position:absolute;top:-20px;left:-20px;width:56px;height:56px;border-radius:50%;' +
       'border:4px solid #a32a26;background:#e8504a;color:#fff;font-family:' + FONT + ';font-size:32px;' +
       'line-height:1;cursor:pointer;transition:transform 0.1s;padding:0;';
@@ -128,11 +144,13 @@
     });
 
     var logo = document.createElement('img');
-    logo.src = 'images/logo.png'; logo.alt = ''; logo.draggable = false;
+    logo.src = 'images/logo.png'; logo.alt = ''; logo.draggable = false; logo.className = 'news-logo';
     logo.style.cssText = 'width:96px;height:auto;user-select:none;';
     var h = document.createElement('div');
+    h.className = 'news-h';
     h.textContent = s.title; h.style.cssText = 'font-size:26px;margin-top:2px;';
     var sub = document.createElement('div');
+    sub.className = 'news-sub';
     sub.textContent = s.sub; sub.style.cssText = 'font-size:14px;';
 
     var list = document.createElement('div');
@@ -170,6 +188,7 @@
     });
 
     var foot = document.createElement('div');
+    foot.className = 'news-foot';
     foot.textContent = s.foot; foot.style.cssText = 'font-size:13px;color:#8b6a00;margin-top:10px;';
 
     card.appendChild(x); card.appendChild(logo); card.appendChild(h);

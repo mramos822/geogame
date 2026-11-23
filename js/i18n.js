@@ -369,7 +369,7 @@ const I18N = {
     'screen.resize': 'Redimensiona la ventana para una experiencia óptima.',
     'screen.tooWide': 'La pantalla es demasiado ancha. Redimensiona la ventana verticalmente.',
     'screen.tooTall': 'La pantalla es demasiado alta. Redimensiona la ventana horizontalmente.',
-    'screen.rotate': 'Rotá el teléfono a horizontal para jugar.',
+    'screen.rotate': 'Gira tu teléfono para jugar',
   },
   en: {
     'mode.shapes': 'Countries', 'mode.cities': 'Cities', 'mode.flags': 'Flags', 'mode.monuments': 'Monuments',
@@ -713,7 +713,7 @@ const I18N = {
     'screen.resize': 'Resize the window for the best experience.',
     'screen.tooWide': 'The screen is too wide. Resize the window vertically.',
     'screen.tooTall': 'The screen is too tall. Resize the window horizontally.',
-    'screen.rotate': 'Rotate your phone to landscape to play.',
+    'screen.rotate': 'Rotate your phone to play',
   },
 };
 

@@ -112,12 +112,13 @@
     const icon = document.getElementById('screen-warning-icon');
     const msg  = document.getElementById('screen-warning-msg');
     const sub  = document.getElementById('screen-warning-sub');
-    if (icon) icon.textContent = '📱';
+    // Icon is a CSS-drawn phone that rotates (see #screen-warning-icon in style.css).
+    if (icon) { icon.textContent = ''; icon.innerHTML = '<span class="sw-phone"><span class="sw-phone-screen"></span></span><span class="sw-arrow">↻</span>'; }
     // Used to show Spanish and English at once, hardcoded. Now a single
     // language, the game's current one — re-applied if the player switches
     // language live (see onLangChange, js/i18n.js) without reloading.
     const applyRotateMsg = () => {
-      if (msg) msg.textContent = (typeof t === 'function') ? t('screen.rotate') : 'Rotá el teléfono a horizontal para jugar.';
+      if (msg) msg.textContent = (typeof t === 'function') ? t('screen.rotate') : 'Gira el teléfono a horizontal para jugar.';
       if (sub) sub.textContent = '';
     };
     applyRotateMsg();

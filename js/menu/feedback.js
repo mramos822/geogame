@@ -51,7 +51,21 @@
       'color:#5a4400;font-family:' + FONT + ';font-size:14px;user-select:none;}' +
       '.fb-cat.sel{background:#ffd54a;}' +
       '.fb-act{cursor:pointer;padding:9px 22px;border-radius:14px;border:3px solid #8b6a00;' +
-      'font-family:' + FONT + ';font-size:16px;user-select:none;}';
+      'font-family:' + FONT + ';font-size:16px;user-select:none;}' +
+      /* Phones (short landscape or narrow): compact card that always fits the screen */
+      '@media (max-height:520px),(max-width:520px){' +
+      '#feedback-overlay{padding:8px !important;}' +
+      '#feedback-overlay .fb-card{max-height:calc(100vh - 16px) !important;max-height:calc(100dvh - 16px) !important;overflow-y:auto !important;' +
+      'padding:12px 14px 10px !important;gap:6px !important;border-width:3px !important;border-radius:14px !important;}' +
+      '#feedback-overlay .fb-logo{display:none !important;}' +
+      '#feedback-overlay .fb-h{font-size:17px !important;}' +
+      '#feedback-overlay .fb-sub{font-size:12px !important;line-height:1.25 !important;}' +
+      '#feedback-overlay .fb-x{width:34px !important;height:34px !important;font-size:18px !important;top:4px !important;left:4px !important;border-width:3px !important;}' +
+      '#feedback-overlay .fb-cat{padding:3px 9px !important;font-size:12px !important;border-width:2px !important;}' +
+      '#feedback-overlay textarea{font-size:13px !important;padding:6px !important;border-width:2px !important;}' +
+      '#feedback-overlay .fb-send{width:54px !important;margin-top:0 !important;}' +
+      '#feedback-overlay .fb-msg{font-size:12px !important;min-height:14px !important;}' +
+      '}';
     document.head.appendChild(st);
   }
 
@@ -64,13 +78,16 @@
     overlay.style.cssText = 'position:fixed;inset:0;z-index:9100;display:flex;align-items:center;' +
       'justify-content:center;padding:20px;background:rgba(0,0,0,0.5);font-family:' + FONT + ';';
     var card = document.createElement('div');
+    card.className = 'fb-card';
     card.style.cssText = 'max-width:460px;width:100%;background:#fffbe6;color:#5a4400;border:4px solid #8b6a00;' +
       'border-radius:18px;box-shadow:0 8px 22px rgba(0,0,0,0.4);padding:24px 22px 20px;text-align:center;position:relative;' +
       'display:flex;flex-direction:column;align-items:center;gap:12px;' +
       'animation:fbPopIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both;';
     var h = document.createElement('div');
+    h.className = 'fb-h';
     h.textContent = s.title; h.style.cssText = 'font-size:24px;';
     var sub = document.createElement('div');
+    sub.className = 'fb-sub';
     sub.textContent = s.sub; sub.style.cssText = 'font-size:15px;line-height:1.35;';
     var cats = document.createElement('div');
     cats.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;justify-content:center;';
@@ -87,15 +104,18 @@
       cats.appendChild(c);
     });
     var ta = document.createElement('textarea');
-    ta.maxLength = 1000; ta.placeholder = s.ph; ta.rows = 5;
+    ta.maxLength = 1000; ta.placeholder = s.ph;
+    ta.rows = window.matchMedia('(max-height:520px),(max-width:520px)').matches ? 3 : 5;
     ta.style.cssText = 'width:100%;box-sizing:border-box;resize:none;border:3px solid #8b6a00;border-radius:12px;' +
       'padding:10px;font-family:Arial,sans-serif;font-size:15px;color:#3a2d00;background:#fff;outline:none;';
     var msg = document.createElement('div');
+    msg.className = 'fb-msg';
     msg.style.cssText = 'font-size:14px;min-height:18px;';
     var row = document.createElement('div');
     row.style.cssText = 'display:flex;gap:10px;';
     // Same confirm1/confirm2.png button as the creator-message pop-up.
     var send = document.createElement('div');
+    send.className = 'fb-send';
     send.style.cssText = 'position:relative;width:76px;cursor:pointer;margin-top:2px;';
     var c1 = document.createElement('img');
     c1.src = 'images/confirm1.png'; c1.draggable = false;
@@ -110,7 +130,7 @@
     send.addEventListener('pointerdown', function () { c2.style.opacity = '0'; });
     // Red round close button, same as .account-modal-close (top-left corner).
     var cancel = document.createElement('button');
-    cancel.type = 'button'; cancel.textContent = '✕';
+    cancel.type = 'button'; cancel.textContent = '✕'; cancel.className = 'fb-x';
     cancel.style.cssText = 'position:absolute;top:-18px;left:-18px;width:50px;height:50px;border-radius:50%;' +
       'border:4px solid #a32a26;background:#e8504a;color:#fff;font-family:' + FONT + ';font-size:28px;' +
       'line-height:1;cursor:pointer;transition:transform 0.1s;padding:0;';
@@ -149,7 +169,7 @@
     });
 
     var logo = document.createElement('img');
-    logo.src = 'images/logo.png'; logo.alt = ''; logo.draggable = false;
+    logo.src = 'images/logo.png'; logo.alt = ''; logo.draggable = false; logo.className = 'fb-logo';
     logo.style.cssText = 'width:110px;height:auto;user-select:none;';
     card.appendChild(logo);
     card.appendChild(h); card.appendChild(sub); card.appendChild(cats);
