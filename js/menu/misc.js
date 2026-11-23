@@ -113,7 +113,7 @@
     const msg  = document.getElementById('screen-warning-msg');
     const sub  = document.getElementById('screen-warning-sub');
     // Icon is a CSS-drawn phone that rotates (see #screen-warning-icon in style.css).
-    if (icon) { icon.textContent = ''; icon.innerHTML = '<span class="sw-phone"><span class="sw-phone-screen"><span class="sw-island"></span><img class="sw-globe" src="images/logo.png" alt="" draggable="false"><span class="sw-homebar"></span></span></span>' + '<svg class="sw-arrow" viewBox="0 0 100 100" aria-hidden="true"><path d="M18 62 A36 36 0 0 1 62 18" fill="none" stroke="#ffd54a" stroke-width="7" stroke-linecap="round"/><path d="M50 10 L66 17 L53 30" fill="none" stroke="#ffd54a" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/></svg>'; }
+    if (icon) { icon.textContent = ''; icon.innerHTML = '<span class="sw-phone"><span class="sw-phone-screen"><span class="sw-island"></span><img class="sw-globe" src="images/logo.png" alt="" draggable="false"><span class="sw-homebar"></span></span></span>'; }
     // Used to show Spanish and English at once, hardcoded. Now a single
     // language, the game's current one — re-applied if the player switches
     // language live (see onLangChange, js/i18n.js) without reloading.

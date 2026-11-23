@@ -6462,26 +6462,10 @@ body.is-mobile #screen-warning-icon {
   border-radius: 99px;
   background: rgba(255,255,255,0.85);
 }
-/* Curved arrow showing the turn direction */
-.sw-arrow {
-  position: absolute;
-  top: -16%;
-  right: -34%;
-  width: 62%;
-  height: 62%;
-  overflow: visible;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.45));
-  animation: sw-arrow-pulse 2.4s ease-in-out infinite;
-}
-
 @keyframes rotate-hint {
   0%, 15%   { transform: rotate(0deg); }
   50%, 85%  { transform: rotate(90deg); }
   100%      { transform: rotate(0deg); }
-}
-@keyframes sw-arrow-pulse {
-  0%, 100% { opacity: 0.4; transform: scale(0.9); }
-  40%, 60% { opacity: 1;   transform: scale(1.15); }
 }
 
 #screen-warning-msg {
