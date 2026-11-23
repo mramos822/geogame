@@ -990,6 +990,9 @@ body.is-mobile .wrong-count-total { top: 29.5cqmin; }
 }
 .loading-lang-option:hover { background: #2f8fd6; }
 .loading-lang-option.active { color: #7fe0ff; }
+/* Phones: the stage is scaled down, so the English/Español options were tiny. */
+body.is-mobile .loading-lang-menu { min-width: 20cqmin; margin-top: 1cqmin; border-width: 0.4cqmin; border-radius: 1.6cqmin; }
+body.is-mobile .loading-lang-option { font-size: 3.8cqmin; padding: 1.6cqmin 3cqmin; }
 
 .flightatt-loading-shadow {
   position: absolute;
