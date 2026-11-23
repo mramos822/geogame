@@ -216,9 +216,8 @@
     st.textContent = '#loading-screen.menu-icons-off #loading-lang,' +
       '#loading-screen.menu-icons-off #feedback-btn,#loading-screen.menu-icons-off #news-btn{display:none !important;}' +
       '#loading-screen.menu-icons-locked #loading-lang,#loading-screen.menu-icons-locked #feedback-btn,#loading-screen.menu-icons-locked #news-btn{pointer-events:none !important;}' +
-      '@keyframes menuIconPop{0%{transform:scale(0);opacity:0}70%{transform:scale(1.15);opacity:1}100%{transform:scale(1);opacity:1}}' +
       '#loading-screen.menu-icons-in #loading-lang .loading-icon-btn,#loading-screen.menu-icons-in #feedback-btn .loading-icon-btn,' +
-      '#loading-screen.menu-icons-in #news-btn .loading-icon-btn{animation:menuIconPop 0.45s cubic-bezier(0.34,1.56,0.64,1) backwards;}' +
+      '#loading-screen.menu-icons-in #news-btn .loading-icon-btn{animation:pop-in 0.35s cubic-bezier(0.34,1.56,0.64,1) backwards;}' +
       '#loading-screen.menu-icons-in #feedback-btn .loading-icon-btn{animation-delay:0.08s;}' +
       '#loading-screen.menu-icons-in #news-btn .loading-icon-btn{animation-delay:0.16s;}';
     document.head.appendChild(st);
@@ -238,7 +237,6 @@
     var inner = document.createElement('button');
     inner.type = 'button';
     inner.className = 'loading-icon-btn';
-    inner.title = S().btn;
     var im = document.createElement('img');
     im.src = 'images/buttons/news.png'; im.alt = ''; im.draggable = false;
     inner.appendChild(im);
@@ -246,7 +244,6 @@
     if (hasUnseen()) { var dot = document.createElement('div'); dot.id = 'news-dot'; b.appendChild(dot); }
     b.addEventListener('click', open);
     ls.appendChild(b);
-    if (window.onLangChange) window.onLangChange(function () { inner.title = S().btn; });
     watchMainMenu();
   }
 

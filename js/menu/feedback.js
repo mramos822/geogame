@@ -169,14 +169,12 @@
     var inner = document.createElement('button');
     inner.type = 'button';
     inner.className = 'loading-icon-btn';
-    inner.title = S().btn;
     var im = document.createElement('img');
     im.src = 'images/buttons/feedback.png'; im.alt = ''; im.draggable = false;
     inner.appendChild(im);
     b.appendChild(inner);
     b.addEventListener('click', open);
     ls.appendChild(b);
-    if (window.onLangChange) window.onLangChange(function () { inner.title = S().btn; });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
