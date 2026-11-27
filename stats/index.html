@@ -951,7 +951,12 @@ try {
       <div class="sub-page" data-sub="categoria">
       <div class="retention-note" style="margin:0 0 12px">Métricas tipo panel de categoría de CrazyGames, calculadas <b>en vivo solo con datos de CrazyGames</b> (no incluye el tráfico de la web). Una "sesión" es una racha de actividad de un mismo jugador sin pausas de más de 30 min; su duración es estimada.</div>
       <div class="subtabs" id="cat-dev" style="margin-bottom:12px"></div>
-      <div class="section-title">Como en CrazyGames <span class="sub">(últimos 30 días, en vivo)</span></div>
+      <div class="subtabs" style="margin-bottom:6px;align-items:center">
+        <button class="subtab" id="cat-reset">🔄 Reiniciar desde ahora</button>
+        <button class="subtab" id="cat-unreset" hidden>↩ Deshacer último reinicio</button>
+      </div>
+      <div class="retention-note" id="cat-since" style="margin:0 0 12px"></div>
+      <div class="section-title">Como en CrazyGames <span class="sub" id="cat-window">(últimos 30 días, en vivo)</span></div>
       <div class="cards" id="cat-kpis"></div>
       <div class="section-title">Requisitos de Basic Launch <span class="sub">(mismo umbral que muestra CrazyGames)</span></div>
       <div class="cards" id="cat-req"></div>
@@ -1617,6 +1622,7 @@ const CHANGELOG = [
     'Página principal más cómoda en celular: botón Play Free sin cortarse, botones del hero a ancho completo, avión y nubes más discretos, tarjetas y textos más compactos, y ajuste para celulares en horizontal.',
   ]],
   ['4.0.12','2026-11-22',110,['Las opciones de idioma (English / Español) del menú ahora se ven más grandes en celular.']],
+  ['4.0.13','2026-11-27',111,['Panel de estadísticas: en "Categoría CG" hay un botón para reiniciar las métricas desde ese instante (sin borrar datos y con opción de deshacer), y la retención D1, D7 y D30 se muestra con decimales.']],
 ];
 function renderChangelog(){
   const el = $('changelog-list');
@@ -1833,15 +1839,32 @@ function stopPolling(){ if(timer){ clearInterval(timer); timer = null; } }
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && creds) refresh(); });
 
 // ── Categoría CrazyGames (en vivo) ────────────────────────────────────────────
-async function loadCategory(){
-  if(!creds) return;
+// _catSeq drops stale answers, so a poll that started before a reset can't
+// overwrite the panel with pre-reset numbers.
+let _catSeq = 0;
+async function loadCategory(action = 'category'){
+  if(!creds) return false;
+  const seq = ++_catSeq;
   try {
     const res = await fetch(FN_URL, { method:'POST', headers:{ 'Content-Type':'application/json', 'apikey':ANON, 'Authorization':'Bearer '+ANON },
-      body: JSON.stringify({ user:creds.user, pass:creds.pass, action:'category' }) });
+      body: JSON.stringify({ user:creds.user, pass:creds.pass, action }) });
     const j = await res.json();
-    if(j && j.ok) renderCategory(j);
-  } catch(e){}
+    // reset_at is absent if the deployed function predates the reset actions.
+    if(!j || !j.ok || j.reset_at === undefined && action !== 'category') return false;
+    if(seq === _catSeq) renderCategory(j);
+    return true;
+  } catch(e){ return false; }
 }
+async function changeCatReset(action, question){
+  if(!confirm(question)) return;
+  const btns = [$('cat-reset'), $('cat-unreset')];
+  btns.forEach(b=>b.disabled = true);
+  const ok = await loadCategory(action);
+  btns.forEach(b=>b.disabled = false);
+  if(!ok) alert('No se pudo cambiar el reinicio. Vuelve a intentarlo.');
+}
+$('cat-reset').onclick = ()=>changeCatReset('category_reset', '¿Reiniciar las métricas de CrazyGames desde este momento? No se borra ningún dato y se puede deshacer.');
+$('cat-unreset').onclick = ()=>changeCatReset('category_unreset', '¿Deshacer el último reinicio y volver al conteo anterior?');
 function fmtDur(s){ if(!s) return '—'; const m=Math.floor(s/60); return m ? `${m}m ${String(s%60).padStart(2,'0')}s` : `${s}s`; }
 let _catJ = null, _catDev = 'all';
 function renderCategory(j){
@@ -1850,16 +1873,23 @@ function renderCategory(j){
   $('cat-dev').innerHTML = [['all','Todos'],['pc','Desktop'],['mobile','Móvil / Tablet']].map(([k,l])=>`<button class="subtab${k===_catDev?' active':''}" data-dev="${k}">${l}</button>`).join('');
   $('cat-dev').querySelectorAll('button').forEach(b=>b.onclick=()=>{ _catDev=b.dataset.dev; renderCategory(); });
   $('cat-upd').textContent = '— ' + new Date(j.generated_at).toLocaleTimeString('es');
+  const since = j.reset_at ? new Date(j.reset_at) : null;
+  $('cat-unreset').hidden = !since;
+  $('cat-window').textContent = since ? '(desde el reinicio, máximo 30 días, en vivo)' : '(últimos 30 días, en vivo)';
+  $('cat-since').innerHTML = since
+    ? `Contando desde el <b>${since.toLocaleString('es')}</b>. Todo lo anterior se ignora, así que quien ya había jugado cuenta como nuevo. La retención D1 aparece a partir del día siguiente (UTC), D7 a los 7 días.`
+    : 'Sin reinicio: se cuenta todo el historial reciente.';
   const card = (i,v,l,h)=>`<div class="card"><div class="icon">${i}</div><div class="v">${v}</div><div class="l">${l}${h?` <span class="help" title="${h}">ⓘ</span>`:''}</div></div>`;
   $('cat-live').innerHTML = card('🟢',n(d.live.last5),'Activos (5 min)') + card('🕐',n(d.live.last30),'Activos (30 min)') + card('⏱',n(d.live.last60),'Activos (1 h)');
   const pct = v => v==null ? '—' : v+'%';
+  const retPct = v => v==null ? '—' : v.toFixed(2)+'%';
   const ret7ret = d.nr7.newVisitors + d.nr7.returning;
   $('cat-kpis').innerHTML =
     card('🎯','' + n(d.d30.starts),'Partidas totales','Partidas de modo iniciadas y guardadas (eventos de partida) en 30 días.') +
     card('👥','' + n(d.d30.players),'Jugadores totales','Visitantes únicos que jugaron al menos una partida en 30 días.') +
     card('⏱','' + fmtDur(d.s30.avgSessionSec),'Tiempo de juego medio','Duración media de sesión, estimada (ver nota arriba).') +
     card('▶️','' + d.d3.conv + '%','Gameplay Conversion (3 días)','Jugadores que jugaron ≥1 partida ÷ visitantes únicos, en los últimos 3 días (igual que CrazyGames).') +
-    card('🔁','' + pct(d.ret1.pct),'Retención D1') + card('🔁','' + pct(d.ret7.pct),'Retención D7') +
+    card('🔁', retPct(d.ret1.pct),'Retención D1') + card('🔁', retPct(d.ret7.pct),'Retención D7') +
     card('↩️', ret7ret ? Math.round(d.nr7.returning/ret7ret*100)+'%' : '—','Usuarios que vuelven (7 días)','Visitantes de los últimos 7 días que ya habían aparecido antes.') +
     card('🆕','' + n(d.nr7.newVisitors),'Nuevos (7 días)');
   const reqScore = (v, steps) => { let sc = 0; for (const [th,pts] of steps) if (v!=null && v>=th) sc = pts; return sc; };
@@ -1867,7 +1897,7 @@ function renderCategory(j){
   const rq = REQ[_catDev==='mobile'?'mobile':'pc'];
   const rcard = (l, v, thr, txt, ok)=>`<div class="card"><div class="icon">${ok?'✅':'⚠️'}</div><div class="v">${txt}</div><div class="l">${l} · mínimo ${thr} <span class="help" title="${ok?'Supera':'No llega a'} el umbral mínimo de CrazyGames para esta plataforma.">ⓘ</span></div></div>`;
   const tOk = d.s30.avgSessionSec >= rq.t, rOk = d.ret1.pct!=null && d.ret1.pct > rq.r, cOk = d.d3.conv >= rq.c;
-  $('cat-req').innerHTML = rcard('Tiempo de juego', 0, fmtDur(rq.t), fmtDur(d.s30.avgSessionSec), tOk) + rcard('Retención D1', 0, rq.r+'%', pct(d.ret1.pct), rOk) + rcard('Gameplay Conversion', 0, rq.c+'%', d.d3.conv+'%', cOk);
+  $('cat-req').innerHTML = rcard('Tiempo de juego', 0, fmtDur(rq.t), fmtDur(d.s30.avgSessionSec), tOk) + rcard('Retención D1', 0, rq.r+'%', retPct(d.ret1.pct), rOk) + rcard('Gameplay Conversion', 0, rq.c+'%', d.d3.conv+'%', cOk);
   const rows = [
     ['Visitantes únicos', p=>n(p.visitors), 'd'],
     ['Jugadores (jugaron ≥1 partida)', p=>n(p.players), 'd'],
@@ -1883,15 +1913,17 @@ function renderCategory(j){
   const P = [['24 h', d.d1, d.s1, d.nr1], ['7 días', d.d7, d.s7, d.nr7], ['30 días', d.d30, d.s30, null]];
   $('tbl-cat').querySelector('tbody').innerHTML = '<tr><th>Métrica</th>' + P.map(x=>`<th style="text-align:right">${x[0]}</th>`).join('') + '</tr>' +
     rows.map(([l,f,k])=>`<tr><td>${l}</td>` + P.map(x=>{ const o = k==='d'?x[1]:k==='s'?x[2]:x[3]; return `<td class="n">${o ? f(o) : '—'}</td>`; }).join('') + '</tr>').join('');
-  const rc = (l,r)=>card('🔁',pct(r.pct),l,`${r.back} de ${r.size} visitantes que llegaron hace al menos ese tiempo volvieron exactamente ese día.`);
+  const rc = (l,r)=>card('🔁',retPct(r.pct),l,`${r.back} de ${r.size} visitantes que llegaron hace al menos ese tiempo volvieron exactamente ese día.`);
   $('cat-ret').innerHTML = rc('Retención D1',d.ret1) + rc('Retención D7',d.ret7) + rc('Retención D30',d.ret30) + card('🌍','' + fmtDur(d.avgGlobequizSec),'Duración media GloboReto');
   const bl = d.live.buckets.map((_,i)=>i===11 ? 'ahora' : `-${(11-i)*5}m`);
   upsertChart('catLive','chart-cat-live',{ type:'bar', data:{ labels:bl, datasets:[{ label:'Visitantes', data:d.live.buckets, backgroundColor:'#4aa3ff', borderRadius:3 }] },
     options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false}, tooltip:chartDefaults.plugins.tooltip },
       scales:{ x:axisX, y:{ beginAtZero:true, ticks:{ color:'#5a7da6', precision:0, font:{size:10} }, grid:{ color:'#16263f' } } } } });
-  const sl = d.series.map(x=>new Date(x.day).toLocaleDateString('es',{day:'2-digit',month:'short',timeZone:'UTC'}));
+  // Days before the reset day would only draw misleading zeros.
+  const series = since ? d.series.filter(x=>x.day + 86400000 > since.getTime()) : d.series;
+  const sl = series.map(x=>new Date(x.day).toLocaleDateString('es',{day:'2-digit',month:'short',timeZone:'UTC'}));
   upsertChart('catSeries','chart-cat-series',{ type:'line', data:{ labels:sl, datasets:[
-      lineDS('Visitantes', d.series.map(x=>x.visitors), '#4aa3ff'), lineDS('Jugadores', d.series.map(x=>x.players), '#6fdf6f'), lineDS('Partidas', d.series.map(x=>x.plays), '#ffb020') ] },
+      lineDS('Visitantes', series.map(x=>x.visitors), '#4aa3ff'), lineDS('Jugadores', series.map(x=>x.players), '#6fdf6f'), lineDS('Partidas', series.map(x=>x.plays), '#ffb020') ] },
     options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false}, plugins:{ legend:{ labels:{ color:'#8aa0c2', boxWidth:10 } }, tooltip:chartDefaults.plugins.tooltip },
       scales:{ x:axisX, y:{ beginAtZero:true, ticks:{ color:'#5a7da6', precision:0, font:{size:10} }, grid:{ color:'#16263f' } } } } });
 }

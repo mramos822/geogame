@@ -311,10 +311,29 @@ Deno.serve(async (req) => {
     // platform. "Session" = a run of events from the
     // same visitor with no gap over 30 min; its length is estimated from the first
     // to the last event, so it undercounts a little (nothing logs a "leave" event).
-    if (action === 'category') {
+    // category_reset starts a new measurement window now; category_unreset
+    // removes the latest one. Both answer with the recomputed panel.
+    if (action === 'category_reset') {
+      const { error } = await sb.from('cg_stats_resets').insert({});
+      if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: CORS });
+    }
+    if (action === 'category_unreset') {
+      const { data: last } = await sb.from('cg_stats_resets').select('id').order('id', { ascending: false }).limit(1);
+      if (last?.length) {
+        const { error } = await sb.from('cg_stats_resets').delete().eq('id', last[0].id);
+        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: CORS });
+      }
+    }
+
+    if (action === 'category' || action === 'category_reset' || action === 'category_unreset') {
       const t0 = Date.now();
       const DAY = 86400000, GAP = 30 * 60000;
-      const sinceISO = new Date(t0 - 40 * DAY).toISOString();
+      // Fail loudly: silently ignoring this would show pre-reset data as current.
+      const { data: resets, error: resetErr } = await sb.from('cg_stats_resets')
+        .select('reset_at').order('id', { ascending: false }).limit(1);
+      if (resetErr) return new Response(JSON.stringify({ error: resetErr.message }), { status: 500, headers: CORS });
+      const resetAt: string | null = resets?.[0]?.reset_at ?? null;
+      const sinceISO = new Date(Math.max(t0 - 40 * DAY, resetAt ? Date.parse(resetAt) : 0)).toISOString();
       const { data: evs } = await paged(sb.from('analytics_events')
         .select('created_at, type, visitor_id, user_id, platform, duration_ms, device')
         .in('type', ['visit', 'game', 'campaign', 'versus', 'globequiz'])
@@ -378,7 +397,7 @@ Deno.serve(async (req) => {
             size++;
             if (arr.some((e) => dayKey(e.t) === k0 + d)) back++;
           }
-          return { size, back, pct: size ? Math.round(back / size * 100) : null };
+          return { size, back, pct: size ? +(back / size * 100).toFixed(2) : null };
         };
         // live: visitors per 5-min bucket for the last hour + windows
         const live: number[] = Array(12).fill(0);
@@ -408,7 +427,7 @@ Deno.serve(async (req) => {
       // CrazyGames only: the site's own traffic would skew every number.
       const cg = rows.filter((r) => r.plat === 'crazygames');
       const data = { all: compute(cg), pc: compute(cg.filter((r) => r.dev === 'pc')), mobile: compute(cg.filter((r) => r.dev === 'mobile')) };
-      return new Response(JSON.stringify({ ok: true, generated_at: new Date().toISOString(), data }), { headers: CORS });
+      return new Response(JSON.stringify({ ok: true, generated_at: new Date().toISOString(), reset_at: resetAt, data }), { headers: CORS });
     }
 
     const now = new Date();
