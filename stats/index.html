@@ -1623,6 +1623,7 @@ const CHANGELOG = [
   ]],
   ['4.0.12','2026-11-22',110,['Las opciones de idioma (English / Español) del menú ahora se ven más grandes en celular.']],
   ['4.0.13','2026-11-27',111,['Panel de estadísticas: en "Categoría CG" hay un botón para reiniciar las métricas desde ese instante (sin borrar datos y con opción de deshacer), y la retención D1, D7 y D30 se muestra con decimales.']],
+  ['4.0.14','2026-11-27',112,['Panel de estadísticas, "Categoría CG": Gameplay Conversion ahora es la parte de visitas que llegan a 1 minuto de juego, y el tiempo de juego medio se mide de verdad, sin contar el tiempo en otra pestaña o ventana.']],
 ];
 function renderChangelog(){
   const el = $('changelog-list');
@@ -1887,8 +1888,8 @@ function renderCategory(j){
   $('cat-kpis').innerHTML =
     card('🎯','' + n(d.d30.starts),'Partidas totales','Partidas de modo iniciadas y guardadas (eventos de partida) en 30 días.') +
     card('👥','' + n(d.d30.players),'Jugadores totales','Visitantes únicos que jugaron al menos una partida en 30 días.') +
-    card('⏱','' + fmtDur(d.s30.avgSessionSec),'Tiempo de juego medio','Duración media de sesión, estimada (ver nota arriba).') +
-    card('▶️','' + d.d3.conv + '%','Gameplay Conversion (3 días)','Jugadores que jugaron ≥1 partida ÷ visitantes únicos, en los últimos 3 días (igual que CrazyGames).') +
+    card('⏱', fmtDur(d.d30.avgPlaySec),'Tiempo de juego medio','Tiempo jugado por visita en la que se jugó, sin contar el tiempo en otra pestaña o ventana (30 días).') +
+    card('▶️', retPct(d.d3.conv),'Gameplay Conversion (3 días)','Visitas a la página del juego que llegaron a 1 minuto de juego ÷ todas las visitas, en los últimos 3 días. «—» significa que aún no hay visitas medidas.') +
     card('🔁', retPct(d.ret1.pct),'Retención D1') + card('🔁', retPct(d.ret7.pct),'Retención D7') +
     card('↩️', ret7ret ? Math.round(d.nr7.returning/ret7ret*100)+'%' : '—','Usuarios que vuelven (7 días)','Visitantes de los últimos 7 días que ya habían aparecido antes.') +
     card('🆕','' + n(d.nr7.newVisitors),'Nuevos (7 días)');
@@ -1896,8 +1897,8 @@ function renderCategory(j){
   const REQ = { pc:{ t:419, r:3.06, c:63.15 }, mobile:{ t:161, r:0, c:34.24 } };
   const rq = REQ[_catDev==='mobile'?'mobile':'pc'];
   const rcard = (l, v, thr, txt, ok)=>`<div class="card"><div class="icon">${ok?'✅':'⚠️'}</div><div class="v">${txt}</div><div class="l">${l} · mínimo ${thr} <span class="help" title="${ok?'Supera':'No llega a'} el umbral mínimo de CrazyGames para esta plataforma.">ⓘ</span></div></div>`;
-  const tOk = d.s30.avgSessionSec >= rq.t, rOk = d.ret1.pct!=null && d.ret1.pct > rq.r, cOk = d.d3.conv >= rq.c;
-  $('cat-req').innerHTML = rcard('Tiempo de juego', 0, fmtDur(rq.t), fmtDur(d.s30.avgSessionSec), tOk) + rcard('Retención D1', 0, rq.r+'%', retPct(d.ret1.pct), rOk) + rcard('Gameplay Conversion', 0, rq.c+'%', d.d3.conv+'%', cOk);
+  const tOk = d.d30.avgPlaySec >= rq.t, rOk = d.ret1.pct!=null && d.ret1.pct > rq.r, cOk = d.d3.conv!=null && d.d3.conv >= rq.c;
+  $('cat-req').innerHTML = rcard('Tiempo de juego', 0, fmtDur(rq.t), fmtDur(d.d30.avgPlaySec), tOk) + rcard('Retención D1', 0, rq.r+'%', retPct(d.ret1.pct), rOk) + rcard('Gameplay Conversion', 0, rq.c+'%', retPct(d.d3.conv), cOk);
   const rows = [
     ['Visitantes únicos', p=>n(p.visitors), 'd'],
     ['Jugadores (jugaron ≥1 partida)', p=>n(p.players), 'd'],

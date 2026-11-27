@@ -128,6 +128,45 @@
     });
   }
 
+
+  // Playtime of this visit (one per browser session), for Gameplay Conversion
+  // and average playtime in /stats. Counts only while a game is on
+  // (window._isPlaying) and the tab is visible and focused. The row is created
+  // on load with 0 ms, so visits that never play are counted too.
+  let _playId = null, _playMs = 0, _sentMs = -1, _lastTick = Date.now();
+  try {
+    _playId = sessionStorage.getItem('_an_playid');
+    _playMs = Number(sessionStorage.getItem('_an_playms')) || 0;
+    if (!_playId && window.crypto && crypto.randomUUID) {
+      _playId = crypto.randomUUID();
+      sessionStorage.setItem('_an_playid', _playId);
+    }
+  } catch (e) {}
+  async function reportPlay() {
+    const ms = Math.round(_playMs);
+    if (!_playId || !window.sb || ms === _sentMs) return;
+    const prev = _sentMs;
+    _sentMs = ms;
+    try {
+      const { error } = await window.sb.rpc('report_play', {
+        p_id: _playId, p_visitor: visitorId, p_platform: platform, p_device: deviceType(), p_play_ms: ms,
+      });
+      if (error) _sentMs = prev; // retried on the next tick
+    } catch (e) { _sentMs = prev; }
+  }
+  setInterval(() => {
+    const now = Date.now(), delta = Math.min(now - _lastTick, 2000);
+    _lastTick = now;
+    if (window._isPlaying && document.visibilityState === 'visible' && document.hasFocus()) {
+      _playMs += delta;
+      try { sessionStorage.setItem('_an_playms', String(Math.round(_playMs))); } catch (e) {}
+    }
+    // Send on creation, every 10s of play, right at the 1-minute mark, and
+    // whatever is left once the game stops.
+    if (_sentMs < 0 || _playMs - _sentMs >= 10000 || (_sentMs < 60000 && _playMs >= 60000) || !window._isPlaying) reportPlay();
+  }, 1000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') reportPlay(); });
+
   // 'practice' (free practice mode) | 'campaign' (Gira Mundial, chains all 4
   // modes) | 'standalone' (a single mode played outside a campaign). Read here
   // instead of received as a parameter to avoid touching flags/shapes/

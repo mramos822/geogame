@@ -346,7 +346,25 @@ Deno.serve(async (req) => {
       const dayKey = (ms: number) => Math.floor(ms / DAY);
       const todayK = dayKey(t0);
 
-      const compute = (list: typeof rows) => {
+      // Measured playtime, one row per game page visit (see report_play).
+      const { data: ps, error: psErr } = await paged(sb.from('play_sessions')
+        .select('started_at, platform, device, play_ms')
+        .gte('started_at', sinceISO).order('started_at', { ascending: true }).order('id', { ascending: true }), 1000, 100000);
+      if (psErr) return new Response(JSON.stringify({ error: String(psErr.message || psErr) }), { status: 500, headers: CORS });
+      const visitsPlayed = (ps || []).map((r: any) => ({
+        t: new Date(r.started_at).getTime(), plat: r.platform, dev: r.device === 'mobile' ? 'mobile' : 'pc', ms: r.play_ms || 0,
+      }));
+
+      const compute = (list: typeof rows, plays_: typeof visitsPlayed) => {
+        // CrazyGames definitions: conversion = share of page visits that reach
+        // 1 minute of play; playtime = average over visits that played at all.
+        const measured = (ms: number) => {
+          const v = plays_.filter((x) => x.t >= t0 - ms), played = v.filter((x) => x.ms > 0);
+          return {
+            conv: v.length ? +(v.filter((x) => x.ms >= 60000).length / v.length * 100).toFixed(2) : null,
+            avgPlaySec: played.length ? Math.round(played.reduce((a, x) => a + x.ms, 0) / played.length / 1000) : null,
+          };
+        };
         const byWho = new Map<string, typeof rows>();
         for (const r of list) { const a = byWho.get(r.who!); if (a) a.push(r); else byWho.set(r.who!, [r]); }
         const win = (ms: number) => {
@@ -355,7 +373,7 @@ Deno.serve(async (req) => {
           for (const r of list) if (r.t >= from) {
             vis.add(r.who!); if (r.type !== 'visit') { players.add(r.who!); if (r.type !== 'game') plays++; else starts++; }
           }
-          return { visitors: vis.size, players: players.size, plays, starts, conv: vis.size ? +(players.size / vis.size * 100).toFixed(2) : 0, bounce: vis.size ? Math.round((1 - players.size / vis.size) * 100) : 0 };
+          return { visitors: vis.size, players: players.size, plays, starts, ...measured(ms), bounce: vis.size ? Math.round((1 - players.size / vis.size) * 100) : 0 };
         };
         // sessions
         const sess: { start: number; len: number; plays: number; who: string }[] = [];
@@ -426,7 +444,9 @@ Deno.serve(async (req) => {
 
       // CrazyGames only: the site's own traffic would skew every number.
       const cg = rows.filter((r) => r.plat === 'crazygames');
-      const data = { all: compute(cg), pc: compute(cg.filter((r) => r.dev === 'pc')), mobile: compute(cg.filter((r) => r.dev === 'mobile')) };
+      const cgp = visitsPlayed.filter((r) => r.plat === 'crazygames');
+      const by = (dev: string) => compute(cg.filter((r) => r.dev === dev), cgp.filter((r) => r.dev === dev));
+      const data = { all: compute(cg, cgp), pc: by('pc'), mobile: by('mobile') };
       return new Response(JSON.stringify({ ok: true, generated_at: new Date().toISOString(), reset_at: resetAt, data }), { headers: CORS });
     }
 
